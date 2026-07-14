@@ -1,0 +1,26 @@
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA
+
+1) PROVA
+   Pubblica i file su GitHub Pages.
+   Login ADMIN: admin.demo / DEMO-ADMIN
+
+2) DATABASE
+   Apri il Foglio Google > Estensioni > Apps Script.
+   Incolla apps-script/Code.gs.
+   Esegui setupSeemaxDatabase.
+
+3) PUBBLICAZIONE APPS SCRIPT
+   Nuovo deployment > Applicazione Web.
+   Esegui come: Me.
+   Accesso: Chiunque.
+   Copia URL /exec.
+
+4) COLLEGAMENTO
+   Apri assets/js/config.js.
+   Imposta demoMode: false.
+   Incolla l'URL in appsScriptUrl.
+
+5) GITHUB PAGES
+   Settings > Pages > Deploy from branch > main > root.
+
+Per tutti i dettagli apri docs/GUIDA_COMPLETA.md.

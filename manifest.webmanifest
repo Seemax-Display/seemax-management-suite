@@ -1,0 +1,14 @@
+{
+  "name": "Seemax Management Suite",
+  "short_name": "Seemax Suite",
+  "description": "Gestionale commerciale e operativo Seemax Display",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0a3570",
+  "icons": [
+    { "src": "assets/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

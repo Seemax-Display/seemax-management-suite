@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a3570">
+  <meta name="description" content="Gestionale commerciale e operativo per Seemax Display.">
+  <title>Seemax Management Suite</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <div id="loginScreen" class="login-screen">
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="login-brand">
+        <div class="brand-mark" aria-hidden="true">S</div>
+        <div>
+          <span>Seemax Display</span>
+          <strong>Management Suite</strong>
+        </div>
+      </div>
+      <div class="login-copy">
+        <span class="eyebrow">Accesso riservato</span>
+        <h1 id="loginTitle">Il lavoro commerciale, in un unico spazio.</h1>
+        <p>Clienti, pratiche, prodotti, documenti e preventivi collegati al tuo Seemax Quotation Planner.</p>
+      </div>
+      <form id="loginForm" class="login-form">
+        <label>Nome utente<input id="loginUsername" autocomplete="username" placeholder="nome.cognome" required></label>
+        <label>Chiave ID<input id="loginKey" type="password" autocomplete="current-password" placeholder="Chiave agente" required></label>
+        <button class="btn primary wide" type="submit">Accedi al gestionale</button>
+      </form>
+      <div id="demoCredentials" class="demo-credentials"></div>
+      <p id="loginError" class="form-error" role="alert"></p>
+    </section>
+    <aside class="login-feature-panel" aria-label="Funzioni principali">
+      <div class="feature-orbit"><span>CRM</span><span>LED</span><span>PDF</span><span>€</span><strong>S</strong></div>
+      <div>
+        <span class="eyebrow light">Seemax for Business</span>
+        <h2>Dal primo contatto all’installazione.</h2>
+        <ul>
+          <li>Catalogo e listini centralizzati</li>
+          <li>Pratiche Grenke, IFIS e acquisto diretto</li>
+          <li>Quotation Planner professionale integrato</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div id="app" class="app-shell is-hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark small">S</div>
+        <div><span>Seemax Display</span><strong>Management Suite</strong></div>
+        <button id="closeSidebar" class="icon-btn mobile-only" aria-label="Chiudi menu">×</button>
+      </div>
+      <nav id="mainNav" class="main-nav" aria-label="Navigazione principale"></nav>
+      <div class="sidebar-footer">
+        <div class="database-state"><i id="databaseDot"></i><div><span>Database</span><strong id="databaseLabel">Modalità demo</strong></div></div>
+        <button id="logoutButton" class="btn sidebar-logout">Esci</button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <button id="openSidebar" class="icon-btn mobile-only" aria-label="Apri menu">☰</button>
+        <div class="page-heading"><span id="pageEyebrow">Seemax Management</span><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Panoramica commerciale e operativa</p></div>
+        <div class="topbar-actions">
+          <label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Cerca cliente o pratica…" aria-label="Ricerca globale"></label>
+          <button id="installAppButton" class="btn ghost is-hidden">Installa App</button>
+          <button id="quickAddButton" class="btn primary">＋ Nuova pratica</button>
+          <button id="userMenuButton" class="user-chip" aria-label="Profilo utente"><span id="userInitials">DF</span><div><strong id="userName">Utente</strong><small id="userRole">AGENTE</small></div></button>
+        </div>
+      </header>
+      <div id="connectionBanner" class="connection-banner is-hidden"></div>
+      <section id="viewContainer" class="view-container" tabindex="-1"></section>
+    </main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+  <div id="loadingLayer" class="loading-layer is-hidden" aria-live="assertive"><div class="spinner"></div><strong>Operazione in corso…</strong></div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/seed.js"></script>
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
