@@ -7,7 +7,9 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - dashboard commerciale con indicatori e pipeline;
 - gestione clienti;
 - gestione pratiche e relativi stati;
-- catalogo Ledwall con listini e promozioni;
+- catalogo Ledwall con immagini, schede tecniche, listini, promozioni e giacenze;
+- inserimento diretto di pratiche Acquisto/Noleggio/Leasing dal riepilogo S.Q.P.;
+- scarico automatico e tracciato del magazzino allo stato Accettata;
 - documenti tramite collegamenti Google Drive;
 - attività, scadenze e appuntamenti;
 - gestione agenti e ruoli ADMIN/AGENTE;
@@ -33,6 +35,8 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 4. Incolla l’URL `/exec` in `assets/js/config.js`.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
+
+Per aggiornare un'installazione già operativa dalla versione 1.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md).
 
 ## Placeholder
 

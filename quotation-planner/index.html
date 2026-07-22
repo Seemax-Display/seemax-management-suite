@@ -395,6 +395,7 @@
     .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
     .summary-box{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff}
     .summary-box h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--brand-3)}
+    .practice-type-panel{max-width:720px!important}.practice-type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:8px 0 16px}.practice-type-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:22px 14px;display:grid;gap:8px;place-items:center;cursor:pointer;color:var(--brand-3);transition:.2s ease}.practice-type-card:hover{transform:translateY(-2px);border-color:#2563eb;box-shadow:var(--shadow-soft)}.practice-type-card span{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0a3570,#2563eb);color:#fff;display:grid;place-items:center;font-weight:950;font-size:17px}.practice-type-card strong{font-size:17px}.practice-type-card small{color:var(--muted);text-align:center}
     .line{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px dashed var(--line);padding:7px 0;font-size:13px}
     .line:last-child{border-bottom:none}.line span{color:var(--muted)}.line strong{text-align:right}
     .total-box{background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;border-radius:18px;padding:16px;margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
@@ -600,6 +601,7 @@
     body.sqp-lite .ifis-head span:last-child{display:none}.lite-hidden-note{font-size:12px;color:var(--muted);line-height:1.45;margin:8px 0 0;display:none}.sqp-lite .lite-hidden-note{display:block}
     @media (max-width:1120px){.mode-mobile-action{display:flex!important;flex:1 1 100%;min-width:220px;border-radius:18px}.mode-side-actions{display:none}.sqp-mode-banner{display:none!important}.draft-mobile-panel .sqp-mode-toggle{min-height:64px}}
     @media (max-width:640px){.lite-finance-attach .checkline{font-size:13px;line-height:1.35}.sqp-lite .summary-options{gap:8px}.sqp-lite .db-status-card{padding:12px}.sqp-lite .finance-switch{align-items:stretch}.sqp-lite .finance-switch .btn{width:100%}}
+    @media (max-width:640px){.practice-type-grid{grid-template-columns:1fr}.practice-type-card{grid-template-columns:auto 1fr;justify-items:start;text-align:left}.practice-type-card small{text-align:left}}
 
     @media (max-width:1120px){
       .app{grid-template-columns:1fr}.sidebar{display:none}.mobile-tabs{display:flex}.main{padding:18px}.topbar{flex-direction:column}.status-pills{justify-content:flex-start;min-width:0}.led-layout,.grenke-shell,.ifis-shell{grid-template-columns:1fr}.span-8,.span-7,.span-6,.span-5,.span-4,.span-3{grid-column:span 12}.mini-metrics{grid-template-columns:1fr 1fr}.summary-grid,.total-box{grid-template-columns:1fr}
@@ -1287,6 +1289,7 @@
           <button class="btn soft" type="button" data-go="grenke">Modifica Grenke</button>
           <button class="btn soft" type="button" data-go="ifis">Modifica IFIS</button>
           <button class="btn success" type="button" id="btnPrint">Stampa / Salva PDF</button>
+          <button class="btn primary" type="button" id="btnInsertPractice">Inserisci Pratica</button>
         </div>
         <div class="summary-options no-print" aria-label="Opzioni stampa">
           <div class="print-option-row">
@@ -1324,6 +1327,19 @@
     <div class="draft-modal-panel" id="onlineArchiveModalPanel" role="dialog" aria-modal="true" aria-label="Archivio preventivi online"></div>
   </div>
   <div class="draft-toast hidden no-print" id="draftToast"></div>
+
+  <div class="draft-modal-layer hidden no-print" id="practiceTypeModalLayer" aria-live="polite">
+    <div class="draft-modal-dim" data-close-practice-type></div>
+    <section class="draft-modal-panel practice-type-panel" role="dialog" aria-modal="true" aria-labelledby="practiceTypeTitle">
+      <div class="draft-modal-head"><div><h3 id="practiceTypeTitle">INSERISCI PRATICA</h3><p>Scegli la tipologia commerciale da riportare nel gestionale.</p></div><button class="draft-close" type="button" data-close-practice-type aria-label="Chiudi">×</button></div>
+      <div class="practice-type-grid">
+        <button class="practice-type-card" type="button" data-practice-type="ACQUISTO"><span>€</span><strong>Acquisto</strong><small>Vendita diretta del Ledwall</small></button>
+        <button class="practice-type-card" type="button" data-practice-type="NOLEGGIO"><span>G</span><strong>Noleggio</strong><small>Pratica Grenke</small></button>
+        <button class="practice-type-card" type="button" data-practice-type="LEASING"><span>IF</span><strong>Leasing</strong><small>Pratica IFIS</small></button>
+      </div>
+      <div class="notice">Cliente, intestazione, valori, Ledwall e numero dei cabinet verranno trasferiti automaticamente.</div>
+    </section>
+  </div>
 
   <div class="calc-loading-layer hidden no-print" id="calcLoadingLayer" aria-live="polite" aria-busy="true">
     <div class="calc-loading-box" role="status">
@@ -2142,6 +2158,29 @@
       };
     }
 
+    function stockProductIdForItem(item){
+      if(!item) return '';
+      if(item.nome === 'P1.9') return 'p19-50100';
+      if(item.nome === 'P2.5') return 'p25-6464';
+      if(item.nome === 'P3') return 'p3-5757';
+      if(item.nome === 'P3.91 - 0.50x0.50' || (item.nome === 'P3.91' && Number(item.cabY) === 50)) return 'p391-5050';
+      if(item.nome === 'P3.91') return 'p391-50100';
+      if(item.nome === 'P4' && Number(item.cabX) === 64) return 'p4-6464';
+      if(item.nome === 'P4') return 'p4-9696';
+      return '';
+    }
+
+    function stockLinesForItem(item){
+      if(item && item.unified){
+        return [
+          {product_id:'p391-50100', quantita:archiveNumber(item.rectCab || 0), descrizione:'P3.91 0.50x1.00'},
+          {product_id:'p391-5050', quantita:archiveNumber(item.sqCab || 0), descrizione:'P3.91 0.50x0.50'}
+        ].filter(line => Number(line.quantita) > 0);
+      }
+      const id = stockProductIdForItem(item);
+      return id ? [{product_id:id, quantita:archiveNumber(item.totalCab || 0), descrizione:item.nome}] : [];
+    }
+
     function currentLedArchiveDetails(){
       const items = selectedLedQuotes();
       const totals = {
@@ -2172,6 +2211,10 @@
           totale_agente_originale: archiveNumber(item.prezzoAgenteTotaleOriginal || item.prezzoAgenteTotale || 0),
           totale_cliente_originale: archiveNumber(item.prezzoClienteTotaleOriginal || item.prezzoClienteTotale || 0),
           promo_attiva: item.promoAttiva ? 'SI' : 'NO',
+          unificato: item.unified ? 'SI' : 'NO',
+          cabinet_rettangolari: archiveNumber(item.rectCab || 0),
+          cabinet_quadrati: archiveNumber(item.sqCab || 0),
+          stock_lines: stockLinesForItem(item),
           costo_cina: archiveNumber(item.costoCinaBase || 0),
           provvigione: archiveNumber(item.provvigione || 0),
           installazione: archiveNumber(item.margineInstallazione || 0),
@@ -4521,9 +4564,69 @@
     // =============================
     // RIEPILOGO
     // =============================
+    function closePracticeTypeModal(){
+      const layer = $('practiceTypeModalLayer');
+      if(layer) layer.classList.add('hidden');
+    }
+
+    function openPracticeTypeModal(){
+      if(!selectedLedQuotes().length){ sqpAlert('Seleziona almeno una soluzione Ledwall prima di inserire la pratica.', {title:'Ledwall mancante'}); return; }
+      if(!agentLoggedIn()){
+        sqpAlert('Per inviare la pratica al gestionale devi prima effettuare l’Accesso Agente nel S.Q.P.', {title:'Accesso richiesto'}).then(openAgentLoginModal);
+        return;
+      }
+      const layer = $('practiceTypeModalLayer');
+      if(layer) layer.classList.remove('hidden');
+    }
+
+    function practicePayloadFromSummary(type){
+      saveActiveLedQuoteFromForm();
+      const led = currentLedArchiveDetails();
+      const total = admin ? led.totals.totale_led_cliente : led.totals.totale_led_agente;
+      return {
+        tipo_pratica:type,
+        preventivo_id:quoteNumberLabel(),
+        data_preventivo:quoteToday(),
+        agente_nome:val('agentName'),
+        cliente_azienda:val('clientCompany'),
+        cliente_referente:val('clientName'),
+        cliente_piva_cf:val('clientVat'),
+        cliente_email:val('clientEmail'),
+        cliente_telefono:val('clientPhone'),
+        cliente_localita:val('clientCity'),
+        note:val('projectNotes'),
+        valore:archiveNumber(total),
+        righe:led.items
+      };
+    }
+
+    async function createPracticeFromSummary(type){
+      if(!agentLoggedIn()){ closePracticeTypeModal(); openAgentLoginModal(); return; }
+      closePracticeTypeModal();
+      showPersistentCalcLoading('Inserimento pratica', 'Trasferimento di cliente, valori e cabinet al gestionale...');
+      try{
+        const response = await jsonpRequest('management_create_from_quote', 25000, {
+          agent_username:agentSession.username,
+          agent_key:agentSession.key,
+          payload:JSON.stringify(practicePayloadFromSummary(type))
+        });
+        if(!response || response.ok === false) throw new Error((response && response.error) || 'Inserimento non riuscito.');
+        hideCalcLoading();
+        const label = response.existing ? 'già presente' : 'creata correttamente';
+        await sqpAlert(`La pratica ${safe(response.practice.numero)} è ${label} nel gestionale.`, {title:'Pratica inserita'});
+      }catch(err){
+        hideCalcLoading();
+        await sqpAlert('Non riesco a inserire la pratica: ' + (err && err.message ? err.message : err), {title:'Inserimento non riuscito', theme:'lite'});
+      }
+    }
+
     function setupSummary(){
       const btn = $('btnPrint');
       if(btn) btn.addEventListener('click', () => { updateSummary(); waitForQuoteImagesThenPrint(); });
+      const practiceBtn = $('btnInsertPractice');
+      if(practiceBtn) practiceBtn.addEventListener('click', openPracticeTypeModal);
+      document.querySelectorAll('[data-close-practice-type]').forEach(node => node.addEventListener('click', closePracticeTypeModal));
+      document.querySelectorAll('[data-practice-type]').forEach(node => node.addEventListener('click', () => createPracticeFromSummary(node.dataset.practiceType)));
       ['printShowInstall','printShowTransfer','printShowCommission','printShowConformity'].forEach(id => {
         if($(id)) $(id).addEventListener('change', updateSummary);
       });

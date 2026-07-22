@@ -10,27 +10,29 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.0.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.1.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
   practices: "PRATICHE",
   documents: "DOCUMENTI",
   activities: "ATTIVITA",
-  users: "AGENTI"
+  users: "AGENTI",
+  movements: "MOVIMENTI_MAGAZZINO"
 };
 
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
-  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "categoria", "descrizione", "immagine_url", "scheda_url"],
+  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "aggiornatoIl"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "email", "telefono", "citta", "indirizzo", "note", "creatoIl", "agent_username", "aggiornatoIl"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "aggiornatoIl", "creatoIl"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
   ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
+  MOVIMENTI_MAGAZZINO: ["id", "data", "practiceId", "numero_pratica", "cliente", "product_id", "sku", "prodotto", "quantita", "tipo_movimento", "giacenza_prima", "giacenza_dopo", "username", "note"],
   LOG: ["data", "username", "ruolo", "azione", "entita", "record_id", "dettaglio"]
 };
 
@@ -42,10 +44,20 @@ function setupSeemaxDatabase() {
   seedSettings_();
   seedPatchNotes_();
   seedProducts_();
+  initializeInventoryV11_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
   styleSheets_();
   return "DATABASE SEEMAX configurato correttamente.";
+}
+
+function upgradeSeemaxV11() {
+  var ss = db_();
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  initializeInventoryV11_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade catalogo e magazzino v1.1");
+  styleSheets_();
+  return "SEEMAX v1.1 configurato: catalogo, pratiche S.Q.P. e magazzino attivi.";
 }
 
 function doGet(e) {
@@ -85,6 +97,7 @@ function routeGet_(action, p) {
     case "management_remove": return managementRemove_(p);
     case "management_settings": return managementSettings_(p);
     case "management_save_settings": return managementSaveSettings_(p);
+    case "management_create_from_quote": return managementCreateFromQuote_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -135,6 +148,11 @@ function managementUpsert_(p) {
   if (!payload || typeof payload !== "object") throw new Error("Dati non validi.");
   if (["clients", "practices", "documents", "activities"].indexOf(entity) >= 0) payload.agent_username = payload.agent_username || user.username;
   payload.aggiornatoIl = new Date().toISOString();
+  if (entity === "practices") {
+    var practiceRow = upsertPracticeWithInventory_(payload, user);
+    log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
+    return { ok: true, row: practiceRow };
+  }
   if (entity === "users") {
     payload.id = payload.username;
     if (!payload.chiave_id_agente) {
@@ -147,6 +165,163 @@ function managementUpsert_(p) {
   return { ok: true, row: entity === "users" ? publicUser_(row) : row };
 }
 
+function managementCreateFromQuote_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  var payload = parseJson_(p.payload, {});
+  var type = String(payload.tipo_pratica || "").toUpperCase();
+  if (["ACQUISTO", "NOLEGGIO", "LEASING"].indexOf(type) < 0) throw new Error("Scegli Acquisto, Noleggio o Leasing.");
+  var company = String(payload.cliente_azienda || payload.cliente_referente || "").trim();
+  if (!company) throw new Error("Inserisci almeno la ragione sociale o il referente cliente nel S.Q.P.");
+  var client = findClientForQuote_(payload, user);
+  var items = Array.isArray(payload.righe) ? payload.righe : [];
+  if (!items.length) throw new Error("Il preventivo non contiene Ledwall selezionati.");
+  var quoteId = String(payload.preventivo_id || "").trim();
+  if (quoteId) {
+    var existingPractice = rowsToObjects_(sheet_("PRATICHE")).filter(function (row) {
+      return String(row.preventivo_id || "") === quoteId && String(row.agent_username || "") === String(user.username);
+    })[0];
+    if (existingPractice) return { ok: true, existing: true, practice: existingPractice, client: findRowObject_("CLIENTI", "id", existingPractice.clientId) || {} };
+  }
+  var finance = type === "ACQUISTO" ? "Acquisto diretto" : (type === "NOLEGGIO" ? "Grenke" : "IFIS");
+  var number = nextPracticeNumber_();
+  var title = items.map(function (item) {
+    return String(item.prodotto || "Ledwall") + " " + String(item.misura_m || item.misura_cm || "");
+  }).join(" + ");
+  var practice = {
+    id: "PR-" + number,
+    numero: number,
+    clientId: client.id,
+    cliente: client.ragioneSociale,
+    titolo: title,
+    stato: "Preventivo",
+    finanziaria: finance,
+    tipo_pratica: type,
+    valore: Number(payload.valore || 0),
+    agente: user.nome_visualizzato || user.username,
+    agent_username: user.username,
+    prossimoPasso: type === "ACQUISTO" ? "Attendere accettazione cliente" : "Raccogliere documentazione finanziaria",
+    note: String(payload.note || ""),
+    preventivo_id: quoteId,
+    origine: "SEEMAX QUOTATION PLANNER",
+    righe_json: JSON.stringify(items),
+    magazzino_applicato: "NO",
+    creatoIl: new Date().toISOString(),
+    aggiornatoIl: new Date().toISOString()
+  };
+  practice = upsertObject_("PRATICHE", "id", practice.id, practice);
+  log_(user, "CREATE_FROM_QUOTE", "practices", practice.id, "Pratica " + type + " creata dal S.Q.P. preventivo " + practice.preventivo_id);
+  return { ok: true, practice: practice, client: client };
+}
+
+function findClientForQuote_(payload, user) {
+  var rows = rowsToObjects_(sheet_("CLIENTI"));
+  var vat = normalizeKey_(payload.cliente_piva_cf);
+  var email = normalizeKey_(payload.cliente_email);
+  var company = normalizeKey_(payload.cliente_azienda || payload.cliente_referente);
+  var found = rows.filter(function (row) {
+    if (vat && normalizeKey_(row.piva) === vat) return true;
+    if (email && normalizeKey_(row.email) === email) return true;
+    return company && normalizeKey_(row.ragioneSociale) === company;
+  })[0];
+  var record = found || { id: uid_("cli"), creatoIl: new Date().toISOString() };
+  record.ragioneSociale = String(payload.cliente_azienda || payload.cliente_referente || record.ragioneSociale || "Cliente S.Q.P.");
+  record.referente = String(payload.cliente_referente || record.referente || "");
+  record.piva = String(payload.cliente_piva_cf || record.piva || "");
+  record.email = String(payload.cliente_email || record.email || "");
+  record.telefono = String(payload.cliente_telefono || record.telefono || "");
+  record.citta = String(payload.cliente_localita || record.citta || "");
+  record.agent_username = record.agent_username || user.username;
+  record.aggiornatoIl = new Date().toISOString();
+  return upsertObject_("CLIENTI", "id", record.id, record);
+}
+
+function nextPracticeNumber_() {
+  var year = String(new Date().getFullYear()).slice(-2);
+  var nums = rowsToObjects_(sheet_("PRATICHE")).map(function (row) {
+    return parseInt(String(row.numero || "0").split("-")[0], 10) || 0;
+  });
+  var next = (nums.length ? Math.max.apply(null, nums) : 0) + 1;
+  return String(next).padStart(3, "0") + "-" + year;
+}
+
+function upsertPracticeWithInventory_(payload, user) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (!payload.id) payload.id = uid_("pra");
+    var existing = findRowObject_("PRATICHE", "id", payload.id);
+    var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
+    var nextStatus = String(payload.stato || existing && existing.stato || "Nuova");
+    var hasInventoryRows = !!String(payload.righe_json || existing && existing.righe_json || "").trim();
+    var shouldApply = nextStatus === "Accettata" && !wasApplied && hasInventoryRows;
+    var shouldReverse = ["Rifiutata", "Annullata"].indexOf(nextStatus) >= 0 && wasApplied;
+    if (wasApplied && existing && payload.righe_json && String(payload.righe_json) !== String(existing.righe_json || "") && !shouldReverse) {
+      throw new Error("La composizione Ledwall non può essere modificata dopo l'impegno di magazzino. Annulla prima la pratica.");
+    }
+    if (shouldApply) {
+      applyInventoryForPractice_(payload, user, -1, "IMPEGNO_PRATICA_ACCETTATA");
+      payload.magazzino_applicato = "SI";
+      payload.magazzino_applicato_il = new Date().toISOString();
+      payload.magazzino_stornato_il = "";
+    } else if (shouldReverse) {
+      applyInventoryForPractice_(existing || payload, user, 1, "STORNO_PRATICA");
+      payload.magazzino_applicato = "NO";
+      payload.magazzino_stornato_il = new Date().toISOString();
+    } else if (existing) {
+      payload.magazzino_applicato = existing.magazzino_applicato || "NO";
+      payload.magazzino_applicato_il = existing.magazzino_applicato_il || "";
+      payload.magazzino_stornato_il = existing.magazzino_stornato_il || "";
+    }
+    return upsertObject_("PRATICHE", "id", payload.id, payload);
+  } finally { lock.releaseLock(); }
+}
+
+function applyInventoryForPractice_(practice, user, direction, movementType) {
+  var lines = inventoryLinesFromPractice_(practice);
+  if (!lines.length) throw new Error("La pratica non contiene righe cabinet valide per il magazzino.");
+  var products = {};
+  lines.forEach(function (line) {
+    var product = findRowObject_("PRODOTTI_LED", "id", line.product_id);
+    if (!product) throw new Error("Prodotto magazzino non trovato: " + line.product_id);
+    products[line.product_id] = product;
+    var available = Number(product.giacenza_attuale || 0);
+    if (direction < 0 && available < line.quantita) throw new Error("Giacenza insufficiente per " + (product.nome || line.product_id) + ": disponibili " + available + ", richiesti " + line.quantita + ".");
+  });
+  lines.forEach(function (line) {
+    var product = products[line.product_id];
+    var before = Number(product.giacenza_attuale || 0);
+    var delta = direction * Number(line.quantita || 0);
+    var after = before + delta;
+    product.giacenza_attuale = after;
+    product.aggiornatoIl = new Date().toISOString();
+    upsertObject_("PRODOTTI_LED", "id", product.id, product);
+    var movementId = uid_("mov");
+    upsertObject_("MOVIMENTI_MAGAZZINO", "id", movementId, {
+      id: movementId, data: new Date().toISOString(), practiceId: practice.id,
+      numero_pratica: practice.numero || "", cliente: practice.cliente || "", product_id: product.id,
+      sku: product.sku || product.id, prodotto: product.nome + " " + product.cabX + "x" + product.cabY,
+      quantita: delta, tipo_movimento: movementType, giacenza_prima: before, giacenza_dopo: after,
+      username: user.username, note: "Movimento automatico da stato pratica"
+    });
+  });
+}
+
+function inventoryLinesFromPractice_(practice) {
+  var items = parseJson_(practice.righe_json, []);
+  var grouped = {};
+  items.forEach(function (item) {
+    var stock = Array.isArray(item.stock_lines) ? item.stock_lines : [];
+    stock.forEach(function (line) {
+      var id = String(line.product_id || "");
+      var qty = Number(line.quantita || 0);
+      if (id && qty > 0) grouped[id] = (grouped[id] || 0) + qty;
+    });
+  });
+  return Object.keys(grouped).map(function (id) { return { product_id: id, quantita: grouped[id] }; });
+}
+
+function normalizeKey_(value) { return String(value || "").trim().toLowerCase().replace(/\s+/g, " "); }
+
 function managementRemove_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var entity = String(p.entity || "");
@@ -154,6 +329,10 @@ function managementRemove_(p) {
   var id = String(p.id || "");
   if (!id) throw new Error("ID mancante.");
   if (entity === "users" && id === user.username) throw new Error("Non puoi eliminare l'account attualmente collegato.");
+  if (entity === "practices") {
+    var practice = findRowObject_("PRATICHE", "id", id);
+    if (practice && String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") throw new Error("Prima di eliminare la pratica, impostala come Annullata per ripristinare le giacenze.");
+  }
   var removed = removeEntity_(entity, id, user);
   log_(user, "DELETE", entity, id, "Eliminazione da Management Suite");
   return { ok: removed };
@@ -177,6 +356,7 @@ function listEntity_(entity, user) {
   var sheetName = ENTITY_SHEETS[entity];
   if (!sheetName) throw new Error("Entità non supportata: " + entity);
   if (entity === "users" && !isAdmin_(user)) return [publicUser_(user)];
+  if (entity === "movements" && !isAdmin_(user)) return [];
   var rows = rowsToObjects_(sheet_(sheetName));
   if (!isAdmin_(user) && ["practices", "documents", "activities"].indexOf(entity) >= 0) {
     rows = rows.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
@@ -215,7 +395,7 @@ function dashboard_(data) {
   var practices = data.practices || [];
   var activities = data.activities || [];
   var open = practices.filter(function (p) { return ["Chiusa", "Rifiutata"].indexOf(String(p.stato)) < 0; });
-  var statuses = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Contratto", "Installazione", "Chiusa"];
+  var statuses = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Accettata", "Contratto", "Installazione", "Chiusa"];
   var pipeline = statuses.map(function (status) {
     var rows = practices.filter(function (p) { return String(p.stato) === status; });
     return { status: status, count: rows.length, value: rows.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0) };
@@ -425,7 +605,7 @@ function publicUser_(user) {
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
 
 function assertWritePermission_(entity, user) {
-  if (["products", "users"].indexOf(entity) >= 0 && !isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
+  if (["products", "users", "movements"].indexOf(entity) >= 0 && !isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
   if (!ENTITY_SHEETS[entity]) throw new Error("Entità non supportata.");
 }
 
@@ -492,14 +672,39 @@ function seedProducts_() {
   var sheet = sheet_("PRODOTTI_LED");
   if (rowsToObjects_(sheet).length) return;
   var products = [
-    { id: "p19-50100", nome: "P1.9", categoria: "Ledwall Outdoor", cabX: 50, cabY: 100, prezzoAgente: 850, prezzoCliente: 950, prezzoCina: 560, attivo: "SI" },
-    { id: "p25-6464", nome: "P2.5", categoria: "Ledwall Outdoor", cabX: 64, cabY: 64, prezzoAgente: 700, prezzoCliente: 890, prezzoCina: 450, attivo: "SI" },
-    { id: "p3-5757", nome: "P3", categoria: "Ledwall Outdoor", cabX: 57, cabY: 57, prezzoAgente: 410, prezzoCliente: 550, prezzoCina: 250, attivo: "SI" },
-    { id: "p391-50100", nome: "P3.91", categoria: "Ledwall Outdoor", cabX: 50, cabY: 100, prezzoAgente: 550, prezzoCliente: 650, prezzoCina: 280, attivo: "SI" },
-    { id: "p391-5050", nome: "P3.91", categoria: "Ledwall Outdoor", cabX: 50, cabY: 50, prezzoAgente: 295, prezzoCliente: 335, prezzoCina: 150, attivo: "SI" },
-    { id: "p4-9696", nome: "P4", categoria: "Ledwall Outdoor", cabX: 96, cabY: 96, prezzoAgente: 860, prezzoCliente: 1080, prezzoCina: 580, attivo: "SI" }
+    { id: "p19-50100", sku: "SMX-P19-50100", nome: "P1.9", categoria: "Ledwall Indoor", cabX: 50, cabY: 100, prezzoAgente: 850, prezzoCliente: 950, prezzoCina: 560, attivo: "SI", immagine_url: "assets/catalog/p19.png" },
+    { id: "p25-6464", sku: "SMX-P25-6464", nome: "P2.5", categoria: "Ledwall Indoor/Outdoor", cabX: 64, cabY: 64, prezzoAgente: 700, prezzoCliente: 890, prezzoCina: 450, attivo: "SI", immagine_url: "assets/catalog/p25.png" },
+    { id: "p3-5757", sku: "SMX-P3-5757", nome: "P3", categoria: "Ledwall Indoor/Outdoor", cabX: 57, cabY: 57, prezzoAgente: 410, prezzoCliente: 550, prezzoCina: 250, attivo: "SI", immagine_url: "assets/catalog/p3.jpg" },
+    { id: "p391-50100", sku: "SMX-P391-50100", nome: "P3.91", categoria: "Ledwall Indoor/Outdoor", cabX: 50, cabY: 100, prezzoAgente: 550, prezzoCliente: 650, prezzoCina: 280, attivo: "SI", immagine_url: "assets/catalog/p391-50100.png" },
+    { id: "p391-5050", sku: "SMX-P391-5050", nome: "P3.91 - 0.50x0.50", categoria: "Ledwall Indoor/Outdoor", cabX: 50, cabY: 50, prezzoAgente: 295, prezzoCliente: 335, prezzoCina: 150, attivo: "SI", immagine_url: "assets/catalog/p391-5050.jpg" },
+    { id: "p4-9696", sku: "SMX-P4-9696", nome: "P4", categoria: "Ledwall Outdoor", cabX: 96, cabY: 96, prezzoAgente: 860, prezzoCliente: 1080, prezzoCina: 580, attivo: "SI", immagine_url: "assets/catalog/p4-9696.jpg" }
   ];
   products.forEach(function (product) { upsertObject_("PRODOTTI_LED", "id", product.id, product); });
+}
+
+function initializeInventoryV11_() {
+  var defaults = [
+    { id: "p19-50100", sku: "SMX-P19-50100", nome: "P1.9", cabX: 50, cabY: 100, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "SOLO SU ORDINAZIONE", promo_attiva: "NO", immagine_url: "assets/catalog/p19.png", descrizione: "Ledwall indoor ad alta definizione.", infoAgenti: "Ledwall Display P1.9 | Misura Cabinet: 0.50x1.00 | Qualità elevata da medie e lunghe distanze; ottimo a distanze ravvicinate | Utilizzabile solo per installazioni indoor", infoAdmin: "Ledwall Display P1.9 | 0.50x1.00 | Indoor | Costo Cina: 560 euro (incluso 30% spedizione)" },
+    { id: "p25-6464", sku: "SMX-P25-6464", nome: "P2.5", cabX: 64, cabY: 64, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "IN ARRIVO", promo_attiva: "NO", immagine_url: "assets/catalog/p25.png", descrizione: "Ledwall indoor/outdoor, formato 0.64x0.64.", infoAgenti: "Ledwall Display P2.5 | Misura Cabinet: 0.64x0.64 | Qualità eccellente da medie e lunghe distanze; buono a distanze ravvicinate | Utilizzabile indoor e outdoor | Adatto per vetrina o installazioni totem", infoAdmin: "Ledwall Display P2.5 | 0.64x0.64 | Indoor/Outdoor | Costo Cina: 450 euro (incluso 30% spedizione)" },
+    { id: "p3-5757", sku: "SMX-P3-5757", nome: "P3", cabX: 57, cabY: 57, giacenza_iniziale: 60, giacenza_attuale: 60, stato_giacenza: "DISPONIBILE", promo_attiva: "SI", immagine_url: "assets/catalog/p3.jpg", descrizione: "Ledwall indoor/outdoor, formato 0.57x0.57.", infoAgenti: "Ledwall Display P3 | Misura Cabinet: 0.57x0.57 | Qualità eccellente da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3 | 0.57x0.57 | Indoor/Outdoor | Costo Cina: 250 euro" },
+    { id: "p391-50100", sku: "SMX-P391-50100", nome: "P3.91", cabX: 50, cabY: 100, giacenza_iniziale: 56, giacenza_attuale: 56, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p391-50100.png", descrizione: "Ledwall indoor/outdoor, cabinet rettangolare.", infoAgenti: "Ledwall Display P3.91 | Misura Cabinet: 0.50x1.00 | Qualità ottima da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3.91 | 0.50x1.00 | Indoor/Outdoor | Costo Cina: 280 euro" },
+    { id: "p391-5050", sku: "SMX-P391-5050", nome: "P3.91 - 0.50x0.50", cabX: 50, cabY: 50, giacenza_iniziale: 64, giacenza_attuale: 64, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p391-5050.jpg", descrizione: "Ledwall indoor/outdoor, cabinet quadrato.", infoAgenti: "Ledwall Display P3.91 | Misura Cabinet: 0.50x0.50 | Qualità ottima da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3.91 | 0.50x0.50 | Indoor/Outdoor | Costo Cina: 150 euro" },
+    { id: "p4-9696", sku: "SMX-P4-9696", nome: "P4", cabX: 96, cabY: 96, giacenza_iniziale: 8, giacenza_attuale: 8, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p4-9696.jpg", descrizione: "Ledwall outdoor, formato 0.96x0.96.", infoAgenti: "Ledwall Display P4 | Misura Cabinet: 0.96x0.96 | Qualità buona da medie e lunghe distanze | Utilizzabile prevalentemente outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P4 | 0.96x0.96 | Outdoor | Costo Cina: 580 euro" },
+    { id: "p4-6464", sku: "SMX-P4-6464", nome: "P4 - 0.64x0.64", cabX: 64, cabY: 64, giacenza_iniziale: 4, giacenza_attuale: 4, stato_giacenza: "DISPONIBILE", promo_attiva: "SI", attivo: "SI", categoria: "Ledwall Outdoor", descrizione: "Prodotto catalogo: prezzo promozionale da completare.", immagine_url: "assets/catalog/p4-9696.jpg" }
+  ];
+  defaults.forEach(function (entry) {
+    var row = findRowObject_("PRODOTTI_LED", "id", entry.id);
+    if (!row) {
+      var matches = rowsToObjects_(sheet_("PRODOTTI_LED")).filter(function (candidate) {
+        return String(candidate.nome) === String(entry.nome) && Number(candidate.cabX) === Number(entry.cabX) && Number(candidate.cabY) === Number(entry.cabY);
+      });
+      row = matches[0] || { id: entry.id, nome: entry.nome, cabX: entry.cabX, cabY: entry.cabY, attivo: "SI" };
+    }
+    Object.keys(entry).forEach(function (key) {
+      if (row[key] === undefined || row[key] === "") row[key] = entry[key];
+    });
+    upsertObject_("PRODOTTI_LED", "id", row.id || entry.id, row);
+  });
 }
 
 function seedPlaceholderAdmin_() {

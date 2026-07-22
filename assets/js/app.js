@@ -31,7 +31,7 @@
     settings: ["Impostazioni", "Configurazione generale del gestionale"]
   };
 
-  const STATUSES = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Contratto", "Installazione", "Chiusa", "Rifiutata"];
+  const STATUSES = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Accettata", "Contratto", "Installazione", "Chiusa", "Rifiutata", "Annullata"];
   const FINANCE = ["Da definire", "Grenke", "IFIS", "Acquisto diretto", "Altro"];
   const ENTITY_LABELS = { practices: "pratica", clients: "cliente", products: "prodotto", documents: "documento", activities: "attività", users: "agente" };
 
@@ -244,7 +244,11 @@
     return `${viewToolbar("Nuovo prodotto", api.isAdmin() ? "new-product" : "", `<p class="toolbar-note">Listino ${api.isAdmin() ? "amministrativo" : "agente"} · ${rows.length} configurazioni</p>`)}<div class="product-grid">${rows.map((p) => {
       const promo = Number(p.prezzoPromoAgenti || 0);
       const price = promo || Number(p.prezzoAgente || 0);
-      return `<article class="product-card"><div class="product-visual"><div class="pixel-pattern"></div><span>${esc(p.nome)}</span>${promo ? `<em>PROMO</em>` : ""}</div><div class="product-body"><div class="product-title"><div><span>${esc(p.categoria || "Ledwall")}</span><h3>${esc(p.nome)} · ${p.cabX}×${p.cabY} cm</h3></div>${badge(p.attivo === "SI" ? "Attivo" : "Non attivo")}</div><p>${esc(p.descrizione || "Descrizione prodotto da completare.")}</p><div class="price-grid"><div><small>Prezzo agente</small><strong>${euros(price)}</strong>${promo ? `<del>${euros(p.prezzoAgente)}</del>` : ""}</div>${api.isAdmin() ? `<div><small>Prezzo cliente</small><strong>${euros(p.prezzoPromoClienti || p.prezzoCliente)}</strong></div><div><small>Costo base</small><strong>${euros(p.prezzoCina)}</strong></div>` : ""}</div><div class="card-actions"><button class="btn soft" data-route="planner">Usa nel Planner</button>${api.isAdmin() ? `<button class="btn ghost" data-action="edit-product" data-id="${esc(p.id)}">Modifica</button>` : ""}</div></div></article>`;
+      const promoActive = promo || String(p.promo_attiva || "NO").toUpperCase() === "SI";
+      const stock = Number(p.giacenza_attuale || 0);
+      const stockLabel = p.stato_giacenza || (stock > 0 ? "DISPONIBILE" : "NON DISPONIBILE");
+      const image = p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}" loading="lazy">` : `<div class="pixel-pattern"></div>`;
+      return `<article class="product-card"><div class="product-visual">${image}<span>${esc(p.nome)}</span>${promoActive ? `<em>PROMO</em>` : ""}</div><div class="product-body"><div class="product-title"><div><span>${esc(p.categoria || "Ledwall")}</span><h3>${esc(p.nome)} · ${p.cabX}×${p.cabY} cm</h3></div>${badge(p.attivo === "SI" ? "Attivo" : "Non attivo")}</div><div class="stock-summary"><div><small>${esc(stockLabel)}</small><strong>${stock} pz</strong></div><span>${esc(p.sku || p.id || "")}</span></div><p>${esc(p.descrizione || p.infoAgenti || "Scheda tecnica disponibile nel Quotation Planner.")}</p><div class="price-grid"><div><small>Prezzo agente</small><strong>${price ? euros(price) : "Da definire"}</strong>${promo ? `<del>${euros(p.prezzoAgente)}</del>` : ""}</div>${api.isAdmin() ? `<div><small>Prezzo cliente</small><strong>${Number(p.prezzoPromoClienti || p.prezzoCliente || 0) ? euros(p.prezzoPromoClienti || p.prezzoCliente) : "Da definire"}</strong></div><div><small>Costo base</small><strong>${Number(p.prezzoCina || 0) ? euros(p.prezzoCina) : "—"}</strong></div>` : ""}</div><div class="card-actions"><button class="btn soft" data-action="product-tech" data-id="${esc(p.id)}">Scheda tecnica</button><button class="btn ghost" data-route="planner">Usa nel Planner</button>${api.isAdmin() ? `<button class="btn ghost" data-action="edit-product" data-id="${esc(p.id)}">Modifica</button>` : ""}</div></div></article>`;
     }).join("")}</div>`;
   }
 
@@ -313,7 +317,10 @@
       field("Oggetto della pratica", "titolo", record.titolo || "", { required: true, full: true }) +
       field("Stato", "stato", record.stato || "Nuova", { options: STATUSES }) + field("Finanziaria", "finanziaria", record.finanziaria || "Da definire", { options: FINANCE }) +
       field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) + field("Scadenza / richiamo", "scadenza", record.scadenza || "", { type: "date" }) +
-      field("Prossimo passo", "prossimoPasso", record.prossimoPasso || "", { full: true }) + field("Note", "note", record.note || "", { type: "textarea", full: true });
+      field("Prossimo passo", "prossimoPasso", record.prossimoPasso || "", { full: true }) +
+      (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
+      (record.righe_json ? field("Composizione Ledwall / cabinet", "righe_json", record.righe_json, { type: "textarea", readonly: true, full: true }) : "") +
+      field("Note", "note", record.note || "", { type: "textarea", full: true });
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
   }
 
@@ -325,8 +332,18 @@
 
   function openProduct(id) {
     const r = state.data.products.find((p) => p.id === id) || { attivo: "SI", categoria: "Ledwall Outdoor" };
-    const fields = field("Nome / Pixel Pitch", "nome", r.nome, { required: true }) + field("Categoria", "categoria", r.categoria) + field("Larghezza cabinet (cm)", "cabX", r.cabX || 50, { type: "number" }) + field("Altezza cabinet (cm)", "cabY", r.cabY || 50, { type: "number" }) + field("Prezzo agente", "prezzoAgente", r.prezzoAgente || 0, { type: "number", step: "0.01" }) + field("Prezzo cliente", "prezzoCliente", r.prezzoCliente || 0, { type: "number", step: "0.01" }) + field("Costo base", "prezzoCina", r.prezzoCina || 0, { type: "number", step: "0.01" }) + field("Promo agente", "prezzoPromoAgenti", r.prezzoPromoAgenti || "", { type: "number", step: "0.01" }) + field("Promo cliente", "prezzoPromoClienti", r.prezzoPromoClienti || "", { type: "number", step: "0.01" }) + field("Stato", "attivo", r.attivo, { options: ["SI", "NO"] }) + field("Descrizione", "descrizione", r.descrizione, { type: "textarea", full: true });
+    const fields = field("Nome / Pixel Pitch", "nome", r.nome, { required: true }) + field("SKU", "sku", r.sku) + field("Categoria", "categoria", r.categoria) + field("Larghezza cabinet (cm)", "cabX", r.cabX || 50, { type: "number" }) + field("Altezza cabinet (cm)", "cabY", r.cabY || 50, { type: "number" }) + field("Prezzo agente", "prezzoAgente", r.prezzoAgente || 0, { type: "number", step: "0.01" }) + field("Prezzo cliente", "prezzoCliente", r.prezzoCliente || 0, { type: "number", step: "0.01" }) + field("Costo base", "prezzoCina", r.prezzoCina || 0, { type: "number", step: "0.01" }) + field("Promo agente", "prezzoPromoAgenti", r.prezzoPromoAgenti || "", { type: "number", step: "0.01" }) + field("Promo cliente", "prezzoPromoClienti", r.prezzoPromoClienti || "", { type: "number", step: "0.01" }) + field("Giacenza attuale", "giacenza_attuale", r.giacenza_attuale || 0, { type: "number", min: 0 }) + field("Stato giacenza", "stato_giacenza", r.stato_giacenza || "DISPONIBILE", { options: ["DISPONIBILE", "IN ARRIVO", "SOLO SU ORDINAZIONE", "NON DISPONIBILE"] }) + field("Promo attiva", "promo_attiva", r.promo_attiva || "NO", { options: ["SI", "NO"] }) + field("Stato", "attivo", r.attivo, { options: ["SI", "NO"] }) + field("Descrizione", "descrizione", r.descrizione, { type: "textarea", full: true });
     openModal(r.id ? "Modifica prodotto" : "Nuovo prodotto", formShell("products", r.id, fields), { wide: true, kicker: "Catalogo Ledwall" });
+  }
+
+  function openProductTech(id) {
+    const p = state.data.products.find((product) => product.id === id);
+    if (!p) return;
+    const details = String(api.isAdmin() ? (p.infoAdmin || p.infoAgenti || p.descrizione || "") : (p.infoAgenti || p.descrizione || ""))
+      .split("|").map((line) => line.trim()).filter(Boolean);
+    const stock = Number(p.giacenza_attuale || 0);
+    const body = `<div class="tech-sheet"><div class="tech-sheet-image">${p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}">` : `<div class="pixel-pattern"></div>`}</div><div><span class="section-kicker">${esc(p.sku || p.id || "Ledwall")}</span><h3>${esc(p.nome)} · ${esc(p.cabX)}×${esc(p.cabY)} cm</h3><ul>${details.length ? details.map((line) => `<li>${esc(line)}</li>`).join("") : `<li>Scheda tecnica da completare.</li>`}</ul><div class="stock-summary"><div><small>${esc(p.stato_giacenza || (stock ? "DISPONIBILE" : "NON DISPONIBILE"))}</small><strong>${stock} pz</strong></div><span>${String(p.promo_attiva || "NO").toUpperCase() === "SI" ? "PROMO ATTIVA" : "LISTINO ORDINARIO"}</span></div></div></div>`;
+    openModal(`Scheda tecnica ${p.nome}`, body, { wide: true, kicker: "Catalogo Seemax" });
   }
 
   function openDocument(id) {
@@ -416,7 +433,7 @@
     const handlers = {
       "new-practice": () => openPractice(), "edit-practice": () => openPractice(id), "delete-practice": () => removeEntity("practices", id),
       "new-client": () => openClient(), "edit-client": () => openClient(id), "delete-client": () => removeEntity("clients", id), "new-practice-client": () => openPractice(null, id),
-      "new-product": () => openProduct(), "edit-product": () => openProduct(id), "delete-product": () => removeEntity("products", id),
+      "new-product": () => openProduct(), "edit-product": () => openProduct(id), "product-tech": () => openProductTech(id), "delete-product": () => removeEntity("products", id),
       "new-document": () => openDocument(), "edit-document": () => openDocument(id), "delete-document": () => removeEntity("documents", id),
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),

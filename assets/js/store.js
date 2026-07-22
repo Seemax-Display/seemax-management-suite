@@ -85,7 +85,7 @@
     const open = db.practices.filter((p) => !["Chiusa", "Rifiutata"].includes(p.stato));
     const value = open.reduce((sum, p) => sum + Number(p.valore || 0), 0);
     const due = db.activities.filter((a) => a.stato !== "Completata");
-    const pipeline = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Contratto", "Installazione", "Chiusa"].map((status) => ({
+    const pipeline = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Accettata", "Contratto", "Installazione", "Chiusa"].map((status) => ({
       status,
       count: db.practices.filter((p) => p.stato === status).length,
       value: db.practices.filter((p) => p.stato === status).reduce((sum, p) => sum + Number(p.valore || 0), 0)
