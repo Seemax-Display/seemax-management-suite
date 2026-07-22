@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.1
+# Aggiornamento Seemax Management Suite 1.2
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -29,7 +29,7 @@ Attendi uno o due minuti, poi apri la pagina GitHub Pages con un aggiornamento f
 5. Nel selettore delle funzioni scegli `upgradeSeemaxV11` e premi **Esegui** una sola volta.
 6. Accetta le autorizzazioni Google, se richieste.
 
-La funzione aggiorna le colonne senza cancellare clienti, agenti o pratiche e crea il foglio `MOVIMENTI_MAGAZZINO`.
+La funzione aggiorna le colonne senza cancellare clienti, agenti o pratiche, crea il foglio `MOVIMENTI_MAGAZZINO`, consolida gli eventuali duplicati P3.91 e completa le pratiche S.Q.P. già registrate con modello, misura e cabinet da sottrarre.
 
 ## 3. Pubblicare la nuova Web App
 
@@ -52,6 +52,8 @@ La funzione aggiorna le colonne senza cancellare clienti, agenti o pratiche e cr
 
 Per uno schermo unificato controlla entrambe le righe P3.91: il gestionale sottrae separatamente i cabinet 0.50×1.00 e 0.50×0.50.
 
+Nel Quotation Planner ogni soluzione mostra inoltre cabinet disponibili e richiesti. Una giacenza insufficiente genera un avviso, ma non impedisce di terminare o inviare il preventivo.
+
 ## Regole di magazzino
 
 - Lo scarico avviene esclusivamente al passaggio a **Accettata**.
@@ -64,4 +66,3 @@ Per uno schermo unificato controlla entrambe le righe P3.91: il gestionale sottr
 ## Dato ancora da completare
 
 Per **P4 0.64×0.64** le immagini ricevute mostrano 4 pezzi e una promozione attiva, ma non mostrano il prezzo. Il prodotto viene quindi creato con giacenza 4 e prezzo da definire. Inserisci il prezzo reale dalla sezione Catalogo come amministratore oppure direttamente nel foglio `PRODOTTI_LED`.
-

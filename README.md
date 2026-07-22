@@ -36,7 +36,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa dalla versione 1.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md).
+Per aggiornare un'installazione già operativa alla versione 1.2 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura corregge anche gli ID prodotto e gli eventuali duplicati P3.91 creati dalla versione precedente.
 
 ## Placeholder
 

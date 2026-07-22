@@ -1884,6 +1884,10 @@
         model.infoAdmin = dbText(row.infoAdmin, model.infoAdmin);
         model.infoAgenti = dbText(row.infoAgenti, model.infoAgenti);
         model.icon = dbText(row.icon, model.icon || '🖥️');
+        model.productId = dbText(row.id, stockProductIdForItem(model));
+        model.sku = dbText(row.sku, '');
+        model.giacenzaAttuale = Math.max(0, dbNumber(row.giacenza_attuale, 0));
+        model.statoGiacenza = dbText(row.stato_giacenza, model.giacenzaAttuale > 0 ? 'DISPONIBILE' : 'NON DISPONIBILE');
         model.prezzo = model.prezzoAgente;
         model.info = admin ? model.infoAdmin : model.infoAgenti;
         merged.push(model);
@@ -2181,6 +2185,25 @@
       return id ? [{product_id:id, quantita:archiveNumber(item.totalCab || 0), descrizione:item.nome}] : [];
     }
 
+    function stockAvailabilityForResult(item){
+      if(!item) return [];
+      if(item.unified){
+        return [
+          {label:'P3.91 0.50x1.00', richiesti:Number(item.rectCab || 0), disponibili:Number(item.rectStock || 0)},
+          {label:'P3.91 0.50x0.50', richiesti:Number(item.sqCab || 0), disponibili:Number(item.sqStock || 0)}
+        ];
+      }
+      return [{label:item.nome, richiesti:Number(item.totalCab || 0), disponibili:Number(item.giacenzaAttuale || 0)}];
+    }
+
+    function stockWarningHtml(item){
+      const lines = stockAvailabilityForResult(item);
+      const shortage = lines.filter(line => line.richiesti > line.disponibili);
+      const summary = lines.map(line => `${safe(line.label)}: <strong>${line.disponibili}</strong> disponibili / ${line.richiesti} richiesti`).join('<br>');
+      if(shortage.length) return `<div class="notice warn stock-warning"><strong>⚠️ Giacenza insufficiente.</strong><br>${summary}<br><small>Puoi comunque continuare e realizzare il preventivo.</small></div>`;
+      return `<div class="notice success stock-warning"><strong>✓ Giacenza disponibile.</strong><br>${summary}</div>`;
+    }
+
     function currentLedArchiveDetails(){
       const items = selectedLedQuotes();
       const totals = {
@@ -2198,8 +2221,10 @@
         const row = {
           numero: idx + 1,
           prodotto: archiveText(item.nome),
+          modello_display: item.unified ? 'P3.91 UNIFICATO' : archiveText(item.nome),
           misura_cm: archiveNumber(item.displayWidth) + 'x' + archiveNumber(item.displayHeight),
           misura_m: (archiveNumber(item.displayWidth / 100) + 'x' + archiveNumber(item.displayHeight / 100)).replace('.', ','),
+          misura_display: archiveNumber(item.displayWidth / 100) + 'x' + archiveNumber(item.displayHeight / 100),
           bifacciale: item.bifacciale ? 'SI' : 'NO',
           cabinet: archiveNumber(item.totalCab),
           cabinet_layout: item.unified ? ('Rettangolari ' + archiveNumber(item.rectCab || 0) + ' + quadrati ' + archiveNumber(item.sqCab || 0)) : (archiveNumber(item.colsNeeded) + 'x' + archiveNumber(item.rowsNeeded)),
@@ -2215,6 +2240,7 @@
           cabinet_rettangolari: archiveNumber(item.rectCab || 0),
           cabinet_quadrati: archiveNumber(item.sqCab || 0),
           stock_lines: stockLinesForItem(item),
+          cabinet_da_sottrarre: item.unified ? ('P3.91 0.50x1.00: ' + archiveNumber(item.rectCab || 0) + ' | P3.91 0.50x0.50: ' + archiveNumber(item.sqCab || 0)) : archiveNumber(item.totalCab || 0),
           costo_cina: archiveNumber(item.costoCinaBase || 0),
           provvigione: archiveNumber(item.provvigione || 0),
           installazione: archiveNumber(item.margineInstallazione || 0),
@@ -3510,6 +3536,10 @@
       } else if(perfectMatches.length === 0){
         alertHtml = `<div class="notice warn">Per questa misura ti consigliamo un <strong>${safe(bestMatch.nome)}</strong> con misure realizzabili ${bestMatch.displayWidth} × ${bestMatch.displayHeight} cm.</div>`;
       }
+      const insufficient = state.ledResults.filter(result => stockAvailabilityForResult(result).some(line => line.richiesti > line.disponibili));
+      if(insufficient.length){
+        alertHtml += `<div class="notice warn" style="margin-top:8px"><strong>⚠️ Disponibilità di magazzino:</strong> ${insufficient.length === state.ledResults.length ? 'nessuna delle soluzioni visualizzate dispone attualmente di tutti i cabinet richiesti.' : insufficient.length + ' soluzione/i superano la giacenza disponibile.'} Il preventivo resta comunque realizzabile.</div>`;
+      }
       $('ledAlert').innerHTML = alertHtml;
       saveActiveLedQuoteFromForm();
       renderLedwall();
@@ -3637,6 +3667,7 @@
       const extraInstall = Math.round(baseInstall * installMultiplier);
       return {
         nome:'P3.91 Unificato', icon:'🧩', cabX:50, cabY:100, info:PRODUCT_DESCRIPTIONS['P3.91 Unificato'], unified:true,
+        rectStock:Number(rectModel.giacenzaAttuale || 0), sqStock:Number(sqModel.giacenzaAttuale || 0),
         colsNeeded:colsU, rowsNeeded:rectRowsU + sqRowsU, totalCab:rectCab + sqCab,
         rectCab, sqCab, rectCabBase, sqCabBase, rectRows:rectRowsU, squareRows:sqRowsU,
         displayWidth:base, displayHeight:altezza, areaMq,
@@ -3742,6 +3773,7 @@
         <div class="pm"><span>Margine cliente</span><strong>${fmtEuro0(r.margineCliente)}</strong></div>
         <div class="pm"><span>Costo Cina</span><strong>${fmtEuro0(r.costoCinaBase)}</strong></div>` : '';
       const unifiedText = r.unified ? `<div class="notice success" style="margin:8px 0 11px">Cabinet 0.50x1.00: <strong>${r.rectCab}</strong> · Cabinet 0.50x0.50: <strong>${r.sqCab}</strong></div>` : '';
+      const stockText = stockWarningHtml(r);
       const autonomaText = r.installAutonoma ? `<div class="autonoma-warning"><strong>Installazione autonoma:</strong> valore inserito manualmente. Base manuale ${fmtEuro0(r.installManualValue)} · valore applicato ${fmtEuro0(r.margineInstallazione)}.</div>` : '';
       return `
         <article class="product-card ${selected ? 'selected' : ''} ${r.unified ? 'unified' : ''} ${promoVisible ? 'has-promo' : ''}">
@@ -3753,6 +3785,7 @@
           <div class="prod-spec">${r.unified ? 'Cabinet misti P3.91' : `Cabinet ${r.cabX} × ${r.cabY} cm`}${r.bifacciale ? ' · Bifacciale' : ''}</div>
           <p class="prod-desc">${safe(PRODUCT_DESCRIPTIONS[r.nome] || r.info || '')}</p>
           ${unifiedText}
+          ${stockText}
           ${autonomaText}
           <div class="product-metrics">
             <div class="pm"><span>Numero cabinet</span><strong>${r.totalCab.toLocaleString('it-IT')}</strong></div>

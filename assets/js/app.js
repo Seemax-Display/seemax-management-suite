@@ -34,6 +34,12 @@
   const STATUSES = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Accettata", "Contratto", "Installazione", "Chiusa", "Rifiutata", "Annullata"];
   const FINANCE = ["Da definire", "Grenke", "IFIS", "Acquisto diretto", "Altro"];
   const ENTITY_LABELS = { practices: "pratica", clients: "cliente", products: "prodotto", documents: "documento", activities: "attività", users: "agente" };
+  const TECH_SPECS = {
+    "P2.5": ["Pixel pitch: 2.5", "Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 160.000 pixel/m²", "LED: SMD1415", "Cabinet: Alluminio Rental", "Dimensioni cabinet: 0.64×0.64 m", "Peso cabinet: 4 kg / 6,3 kg", "Scala di grigi: 16384", "Temperatura: da -20° a +60°", "Protezione: IP65", "Consumo medio: 350 W/m²", "Consumo massimo: 700 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 2,5 m", "Luminosità: 4500–5000 cd/m²", "Refresh: 1920–3840 Hz"],
+    "P3": ["Pixel pitch: 3", "Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 110.592 pixel/m²", "LED: SMD1921", "Cabinet: Alluminio Rental", "Dimensioni cabinet: 0.57×0.57 m", "Peso cabinet: 9,5 kg", "Scala di grigi: 16384", "Temperatura: da -20° a +60°", "Protezione: IP65", "Consumo medio: 300 W/m²", "Consumo massimo: 700 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 3 m", "Luminosità: 5000–5500 cd/m²", "Refresh: 1920–3840 Hz"],
+    "P3.91": ["Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 65.536 pixel/m²", "LED: SMD1921", "Cabinet: Alluminio Rental", "Peso cabinet: 4 kg / 6,3 kg", "Scala di grigi: 16", "Temperatura: da -10° a +45°", "Protezione: IP65", "Consumo medio: 230 W/m²", "Consumo massimo: 800 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 3–4 m", "Luminosità: 4000–6000 cd/m²", "Refresh: 1920–3840 Hz"],
+    "P4": ["Pixel pitch: 4", "Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 62.500 pixel/m²", "LED: SMD1921", "Cabinet: Alluminio Rental", "Dimensioni cabinet: 0.96×0.96 m", "Peso cabinet: 9 kg / 11 kg", "Scala di grigi: 16", "Temperatura: da -20° a +60°", "Protezione: IP65", "Consumo medio: 280 W/m²", "Consumo massimo: 800 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 4 m", "Luminosità: 4500–5000 cd/m²", "Refresh: 1920–3840 Hz"]
+  };
 
   function esc(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -319,7 +325,11 @@
       field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) + field("Scadenza / richiamo", "scadenza", record.scadenza || "", { type: "date" }) +
       field("Prossimo passo", "prossimoPasso", record.prossimoPasso || "", { full: true }) +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
-      (record.righe_json ? field("Composizione Ledwall / cabinet", "righe_json", record.righe_json, { type: "textarea", readonly: true, full: true }) : "") +
+      (record.modelli_display ? field("Modello display", "modelli_display", record.modelli_display, { readonly: true }) : "") +
+      (record.misure_display ? field("Misura preventivata", "misure_display", record.misure_display, { readonly: true }) : "") +
+      (record.cabinet_da_sottrarre ? field("Cabinet da sottrarre", "cabinet_da_sottrarre", record.cabinet_da_sottrarre, { readonly: true, full: true }) : "") +
+      (record.righe_magazzino_json ? field("Righe magazzino", "righe_magazzino_json", record.righe_magazzino_json, { type: "textarea", readonly: true, full: true }) : "") +
+      (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
       field("Note", "note", record.note || "", { type: "textarea", full: true });
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
   }
@@ -339,10 +349,11 @@
   function openProductTech(id) {
     const p = state.data.products.find((product) => product.id === id);
     if (!p) return;
-    const details = String(api.isAdmin() ? (p.infoAdmin || p.infoAgenti || p.descrizione || "") : (p.infoAgenti || p.descrizione || ""))
-      .split("|").map((line) => line.trim()).filter(Boolean);
+    const canonical = String(p.nome || "").startsWith("P3.91") ? "P3.91" : String(p.nome || "").startsWith("P4") ? "P4" : p.nome;
+    const summary = String(p.infoAgenti || p.descrizione || "").split("|").map((line) => line.trim()).filter(Boolean);
+    const details = [...summary, ...(TECH_SPECS[canonical] || [])].filter((line, index, all) => all.indexOf(line) === index);
     const stock = Number(p.giacenza_attuale || 0);
-    const body = `<div class="tech-sheet"><div class="tech-sheet-image">${p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}">` : `<div class="pixel-pattern"></div>`}</div><div><span class="section-kicker">${esc(p.sku || p.id || "Ledwall")}</span><h3>${esc(p.nome)} · ${esc(p.cabX)}×${esc(p.cabY)} cm</h3><ul>${details.length ? details.map((line) => `<li>${esc(line)}</li>`).join("") : `<li>Scheda tecnica da completare.</li>`}</ul><div class="stock-summary"><div><small>${esc(p.stato_giacenza || (stock ? "DISPONIBILE" : "NON DISPONIBILE"))}</small><strong>${stock} pz</strong></div><span>${String(p.promo_attiva || "NO").toUpperCase() === "SI" ? "PROMO ATTIVA" : "LISTINO ORDINARIO"}</span></div></div></div>`;
+    const body = `<div class="tech-sheet"><div class="tech-sheet-image">${p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}">` : `<div class="pixel-pattern"></div>`}</div><div><span class="section-kicker">${esc(p.sku || p.id || "Ledwall")}</span><h3>${esc(p.nome)} · ${esc(p.cabX)}×${esc(p.cabY)} cm</h3><div class="tech-spec-grid">${details.length ? details.map((line) => { const parts = line.split(":"); return `<div><small>${esc(parts.length > 1 ? parts.shift() : "SPECIFICA")}</small><strong>${esc(parts.join(":").trim() || line)}</strong></div>`; }).join("") : `<p>Scheda tecnica da completare.</p>`}</div><div class="stock-summary"><div><small>${esc(p.stato_giacenza || (stock ? "DISPONIBILE" : "NON DISPONIBILE"))}</small><strong>${stock} pz</strong></div><span>${String(p.promo_attiva || "NO").toUpperCase() === "SI" ? "PROMO ATTIVA" : "LISTINO ORDINARIO"}</span></div></div></div>`;
     openModal(`Scheda tecnica ${p.nome}`, body, { wide: true, kicker: "Catalogo Seemax" });
   }
 

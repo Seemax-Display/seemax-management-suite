@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.1.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.2.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -25,7 +25,7 @@ var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "aggiornatoIl"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "email", "telefono", "citta", "indirizzo", "note", "creatoIl", "agent_username", "aggiornatoIl"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
@@ -45,6 +45,7 @@ function setupSeemaxDatabase() {
   seedPatchNotes_();
   seedProducts_();
   initializeInventoryV11_();
+  backfillPracticeInventoryV12_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
   styleSheets_();
@@ -55,9 +56,10 @@ function upgradeSeemaxV11() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   initializeInventoryV11_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade catalogo e magazzino v1.1");
+  backfillPracticeInventoryV12_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade catalogo e magazzino v1.2");
   styleSheets_();
-  return "SEEMAX v1.1 configurato: catalogo, pratiche S.Q.P. e magazzino attivi.";
+  return "SEEMAX v1.2 configurato: catalogo consolidato, pratiche S.Q.P. e magazzino attivi.";
 }
 
 function doGet(e) {
@@ -203,6 +205,10 @@ function managementCreateFromQuote_(p) {
     note: String(payload.note || ""),
     preventivo_id: quoteId,
     origine: "SEEMAX QUOTATION PLANNER",
+    modelli_display: items.map(function (item) { return String(item.modello_display || item.prodotto || ""); }).filter(Boolean).join(" | "),
+    misure_display: items.map(function (item) { return String(item.misura_display || item.misura_m || item.misura_cm || ""); }).filter(Boolean).join(" | "),
+    cabinet_da_sottrarre: items.map(function (item) { return String(item.cabinet_da_sottrarre || item.cabinet || ""); }).filter(Boolean).join(" | "),
+    righe_magazzino_json: JSON.stringify(buildInventoryRowsFromItems_(items)),
     righe_json: JSON.stringify(items),
     magazzino_applicato: "NO",
     creatoIl: new Date().toISOString(),
@@ -281,7 +287,7 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
   if (!lines.length) throw new Error("La pratica non contiene righe cabinet valide per il magazzino.");
   var products = {};
   lines.forEach(function (line) {
-    var product = findRowObject_("PRODOTTI_LED", "id", line.product_id);
+    var product = findInventoryProduct_(line.product_id);
     if (!product) throw new Error("Prodotto magazzino non trovato: " + line.product_id);
     products[line.product_id] = product;
     var available = Number(product.giacenza_attuale || 0);
@@ -307,17 +313,75 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
 }
 
 function inventoryLinesFromPractice_(practice) {
+  var explicit = parseJson_(practice.righe_magazzino_json, []);
   var items = parseJson_(practice.righe_json, []);
   var grouped = {};
-  items.forEach(function (item) {
+  explicit.forEach(function (line) {
+    var id = canonicalProductId_(line.product_id || line.modello_display, line.cabX, line.cabY);
+    var qty = Number(line.quantita || line.cabinet_da_sottrarre || 0);
+    if (id && qty > 0) grouped[id] = (grouped[id] || 0) + qty;
+  });
+  if (!explicit.length) items.forEach(function (item) {
     var stock = Array.isArray(item.stock_lines) ? item.stock_lines : [];
+    if (!stock.length) stock = buildInventoryRowsFromItems_([item]);
     stock.forEach(function (line) {
-      var id = String(line.product_id || "");
+      var id = canonicalProductId_(line.product_id || line.modello_display || item.modello_display || item.prodotto, line.cabX, line.cabY);
       var qty = Number(line.quantita || 0);
       if (id && qty > 0) grouped[id] = (grouped[id] || 0) + qty;
     });
   });
   return Object.keys(grouped).map(function (id) { return { product_id: id, quantita: grouped[id] }; });
+}
+
+function findInventoryProduct_(productId) {
+  var direct = findRowObject_("PRODOTTI_LED", "id", productId);
+  if (direct) return direct;
+  return rowsToObjects_(sheet_("PRODOTTI_LED")).filter(function (row) {
+    return canonicalProductId_(row.id || row.nome, row.cabX, row.cabY) === productId;
+  })[0] || null;
+}
+
+function buildInventoryRowsFromItems_(items) {
+  var out = [];
+  (items || []).forEach(function (item) {
+    if (Array.isArray(item.stock_lines) && item.stock_lines.length) {
+      item.stock_lines.forEach(function (line) { out.push(line); });
+      return;
+    }
+    var qty = Number(item.cabinet_da_sottrarre || item.cabinet || 0);
+    var id = canonicalProductId_(item.product_id || item.modello_display || item.prodotto, item.cabX, item.cabY);
+    if (id && qty > 0) out.push({ product_id: id, modello_display: item.modello_display || item.prodotto || "", quantita: qty });
+  });
+  return out;
+}
+
+function backfillPracticeInventoryV12_() {
+  rowsToObjects_(sheet_("PRATICHE")).forEach(function (practice) {
+    var items = parseJson_(practice.righe_json, []);
+    if (!items.length) return;
+    var changed = false;
+    if (!practice.modelli_display) { practice.modelli_display = items.map(function (item) { return item.modello_display || item.prodotto || ""; }).filter(Boolean).join(" | "); changed = true; }
+    if (!practice.misure_display) { practice.misure_display = items.map(function (item) { return item.misura_display || item.misura_m || item.misura_cm || ""; }).filter(Boolean).join(" | "); changed = true; }
+    if (!practice.righe_magazzino_json) { practice.righe_magazzino_json = JSON.stringify(buildInventoryRowsFromItems_(items)); changed = true; }
+    if (!practice.cabinet_da_sottrarre) {
+      practice.cabinet_da_sottrarre = buildInventoryRowsFromItems_(items).map(function (line) { return (line.descrizione || line.modello_display || line.product_id) + ": " + Number(line.quantita || 0); }).join(" | ");
+      changed = true;
+    }
+    if (changed) upsertObject_("PRATICHE", "id", practice.id, practice);
+  });
+}
+
+function canonicalProductId_(value, cabX, cabY) {
+  var raw = String(value || "").toLowerCase().replace(/,/g, ".").replace(/p3[-_ ]91/g, "p3.91").replace(/p2[-_ ]5/g, "p2.5").replace(/p1[-_ ]9/g, "p1.9");
+  if (/p391-50100|p3\.91.*(0\.50x1\.00|50x100)/.test(raw)) return "p391-50100";
+  if (/p391-5050|p3\.91.*(0\.50x0\.50|50x50)/.test(raw)) return "p391-5050";
+  if (raw.indexOf("p3.91") >= 0) return Number(cabY) === 50 ? "p391-5050" : "p391-50100";
+  if (/p19-50100|p1\.9/.test(raw)) return "p19-50100";
+  if (/p25-6464|p2\.5/.test(raw)) return "p25-6464";
+  if (/p3-5757|(^|[^0-9])p3([^0-9]|$)/.test(raw)) return "p3-5757";
+  if (/p4-6464|p4.*(0\.64x0\.64|64x64)/.test(raw) || (raw.indexOf("p4") >= 0 && Number(cabX) === 64)) return "p4-6464";
+  if (/p4-9696|p4/.test(raw)) return "p4-9696";
+  return "";
 }
 
 function normalizeKey_(value) { return String(value || "").trim().toLowerCase().replace(/\s+/g, " "); }
@@ -684,27 +748,44 @@ function seedProducts_() {
 
 function initializeInventoryV11_() {
   var defaults = [
-    { id: "p19-50100", sku: "SMX-P19-50100", nome: "P1.9", cabX: 50, cabY: 100, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "SOLO SU ORDINAZIONE", promo_attiva: "NO", immagine_url: "assets/catalog/p19.png", descrizione: "Ledwall indoor ad alta definizione.", infoAgenti: "Ledwall Display P1.9 | Misura Cabinet: 0.50x1.00 | Qualità elevata da medie e lunghe distanze; ottimo a distanze ravvicinate | Utilizzabile solo per installazioni indoor", infoAdmin: "Ledwall Display P1.9 | 0.50x1.00 | Indoor | Costo Cina: 560 euro (incluso 30% spedizione)" },
+    { id: "p19-50100", sku: "SMX-P19-50100", nome: "P1.9", cabX: 50, cabY: 100, prezzoAgente: 850, prezzoCliente: 950, prezzoCina: 560, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "SOLO SU ORDINAZIONE", promo_attiva: "NO", immagine_url: "assets/catalog/p19.png", descrizione: "Ledwall indoor ad alta definizione.", infoAgenti: "Ledwall Display P1.9 | Misura Cabinet: 0.50x1.00 | Qualità elevata da medie e lunghe distanze; ottimo a distanze ravvicinate | Utilizzabile solo per installazioni indoor", infoAdmin: "Ledwall Display P1.9 | 0.50x1.00 | Indoor | Costo Cina: 560 euro (incluso 30% spedizione)" },
     { id: "p25-6464", sku: "SMX-P25-6464", nome: "P2.5", cabX: 64, cabY: 64, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "IN ARRIVO", promo_attiva: "NO", immagine_url: "assets/catalog/p25.png", descrizione: "Ledwall indoor/outdoor, formato 0.64x0.64.", infoAgenti: "Ledwall Display P2.5 | Misura Cabinet: 0.64x0.64 | Qualità eccellente da medie e lunghe distanze; buono a distanze ravvicinate | Utilizzabile indoor e outdoor | Adatto per vetrina o installazioni totem", infoAdmin: "Ledwall Display P2.5 | 0.64x0.64 | Indoor/Outdoor | Costo Cina: 450 euro (incluso 30% spedizione)" },
     { id: "p3-5757", sku: "SMX-P3-5757", nome: "P3", cabX: 57, cabY: 57, giacenza_iniziale: 60, giacenza_attuale: 60, stato_giacenza: "DISPONIBILE", promo_attiva: "SI", immagine_url: "assets/catalog/p3.jpg", descrizione: "Ledwall indoor/outdoor, formato 0.57x0.57.", infoAgenti: "Ledwall Display P3 | Misura Cabinet: 0.57x0.57 | Qualità eccellente da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3 | 0.57x0.57 | Indoor/Outdoor | Costo Cina: 250 euro" },
     { id: "p391-50100", sku: "SMX-P391-50100", nome: "P3.91", cabX: 50, cabY: 100, giacenza_iniziale: 56, giacenza_attuale: 56, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p391-50100.png", descrizione: "Ledwall indoor/outdoor, cabinet rettangolare.", infoAgenti: "Ledwall Display P3.91 | Misura Cabinet: 0.50x1.00 | Qualità ottima da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3.91 | 0.50x1.00 | Indoor/Outdoor | Costo Cina: 280 euro" },
-    { id: "p391-5050", sku: "SMX-P391-5050", nome: "P3.91 - 0.50x0.50", cabX: 50, cabY: 50, giacenza_iniziale: 64, giacenza_attuale: 64, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p391-5050.jpg", descrizione: "Ledwall indoor/outdoor, cabinet quadrato.", infoAgenti: "Ledwall Display P3.91 | Misura Cabinet: 0.50x0.50 | Qualità ottima da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3.91 | 0.50x0.50 | Indoor/Outdoor | Costo Cina: 150 euro" },
+    { id: "p391-5050", sku: "SMX-P391-5050", nome: "P3.91 - 0.50x0.50", cabX: 50, cabY: 50, prezzoAgente: 295, prezzoCliente: 335, prezzoCina: 150, giacenza_iniziale: 64, giacenza_attuale: 64, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p391-5050.jpg", descrizione: "Ledwall indoor/outdoor, cabinet quadrato.", infoAgenti: "Ledwall Display P3.91 | Misura Cabinet: 0.50x0.50 | Qualità ottima da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3.91 | 0.50x0.50 | Indoor/Outdoor | Costo Cina: 150 euro" },
     { id: "p4-9696", sku: "SMX-P4-9696", nome: "P4", cabX: 96, cabY: 96, giacenza_iniziale: 8, giacenza_attuale: 8, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p4-9696.jpg", descrizione: "Ledwall outdoor, formato 0.96x0.96.", infoAgenti: "Ledwall Display P4 | Misura Cabinet: 0.96x0.96 | Qualità buona da medie e lunghe distanze | Utilizzabile prevalentemente outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P4 | 0.96x0.96 | Outdoor | Costo Cina: 580 euro" },
     { id: "p4-6464", sku: "SMX-P4-6464", nome: "P4 - 0.64x0.64", cabX: 64, cabY: 64, giacenza_iniziale: 4, giacenza_attuale: 4, stato_giacenza: "DISPONIBILE", promo_attiva: "SI", attivo: "SI", categoria: "Ledwall Outdoor", descrizione: "Prodotto catalogo: prezzo promozionale da completare.", immagine_url: "assets/catalog/p4-9696.jpg" }
   ];
-  defaults.forEach(function (entry) {
-    var row = findRowObject_("PRODOTTI_LED", "id", entry.id);
-    if (!row) {
-      var matches = rowsToObjects_(sheet_("PRODOTTI_LED")).filter(function (candidate) {
-        return String(candidate.nome) === String(entry.nome) && Number(candidate.cabX) === Number(entry.cabX) && Number(candidate.cabY) === Number(entry.cabY);
-      });
-      row = matches[0] || { id: entry.id, nome: entry.nome, cabX: entry.cabX, cabY: entry.cabY, attivo: "SI" };
-    }
-    Object.keys(entry).forEach(function (key) {
-      if (row[key] === undefined || row[key] === "") row[key] = entry[key];
+  defaults.forEach(function (entry) { consolidateProductRows_(entry); });
+}
+
+function consolidateProductRows_(entry) {
+  var productSheet = sheet_("PRODOTTI_LED");
+  var values = productSheet.getDataRange().getValues();
+  var headers = values[0].map(String);
+  var matches = [];
+  for (var i = 1; i < values.length; i++) {
+    var row = {};
+    headers.forEach(function (header, index) { row[header] = values[i][index]; });
+    if (canonicalProductId_(row.id || row.nome, row.cabX, row.cabY) === entry.id) matches.push({ sheetRow: i + 1, row: row });
+  }
+  matches.sort(function (a, b) { return (a.row.id === entry.id ? 1 : 0) - (b.row.id === entry.id ? 1 : 0); });
+  var merged = {};
+  Object.keys(entry).forEach(function (key) { merged[key] = entry[key]; });
+  matches.forEach(function (match) {
+    Object.keys(match.row).forEach(function (key) {
+      var value = match.row[key];
+      if (value !== "" && value !== null && value !== undefined) merged[key] = value;
     });
-    upsertObject_("PRODOTTI_LED", "id", row.id || entry.id, row);
   });
+  merged.id = entry.id;
+  merged.sku = entry.sku;
+  merged.nome = entry.nome;
+  merged.cabX = entry.cabX;
+  merged.cabY = entry.cabY;
+  merged.attivo = merged.attivo || "SI";
+  matches.map(function (match) { return match.sheetRow; }).sort(function (a, b) { return b - a; }).forEach(function (sheetRow) { productSheet.deleteRow(sheetRow); });
+  upsertObject_("PRODOTTI_LED", "id", entry.id, merged);
 }
 
 function seedPlaceholderAdmin_() {
