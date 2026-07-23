@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.2.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.3.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -33,6 +33,7 @@ var SHEET_SCHEMAS = {
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
   ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
   MOVIMENTI_MAGAZZINO: ["id", "data", "practiceId", "numero_pratica", "cliente", "product_id", "sku", "prodotto", "quantita", "tipo_movimento", "giacenza_prima", "giacenza_dopo", "username", "note"],
+  NOTIFICHE: ["id", "data", "recipient_username", "recipient_name", "practiceId", "numero_pratica", "stato_precedente", "nuovo_stato", "titolo", "messaggio", "letta", "letta_il", "actor_username"],
   LOG: ["data", "username", "ruolo", "azione", "entita", "record_id", "dettaglio"]
 };
 
@@ -46,6 +47,7 @@ function setupSeemaxDatabase() {
   seedProducts_();
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
+  migratePracticeStatusesV13_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
   styleSheets_();
@@ -57,6 +59,7 @@ function upgradeSeemaxV11() {
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
+  migratePracticeStatusesV13_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade catalogo e magazzino v1.2");
   styleSheets_();
   return "SEEMAX v1.2 configurato: catalogo consolidato, pratiche S.Q.P. e magazzino attivi.";
@@ -100,6 +103,7 @@ function routeGet_(action, p) {
     case "management_settings": return managementSettings_(p);
     case "management_save_settings": return managementSaveSettings_(p);
     case "management_create_from_quote": return managementCreateFromQuote_(p);
+    case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -129,7 +133,8 @@ function managementBootstrap_(p) {
   var activities = listEntity_("activities", user);
   var users = isAdmin_(user) ? listEntity_("users", user).map(publicUser_) : [publicUser_(user)];
   var settings = getSettings_();
-  var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, settings: settings };
+  var notifications = listNotificationsForUser_(user);
+  var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, settings: settings, notifications: notifications };
   data.dashboard = dashboard_(data);
   return { ok: true, data: data, user: publicUser_(user), version: SEEMAX_VERSION };
 }
@@ -148,10 +153,15 @@ function managementUpsert_(p) {
   assertWritePermission_(entity, user);
   var payload = parseJson_(p.payload, {});
   if (!payload || typeof payload !== "object") throw new Error("Dati non validi.");
-  if (["clients", "practices", "documents", "activities"].indexOf(entity) >= 0) payload.agent_username = payload.agent_username || user.username;
+  if (["clients", "practices", "documents", "activities"].indexOf(entity) >= 0) {
+    var ownedRecord = entity === "practices" && payload.id ? findRowObject_("PRATICHE", "id", payload.id) : null;
+    payload.agent_username = payload.agent_username || (ownedRecord && ownedRecord.agent_username) || user.username;
+  }
   payload.aggiornatoIl = new Date().toISOString();
   if (entity === "practices") {
+    var previousPractice = payload.id ? findRowObject_("PRATICHE", "id", payload.id) : null;
     var practiceRow = upsertPracticeWithInventory_(payload, user);
+    if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) createPracticeStatusNotification_(previousPractice, practiceRow, user);
     log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
     return { ok: true, row: practiceRow };
   }
@@ -195,7 +205,7 @@ function managementCreateFromQuote_(p) {
     clientId: client.id,
     cliente: client.ragioneSociale,
     titolo: title,
-    stato: "Preventivo",
+    stato: "Inserita",
     finanziaria: finance,
     tipo_pratica: type,
     valore: Number(payload.valore || 0),
@@ -257,15 +267,22 @@ function upsertPracticeWithInventory_(payload, user) {
     if (!payload.id) payload.id = uid_("pra");
     var existing = findRowObject_("PRATICHE", "id", payload.id);
     var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
-    var nextStatus = String(payload.stato || existing && existing.stato || "Nuova");
-    var hasInventoryRows = !!String(payload.righe_json || existing && existing.righe_json || "").trim();
-    var shouldApply = nextStatus === "Accettata" && !wasApplied && hasInventoryRows;
-    var shouldReverse = ["Rifiutata", "Annullata"].indexOf(nextStatus) >= 0 && wasApplied;
+    var nextStatus = normalizePracticeStatus_(payload.stato || existing && existing.stato || "Inserita");
+    payload.stato = nextStatus;
+    var inferredType = String(payload.finanziaria || existing && existing.finanziaria || "") === "Grenke" ? "NOLEGGIO" : (String(payload.finanziaria || existing && existing.finanziaria || "") === "IFIS" ? "LEASING" : "ACQUISTO");
+    var practiceType = String(payload.tipo_pratica || existing && existing.tipo_pratica || inferredType).toUpperCase();
+    payload.tipo_pratica = practiceType;
+    if (nextStatus === "Bocciata" && practiceType === "ACQUISTO") throw new Error("Lo stato Bocciata è disponibile solo per pratiche di noleggio o leasing.");
+    var hasInventoryRows = !!String(payload.righe_magazzino_json || existing && existing.righe_magazzino_json || payload.righe_json || existing && existing.righe_json || "").trim();
+    var requiresStock = ["Accettata", "Completata"].indexOf(nextStatus) >= 0;
+    var releasesStock = ["Inserita", "Sospesa", "Bocciata"].indexOf(nextStatus) >= 0;
+    var shouldApply = requiresStock && !wasApplied && hasInventoryRows;
+    var shouldReverse = releasesStock && wasApplied;
     if (wasApplied && existing && payload.righe_json && String(payload.righe_json) !== String(existing.righe_json || "") && !shouldReverse) {
       throw new Error("La composizione Ledwall non può essere modificata dopo l'impegno di magazzino. Annulla prima la pratica.");
     }
     if (shouldApply) {
-      applyInventoryForPractice_(payload, user, -1, "IMPEGNO_PRATICA_ACCETTATA");
+      applyInventoryForPractice_(payload, user, -1, "SCARICO_PRATICA_" + nextStatus.toUpperCase());
       payload.magazzino_applicato = "SI";
       payload.magazzino_applicato_il = new Date().toISOString();
       payload.magazzino_stornato_il = "";
@@ -280,6 +297,74 @@ function upsertPracticeWithInventory_(payload, user) {
     }
     return upsertObject_("PRATICHE", "id", payload.id, payload);
   } finally { lock.releaseLock(); }
+}
+
+function normalizePracticeStatus_(status) {
+  var value = String(status || "").trim().toLowerCase();
+  var map = {
+    "nuova": "Inserita", "preventivo": "Inserita", "documenti": "Inserita", "istruttoria": "Inserita", "delibera": "Inserita", "inserita": "Inserita",
+    "accettata": "Accettata", "sospesa": "Sospesa", "annullata": "Sospesa",
+    "rifiutata": "Bocciata", "bocciata": "Bocciata",
+    "contratto": "Completata", "installazione": "Completata", "chiusa": "Completata", "completata": "Completata"
+  };
+  if (!map[value]) throw new Error("Stato pratica non valido.");
+  return map[value];
+}
+
+function migratePracticeStatusesV13_() {
+  rowsToObjects_(sheet_("PRATICHE")).forEach(function (practice) {
+    var normalized;
+    try { normalized = normalizePracticeStatus_(practice.stato || "Inserita"); } catch (error) { normalized = "Inserita"; }
+    var changed = practice.stato !== normalized;
+    practice.stato = normalized;
+    if (!practice.tipo_pratica) { practice.tipo_pratica = practice.finanziaria === "Grenke" ? "NOLEGGIO" : (practice.finanziaria === "IFIS" ? "LEASING" : "ACQUISTO"); changed = true; }
+    if (changed) upsertObject_("PRATICHE", "id", practice.id, practice);
+  });
+}
+
+function listNotificationsForUser_(user) {
+  return rowsToObjects_(sheet_("NOTIFICHE")).filter(function (row) {
+    return String(row.recipient_username || "") === String(user.username || "");
+  }).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 50);
+}
+
+function managementMarkNotificationsRead_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  var rows = listNotificationsForUser_(user);
+  var now = new Date().toISOString();
+  rows.forEach(function (row) {
+    if (String(row.letta || "NO").toUpperCase() !== "SI") {
+      row.letta = "SI";
+      row.letta_il = now;
+      upsertObject_("NOTIFICHE", "id", row.id, row);
+    }
+  });
+  return { ok: true, notifications: listNotificationsForUser_(user) };
+}
+
+function createPracticeStatusNotification_(before, after, actor) {
+  var recipientUsername = String(after.agent_username || before.agent_username || "");
+  if (!recipientUsername) return;
+  var recipient = findRowObject_("AGENTI", "username", recipientUsername) || {};
+  var title = "Pratica " + String(after.numero || after.id || "") + ": " + String(after.stato || "");
+  var message = "La pratica " + String(after.numero || after.id || "") + " di " + String(after.cliente || "cliente") + " è passata da " + String(before.stato || "—") + " a " + String(after.stato || "—") + ".";
+  var id = uid_("not");
+  upsertObject_("NOTIFICHE", "id", id, {
+    id: id, data: new Date().toISOString(), recipient_username: recipientUsername,
+    recipient_name: recipient.nome_visualizzato || recipientUsername, practiceId: after.id,
+    numero_pratica: after.numero || "", stato_precedente: before.stato || "", nuovo_stato: after.stato || "",
+    titolo: title, messaggio: message, letta: "NO", letta_il: "", actor_username: actor.username || ""
+  });
+  var email = String(recipient.email || "").trim();
+  if (email) {
+    try {
+      MailApp.sendEmail({ to: email, subject: "Seemax Management · " + title, name: "Seemax Management Suite", htmlBody: "<p>" + escapeHtml_(message) + "</p><p>Accedi al gestionale per visualizzare la pratica.</p>" });
+    } catch (error) { log_(actor, "EMAIL_NOTIFICATION_ERROR", "notifications", id, String(error && error.message || error)); }
+  }
+}
+
+function escapeHtml_(value) {
+  return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function applyInventoryForPractice_(practice, user, direction, movementType) {
@@ -458,8 +543,8 @@ function removeEntity_(entity, id, user) {
 function dashboard_(data) {
   var practices = data.practices || [];
   var activities = data.activities || [];
-  var open = practices.filter(function (p) { return ["Chiusa", "Rifiutata"].indexOf(String(p.stato)) < 0; });
-  var statuses = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Accettata", "Contratto", "Installazione", "Chiusa"];
+  var open = practices.filter(function (p) { return ["Bocciata", "Completata"].indexOf(String(p.stato)) < 0; });
+  var statuses = ["Inserita", "Accettata", "Sospesa", "Bocciata", "Completata"];
   var pipeline = statuses.map(function (status) {
     var rows = practices.filter(function (p) { return String(p.stato) === status; });
     return { status: status, count: rows.length, value: rows.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0) };

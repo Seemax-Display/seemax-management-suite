@@ -99,6 +99,12 @@
     return response.settings;
   }
 
+  async function markNotificationsRead() {
+    if (config.demoMode) return [];
+    const response = await jsonp("management_mark_notifications_read", authParams());
+    return response.notifications || [];
+  }
+
   function nextPracticeNumber() {
     return config.demoMode ? demo.nextPracticeNumber() : "AUTO";
   }
@@ -109,5 +115,5 @@
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
   function status() { return { demo: config.demoMode, configured: isConfigured(), online }; }
 
-  window.SeemaxApi = { login, logout, ping, bootstrap, list, upsert, remove, getSettings, saveSettings, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status };
+  window.SeemaxApi = { login, logout, ping, bootstrap, list, upsert, remove, getSettings, saveSettings, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status };
 })();

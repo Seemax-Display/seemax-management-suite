@@ -31,7 +31,7 @@
     settings: ["Impostazioni", "Configurazione generale del gestionale"]
   };
 
-  const STATUSES = ["Nuova", "Preventivo", "Documenti", "Istruttoria", "Delibera", "Accettata", "Contratto", "Installazione", "Chiusa", "Rifiutata", "Annullata"];
+  const STATUSES = ["Inserita", "Accettata", "Sospesa", "Bocciata", "Completata"];
   const FINANCE = ["Da definire", "Grenke", "IFIS", "Acquisto diretto", "Altro"];
   const ENTITY_LABELS = { practices: "pratica", clients: "cliente", products: "prodotto", documents: "documento", activities: "attività", users: "agente" };
   const TECH_SPECS = {
@@ -119,6 +119,7 @@
     setLoading(true, "Caricamento database…");
     try {
       state.data = await api.bootstrap();
+      updateNotificationBell();
       setConnectionState();
     } catch (error) {
       setConnectionState();
@@ -318,10 +319,14 @@
     const record = state.data.practices.find((p) => p.id === id) || {};
     const client = state.data.clients.find((c) => c.id === (clientId || record.clientId));
     const number = record.numero || api.nextPracticeNumber();
+    const inferredType = record.finanziaria === "Grenke" ? "NOLEGGIO" : record.finanziaria === "IFIS" ? "LEASING" : "ACQUISTO";
+    const practiceType = String(record.tipo_pratica || inferredType).toUpperCase();
+    const allowedStatuses = practiceType === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
     const fields = field("Numero pratica", "numero", number, { required: true, readonly: number !== "AUTO" }) +
       field("Cliente", "clientId", record.clientId || clientId || "", { required: true, options: ["", ...state.data.clients.map((c) => c.id)] }).replace(/>(cli-[^<]+)</g, (m, value) => `>${esc((state.data.clients.find((c) => c.id === value) || {}).ragioneSociale || value)}<`) +
       field("Oggetto della pratica", "titolo", record.titolo || "", { required: true, full: true }) +
-      field("Stato", "stato", record.stato || "Nuova", { options: STATUSES }) + field("Finanziaria", "finanziaria", record.finanziaria || "Da definire", { options: FINANCE }) +
+      field("Tipo pratica", "tipo_pratica", practiceType, { options: ["ACQUISTO", "NOLEGGIO", "LEASING"] }) +
+      field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses }) + field("Finanziaria", "finanziaria", record.finanziaria || "Da definire", { options: FINANCE }) +
       field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) + field("Scadenza / richiamo", "scadenza", record.scadenza || "", { type: "date" }) +
       field("Prossimo passo", "prossimoPasso", record.prossimoPasso || "", { full: true }) +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
@@ -332,6 +337,29 @@
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
       field("Note", "note", record.note || "", { type: "textarea", full: true });
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
+    const typeSelect = document.querySelector('.entity-form select[name="tipo_pratica"]');
+    const statusSelect = document.querySelector('.entity-form select[name="stato"]');
+    if (typeSelect && statusSelect) typeSelect.addEventListener("change", () => {
+      const current = statusSelect.value;
+      const options = typeSelect.value === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
+      statusSelect.innerHTML = options.map((status) => `<option value="${status}" ${status === current ? "selected" : ""}>${status}</option>`).join("");
+      if (!options.includes(current)) statusSelect.value = "Sospesa";
+    });
+  }
+
+  function updateNotificationBell() {
+    const unread = ((state.data && state.data.notifications) || []).filter((item) => String(item.letta || "NO").toUpperCase() !== "SI").length;
+    const dot = $("notificationDot");
+    if (dot) { dot.classList.toggle("visible", unread > 0); dot.textContent = unread > 9 ? "9+" : (unread || ""); }
+  }
+
+  async function openNotifications() {
+    const notes = (state.data.notifications || []).slice(0, 30);
+    const body = `<div class="notification-list">${notes.length ? notes.map((note) => `<article class="notification-item ${String(note.letta || "NO").toUpperCase() === "SI" ? "" : "unread"}"><span>${badge(note.nuovo_stato)}</span><div><strong>${esc(note.titolo)}</strong><p>${esc(note.messaggio)}</p><small>${dateIt(note.data)}</small></div></article>`).join("") : `<div class="empty-state"><span>♢</span><h3>Nessuna notifica</h3><p>Le variazioni delle tue pratiche appariranno qui.</p></div>`}</div>`;
+    openModal("Notifiche", body, { kicker: "Aggiornamenti pratiche" });
+    if (notes.some((note) => String(note.letta || "NO").toUpperCase() !== "SI")) {
+      try { state.data.notifications = await api.markNotificationsRead(); updateNotificationBell(); } catch (error) { toast(error.message, "danger"); }
+    }
   }
 
   function openClient(id) {
@@ -449,6 +477,7 @@
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
       "close-modal": closeModal,
+      "open-notifications": openNotifications,
       "reload": async () => { await loadAll(); renderRoute(); },
       "open-planner-window": () => window.open(config.quotationPlannerPath, "_blank", "noopener"),
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.ping(); setConnectionState(); toast(response.ok ? "Collegamento funzionante." : "Collegamento non disponibile.", response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },

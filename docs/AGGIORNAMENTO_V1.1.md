@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.2
+# Aggiornamento Seemax Management Suite 1.3
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -53,6 +53,17 @@ La funzione aggiorna le colonne senza cancellare clienti, agenti o pratiche, cre
 Per uno schermo unificato controlla entrambe le righe P3.91: il gestionale sottrae separatamente i cabinet 0.50×1.00 e 0.50×0.50.
 
 Nel Quotation Planner ogni soluzione mostra inoltre cabinet disponibili e richiesti. Una giacenza insufficiente genera un avviso, ma non impedisce di terminare o inviare il preventivo.
+
+## Stati pratica e notifiche 1.3
+
+Gli unici stati disponibili sono `Inserita`, `Accettata`, `Sospesa`, `Bocciata` e `Completata`. Lo stato `Bocciata` è disponibile esclusivamente per noleggio e leasing.
+
+- `Inserita`, `Sospesa` e `Bocciata`: i cabinet non risultano impegnati e un eventuale scarico precedente viene ripristinato una sola volta.
+- `Accettata` e `Completata`: i cabinet risultano impegnati e vengono sottratti una sola volta.
+
+Quando cambia lo stato, il gestionale crea una notifica per l'agente responsabile. La notifica appare nella campanella in alto e, se nella riga dell'agente è presente un indirizzo email, viene inviata anche tramite email Google senza servizi esterni.
+
+La prima esecuzione di `upgradeSeemaxV11` crea il foglio `NOTIFICHE` e converte automaticamente gli stati precedenti.
 
 ## Regole di magazzino
 
