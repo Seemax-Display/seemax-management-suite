@@ -228,7 +228,7 @@
 
   function practiceTable(rows, compact = false) {
     if (!rows.length) return emptyState("Nessuna pratica", "Crea la prima pratica per iniziare.", "Nuova pratica", "new-practice");
-    return `<div class="table-wrap"><table><thead><tr><th>Pratica</th><th>Cliente</th><th>Oggetto</th><th>Stato</th><th>Finanziaria</th><th>Valore</th><th>Scadenza</th><th></th></tr></thead><tbody>${rows.map((p) => `<tr><td><strong>${esc(p.numero)}</strong><small>${dateIt(p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.titolo)}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td><td>${dateIt(p.scadenza)}</td><td><button class="table-action" data-action="edit-practice" data-id="${esc(p.id)}">Apri</button>${compact ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="practice-table"><thead><tr><th>Pratica</th><th>Cliente</th><th>Tipologia</th><th>Stato</th><th>Finanziaria</th><th>Valore</th><th></th></tr></thead><tbody>${rows.map((p) => `<tr class="practice-row practice-${slug(p.stato)}"><td><strong>${esc(p.numero)}</strong><small>${dateIt(p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td><td><button class="table-action" data-action="edit-practice" data-id="${esc(p.id)}">Apri</button>${compact || p.stato === "Completata" ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`).join("")}</tbody></table></div>`;
   }
 
   function renderPractices() {
@@ -242,7 +242,8 @@
     const rows = filterRows(state.data.clients, ["ragioneSociale", "referente", "piva", "email", "telefono", "citta"]);
     return `${viewToolbar("Nuovo cliente", "new-client", `<p class="toolbar-note">${rows.length} clienti visualizzati</p>`)}<div class="card-grid">${rows.length ? rows.map((c) => {
       const count = state.data.practices.filter((p) => p.clientId === c.id).length;
-      return `<article class="client-card"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)}</h3><p>${esc(c.referente || "Referente non indicato")}</p></div><button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button></div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}">Apri anagrafica</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}">＋ Pratica</button></div></article>`;
+      const locked = state.data.practices.some((p) => p.clientId === c.id && p.stato === "Completata");
+      return `<article class="client-card"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)}</h3><p>${esc(c.referente || "Referente non indicato")}</p></div>${locked ? `<span class="locked-record" title="Cliente collegato a una pratica completata">🔒</span>` : `<button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button>`}</div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}">Apri anagrafica</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}">＋ Pratica</button></div></article>`;
     }).join("") : emptyState("Nessun cliente", "Aggiungi la prima anagrafica.", "Nuovo cliente", "new-client")}</div>`;
   }
 
@@ -255,12 +256,12 @@
       const stock = Number(p.giacenza_attuale || 0);
       const stockLabel = p.stato_giacenza || (stock > 0 ? "DISPONIBILE" : "NON DISPONIBILE");
       const image = p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}" loading="lazy">` : `<div class="pixel-pattern"></div>`;
-      return `<article class="product-card"><div class="product-visual">${image}<span>${esc(p.nome)}</span>${promoActive ? `<em>PROMO</em>` : ""}</div><div class="product-body"><div class="product-title"><div><span>${esc(p.categoria || "Ledwall")}</span><h3>${esc(p.nome)} · ${p.cabX}×${p.cabY} cm</h3></div>${badge(p.attivo === "SI" ? "Attivo" : "Non attivo")}</div><div class="stock-summary"><div><small>${esc(stockLabel)}</small><strong>${stock} pz</strong></div><span>${esc(p.sku || p.id || "")}</span></div><p>${esc(p.descrizione || p.infoAgenti || "Scheda tecnica disponibile nel Quotation Planner.")}</p><div class="price-grid"><div><small>Prezzo agente</small><strong>${price ? euros(price) : "Da definire"}</strong>${promo ? `<del>${euros(p.prezzoAgente)}</del>` : ""}</div>${api.isAdmin() ? `<div><small>Prezzo cliente</small><strong>${Number(p.prezzoPromoClienti || p.prezzoCliente || 0) ? euros(p.prezzoPromoClienti || p.prezzoCliente) : "Da definire"}</strong></div><div><small>Costo base</small><strong>${Number(p.prezzoCina || 0) ? euros(p.prezzoCina) : "—"}</strong></div>` : ""}</div><div class="card-actions"><button class="btn soft" data-action="product-tech" data-id="${esc(p.id)}">Scheda tecnica</button><button class="btn ghost" data-route="planner">Usa nel Planner</button>${api.isAdmin() ? `<button class="btn ghost" data-action="edit-product" data-id="${esc(p.id)}">Modifica</button>` : ""}</div></div></article>`;
+      return `<article class="product-card"><div class="product-visual">${image}<span>${esc(p.nome)}</span>${promoActive ? `<em>PROMO</em>` : ""}</div><div class="product-body"><div class="product-title"><div><span>${esc(p.categoria || "Ledwall")}</span><h3>${esc(p.nome)} · ${p.cabX}×${p.cabY} cm</h3></div>${badge(p.attivo === "SI" ? "Attivo" : "Non attivo")}</div><div class="stock-summary"><div><small>${esc(stockLabel)}</small><strong>${stock} pz</strong></div><span>${esc(p.sku || p.id || "")}</span></div><p>${esc(p.descrizione || p.infoAgenti || "Scheda tecnica disponibile nel Quotation Planner.")}</p><div class="price-grid"><div><small>Prezzo agente</small><strong>${price ? euros(price) : "Da definire"}</strong>${promo ? `<del>${euros(p.prezzoAgente)}</del>` : ""}</div>${api.isAdmin() ? `<div><small>Prezzo cliente</small><strong>${Number(p.prezzoPromoClienti || p.prezzoCliente || 0) ? euros(p.prezzoPromoClienti || p.prezzoCliente) : "Da definire"}</strong></div><div><small>Costo base</small><strong>${Number(p.prezzoCina || 0) ? euros(p.prezzoCina) : "—"}</strong></div>` : ""}</div><div class="card-actions"><button class="btn soft" data-action="product-tech" data-id="${esc(p.id)}">Scheda tecnica</button>${api.isAdmin() ? `<button class="btn ghost" data-action="edit-product" data-id="${esc(p.id)}">Modifica</button>` : ""}</div></div></article>`;
     }).join("")}</div>`;
   }
 
   function renderPlanner() {
-    return `<div class="planner-shell"><div class="planner-info"><div><strong>Quotation Planner integrato</strong><span>Il calcolatore originale è incorporato senza alterarne le logiche.</span></div><button class="btn ghost" data-action="open-planner-window">Apri a schermo intero ↗</button></div><iframe id="plannerFrame" title="Seemax Quotation Planner" src="${esc(config.quotationPlannerPath)}"></iframe></div>`;
+    return `<div class="planner-shell planner-native"><iframe id="plannerFrame" title="Seemax Quotation Planner integrato" src="${esc(config.quotationPlannerPath)}?integrated=1"></iframe></div>`;
   }
 
   function renderDocuments() {
@@ -322,18 +323,20 @@
     const inferredType = record.finanziaria === "Grenke" ? "NOLEGGIO" : record.finanziaria === "IFIS" ? "LEASING" : "ACQUISTO";
     const practiceType = String(record.tipo_pratica || inferredType).toUpperCase();
     const allowedStatuses = practiceType === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
-    const fields = field("Numero pratica", "numero", number, { required: true, readonly: number !== "AUTO" }) +
-      field("Cliente", "clientId", record.clientId || clientId || "", { required: true, options: ["", ...state.data.clients.map((c) => c.id)] }).replace(/>(cli-[^<]+)</g, (m, value) => `>${esc((state.data.clients.find((c) => c.id === value) || {}).ragioneSociale || value)}<`) +
-      field("Oggetto della pratica", "titolo", record.titolo || "", { required: true, full: true }) +
+    const selectedClientId = record.clientId || clientId || "";
+    const selectedClient = state.data.clients.find((c) => c.id === selectedClientId);
+    const clientField = record.id
+      ? `${field("Cliente", "cliente_display", record.cliente || (selectedClient && selectedClient.ragioneSociale) || "", { readonly: true })}<input type="hidden" name="clientId" value="${esc(selectedClientId)}">`
+      : field("Cliente", "clientId", selectedClientId, { required: true, options: ["", ...state.data.clients.map((c) => c.id)] }).replace(/>(cli-[^<]+)</g, (m, value) => `>${esc((state.data.clients.find((c) => c.id === value) || {}).ragioneSociale || value)}<`);
+    const fields = field("Numero pratica", "numero", number, { required: true, readonly: number !== "AUTO" }) + clientField +
       field("Tipo pratica", "tipo_pratica", practiceType, { options: ["ACQUISTO", "NOLEGGIO", "LEASING"] }) +
       field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses }) + field("Finanziaria", "finanziaria", record.finanziaria || "Da definire", { options: FINANCE }) +
-      field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) + field("Scadenza / richiamo", "scadenza", record.scadenza || "", { type: "date" }) +
-      field("Prossimo passo", "prossimoPasso", record.prossimoPasso || "", { full: true }) +
+      field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
       (record.modelli_display ? field("Modello display", "modelli_display", record.modelli_display, { readonly: true }) : "") +
       (record.misure_display ? field("Misura preventivata", "misure_display", record.misure_display, { readonly: true }) : "") +
       (record.cabinet_da_sottrarre ? field("Cabinet da sottrarre", "cabinet_da_sottrarre", record.cabinet_da_sottrarre, { readonly: true, full: true }) : "") +
-      (record.righe_magazzino_json ? field("Righe magazzino", "righe_magazzino_json", record.righe_magazzino_json, { type: "textarea", readonly: true, full: true }) : "") +
+      (record.righe_magazzino_json ? `<input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json)}">` : "") +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
       field("Note", "note", record.note || "", { type: "textarea", full: true });
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
@@ -370,7 +373,16 @@
 
   function openProduct(id) {
     const r = state.data.products.find((p) => p.id === id) || { attivo: "SI", categoria: "Ledwall Outdoor" };
-    const fields = field("Nome / Pixel Pitch", "nome", r.nome, { required: true }) + field("SKU", "sku", r.sku) + field("Categoria", "categoria", r.categoria) + field("Larghezza cabinet (cm)", "cabX", r.cabX || 50, { type: "number" }) + field("Altezza cabinet (cm)", "cabY", r.cabY || 50, { type: "number" }) + field("Prezzo agente", "prezzoAgente", r.prezzoAgente || 0, { type: "number", step: "0.01" }) + field("Prezzo cliente", "prezzoCliente", r.prezzoCliente || 0, { type: "number", step: "0.01" }) + field("Costo base", "prezzoCina", r.prezzoCina || 0, { type: "number", step: "0.01" }) + field("Promo agente", "prezzoPromoAgenti", r.prezzoPromoAgenti || "", { type: "number", step: "0.01" }) + field("Promo cliente", "prezzoPromoClienti", r.prezzoPromoClienti || "", { type: "number", step: "0.01" }) + field("Giacenza attuale", "giacenza_attuale", r.giacenza_attuale || 0, { type: "number", min: 0 }) + field("Stato giacenza", "stato_giacenza", r.stato_giacenza || "DISPONIBILE", { options: ["DISPONIBILE", "IN ARRIVO", "SOLO SU ORDINAZIONE", "NON DISPONIBILE"] }) + field("Promo attiva", "promo_attiva", r.promo_attiva || "NO", { options: ["SI", "NO"] }) + field("Stato", "attivo", r.attivo, { options: ["SI", "NO"] }) + field("Descrizione", "descrizione", r.descrizione, { type: "textarea", full: true });
+    const canonical = String(r.nome || "").startsWith("P3.91") ? "P3.91" : String(r.nome || "").startsWith("P4") ? "P4" : r.nome;
+    const specs = TECH_SPECS[canonical] || [];
+    const spec = (key, prefix) => r[key] || ((specs.find((line) => line.toLowerCase().startsWith(prefix.toLowerCase())) || "").split(":").slice(1).join(":").trim());
+    const section = (title, content) => `<fieldset class="product-form-section full"><legend>${esc(title)}</legend><div class="form-grid">${content}</div></fieldset>`;
+    const fields =
+      section("Dettagli", field("Nome / Pixel Pitch", "nome", r.nome, { required: true }) + field("SKU", "sku", r.sku) + field("Categoria", "categoria", r.categoria) + field("Descrizione", "descrizione", r.descrizione, { type: "textarea", full: true }) + field("Larghezza cabinet (cm)", "cabX", r.cabX || 50, { type: "number" }) + field("Altezza cabinet (cm)", "cabY", r.cabY || 50, { type: "number" })) +
+      section("Costi", field("Prezzo agente", "prezzoAgente", r.prezzoAgente || 0, { type: "number", step: "0.01" }) + field("Prezzo cliente", "prezzoCliente", r.prezzoCliente || 0, { type: "number", step: "0.01" }) + field("Costo base", "prezzoCina", r.prezzoCina || 0, { type: "number", step: "0.01" }) + field("Promo agente", "prezzoPromoAgenti", r.prezzoPromoAgenti || "", { type: "number", step: "0.01" }) + field("Promo cliente", "prezzoPromoClienti", r.prezzoPromoClienti || "", { type: "number", step: "0.01" }) + field("Promo attiva", "promo_attiva", r.promo_attiva || "NO", { options: ["SI", "NO"] })) +
+      section("Giacenze", field("Giacenza iniziale", "giacenza_iniziale", r.giacenza_iniziale || 0, { type: "number", min: 0 }) + field("Giacenza attuale", "giacenza_attuale", r.giacenza_attuale || 0, { type: "number", min: 0 }) + field("Stato giacenza", "stato_giacenza", r.stato_giacenza || "DISPONIBILE", { options: ["DISPONIBILE", "IN ARRIVO", "SOLO SU ORDINAZIONE", "NON DISPONIBILE"] })) +
+      section("Scheda tecnica", field("Pixel pitch", "tech_pixel_pitch", spec("tech_pixel_pitch", "Pixel pitch")) + field("Certificazione", "tech_certificazione", spec("tech_certificazione", "Certificazione")) + field("Modalità di utilizzo", "tech_utilizzo", spec("tech_utilizzo", "Modalità")) + field("Densità pixel", "tech_densita_pixel", spec("tech_densita_pixel", "Densità pixel")) + field("LED standard", "tech_led_standard", spec("tech_led_standard", "LED")) + field("Materiale cabinet", "tech_materiale_cabinet", spec("tech_materiale_cabinet", "Cabinet")) + field("Peso cabinet", "tech_peso_cabinet", spec("tech_peso_cabinet", "Peso cabinet")) + field("Scala di grigi", "tech_scala_grigi", spec("tech_scala_grigi", "Scala di grigi")) + field("Temperatura operativa", "tech_temperatura", spec("tech_temperatura", "Temperatura")) + field("Valore IP", "tech_ip", spec("tech_ip", "Protezione")) + field("Consumo medio", "tech_consumo_medio", spec("tech_consumo_medio", "Consumo medio")) + field("Consumo massimo", "tech_consumo_massimo", spec("tech_consumo_massimo", "Consumo massimo")) + field("Vita media", "tech_vita_media", spec("tech_vita_media", "Vita media")) + field("Visibilità", "tech_visibilita", spec("tech_visibilita", "Visibilità")) + field("Luminosità", "tech_luminosita", spec("tech_luminosita", "Luminosità")) + field("Frequenza aggiornamento", "tech_refresh", spec("tech_refresh", "Refresh"))) +
+      section("Altro", field("Immagine prodotto", "immagine_url", r.immagine_url, { full: true }) + field("Link scheda tecnica", "scheda_url", r.scheda_url, { full: true }) + field("Informazioni agenti", "infoAgenti", r.infoAgenti, { type: "textarea", full: true }) + field("Informazioni amministrative", "infoAdmin", r.infoAdmin, { type: "textarea", full: true }) + field("Prodotto attivo", "attivo", r.attivo || "SI", { options: ["SI", "NO"] }));
     openModal(r.id ? "Modifica prodotto" : "Nuovo prodotto", formShell("products", r.id, fields), { wide: true, kicker: "Catalogo Ledwall" });
   }
 
@@ -379,7 +391,8 @@
     if (!p) return;
     const canonical = String(p.nome || "").startsWith("P3.91") ? "P3.91" : String(p.nome || "").startsWith("P4") ? "P4" : p.nome;
     const summary = String(p.infoAgenti || p.descrizione || "").split("|").map((line) => line.trim()).filter(Boolean);
-    const details = [...summary, ...(TECH_SPECS[canonical] || [])].filter((line, index, all) => all.indexOf(line) === index);
+    const editableSpecs = [["Pixel pitch",p.tech_pixel_pitch],["Certificazione",p.tech_certificazione],["Modalità",p.tech_utilizzo],["Densità pixel",p.tech_densita_pixel],["LED",p.tech_led_standard],["Cabinet",p.tech_materiale_cabinet],["Peso cabinet",p.tech_peso_cabinet],["Scala di grigi",p.tech_scala_grigi],["Temperatura",p.tech_temperatura],["Protezione",p.tech_ip],["Consumo medio",p.tech_consumo_medio],["Consumo massimo",p.tech_consumo_massimo],["Vita media",p.tech_vita_media],["Visibilità",p.tech_visibilita],["Luminosità",p.tech_luminosita],["Refresh",p.tech_refresh]].filter((entry) => entry[1]).map((entry) => `${entry[0]}: ${entry[1]}`);
+    const details = [...summary, ...(editableSpecs.length ? editableSpecs : (TECH_SPECS[canonical] || []))].filter((line, index, all) => all.indexOf(line) === index);
     const stock = Number(p.giacenza_attuale || 0);
     const body = `<div class="tech-sheet"><div class="tech-sheet-image">${p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}">` : `<div class="pixel-pattern"></div>`}</div><div><span class="section-kicker">${esc(p.sku || p.id || "Ledwall")}</span><h3>${esc(p.nome)} · ${esc(p.cabX)}×${esc(p.cabY)} cm</h3><div class="tech-spec-grid">${details.length ? details.map((line) => { const parts = line.split(":"); return `<div><small>${esc(parts.length > 1 ? parts.shift() : "SPECIFICA")}</small><strong>${esc(parts.join(":").trim() || line)}</strong></div>`; }).join("") : `<p>Scheda tecnica da completare.</p>`}</div><div class="stock-summary"><div><small>${esc(p.stato_giacenza || (stock ? "DISPONIBILE" : "NON DISPONIBILE"))}</small><strong>${stock} pz</strong></div><span>${String(p.promo_attiva || "NO").toUpperCase() === "SI" ? "PROMO ATTIVA" : "LISTINO ORDINARIO"}</span></div></div></div>`;
     openModal(`Scheda tecnica ${p.nome}`, body, { wide: true, kicker: "Catalogo Seemax" });
@@ -410,6 +423,26 @@
     return record;
   }
 
+  function updateLocalDashboard() {
+    const practices = state.data.practices || [];
+    const activities = state.data.activities || [];
+    const open = practices.filter((p) => !["Completata", "Bocciata"].includes(p.stato));
+    state.data.dashboard = {
+      totals: { clients: (state.data.clients || []).length, practices: open.length, value: open.reduce((sum, p) => sum + Number(p.valore || 0), 0), activities: activities.filter((a) => a.stato !== "Completata").length },
+      recentPractices: practices.slice().sort((a, b) => String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || ""))).slice(0, 5),
+      nextActivities: activities.filter((a) => a.stato !== "Completata").sort((a, b) => String(a.scadenza || "").localeCompare(String(b.scadenza || ""))).slice(0, 6),
+      pipeline: STATUSES.map((status) => ({ status, count: practices.filter((p) => p.stato === status).length, value: practices.filter((p) => p.stato === status).reduce((sum, p) => sum + Number(p.valore || 0), 0) }))
+    };
+  }
+
+  function replaceLocalEntity(entity, row) {
+    const rows = state.data[entity] || (state.data[entity] = []);
+    const index = rows.findIndex((item) => String(item.id || item.username) === String(row.id || row.username));
+    if (index >= 0) rows[index] = { ...rows[index], ...row };
+    else rows.unshift(row);
+    updateLocalDashboard();
+  }
+
   async function saveEntity(form) {
     const entity = form.dataset.entity;
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
@@ -435,8 +468,9 @@
     }
     setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
     try {
-      await api.upsert(entity, record);
-      await loadAll();
+      const saved = await api.upsert(entity, record);
+      if (saved.__notifications) { state.data.notifications = saved.__notifications; delete saved.__notifications; updateNotificationBell(); }
+      replaceLocalEntity(entity, saved);
       closeModal();
       renderRoute();
       toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
@@ -448,7 +482,7 @@
     const label = ENTITY_LABELS[entity] || "elemento";
     if (!confirm(`Eliminare definitivamente questo ${label}?`)) return;
     setLoading(true, "Eliminazione…");
-    try { await api.remove(entity, id); await loadAll(); renderRoute(); toast(`${label} eliminato.`); }
+    try { await api.remove(entity, id); state.data[entity] = (state.data[entity] || []).filter((item) => String(item.id || item.username) !== String(id)); updateLocalDashboard(); renderRoute(); toast(`${label} eliminato.`); }
     catch (error) { toast(error.message, "danger"); }
     finally { setLoading(false); }
   }
@@ -456,8 +490,8 @@
   async function toggleActivity(id) {
     const record = state.data.activities.find((a) => a.id === id);
     if (!record) return;
-    await api.upsert("activities", { ...record, stato: record.stato === "Completata" ? "Aperta" : "Completata" });
-    await loadAll(); renderRoute(); toast("Attività aggiornata.");
+    const saved = await api.upsert("activities", { ...record, stato: record.stato === "Completata" ? "Aperta" : "Completata" });
+    replaceLocalEntity("activities", saved); renderRoute(); toast("Attività aggiornata.");
   }
 
   function searchEverywhere(query) {
@@ -479,7 +513,6 @@
       "close-modal": closeModal,
       "open-notifications": openNotifications,
       "reload": async () => { await loadAll(); renderRoute(); },
-      "open-planner-window": () => window.open(config.quotationPlannerPath, "_blank", "noopener"),
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.ping(); setConnectionState(); toast(response.ok ? "Collegamento funzionante." : "Collegamento non disponibile.", response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
       "reset-demo": async () => { if (confirm("Ripristinare tutti i dati dimostrativi?")) { api.resetDemo(); await loadAll(); renderRoute(); toast("Dati demo ripristinati."); } }

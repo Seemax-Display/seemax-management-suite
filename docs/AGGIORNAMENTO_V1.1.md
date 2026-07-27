@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.3
+# Aggiornamento Seemax Management Suite 1.4
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -64,6 +64,15 @@ Gli unici stati disponibili sono `Inserita`, `Accettata`, `Sospesa`, `Bocciata` 
 Quando cambia lo stato, il gestionale crea una notifica per l'agente responsabile. La notifica appare nella campanella in alto e, se nella riga dell'agente è presente un indirizzo email, viene inviata anche tramite email Google senza servizi esterni.
 
 La prima esecuzione di `upgradeSeemaxV11` crea il foglio `NOTIFICHE` e converte automaticamente gli stati precedenti.
+
+## Interfaccia e prestazioni 1.4
+
+- Testi ingranditi e righe delle pratiche evidenziate completamente in base allo stato.
+- Modulo pratica semplificato: cliente bloccato nelle pratiche esistenti; rimossi oggetto, scadenza e prossimo passo; righe tecniche di magazzino nascoste.
+- Salvataggi rapidi: dopo un'operazione viene aggiornata solo la riga interessata, evitando di ricaricare tutte le tabelle Google.
+- Le pratiche completate e i clienti collegati a pratiche completate possono essere eliminati soltanto direttamente dal Foglio Google.
+- Catalogo senza il comando “Usa nel Planner”; modifica prodotto divisa in Dettagli, Costi, Giacenze, Scheda tecnica e Altro.
+- Quotation Planner incorporato senza apertura in una pagina separata e con accesso ereditato automaticamente dalla sessione del gestionale.
 
 ## Regole di magazzino
 

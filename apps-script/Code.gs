@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.3.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.4.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -23,7 +23,7 @@ var ENTITY_SHEETS = {
 
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
-  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "aggiornatoIl"],
+  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "email", "telefono", "citta", "indirizzo", "note", "creatoIl", "agent_username", "aggiornatoIl"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "data", "note", "agent_username", "aggiornatoIl"],
@@ -163,7 +163,7 @@ function managementUpsert_(p) {
     var practiceRow = upsertPracticeWithInventory_(payload, user);
     if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) createPracticeStatusNotification_(previousPractice, practiceRow, user);
     log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
-    return { ok: true, row: practiceRow };
+    return { ok: true, row: practiceRow, notifications: listNotificationsForUser_(user) };
   }
   if (entity === "users") {
     payload.id = payload.username;
@@ -480,7 +480,12 @@ function managementRemove_(p) {
   if (entity === "users" && id === user.username) throw new Error("Non puoi eliminare l'account attualmente collegato.");
   if (entity === "practices") {
     var practice = findRowObject_("PRATICHE", "id", id);
-    if (practice && String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") throw new Error("Prima di eliminare la pratica, impostala come Annullata per ripristinare le giacenze.");
+    if (practice && String(practice.stato || "") === "Completata") throw new Error("Le pratiche completate possono essere eliminate solo dal Foglio Google.");
+    if (practice && String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") throw new Error("Prima di eliminare la pratica, impostala come Sospesa per ripristinare le giacenze.");
+  }
+  if (entity === "clients") {
+    var completedPractice = rowsToObjects_(sheet_("PRATICHE")).filter(function (row) { return String(row.clientId || "") === id && String(row.stato || "") === "Completata"; })[0];
+    if (completedPractice) throw new Error("Il cliente è collegato a una pratica completata e può essere eliminato solo dal Foglio Google.");
   }
   var removed = removeEntity_(entity, id, user);
   log_(user, "DELETE", entity, id, "Eliminazione da Management Suite");

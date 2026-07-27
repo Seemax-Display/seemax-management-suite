@@ -10,15 +10,13 @@ Contiene le anagrafiche aziendali e i relativi contatti. `id` identifica il clie
 
 Ogni riga rappresenta un’opportunità o lavoro. Gli stati previsti sono:
 
-1. Nuova
-2. Preventivo
-3. Documenti
-4. Istruttoria
-5. Delibera
-6. Contratto
-7. Installazione
-8. Chiusa
-9. Rifiutata
+1. Inserita
+2. Accettata
+3. Sospesa
+4. Bocciata, solo per noleggio e leasing
+5. Completata
+
+Le colonne `modelli_display`, `misure_display`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito l'impegno di magazzino.
 
 ### DOCUMENTI
 
@@ -32,6 +30,10 @@ Contiene telefonate, email, appuntamenti, verifiche e installazioni con scadenza
 
 Registra le principali operazioni effettuate dagli utenti: salvataggi, modifiche ed eliminazioni.
 
+### NOTIFICHE
+
+Conserva le variazioni di stato destinate all'agente responsabile e lo stato letto/non letto mostrato dalla campanella.
+
 ## Fogli condivisi con il Quotation Planner
 
 ### AGENTI
@@ -40,7 +42,7 @@ Utilizzato sia dal gestionale sia dal Planner per login e ruoli.
 
 ### PRODOTTI_LED
 
-Listino comune a catalogo e calcolatore. Le colonne originali restano compatibili; il setup aggiunge soltanto campi gestionali come `id`, `categoria`, `descrizione` e URL delle immagini.
+Listino comune a catalogo e calcolatore. Comprende ID prodotto, costi, giacenze, promozioni e singoli campi della scheda tecnica modificabili dal gestionale.
 
 ### ARCHIVIO_PREVENTIVI
 

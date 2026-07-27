@@ -1003,6 +1003,10 @@
         transform:none!important;
       }
     }
+    body.integrated-suite .app{grid-template-columns:1fr}
+    body.integrated-suite .sidebar{display:none!important}
+    body.integrated-suite .mobile-tabs{display:flex!important;position:sticky;top:0;z-index:70}
+    body.integrated-suite .main{padding:18px 20px 28px}
 </style>
 </head>
 <body>
@@ -1888,6 +1892,21 @@
         model.sku = dbText(row.sku, '');
         model.giacenzaAttuale = Math.max(0, dbNumber(row.giacenza_attuale, 0));
         model.statoGiacenza = dbText(row.stato_giacenza, model.giacenzaAttuale > 0 ? 'DISPONIBILE' : 'NON DISPONIBILE');
+        const technicalSheet = TECH_SHEETS[canonicalProductName(model.nome)];
+        if(technicalSheet){
+          const techFields = [
+            ['pixel pitch','tech_pixel_pitch'],['certificazione','tech_certificazione'],['modalità','tech_utilizzo'],['densità pixel','tech_densita_pixel'],
+            ['led standard','tech_led_standard'],['materiale cabinet','tech_materiale_cabinet'],['peso cabinet','tech_peso_cabinet'],['scala di grigi','tech_scala_grigi'],
+            ['temperatura','tech_temperatura'],['valore ip','tech_ip'],['consumo medio','tech_consumo_medio'],['consumo massimo','tech_consumo_massimo'],
+            ['vita media','tech_vita_media'],['visibilità','tech_visibilita'],['luminosità','tech_luminosita'],['frequenza aggiornamento','tech_refresh']
+          ];
+          techFields.forEach(([keyword, fieldName]) => {
+            const value = dbText(row[fieldName], '');
+            if(!value) return;
+            const target = technicalSheet.rows.find(specRow => String(specRow[0] || '').toLowerCase().includes(keyword));
+            if(target) target[1] = value;
+          });
+        }
         model.prezzo = model.prezzoAgente;
         model.info = admin ? model.infoAdmin : model.infoAgenti;
         merged.push(model);
@@ -2572,6 +2591,21 @@
 
     function loadAgentSession(){
       try{
+        const managementRaw = localStorage.getItem('SEEMAX_MANAGEMENT_SESSION_V1');
+        if(managementRaw){
+          const managementSession = JSON.parse(managementRaw);
+          if(managementSession && managementSession.username && managementSession.key){
+            return {
+              username:managementSession.username,
+              key:managementSession.key,
+              displayName:managementSession.displayName || managementSession.nome_visualizzato || managementSession.username,
+              nome_visualizzato:managementSession.displayName || managementSession.nome_visualizzato || managementSession.username,
+              email:managementSession.email || '',
+              telefono:managementSession.telefono || managementSession.phone || '',
+              role:managementSession.role || managementSession.ruolo || 'AGENTE'
+            };
+          }
+        }
         const raw = localStorage.getItem(AGENT_SESSION_STORAGE_KEY);
         if(!raw) return null;
         const session = JSON.parse(raw);
@@ -2626,7 +2660,7 @@
     }
 
     function agentAccessAvailable(){ return !isLiteMode(); }
-    function agentLoggedIn(){ return !!(agentAccessAvailable() && agentSession && agentSession.username && agentSession.key); }
+    function agentLoggedIn(){ return !!(agentSession && agentSession.username && agentSession.key); }
 
     function agentDisplayName(){
       return agentSession ? (agentSession.displayName || agentSession.username || '') : '';
@@ -5610,6 +5644,7 @@
     }
 
     function boot(){
+      if(new URLSearchParams(location.search).get('integrated') === '1') document.body.classList.add('integrated-suite');
       applyRuntimeRole(agentSession && agentSession.role ? agentSession.role : 'AGENTE', {refresh:false});
       initNavigation();
       setupSqpDecisionModal();

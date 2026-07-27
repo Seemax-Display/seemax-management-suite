@@ -79,7 +79,9 @@
   async function upsert(entity, record) {
     if (config.demoMode) return demo.upsert(entity, record);
     const response = await jsonp("management_upsert", { ...authParams(), entity, payload: JSON.stringify(record) }, 20000);
-    return response.row;
+    const row = response.row || {};
+    if (response.notifications) row.__notifications = response.notifications;
+    return row;
   }
 
   async function remove(entity, id) {
