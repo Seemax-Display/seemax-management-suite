@@ -12,7 +12,7 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - scarico automatico e tracciato del magazzino allo stato Accettata;
 - workflow pratiche semplificato: Inserita, Accettata, Sospesa, Bocciata e Completata;
 - notifiche interne con campanella ed email gratuita all'agente responsabile;
-- documenti tramite collegamenti Google Drive;
+- documenti e media caricati direttamente e archiviati su Google Drive;
 - attività, scadenze e appuntamenti;
 - gestione agenti e ruoli ADMIN/AGENTE;
 - Quotation Planner originale integrato;
@@ -38,7 +38,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 1.5.2 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene le correzioni di catalogo e magazzino e aggiunge fatturato, Modalità Rapida, documenti caricabili e configurazione cabinet nelle pratiche.
+Per aggiornare un'installazione già operativa alla versione 1.6.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge upload con conferma, P3.91 unificato e accesso mobile più chiaro alla Modalità Rapida.
 
 ## Placeholder
 

@@ -172,8 +172,9 @@
         mimeType: value.file_type || "application/octet-stream",
         fileBase64: value.file_base64
       });
-      value.url = upload.url;
-      value.file_id = upload.file_id;
+      const confirmedUpload = upload.pending ? await waitForUpload(upload.requestId) : upload;
+      value.url = confirmedUpload.url;
+      value.file_id = confirmedUpload.file_id;
       delete value.file_base64;
     }
     const response = await jsonp("management_upsert", { ...authParams(), entity, payload: JSON.stringify(value) }, 30000);
@@ -225,8 +226,21 @@
         input.type = "hidden"; input.name = name; input.value = value == null ? "" : String(value);
         form.appendChild(input);
       });
-      const timer = setTimeout(() => finish(new Error("Il caricamento del file non ha risposto in tempo.")), 90000);
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        window.removeEventListener("message", onMessage);
+        form.remove();
+        /* Il POST può proseguire anche se Apps Script non riesce a fare
+           postMessage verso GitHub Pages. Conserviamo l'iframe e verifichiamo
+           il risultato tramite management_upload_status. */
+        setTimeout(() => iframe.remove(), 120000);
+        resolve({ ok: true, pending: true, requestId });
+      }, 2500);
       function finish(error, result) {
+        if (done) return;
+        done = true;
         clearTimeout(timer);
         window.removeEventListener("message", onMessage);
         form.remove(); iframe.remove();
@@ -243,6 +257,26 @@
       document.body.append(iframe, form);
       form.submit();
     });
+  }
+
+  async function waitForUpload(requestId) {
+    const started = Date.now();
+    let lastError = null;
+    while (Date.now() - started < 90000) {
+      try {
+        const response = await jsonp("management_upload_status", { ...authParams(), requestId }, 12000);
+        if (response.completed) {
+          if (response.upload && response.upload.ok !== false) return response.upload;
+          throw new Error((response.upload && response.upload.error) || "Caricamento non riuscito.");
+        }
+      } catch (error) {
+        lastError = error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
+    throw new Error(lastError && lastError.message
+      ? `Il file non è stato confermato dal database: ${lastError.message}`
+      : "Il file non è stato confermato dal database entro 90 secondi.");
   }
 
   async function syncAll(onProgress) {

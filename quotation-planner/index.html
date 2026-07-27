@@ -1025,28 +1025,12 @@
           <div class="brand-title">COMPLETE QUOTATION PLANNER</div>
         </div>
       </div>
-      <div class="sqp-mode-banner" id="sqpModeBanner"><div><strong>S.Q.P. LITE ON</strong><span>Modalità semplificata attiva</span></div><i class="mode-led" aria-hidden="true"></i></div>
-      <div class="side-card mode-hero-card">
-        <h2>Modalità S.Q.P.</h2>
-        <div class="mode-side-actions" id="modeSwitchSlot" aria-label="Modalità S.Q.P.">
-          <button class="sqp-mode-toggle" type="button" id="btnSwitchMode">
-            <span class="mode-toggle-left"><span class="mode-toggle-icon">⚡</span><span><span class="mode-toggle-title">Modalità Lite</span><span class="mode-toggle-sub">Attiva interfaccia semplificata</span></span></span>
-            <span class="mode-toggle-arrow">→</span>
-          </button>
-        </div>
-        <div class="mode-static-chip" id="modeHeroStatic">🛡️ Modalità amministrativa avanzata</div>
-        <p class="mode-card-note" id="modeHeroNote">S.Q.P. ricorda l’ultima modalità avviata su questo dispositivo.</p>
-      </div>
       <nav class="nav" id="sideNav" aria-label="Navigazione principale"></nav>
       <div class="side-card quick-status-card">
         <h2>Ri-epilogo Rapido</h2>
         <div class="tutorial-side-actions" id="tutorialButtonSlot">
           <button class="btn tutorial-launch" type="button" id="btnTutorial" aria-label="Avvia tutorial guidato">🎓 AVVIA TUTORIAL GUIDATO</button>
           <small class="tutorial-hint">Guida passo-passo l’utente nella scheda in cui si trova.</small>
-        </div>
-        <div class="draft-side-actions" aria-label="Bozze preventivo">
-          <button class="btn soft" type="button" id="btnDraftSave">💾 Salva bozza</button>
-          <button class="btn ghost" type="button" id="btnDraftLoad">📂 Carica bozza</button>
         </div>
         <div class="side-mini-grid">
           <div class="side-mini"><span>Modalità</span><strong id="sideMode">Admin</strong></div>
@@ -1069,15 +1053,6 @@
           <span class="pill db-pill" id="databaseStatusPill"><span class="dot"></span><span id="databaseStatusText">DB locale</span></span>
         </div>
       </header>
-
-      <div class="draft-mobile-panel no-print" aria-label="Bozze preventivo mobile">
-        <button class="btn soft" type="button" id="btnDraftSaveMobile">💾 Salva bozza</button>
-        <button class="btn ghost" type="button" id="btnDraftLoadMobile">📂 Carica bozza</button>
-        <button class="sqp-mode-toggle mode-mobile-action" type="button" id="btnSwitchModeMobile">
-          <span class="mode-toggle-left"><span class="mode-toggle-icon">⚡</span><span><span class="mode-toggle-title">Modalità Lite</span><span class="mode-toggle-sub">Attiva interfaccia semplificata</span></span></span>
-          <span class="mode-toggle-arrow">→</span>
-        </button>
-      </div>
 
       <div class="db-status-card db-status-global no-print" aria-live="polite">
         <div>
@@ -1412,10 +1387,9 @@
 
     const SQP_MODE_STORAGE_KEY = 'SEEMAX_QUOTATION_PLANNER_MODE';
     const SQP_MODE_DEFAULT = 'advanced';
-    let liteModeAllowed = !admin;
-    let sqpMode = liteModeAllowed ? (localStorage.getItem(SQP_MODE_STORAGE_KEY) || SQP_MODE_DEFAULT) : 'advanced';
-    if(!['lite','advanced'].includes(sqpMode)) sqpMode = SQP_MODE_DEFAULT;
-    const isLiteMode = () => liteModeAllowed && sqpMode === 'lite';
+    let liteModeAllowed = false;
+    let sqpMode = 'advanced';
+    const isLiteMode = () => false;
 
     const APP_CONFIG = {
       get modeText(){ return admin ? 'Admin' : 'Agente'; },
@@ -2631,13 +2605,8 @@
       const nextRole = normalizeUserRole(role);
       const nextAdmin = nextRole === 'ADMIN';
       admin = nextAdmin;
-      liteModeAllowed = !admin;
-      if(admin){
-        sqpMode = 'advanced';
-      }else{
-        const remembered = localStorage.getItem(SQP_MODE_STORAGE_KEY) || SQP_MODE_DEFAULT;
-        sqpMode = ['lite','advanced'].includes(remembered) ? remembered : SQP_MODE_DEFAULT;
-      }
+      liteModeAllowed = false;
+      sqpMode = 'advanced';
       ledwalls.forEach(model => {
         model.prezzo = model.prezzoAgente;
         model.info = admin ? model.infoAdmin : model.infoAgenti;
@@ -5669,11 +5638,9 @@
       applyRuntimeRole(agentSession && agentSession.role ? agentSession.role : 'AGENTE', {refresh:false});
       initNavigation();
       setupSqpDecisionModal();
-      setupSqpModeSwitch();
       setupLiteFinanceAttach();
       setupAgentAccess();
       setupTutorial();
-      setupDrafts();
       setupOnlineArchive();
       setupPatchNotes();
       setupDatabaseTest();

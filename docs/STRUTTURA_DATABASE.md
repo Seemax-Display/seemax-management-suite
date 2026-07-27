@@ -16,7 +16,7 @@ Ogni riga rappresenta un’opportunità o lavoro. Gli stati previsti sono:
 4. Bocciata, solo per noleggio e leasing
 5. Completata
 
-Le colonne `modelli_display`, `misure_display`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito l'impegno di magazzino.
+Le colonne `modelli_display`, `misure_display`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito l'impegno di magazzino. Per il P3.91 unificato sono disponibili anche `p391_unificato`, `p391_cabinet_50100` e `p391_cabinet_5050`; lo scarico continua a usare le righe JSON separate, quindi resta atomico e idempotente.
 
 ### DOCUMENTI
 

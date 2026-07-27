@@ -230,6 +230,9 @@ body { font-size: 16px; }
 .empty-state p { font-size: 13px; }.modal-panel header p { font-size: 12px; }
 
 .mode-controls { display: flex; align-items: center; gap: 7px; }
+.sidebar-mode-mobile { gap: 7px; border: 1px solid rgba(255,255,255,.2); border-radius: 13px; padding: 9px; }
+.sidebar-mode-mobile span { color: #fff; font-size: 12px; font-weight: 900; }
+.sidebar-mode-mobile .btn { width: 100%; color: #fff; border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.1); }
 .mode-indicator { border: 1px solid #bfdbfe; border-radius: 999px; padding: 7px 9px; color: #1d4ed8; background: #eff6ff; font-size: 10px; font-weight: 950; letter-spacing: .08em; }
 .mode-indicator.fast { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
 #saveAllButton i { min-width: 20px; border-radius: 999px; padding: 2px 5px; color: #fff; background: var(--brand); font-size: 10px; font-style: normal; }
@@ -281,9 +284,10 @@ body { font-size: 16px; }
   .mode-controls .btn { padding-inline: 10px; font-size: 11px; }
 }
 @media (max-width: 900px) {
-  .mode-controls { position: fixed; z-index: 45; left: 14px; right: 14px; bottom: 12px; justify-content: center; border: 1px solid var(--line); border-radius: 16px; padding: 8px; background: rgba(255,255,255,.96); box-shadow: var(--shadow); }
+  .mode-controls { position: fixed; z-index: 160; left: 14px; right: 14px; bottom: max(12px, env(safe-area-inset-bottom)); display: flex !important; visibility: visible; opacity: 1; justify-content: center; border: 1px solid var(--line); border-radius: 16px; padding: 8px; background: rgba(255,255,255,.98); box-shadow: var(--shadow); }
   .mode-indicator { display: inline-flex; }.mode-controls .btn { flex: 1; }
   .workspace { padding-bottom: 90px; }
+  .sidebar-mode-mobile { display: grid !important; }
 }
 @media (max-width: 620px) {
   .revenue-grid { grid-template-columns: 1fr; }

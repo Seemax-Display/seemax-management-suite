@@ -356,7 +356,14 @@
     try { inventoryRows = JSON.parse(record.righe_magazzino_json || "[]"); } catch (error) { inventoryRows = []; }
     const selectedProductId = (inventoryRows[0] && inventoryRows[0].product_id) || "";
     const productOptions = state.data.products.filter((p) => String(p.attivo || "SI").toUpperCase() === "SI");
-    const selectedProduct = productOptions.find((p) => p.id === selectedProductId) || productOptions[0] || {};
+    const isP391Id = (value) => ["p391-50100", "p391-5050"].includes(String(value || "").toLowerCase());
+    const logicalProducts = productOptions.filter((p) => !isP391Id(p.id));
+    if (productOptions.some((p) => isP391Id(p.id))) {
+      logicalProducts.splice(Math.min(3, logicalProducts.length), 0, { id: "P391_UNIFIED", nome: "P3.91", cabX: 50, cabY: 50, unifiedP391: true });
+    }
+    const selectedProduct = isP391Id(selectedProductId)
+      ? logicalProducts.find((p) => p.id === "P391_UNIFIED")
+      : logicalProducts.find((p) => p.id === selectedProductId) || logicalProducts[0] || {};
     const measure = String(record.misure_display || "").match(/([\d.,]+)\s*[x×]\s*([\d.,]+)/i);
     const width = measure ? Number(measure[1].replace(",", ".")) : Number(selectedProduct.cabX || 50) / 100;
     const height = measure ? Number(measure[2].replace(",", ".")) : Number(selectedProduct.cabY || 50) / 100;
@@ -365,7 +372,7 @@
       ? `${field("Stato (gestibile dall’admin)", "stato_display", record.stato || "Inserita", { readonly: true })}<input type="hidden" name="stato" value="${esc(record.stato || "Inserita")}">`
       : field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses, readonly: !api.isAdmin() });
     const technicalFields = `<fieldset class="practice-configurator full"><legend>Configurazione display</legend><div class="form-grid">
-      <label>Display di riferimento<select name="product_id" required>${productOptions.map((p) => `<option value="${esc(p.id)}" ${p.id === selectedProduct.id ? "selected" : ""}>${esc(p.nome)} · cabinet ${esc(p.cabX)}×${esc(p.cabY)} cm</option>`).join("")}</select></label>
+      <label>Display di riferimento<select name="product_id" required>${logicalProducts.map((p) => `<option value="${esc(p.id)}" ${p.id === selectedProduct.id ? "selected" : ""}>${esc(p.nome)}${p.unifiedP391 ? " · composizione automatica 50×100 + 50×50 cm" : ` · cabinet ${esc(p.cabX)}×${esc(p.cabY)} cm`}</option>`).join("")}</select></label>
       ${field("Larghezza display (m)", "display_width", width, { type: "number", min: 0, step: "any" })}
       ${field("Altezza display (m)", "display_height", height, { type: "number", min: 0, step: "any" })}
       ${field("Bifacciale", "bifacciale", bifacial, { options: ["NO", "SI"] })}
@@ -378,7 +385,7 @@
       field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) +
       technicalFields +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
-      `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}">` +
+      `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}"><input type="hidden" name="p391_unificato" value="${esc(record.p391_unificato || "NO")}"><input type="hidden" name="p391_cabinet_50100" value="${esc(record.p391_cabinet_50100 || "0")}"><input type="hidden" name="p391_cabinet_5050" value="${esc(record.p391_cabinet_5050 || "0")}">` +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
       field("Note", "note", record.note || "", { type: "textarea", full: true });
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
@@ -401,10 +408,10 @@
       typeSelect.addEventListener("change", updatePracticeType);
       if (!record.id) updatePracticeType();
     }
-    bindPracticeCalculator(productOptions);
+    bindPracticeCalculator(logicalProducts, productOptions);
   }
 
-  function bindPracticeCalculator(products) {
+  function bindPracticeCalculator(products, inventoryProducts) {
     const form = document.querySelector(".entity-form[data-entity='practices']");
     if (!form) return;
     form.noValidate = true;
@@ -417,6 +424,7 @@
     const availability = $("cabinetAvailability");
     function calculate() {
       const p = products.find((item) => item.id === product.value) || {};
+      const isUnifiedP391 = p.id === "P391_UNIFIED";
       const stepX = Number(p.cabX || 50) / 100;
       const stepY = Number(p.cabY || 50) / 100;
       width.step = String(stepX); height.step = String(stepY);
@@ -424,10 +432,46 @@
       const x = Math.max(1, Math.ceil((Number(width.value || 0) - 1e-8) / stepX));
       const y = Math.max(1, Math.ceil((Number(height.value || 0) - 1e-8) / stepY));
       const faces = bifacial.value === "SI" ? 2 : 1;
-      const count = x * y * faces;
+      let count = x * y * faces;
       const exactX = Math.abs(Number(width.value || 0) / stepX - Math.round(Number(width.value || 0) / stepX)) < 0.001;
       const exactY = Math.abs(Number(height.value || 0) / stepY - Math.round(Number(height.value || 0) / stepY)) < 0.001;
       cabinets.value = count;
+      if (isUnifiedP391) {
+        const cellsWide = Math.max(1, Math.ceil((Number(width.value || 0) - 1e-8) / 0.5));
+        const cellsHigh = Math.max(1, Math.ceil((Number(height.value || 0) - 1e-8) / 0.5));
+        const rectangularCount = cellsWide * Math.floor(cellsHigh / 2) * faces;
+        const squareCount = cellsWide * (cellsHigh % 2) * faces;
+        const rectangular = inventoryProducts.find((item) => String(item.id).toLowerCase() === "p391-50100") || {};
+        const square = inventoryProducts.find((item) => String(item.id).toLowerCase() === "p391-5050") || {};
+        const rectangularStock = Number(rectangular.giacenza_attuale || 0);
+        const squareStock = Number(square.giacenza_attuale || 0);
+        const missingRectangular = Math.max(0, rectangularCount - rectangularStock);
+        const missingSquare = Math.max(0, squareCount - squareStock);
+        count = rectangularCount + squareCount;
+        cabinets.value = count;
+        availability.textContent = `50×100: ${rectangularCount}/${rectangularStock} · 50×50: ${squareCount}/${squareStock}`;
+        availability.className = `cabinet-availability ${missingRectangular || missingSquare ? "insufficient" : "available"}`;
+        const exactWidth = Math.abs(Number(width.value || 0) / 0.5 - Math.round(Number(width.value || 0) / 0.5)) < 0.001;
+        const exactHeight = Math.abs(Number(height.value || 0) / 0.5 - Math.round(Number(height.value || 0) / 0.5)) < 0.001;
+        const realizedWidth = cellsWide * 0.5;
+        const realizedHeight = cellsHigh * 0.5;
+        validation.innerHTML = missingRectangular || missingSquare
+          ? `<strong>Giacenza insufficiente:</strong> ${missingRectangular ? `mancano ${missingRectangular} cabinet 50×100` : ""}${missingRectangular && missingSquare ? " e " : ""}${missingSquare ? `mancano ${missingSquare} cabinet 50×50` : ""}. Puoi comunque inserire la pratica.`
+          : (!exactWidth || !exactHeight)
+            ? `<strong>Misura adattata:</strong> configurazione reale ${realizedWidth.toFixed(2)}×${realizedHeight.toFixed(2)} m. Composizione: ${rectangularCount} cabinet 50×100 e ${squareCount} cabinet 50×50${faces === 2 ? " (bifacciale)" : ""}.`
+            : `P3.91 unificato: ${rectangularCount} cabinet 50×100 e ${squareCount} cabinet 50×50${faces === 2 ? " (bifacciale)" : ""}.`;
+        const rows = [];
+        if (rectangularCount) rows.push({ product_id: rectangular.id || "p391-50100", quantita: rectangularCount, descrizione: "P3.91 · cabinet 50×100 cm" });
+        if (squareCount) rows.push({ product_id: square.id || "p391-5050", quantita: squareCount, descrizione: "P3.91 · cabinet 50×50 cm" });
+        form.elements.modelli_display.value = "P3.91";
+        form.elements.misure_display.value = `${Number(width.value || 0).toFixed(2)}x${Number(height.value || 0).toFixed(2)}`;
+        form.elements.cabinet_da_sottrarre.value = `P3.91 50×100: ${rectangularCount}; P3.91 50×50: ${squareCount}`;
+        form.elements.righe_magazzino_json.value = JSON.stringify(rows);
+        form.elements.p391_unificato.value = "SI";
+        form.elements.p391_cabinet_50100.value = String(rectangularCount);
+        form.elements.p391_cabinet_5050.value = String(squareCount);
+        return;
+      }
       const stock = Number(p.giacenza_attuale || 0);
       availability.textContent = `${stock} disponibili · ${count} necessari`;
       availability.className = `cabinet-availability ${count > stock ? "insufficient" : "available"}`;
@@ -436,6 +480,9 @@
       form.elements.misure_display.value = `${Number(width.value || 0).toFixed(2)}x${Number(height.value || 0).toFixed(2)}`;
       form.elements.cabinet_da_sottrarre.value = `${p.nome}: ${count}`;
       form.elements.righe_magazzino_json.value = JSON.stringify([{ product_id: p.id, quantita: count, descrizione: p.nome }]);
+      form.elements.p391_unificato.value = "NO";
+      form.elements.p391_cabinet_50100.value = "0";
+      form.elements.p391_cabinet_5050.value = "0";
     }
     [product, width, height, bifacial].forEach((element) => element && element.addEventListener("change", calculate));
     [width, height].forEach((element) => element && element.addEventListener("input", calculate));
@@ -645,13 +692,20 @@
     const switchButton = $("modeSwitchButton");
     const saveButton = $("saveAllButton");
     if (!label || !switchButton || !saveButton) return;
-    label.textContent = fast ? "RAPIDA" : "STANDARD";
+    label.textContent = fast ? "MODALITÀ: RAPIDA" : "MODALITÀ: STANDARD";
     label.className = `mode-indicator ${fast ? "fast" : "standard"}`;
     switchButton.textContent = fast ? "Modalità Standard" : "Modalità Rapida";
     switchButton.dataset.action = fast ? "disable-fast-mode" : "enable-fast-mode";
     saveButton.classList.toggle("is-hidden", !fast);
     $("pendingCount").textContent = count;
     saveButton.disabled = count === 0;
+    const mobileLabel = $("mobileWorkModeLabel");
+    const mobileButton = $("mobileModeSwitchButton");
+    if (mobileLabel) mobileLabel.textContent = fast ? `⚡ Modalità Rapida${count ? ` · ${count} da salvare` : ""}` : "● Modalità Standard";
+    if (mobileButton) {
+      mobileButton.textContent = fast ? "Passa a Standard" : "Passa a Rapida";
+      mobileButton.dataset.action = fast ? "disable-fast-mode" : "enable-fast-mode";
+    }
   }
 
   function openFastModeWarning() {

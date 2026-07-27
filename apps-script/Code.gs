@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.5.2";
+var SEEMAX_VERSION = "seemax-management-suite-1.6.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -25,7 +25,7 @@ var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "email", "telefono", "citta", "indirizzo", "note", "creatoIl", "agent_username", "aggiornatoIl"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
@@ -63,9 +63,9 @@ function upgradeSeemaxV11() {
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
   migratePracticeStatusesV13_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.5.2");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.6.0");
   styleSheets_();
-  return "SEEMAX v1.5.2 configurato: misure cabinet corrette e creazione pratiche ripristinata.";
+  return "SEEMAX v1.6.0 configurato: upload affidabile, P3.91 unificato e interfaccia mobile aggiornata.";
 }
 
 function doGet(e) {
@@ -108,6 +108,7 @@ function routeGet_(action, p) {
     case "management_create_from_quote": return managementCreateFromQuote_(p);
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
     case "management_upload_document": return managementUploadDocument_(p);
+    case "management_upload_status": return managementUploadStatus_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -186,22 +187,43 @@ function managementUpsert_(p) {
 }
 
 function managementUploadDocument_(p) {
-  var user = authenticate_(p.agent_username, p.agent_key);
-  var filename = String(p.filename || "documento").replace(/[\\\/:*?"<>|]+/g, "_");
-  var mimeType = String(p.mimeType || "application/octet-stream");
-  var raw = String(p.fileBase64 || "");
-  var comma = raw.indexOf(",");
-  if (comma >= 0) raw = raw.substring(comma + 1);
-  if (!raw) throw new Error("File mancante.");
-  var bytes = Utilities.base64Decode(raw);
-  if (bytes.length > 8 * 1024 * 1024) throw new Error("Il file supera il limite di 8 MB.");
-  var folderName = "SEEMAX MANAGEMENT DOCUMENTI";
-  var folders = DriveApp.getFoldersByName(folderName);
-  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-  var file = folder.createFile(Utilities.newBlob(bytes, mimeType, filename));
-  file.setDescription("Caricato da " + (user.nome_visualizzato || user.username) + " tramite Seemax Management Suite");
-  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (sharingError) { /* alcuni domini Workspace impediscono la condivisione pubblica */ }
-  return { ok: true, url: file.getUrl(), file_id: file.getId(), file_name: filename, file_size: bytes.length };
+  var requestId = String(p.requestId || "");
+  try {
+    var user = authenticate_(p.agent_username, p.agent_key);
+    var filename = String(p.filename || "documento").replace(/[\\\/:*?"<>|]+/g, "_");
+    var mimeType = String(p.mimeType || "application/octet-stream");
+    var raw = String(p.fileBase64 || "");
+    var comma = raw.indexOf(",");
+    if (comma >= 0) raw = raw.substring(comma + 1);
+    if (!raw) throw new Error("File mancante.");
+    var bytes = Utilities.base64Decode(raw);
+    if (bytes.length > 8 * 1024 * 1024) throw new Error("Il file supera il limite di 8 MB.");
+    var folderName = "SEEMAX MANAGEMENT DOCUMENTI";
+    var folders = DriveApp.getFoldersByName(folderName);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+    var file = folder.createFile(Utilities.newBlob(bytes, mimeType, filename));
+    file.setDescription("Caricato da " + (user.nome_visualizzato || user.username) + " tramite Seemax Management Suite");
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (sharingError) { /* alcuni domini Workspace impediscono la condivisione pubblica */ }
+    var upload = { ok: true, url: file.getUrl(), file_id: file.getId(), file_name: filename, file_size: bytes.length };
+    cacheUploadResult_(requestId, upload);
+    return upload;
+  } catch (error) {
+    cacheUploadResult_(requestId, { ok: false, error: String(error && error.message ? error.message : error) });
+    throw error;
+  }
+}
+
+function cacheUploadResult_(requestId, result) {
+  if (!requestId) return;
+  CacheService.getScriptCache().put("management_upload_" + requestId, JSON.stringify(result), 600);
+}
+
+function managementUploadStatus_(p) {
+  authenticate_(p.agent_username, p.agent_key);
+  var requestId = String(p.requestId || "");
+  if (!requestId) throw new Error("Identificativo upload mancante.");
+  var raw = CacheService.getScriptCache().get("management_upload_" + requestId);
+  return { ok: true, completed: !!raw, upload: raw ? parseJson_(raw, {}) : null };
 }
 
 function managementCreateFromQuote_(p) {
