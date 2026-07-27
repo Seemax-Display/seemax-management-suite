@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.5.1";
+var SEEMAX_VERSION = "seemax-management-suite-1.5.2";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -63,9 +63,9 @@ function upgradeSeemaxV11() {
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
   migratePracticeStatusesV13_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.5.1");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.5.2");
   styleSheets_();
-  return "SEEMAX v1.5.1 configurato: Planner rapido, obiettivo 500.000 euro e caricamento file protetto.";
+  return "SEEMAX v1.5.2 configurato: misure cabinet corrette e creazione pratiche ripristinata.";
 }
 
 function doGet(e) {

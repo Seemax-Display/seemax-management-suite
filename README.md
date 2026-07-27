@@ -38,7 +38,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 1.5.1 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene le correzioni di catalogo e magazzino e aggiunge fatturato, Modalità Rapida, documenti caricabili e configurazione cabinet nelle pratiche.
+Per aggiornare un'installazione già operativa alla versione 1.5.2 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene le correzioni di catalogo e magazzino e aggiunge fatturato, Modalità Rapida, documenti caricabili e configurazione cabinet nelle pratiche.
 
 ## Placeholder
 

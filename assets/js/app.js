@@ -366,9 +366,8 @@
       : field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses, readonly: !api.isAdmin() });
     const technicalFields = `<fieldset class="practice-configurator full"><legend>Configurazione display</legend><div class="form-grid">
       <label>Display di riferimento<select name="product_id" required>${productOptions.map((p) => `<option value="${esc(p.id)}" ${p.id === selectedProduct.id ? "selected" : ""}>${esc(p.nome)} · cabinet ${esc(p.cabX)}×${esc(p.cabY)} cm</option>`).join("")}</select></label>
-      ${field("Inserimento misura", "measure_mode", "GUIDATA", { options: ["GUIDATA", "LIBERA"] })}
-      ${field("Larghezza display (m)", "display_width", width, { type: "number", min: 0.01, step: "0.01" })}
-      ${field("Altezza display (m)", "display_height", height, { type: "number", min: 0.01, step: "0.01" })}
+      ${field("Larghezza display (m)", "display_width", width, { type: "number", min: 0, step: "any" })}
+      ${field("Altezza display (m)", "display_height", height, { type: "number", min: 0, step: "any" })}
       ${field("Bifacciale", "bifacciale", bifacial, { options: ["NO", "SI"] })}
       <label>Cabinet necessari<input name="cabinet_calculated" value="0" readonly><small id="cabinetAvailability" class="cabinet-availability"></small></label>
       <div id="measureValidation" class="measure-validation full"></div>
@@ -386,7 +385,7 @@
     const typeSelect = document.querySelector('.entity-form select[name="tipo_pratica"]');
     const statusSelect = document.querySelector('.entity-form select[name="stato"]');
     const financeSelect = document.querySelector('.entity-form select[name="finanziaria"]');
-    if (typeSelect) typeSelect.addEventListener("change", () => {
+    const updatePracticeType = () => {
       if (financeSelect) {
         financeSelect.value = typeSelect.value === "NOLEGGIO" ? "Grenke" : typeSelect.value === "LEASING" ? "IFIS" : "Da definire";
         financeSelect.disabled = typeSelect.value !== "ACQUISTO";
@@ -397,32 +396,31 @@
         statusSelect.innerHTML = options.map((status) => `<option value="${status}" ${status === current ? "selected" : ""}>${status}</option>`).join("");
         if (!options.includes(current)) statusSelect.value = "Sospesa";
       }
-    });
+    };
+    if (typeSelect) {
+      typeSelect.addEventListener("change", updatePracticeType);
+      if (!record.id) updatePracticeType();
+    }
     bindPracticeCalculator(productOptions);
   }
 
   function bindPracticeCalculator(products) {
     const form = document.querySelector(".entity-form[data-entity='practices']");
     if (!form) return;
+    form.noValidate = true;
     const product = form.elements.product_id;
-    const mode = form.elements.measure_mode;
     const width = form.elements.display_width;
     const height = form.elements.display_height;
     const bifacial = form.elements.bifacciale;
     const cabinets = form.elements.cabinet_calculated;
     const validation = $("measureValidation");
     const availability = $("cabinetAvailability");
-    function calculate(snap) {
+    function calculate() {
       const p = products.find((item) => item.id === product.value) || {};
       const stepX = Number(p.cabX || 50) / 100;
       const stepY = Number(p.cabY || 50) / 100;
-      if (mode.value === "GUIDATA") {
-        width.step = stepX; height.step = stepY;
-        if (snap) {
-          width.value = (Math.max(1, Math.round(Number(width.value || stepX) / stepX)) * stepX).toFixed(2);
-          height.value = (Math.max(1, Math.round(Number(height.value || stepY) / stepY)) * stepY).toFixed(2);
-        }
-      } else { width.step = "0.01"; height.step = "0.01"; }
+      width.step = String(stepX); height.step = String(stepY);
+      width.min = String(stepX); height.min = String(stepY);
       const x = Math.max(1, Math.ceil((Number(width.value || 0) - 1e-8) / stepX));
       const y = Math.max(1, Math.ceil((Number(height.value || 0) - 1e-8) / stepY));
       const faces = bifacial.value === "SI" ? 2 : 1;
@@ -439,9 +437,9 @@
       form.elements.cabinet_da_sottrarre.value = `${p.nome}: ${count}`;
       form.elements.righe_magazzino_json.value = JSON.stringify([{ product_id: p.id, quantita: count, descrizione: p.nome }]);
     }
-    [product, mode, width, height, bifacial].forEach((element) => element && element.addEventListener("change", () => calculate(true)));
-    [width, height].forEach((element) => element && element.addEventListener("input", () => calculate(false)));
-    calculate(true);
+    [product, width, height, bifacial].forEach((element) => element && element.addEventListener("change", calculate));
+    [width, height].forEach((element) => element && element.addEventListener("input", calculate));
+    calculate();
   }
 
   function updateNotificationBell() {
@@ -551,10 +549,19 @@
 
   async function saveEntity(form) {
     const entity = form.dataset.entity;
+    const missing = Array.from(form.querySelectorAll("[required]")).find((element) => !String(element.value || "").trim());
+    if (missing) {
+      toast("Compila tutti i campi obbligatori prima di proseguire.", "danger");
+      missing.focus();
+      return;
+    }
+    if (entity === "practices" && (Number(form.elements.display_width?.value || 0) <= 0 || Number(form.elements.display_height?.value || 0) <= 0)) {
+      toast("Inserisci larghezza e altezza maggiori di zero.", "danger");
+      return;
+    }
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const record = { ...current, ...serializeForm(form) };
     delete record.cabinet_calculated;
-    delete record.measure_mode;
     delete record.display_width;
     delete record.display_height;
     delete record.product_id;

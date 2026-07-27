@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.5.1
+# Aggiornamento Seemax Management Suite 1.5.2
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -91,6 +91,15 @@ La prima esecuzione di `upgradeSeemaxV11` crea il foglio `NOTIFICHE` e converte 
 Il caricamento o la sostituzione dei file non è disponibile in Modalità Rapida. In Modalità Standard il limite per singolo file è 8 MB.
 
 L’obiettivo fatturato iniziale è impostato a **500.000 €**. Durante l’aggiornamento, l’eventuale valore predefinito precedente di 100.000 € viene sostituito automaticamente; valori personalizzati differenti vengono conservati.
+
+### Correzione misure pratica 1.5.2
+
+- rimosso il campo “Inserimento misura”;
+- larghezza e altezza possono essere digitate liberamente;
+- le frecce native avanzano secondo la misura reale del cabinet: 0,50, 0,57, 0,64, 0,96 o 1,00 m;
+- eliminata la base errata di 0,01 che generava valori come 0,51 e 1,01;
+- una misura non multipla mostra la configurazione reale necessaria senza impedire la creazione della pratica;
+- la finanziaria iniziale viene riallineata automaticamente al tipo di pratica.
 
 ## Regole di magazzino
 
