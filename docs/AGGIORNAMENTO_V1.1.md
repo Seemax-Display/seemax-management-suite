@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.6.0
+# Aggiornamento Seemax Management Suite 1.7.0
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -111,6 +111,21 @@ L’obiettivo fatturato iniziale è impostato a **500.000 €**. Durante l’agg
 - il campo `righe_magazzino_json` conserva le due righe reali da scaricare, mentre le nuove colonne `p391_unificato`, `p391_cabinet_50100` e `p391_cabinet_5050` rendono la composizione leggibile anche direttamente dal Foglio Google.
 
 Esempio: un P3.91 da **1,00×1,50 m** richiede 2 cabinet 50×100 e 2 cabinet 50×50. In caso bifacciale le due quantità vengono raddoppiate.
+
+## Novità 1.7 – Anagrafica cliente
+
+- controllo formale della Partita IVA italiana e rilevamento dei duplicati;
+- verifica facoltativa automatica VIES, distinta dalla verifica di esistenza italiana;
+- pulsante diretto al servizio ufficiale Agenzia delle Entrate e registrazione manuale dell’esito;
+- verifica IBAN tramite lunghezza nazionale e algoritmo MOD-97;
+- telefono internazionale con bandiera, Paese, prefisso e controllo del numero;
+- menu dipendenti Regione → Provincia → Comune/Città → CAP;
+- archivio territoriale locale derivato dai dati ISTAT, utilizzabile senza interrogazioni continue al database;
+- colonne aggiunte automaticamente al foglio `CLIENTI` tramite `upgradeSeemaxV11`.
+
+La verifica VIES negativa non blocca la creazione del cliente: indica soltanto che la P.IVA non risulta abilitata alle operazioni intracomunitarie. Il controllo formale della P.IVA, l’IBAN e il telefono non valido sono invece bloccanti quando i rispettivi campi vengono compilati.
+
+Durante l’aggiornamento, gli eventuali codici fiscali alfanumerici precedentemente conservati nella vecchia colonna “P.IVA / C.F.” vengono spostati automaticamente nella nuova colonna `codice_fiscale`, senza perdita del dato.
 
 ## Regole di magazzino
 

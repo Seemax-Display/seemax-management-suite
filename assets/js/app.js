@@ -506,8 +506,14 @@
 
   function openClient(id) {
     const r = state.data.clients.find((c) => c.id === id) || {};
-    const fields = field("Ragione sociale", "ragioneSociale", r.ragioneSociale, { required: true, full: true }) + field("Referente", "referente", r.referente) + field("P.IVA / C.F.", "piva", r.piva) + field("Email", "email", r.email, { type: "email" }) + field("Telefono", "telefono", r.telefono) + field("Comune / località", "citta", r.citta) + field("Indirizzo", "indirizzo", r.indirizzo) + field("Note commerciali", "note", r.note, { type: "textarea", full: true });
+    const fields = field("Ragione sociale", "ragioneSociale", r.ragioneSociale, { required: true, full: true }) +
+      field("Referente", "referente", r.referente) +
+      field("Email", "email", r.email, { type: "email" }) +
+      window.SeemaxClientTools.renderFields(r) +
+      field("Note commerciali", "note", r.note, { type: "textarea", full: true });
     openModal(r.id ? "Modifica cliente" : "Nuovo cliente", formShell("clients", r.id, fields), { wide: true, kicker: "Anagrafica cliente" });
+    const form = document.querySelector(".entity-form[data-entity='clients']");
+    if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast);
   }
 
   function openProduct(id) {
@@ -606,6 +612,23 @@
       toast("Inserisci larghezza e altezza maggiori di zero.", "danger");
       return;
     }
+    if (entity === "clients") {
+      if (form.elements.piva?.value && (form.elements.piva_formalmente_valida?.value !== "SI" || form.elements.piva_duplicata?.value === "SI")) {
+        toast("La Partita IVA non è formalmente valida oppure è già presente nel gestionale.", "danger");
+        form.elements.piva.focus();
+        return;
+      }
+      if (form.elements.iban?.value && form.elements.iban_valido?.value !== "SI") {
+        toast("Controlla l’IBAN: il codice inserito non supera la verifica MOD-97.", "danger");
+        form.elements.iban.focus();
+        return;
+      }
+      if (form.elements.telefono_numero?.value && form.elements.telefono_valido?.value !== "SI") {
+        toast("Controlla il numero di cellulare e il prefisso internazionale.", "danger");
+        form.elements.telefono_numero.focus();
+        return;
+      }
+    }
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const record = { ...current, ...serializeForm(form) };
     delete record.cabinet_calculated;
@@ -616,6 +639,14 @@
     if (form.dataset.id) record.id = form.dataset.id;
     const now = new Date().toISOString().slice(0, 10);
     if (entity === "clients") record.creatoIl = record.creatoIl || now;
+    if (entity === "clients") {
+      delete record.telefono_numero;
+      delete record.piva_duplicata;
+      record.piva = String(record.piva || "").replace(/\D/g, "");
+      record.codice_fiscale = String(record.codice_fiscale || "").replace(/\s+/g, "").toUpperCase();
+      record.iban = String(record.iban || "").replace(/\s+/g, "").toUpperCase();
+      record.citta = record.comune || record.citta || "";
+    }
     if (entity === "practices") {
       const client = state.data.clients.find((c) => c.id === record.clientId);
       record.cliente = client ? client.ragioneSociale : record.cliente;

@@ -4,7 +4,7 @@
 
 ### CLIENTI
 
-Contiene le anagrafiche aziendali e i relativi contatti. `id` identifica il cliente nelle pratiche.
+Contiene le anagrafiche aziendali e i relativi contatti. `id` identifica il cliente nelle pratiche. Dalla versione 1.7 comprende inoltre gli esiti distinti della P.IVA (`piva_formalmente_valida`, `piva_vies_valida`, `piva_verifica_ade`), IBAN, telefono internazionale e la gerarchia geografica Regione/Provincia/Comune/CAP.
 
 ### PRATICHE
 

@@ -1,8 +1,9 @@
-const CACHE = "seemax-management-v1-6-0";
+const CACHE = "seemax-management-v1-7-0";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
-  "./assets/js/app.js", "./assets/icons/icon.svg", "./manifest.webmanifest"
+  "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/vendor/libphonenumber-min.js",
+  "./assets/data/italy-locations.json", "./assets/icons/icon.svg", "./manifest.webmanifest"
 ];
 
 self.addEventListener("install", (event) => {

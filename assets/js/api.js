@@ -199,6 +199,11 @@
     return response.settings || {};
   }
 
+  async function verifyVat(vatNumber) {
+    if (config.demoMode) return { ok: true, valid: false, name: "", demo: true };
+    return jsonp("management_verify_vat", { ...authParams(), vatNumber: String(vatNumber || "").replace(/\D/g, "") }, 30000);
+  }
+
   async function saveSettings(values) {
     if (isFastMode()) {
       queueOperation({ type: "settings", values });
@@ -312,5 +317,5 @@
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length }; }
 
-  window.SeemaxApi = { login, logout, ping, bootstrap, list, upsert, remove, getSettings, saveSettings, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, bootstrap, list, upsert, remove, getSettings, saveSettings, verifyVat, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

@@ -259,6 +259,19 @@ body { font-size: 16px; }
 .upload-field { border: 2px dashed #bfdbfe; border-radius: 14px; padding: 14px; background: #f8fbff; }
 .upload-field input[type="file"] { border: 0; padding: 8px 0 0; background: transparent; }
 
+.client-section { margin: 4px 0; border: 1px solid #bfdbfe; border-radius: 17px; padding: 16px; background: #f8fbff; }
+.client-section legend { padding: 0 8px; color: var(--brand); font-size: 14px; font-weight: 950; }
+.client-section label { min-width: 0; }
+.client-section select { width: 100%; }
+.client-section select:disabled { color: #94a3b8; background: #f1f5f9; cursor: not-allowed; }
+.field-validation { display: block; min-height: 18px; margin-top: 5px; font-size: 12px; font-weight: 800; line-height: 1.4; }
+.field-validation.neutral { color: #64748b; }
+.field-validation.valid { color: #15803d; }
+.field-validation.invalid { color: #b91c1c; }
+.field-validation.warning { color: #a16207; }
+.verification-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+.verification-actions .btn { min-height: 42px; }
+
 .fast-mode-warning { text-align: left; }
 .fast-bolt { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 18px; color: #92400e; background: #fef3c7; font-size: 28px; }
 .fast-mode-warning h3 { margin: 16px 0 8px; font-size: 20px; }

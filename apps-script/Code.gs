@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.6.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.7.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -24,7 +24,7 @@ var ENTITY_SHEETS = {
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
-  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "email", "telefono", "citta", "indirizzo", "note", "creatoIl", "agent_username", "aggiornatoIl"],
+  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "note", "creatoIl", "agent_username", "aggiornatoIl"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
@@ -49,6 +49,7 @@ function setupSeemaxDatabase() {
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
   migratePracticeStatusesV13_();
+  migrateClientFiscalV17_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
   styleSheets_();
@@ -63,9 +64,10 @@ function upgradeSeemaxV11() {
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
   migratePracticeStatusesV13_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.6.0");
+  migrateClientFiscalV17_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.7.0");
   styleSheets_();
-  return "SEEMAX v1.6.0 configurato: upload affidabile, P3.91 unificato e interfaccia mobile aggiornata.";
+  return "SEEMAX v1.7.0 configurato: anagrafica cliente professionale, verifiche fiscali, IBAN, telefono internazionale e località italiane.";
 }
 
 function doGet(e) {
@@ -109,6 +111,7 @@ function routeGet_(action, p) {
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
     case "management_upload_document": return managementUploadDocument_(p);
     case "management_upload_status": return managementUploadStatus_(p);
+    case "management_verify_vat": return managementVerifyVat_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -174,6 +177,7 @@ function managementUpsert_(p) {
     log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
     return { ok: true, row: practiceRow, notifications: listNotificationsForUser_(user) };
   }
+  if (entity === "clients") validateClientFiscalData_(payload);
   if (entity === "users") {
     payload.id = payload.username;
     if (!payload.chiave_id_agente) {
@@ -211,6 +215,88 @@ function managementUploadDocument_(p) {
     cacheUploadResult_(requestId, { ok: false, error: String(error && error.message ? error.message : error) });
     throw error;
   }
+}
+
+function managementVerifyVat_(p) {
+  authenticate_(p.agent_username, p.agent_key);
+  var vatNumber = String(p.vatNumber || "").replace(/\D/g, "");
+  if (!validItalianVat_(vatNumber)) throw new Error("Partita IVA formalmente non valida.");
+  var response = UrlFetchApp.fetch("https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number", {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ countryCode: "IT", vatNumber: vatNumber }),
+    muteHttpExceptions: true
+  });
+  var code = response.getResponseCode();
+  var body = parseJson_(response.getContentText(), {});
+  if (code < 200 || code >= 300) throw new Error(body.message || "Servizio VIES temporaneamente non disponibile.");
+  return {
+    ok: true,
+    valid: body.valid === true,
+    countryCode: String(body.countryCode || "IT"),
+    vatNumber: String(body.vatNumber || vatNumber),
+    name: String(body.name || body.traderName || "").trim(),
+    address: String(body.address || "").trim(),
+    requestDate: body.requestDate || new Date().toISOString()
+  };
+}
+
+function validateClientFiscalData_(payload) {
+  var vat = String(payload.piva || "").replace(/\D/g, "");
+  var iban = String(payload.iban || "").replace(/\s+/g, "").toUpperCase();
+  if (vat && !validItalianVat_(vat)) throw new Error("Partita IVA formalmente non valida.");
+  if (iban && !validIban_(iban)) throw new Error("IBAN formalmente non valido.");
+  if (vat) {
+    var duplicate = rowsToObjects_(sheet_("CLIENTI")).filter(function (row) {
+      return String(row.id || "") !== String(payload.id || "") && String(row.piva || "").replace(/\D/g, "") === vat;
+    })[0];
+    if (duplicate) throw new Error("Partita IVA già associata al cliente " + (duplicate.ragioneSociale || duplicate.id) + ".");
+  }
+  payload.piva = vat;
+  payload.codice_fiscale = String(payload.codice_fiscale || "").replace(/\s+/g, "").toUpperCase();
+  payload.piva_formalmente_valida = vat ? "SI" : "NO";
+  payload.iban = iban;
+  payload.iban_valido = iban ? "SI" : "NO";
+  payload.citta = payload.comune || payload.citta || "";
+}
+
+function migrateClientFiscalV17_() {
+  rowsToObjects_(sheet_("CLIENTI")).forEach(function (client) {
+    var previous = String(client.piva || "").replace(/\s+/g, "").toUpperCase();
+    if (/^[A-Z0-9]{16}$/.test(previous) && /[A-Z]/.test(previous) && !client.codice_fiscale) {
+      client.codice_fiscale = previous;
+      client.piva = "";
+      client.piva_formalmente_valida = "NO";
+      upsertObject_("CLIENTI", "id", client.id, client);
+    }
+  });
+}
+
+function validItalianVat_(vat) {
+  if (!/^\d{11}$/.test(String(vat || ""))) return false;
+  var sum = 0;
+  for (var index = 0; index < 10; index++) {
+    var number = Number(vat.charAt(index));
+    if (index % 2 === 1) {
+      number *= 2;
+      if (number > 9) number -= 9;
+    }
+    sum += number;
+  }
+  return (10 - (sum % 10)) % 10 === Number(vat.charAt(10));
+}
+
+function validIban_(value) {
+  var iban = String(value || "").replace(/\s+/g, "").toUpperCase();
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban) || iban.length < 15 || iban.length > 34) return false;
+  var rearranged = iban.substring(4) + iban.substring(0, 4);
+  var remainder = 0;
+  for (var index = 0; index < rearranged.length; index++) {
+    var char = rearranged.charAt(index);
+    var expanded = /\d/.test(char) ? char : String(char.charCodeAt(0) - 55);
+    for (var digit = 0; digit < expanded.length; digit++) remainder = (remainder * 10 + Number(expanded.charAt(digit))) % 97;
+  }
+  return remainder === 1;
 }
 
 function cacheUploadResult_(requestId, result) {
