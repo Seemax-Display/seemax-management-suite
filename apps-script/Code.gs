@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.4.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.5.1";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -26,7 +26,7 @@ var SHEET_SCHEMAS = {
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "email", "telefono", "citta", "indirizzo", "note", "creatoIl", "agent_username", "aggiornatoIl"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
-  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "data", "note", "agent_username", "aggiornatoIl"],
+  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
@@ -43,6 +43,7 @@ function setupSeemaxDatabase() {
   PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", ss.getId());
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
+  migrateRevenueTargetV151_();
   seedPatchNotes_();
   seedProducts_();
   initializeInventoryV11_();
@@ -57,12 +58,14 @@ function setupSeemaxDatabase() {
 function upgradeSeemaxV11() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  seedSettings_();
+  migrateRevenueTargetV151_();
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
   migratePracticeStatusesV13_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade catalogo e magazzino v1.2");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.5.1");
   styleSheets_();
-  return "SEEMAX v1.2 configurato: catalogo consolidato, pratiche S.Q.P. e magazzino attivi.";
+  return "SEEMAX v1.5.1 configurato: Planner rapido, obiettivo 500.000 euro e caricamento file protetto.";
 }
 
 function doGet(e) {
@@ -104,6 +107,7 @@ function routeGet_(action, p) {
     case "management_save_settings": return managementSaveSettings_(p);
     case "management_create_from_quote": return managementCreateFromQuote_(p);
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
+    case "management_upload_document": return managementUploadDocument_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -130,12 +134,12 @@ function managementBootstrap_(p) {
   var clients = listEntity_("clients", user);
   var practices = listEntity_("practices", user);
   var documents = listEntity_("documents", user);
-  var activities = listEntity_("activities", user);
+  var activities = [];
   var users = isAdmin_(user) ? listEntity_("users", user).map(publicUser_) : [publicUser_(user)];
   var settings = getSettings_();
   var notifications = listNotificationsForUser_(user);
   var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, settings: settings, notifications: notifications };
-  data.dashboard = dashboard_(data);
+  data.dashboard = dashboard_(data, user);
   return { ok: true, data: data, user: publicUser_(user), version: SEEMAX_VERSION };
 }
 
@@ -160,6 +164,10 @@ function managementUpsert_(p) {
   payload.aggiornatoIl = new Date().toISOString();
   if (entity === "practices") {
     var previousPractice = payload.id ? findRowObject_("PRATICHE", "id", payload.id) : null;
+    if (!isAdmin_(user) && previousPractice && normalizePracticeStatus_(previousPractice.stato || "Inserita") !== normalizePracticeStatus_(payload.stato || previousPractice.stato || "Inserita")) {
+      throw new Error("Solo l'amministratore può modificare lo stato di una pratica.");
+    }
+    if (!isAdmin_(user) && !previousPractice) payload.stato = "Inserita";
     var practiceRow = upsertPracticeWithInventory_(payload, user);
     if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) createPracticeStatusNotification_(previousPractice, practiceRow, user);
     log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
@@ -175,6 +183,25 @@ function managementUpsert_(p) {
   var row = upsertEntity_(entity, payload);
   log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
   return { ok: true, row: entity === "users" ? publicUser_(row) : row };
+}
+
+function managementUploadDocument_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  var filename = String(p.filename || "documento").replace(/[\\\/:*?"<>|]+/g, "_");
+  var mimeType = String(p.mimeType || "application/octet-stream");
+  var raw = String(p.fileBase64 || "");
+  var comma = raw.indexOf(",");
+  if (comma >= 0) raw = raw.substring(comma + 1);
+  if (!raw) throw new Error("File mancante.");
+  var bytes = Utilities.base64Decode(raw);
+  if (bytes.length > 8 * 1024 * 1024) throw new Error("Il file supera il limite di 8 MB.");
+  var folderName = "SEEMAX MANAGEMENT DOCUMENTI";
+  var folders = DriveApp.getFoldersByName(folderName);
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+  var file = folder.createFile(Utilities.newBlob(bytes, mimeType, filename));
+  file.setDescription("Caricato da " + (user.nome_visualizzato || user.username) + " tramite Seemax Management Suite");
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (sharingError) { /* alcuni domini Workspace impediscono la condivisione pubblica */ }
+  return { ok: true, url: file.getUrl(), file_id: file.getId(), file_name: filename, file_size: bytes.length };
 }
 
 function managementCreateFromQuote_(p) {
@@ -195,7 +222,7 @@ function managementCreateFromQuote_(p) {
     if (existingPractice) return { ok: true, existing: true, practice: existingPractice, client: findRowObject_("CLIENTI", "id", existingPractice.clientId) || {} };
   }
   var finance = type === "ACQUISTO" ? "Acquisto diretto" : (type === "NOLEGGIO" ? "Grenke" : "IFIS");
-  var number = nextPracticeNumber_();
+  var number = nextPracticeIdentifier_(user);
   var title = items.map(function (item) {
     return String(item.prodotto || "Ledwall") + " " + String(item.misura_m || item.misura_cm || "");
   }).join(" + ");
@@ -260,10 +287,34 @@ function nextPracticeNumber_() {
   return String(next).padStart(3, "0") + "-" + year;
 }
 
+function practiceInitials_(user) {
+  var source = String(user.nome_visualizzato || user.username || "SM").trim();
+  var parts = source.split(/\s+/).filter(String);
+  var initials = parts.length > 1 ? parts[0].charAt(0) + parts[parts.length - 1].charAt(0) : source.replace(/[^A-Za-z0-9]/g, "").substring(0, 2);
+  return String(initials || "SM").toUpperCase();
+}
+
+function nextPracticeIdentifier_(user) {
+  var prefix = practiceInitials_(user);
+  var pattern = new RegExp("^" + prefix + "(\\d{4})$", "i");
+  var max = rowsToObjects_(sheet_("PRATICHE")).reduce(function (current, row) {
+    var match = String(row.numero || "").match(pattern);
+    return match ? Math.max(current, Number(match[1]) || 0) : current;
+  }, 0);
+  return prefix + String(max + 1).padStart(4, "0");
+}
+
 function upsertPracticeWithInventory_(payload, user) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    if (String(payload.nuova_pratica || "NO").toUpperCase() === "SI") {
+      payload.numero = nextPracticeIdentifier_(user);
+      payload.id = "PR-" + payload.numero;
+      delete payload.nuova_pratica;
+    }
+    if (!payload.numero || String(payload.numero).toUpperCase() === "AUTO") payload.numero = nextPracticeIdentifier_(user);
+    payload.id = payload.id || "PR-" + payload.numero;
     if (!payload.id) payload.id = uid_("pra");
     var existing = findRowObject_("PRATICHE", "id", payload.id);
     var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
@@ -545,7 +596,7 @@ function removeEntity_(entity, id, user) {
   return false;
 }
 
-function dashboard_(data) {
+function dashboard_(data, user) {
   var practices = data.practices || [];
   var activities = data.activities || [];
   var open = practices.filter(function (p) { return ["Bocciata", "Completata"].indexOf(String(p.stato)) < 0; });
@@ -554,8 +605,17 @@ function dashboard_(data) {
     var rows = practices.filter(function (p) { return String(p.stato) === status; });
     return { status: status, count: rows.length, value: rows.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0) };
   });
+  var allPractices = rowsToObjects_(sheet_("PRATICHE"));
+  var completedAll = allPractices.filter(function (p) { return String(p.stato) === "Completata"; });
+  var completedPersonal = completedAll.filter(function (p) { return String(p.agent_username || "") === String(user.username || ""); });
+  var target = Number((data.settings || {}).obiettivo_fatturato || 0);
   return {
     totals: { clients: (data.clients || []).length, practices: open.length, value: open.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0), activities: activities.filter(function (a) { return String(a.stato) !== "Completata"; }).length },
+    revenue: {
+      personal: completedPersonal.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0),
+      company: completedAll.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0),
+      target: target
+    },
     recentPractices: practices.slice().sort(function (a, b) { return String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || "")); }).slice(0, 5),
     nextActivities: activities.filter(function (a) { return String(a.stato) !== "Completata"; }).sort(function (a, b) { return String(a.scadenza || "").localeCompare(String(b.scadenza || "")); }).slice(0, 6),
     pipeline: pipeline
@@ -779,6 +839,11 @@ function getKeyValueSheet_(sheetName) {
 
 function setSetting_(key, value, note) { return upsertObject_("IMPOSTAZIONI", "chiave", key, { chiave: key, valore: value, note: note || "" }); }
 
+function migrateRevenueTargetV151_() {
+  var current = Number(getSettings_().obiettivo_fatturato || 0);
+  if (!current || current === 100000) setSetting_("obiettivo_fatturato", 500000, "Obiettivo iniziale Management Suite v1.5.1");
+}
+
 function log_(user, action, entity, id, detail) {
   try {
     var sheet = sheet_("LOG");
@@ -806,7 +871,8 @@ function seedSettings_() {
     telefono_commerciale: "INSERISCI_TELEFONO",
     numero_preventivo_iniziale: 1,
     numero_preventivo_admin_iniziale: 1,
-    numero_preventivo_agenti_iniziale: 1
+    numero_preventivo_agenti_iniziale: 1,
+    obiettivo_fatturato: 500000
   };
   var current = getSettings_();
   Object.keys(defaults).forEach(function (key) { if (current[key] === undefined || current[key] === "") setSetting_(key, defaults[key], "Valore iniziale Seemax Management Suite"); });

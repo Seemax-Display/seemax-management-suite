@@ -1007,6 +1007,10 @@
     body.integrated-suite .sidebar{display:none!important}
     body.integrated-suite .mobile-tabs{display:flex!important;position:sticky;top:0;z-index:70}
     body.integrated-suite .main{padding:18px 20px 28px}
+    body.management-fast #btnOnlineArchiveSave,
+    body.management-fast #btnOnlineArchiveLoad{opacity:.48;cursor:not-allowed;filter:grayscale(.35)}
+    .management-fast-archive-note{margin:0 0 12px;border:1px solid #fcd34d;border-radius:14px;padding:11px 13px;color:#92400e;background:#fffbeb;font-size:13px;line-height:1.45}
+    .management-fast-archive-note strong{display:block;margin-bottom:3px}
 </style>
 </head>
 <body>
@@ -1404,6 +1408,7 @@
     // CONFIGURAZIONE GENERALE
     // =============================
     let admin = false; // Determinato dinamicamente dal ruolo ADMIN / AGENTE restituito dal DATABASE SEEMAX
+    const MANAGEMENT_FAST_MODE = new URLSearchParams(location.search).get('fast') === '1';
 
     const SQP_MODE_STORAGE_KEY = 'SEEMAX_QUOTATION_PLANNER_MODE';
     const SQP_MODE_DEFAULT = 'advanced';
@@ -2338,6 +2343,7 @@
     }
 
     function openOnlineArchiveModal(mode){
+      if(MANAGEMENT_FAST_MODE){ sqpAlert('Il salvataggio e il caricamento dei preventivi dall’archivio online non sono disponibili in Modalità Rapida.', {title:'Archivio preventivi sospeso', theme:'lite'}); return; }
       const layer = $('onlineArchiveModalLayer');
       const panel = $('onlineArchiveModalPanel');
       if(!layer || !panel) return;
@@ -2512,6 +2518,7 @@
     }
 
     async function saveQuoteOnline(){
+      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il salvataggio dei preventivi online è disabilitato in Modalità Rapida.', {title:'Salvataggio non disponibile', theme:'lite'}); return; }
       const valid = validateArchiveFields(true);
       if(!valid) return;
       showPersistentCalcLoading('Comando ricevuto', 'Preparazione del salvataggio nel DATABASE SEEMAX...');
@@ -2565,6 +2572,7 @@
     }
 
     async function loadQuoteOnline(){
+      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il caricamento dei preventivi online è disabilitato in Modalità Rapida.', {title:'Caricamento non disponibile', theme:'lite'}); return; }
       const valid = validateArchiveFields(false);
       if(!valid) return;
       const proceedLoad = await sqpConfirm('Caricare questo preventivo online? I dati attualmente compilati verranno sostituiti.', {title:'Carica preventivo online', confirmText:'Carica', cancelText:'Annulla'});
@@ -2819,6 +2827,7 @@
     }
 
     async function saveQuoteOnlineAgent(){
+      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il salvataggio dei preventivi online è disabilitato in Modalità Rapida.', {title:'Salvataggio non disponibile', theme:'lite'}); return; }
       if(!agentLoggedIn()){ openAgentLoginModal(); return; }
       if(!onlineArchiveAvailable()){ await sqpAlert('Questo browser non supporta la crittografia necessaria per l archivio online.', {title:'Browser non compatibile'}); return; }
       const id = archiveDefaultId();
@@ -2886,6 +2895,7 @@
     }
 
     async function openAgentQuoteListModal(){
+      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il caricamento dei preventivi online è disabilitato in Modalità Rapida.', {title:'Caricamento non disponibile', theme:'lite'}); return; }
       if(!agentLoggedIn()){ openAgentLoginModal(); return; }
       const layer = $('onlineArchiveModalLayer');
       const panel = $('onlineArchiveModalPanel');
@@ -2965,6 +2975,16 @@
     function setupOnlineArchive(){
       const btnSave = $('btnOnlineArchiveSave');
       const btnLoad = $('btnOnlineArchiveLoad');
+      if(MANAGEMENT_FAST_MODE){
+        [btnSave, btnLoad].forEach(btn => { if(btn){ btn.disabled = true; btn.title = 'Non disponibile in Modalità Rapida'; } });
+        const card = document.querySelector('.db-status-global');
+        if(card){
+          const note = document.createElement('div');
+          note.className = 'management-fast-archive-note';
+          note.innerHTML = '<strong>Modalità Rapida attiva</strong>Il calcolatore è completamente utilizzabile. Sono sospesi soltanto il salvataggio e il caricamento dei preventivi dall’archivio online.';
+          card.insertAdjacentElement('afterend', note);
+        }
+      }
       if(btnSave) btnSave.addEventListener('click', async () => {
         if(btnSave.classList.contains('is-busy')) return;
         setActionButtonBusy(btnSave, true, 'Comando ricevuto...');
@@ -5645,6 +5665,7 @@
 
     function boot(){
       if(new URLSearchParams(location.search).get('integrated') === '1') document.body.classList.add('integrated-suite');
+      if(MANAGEMENT_FAST_MODE) document.body.classList.add('management-fast');
       applyRuntimeRole(agentSession && agentSession.role ? agentSession.role : 'AGENTE', {refresh:false});
       initNavigation();
       setupSqpDecisionModal();

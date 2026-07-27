@@ -1,5 +1,14 @@
 SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA
 
+NOVITÀ VERSIONE 1.5
+- MODALITÀ STANDARD: ogni modifica viene salvata subito nel database.
+- MODALITÀ RAPIDA: le modifiche restano sul dispositivo; premere SALVA TUTTO prima di tornare alla modalità standard.
+- QUOTATION PLANNER: resta utilizzabile in Modalità Rapida, ma non può salvare o caricare preventivi dall'archivio online.
+- ATTIVITÀ: sono sempre locali e non vengono inviate al Foglio Google.
+- DOCUMENTI: selezionare direttamente il file in Modalità Standard; il caricamento è sospeso in Modalità Rapida.
+- STATI PRATICA: soltanto un amministratore può modificarli.
+- OBIETTIVO FATTURATO: valore iniziale 500.000 euro, modificabile da Impostazioni.
+
 1) PROVA
    Pubblica i file su GitHub Pages.
    Login ADMIN: admin.demo / DEMO-ADMIN

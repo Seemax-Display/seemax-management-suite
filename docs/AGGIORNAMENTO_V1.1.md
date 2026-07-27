@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.4
+# Aggiornamento Seemax Management Suite 1.5.1
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -73,6 +73,24 @@ La prima esecuzione di `upgradeSeemaxV11` crea il foglio `NOTIFICHE` e converte 
 - Le pratiche completate e i clienti collegati a pratiche completate possono essere eliminati soltanto direttamente dal Foglio Google.
 - Catalogo senza il comando “Usa nel Planner”; modifica prodotto divisa in Dettagli, Costi, Giacenze, Scheda tecnica e Altro.
 - Quotation Planner incorporato senza apertura in una pagina separata e con accesso ereditato automaticamente dalla sessione del gestionale.
+
+## Novità 1.5
+
+- testi e schede tecniche ulteriormente ingranditi;
+- Dashboard con fatturato personale, fatturato Seemax e obiettivo modificabile;
+- solo l’amministratore può cambiare lo stato delle pratiche;
+- Attività salvate esclusivamente sul dispositivo, senza accessi al database;
+- Modalità Rapida con coda locale, indicatore permanente e comando **SALVA TUTTO**;
+- barra di avanzamento durante la sincronizzazione e nome dell’elemento trasferito;
+- Quotation Planner utilizzabile anche durante la Modalità Rapida; vengono sospesi soltanto salvataggio e caricamento dei preventivi dall’archivio online;
+- Documenti caricati come file e archiviati automaticamente in Google Drive;
+- identificativo pratica formato da iniziali utente e progressivo a quattro cifre;
+- configuratore display con misura guidata/libera, bifacciale, cabinet necessari e controllo giacenza;
+- Grenke assegnata automaticamente al Noleggio e IFIS al Leasing.
+
+Il caricamento o la sostituzione dei file non è disponibile in Modalità Rapida. In Modalità Standard il limite per singolo file è 8 MB.
+
+L’obiettivo fatturato iniziale è impostato a **500.000 €**. Durante l’aggiornamento, l’eventuale valore predefinito precedente di 100.000 € viene sostituito automaticamente; valori personalizzati differenti vengono conservati.
 
 ## Regole di magazzino
 

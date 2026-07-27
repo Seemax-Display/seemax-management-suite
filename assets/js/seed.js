@@ -42,7 +42,8 @@
       validita_preventivo_giorni: 15,
       telefono_commerciale: "INSERISCI_TELEFONO",
       numero_preventivo_admin_iniziale: 1,
-      numero_preventivo_agenti_iniziale: 1
+      numero_preventivo_agenti_iniziale: 1,
+      obiettivo_fatturato: 500000
     }
   };
 })();

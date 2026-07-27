@@ -20,11 +20,11 @@ Le colonne `modelli_display`, `misure_display`, `cabinet_da_sottrarre` e `righe_
 
 ### DOCUMENTI
 
-Registra nome, tipologia e collegamento Google Drive del documento. `practiceId` collega il file alla pratica.
+Registra nome, tipologia, ID e collegamento Google Drive del file caricato. `practiceId` collega il file alla pratica. I byte del file non vengono inseriti nel Foglio: restano nella cartella Drive `SEEMAX MANAGEMENT DOCUMENTI`.
 
 ### ATTIVITA
 
-Contiene telefonate, email, appuntamenti, verifiche e installazioni con scadenza.
+Il foglio può rimanere per compatibilità storica, ma dalla versione 1.5 le attività non vengono più lette o scritte nel database. Telefonate, email, appuntamenti e scadenze sono salvati localmente sul dispositivo.
 
 ### LOG
 
@@ -50,14 +50,13 @@ Archivio tecnico dei preventivi S.Q.P. Il backend aggiunge automaticamente event
 
 ### IMPOSTAZIONI
 
-Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni e versione della configurazione.
+Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni, versione della configurazione e `obiettivo_fatturato`.
 
 ## Relazioni principali
 
 ```text
 AGENTI.username
     ├── PRATICHE.agent_username
-    ├── ATTIVITA.agent_username
     ├── DOCUMENTI.agent_username
     └── ARCHIVIO_PREVENTIVI.agent_username
 
@@ -65,6 +64,5 @@ CLIENTI.id
     └── PRATICHE.clientId
 
 PRATICHE.id
-    ├── DOCUMENTI.practiceId
-    └── ATTIVITA.practiceId
+    └── DOCUMENTI.practiceId
 ```

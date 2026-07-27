@@ -103,8 +103,9 @@
 
   function setConnectionState() {
     const status = api.status();
-    $("databaseLabel").textContent = status.demo ? "Modalità demo locale" : (status.online ? "Google Sheets online" : "Database non raggiungibile");
+    $("databaseLabel").textContent = status.fast ? `Modalità Rapida · ${status.pending} in attesa` : (status.demo ? "Modalità demo locale" : (status.online ? "Google Sheets online" : "Database non raggiungibile"));
     $("databaseDot").className = status.online ? "online" : "offline";
+    updateModeControls();
     const banner = $("connectionBanner");
     if (status.demo) {
       banner.className = "connection-banner demo";
@@ -119,6 +120,7 @@
     setLoading(true, "Caricamento database…");
     try {
       state.data = await api.bootstrap();
+      if (api.isFastMode()) updateLocalDashboard();
       updateNotificationBell();
       setConnectionState();
     } catch (error) {
@@ -189,6 +191,7 @@
   function renderDashboard() {
     const d = state.data.dashboard || {};
     const totals = d.totals || {};
+    const revenue = d.revenue || {};
     const maxPipeline = Math.max(1, ...(d.pipeline || []).map((item) => item.count));
     return `
       <div class="welcome-panel">
@@ -201,6 +204,13 @@
         ${kpi("Valore pipeline", euros(totals.value), "€", "green", "practices")}
         ${kpi("Attività aperte", totals.activities, "✓", "orange", "activities")}
       </div>
+      <section class="revenue-panel">
+        <div class="panel-head"><div><span class="section-kicker">Fatturato</span><h3>Avanzamento verso l’obiettivo</h3></div><span class="revenue-target">Obiettivo ${euros(revenue.target || 0)}</span></div>
+        <div class="revenue-grid">
+          ${revenueCard("Il tuo fatturato", revenue.personal, revenue.target, "Pratiche completate assegnate a te")}
+          ${revenueCard("Fatturato complessivo Seemax", revenue.company, revenue.target, "Tutte le pratiche completate")}
+        </div>
+      </section>
       <div class="dashboard-grid">
         <section class="panel span-7">
           <div class="panel-head"><div><span class="section-kicker">Pipeline</span><h3>Stato delle pratiche</h3></div><button class="text-button" data-route="practices">Vedi tutte →</button></div>
@@ -215,6 +225,15 @@
           ${practiceTable(d.recentPractices || [], true)}
         </section>
       </div>`;
+  }
+
+  function revenueCard(label, value, target, note) {
+    const amount = Number(value || 0);
+    const goal = Number(target || 0);
+    const ratio = goal > 0 ? Math.min(1, amount / goal) : 0;
+    const percent = Math.round(ratio * 100);
+    const hue = Math.round(ratio * 120);
+    return `<article class="revenue-card" style="--revenue-hue:${hue};--revenue-progress:${percent}%"><div><span>${esc(label)}</span><strong>${euros(amount)}</strong><small>${esc(note)}</small></div><em>${percent}%</em><div class="revenue-progress"><i></i></div></article>`;
   }
 
   function kpi(label, value, icon, tone, route) {
@@ -261,12 +280,14 @@
   }
 
   function renderPlanner() {
-    return `<div class="planner-shell planner-native"><iframe id="plannerFrame" title="Seemax Quotation Planner integrato" src="${esc(config.quotationPlannerPath)}?integrated=1"></iframe></div>`;
+    const fast = api.isFastMode() ? "&fast=1" : "";
+    return `${api.isFastMode() ? `<div class="planner-fast-notice"><strong>Modalità Rapida attiva</strong><span>Il Planner è utilizzabile normalmente. Sono disabilitati soltanto il salvataggio e il caricamento dei preventivi dall’archivio online.</span></div>` : ""}<div class="planner-shell planner-native"><iframe id="plannerFrame" title="Seemax Quotation Planner integrato" src="${esc(config.quotationPlannerPath)}?integrated=1${fast}"></iframe></div>`;
   }
 
   function renderDocuments() {
     const rows = filterRows(state.data.documents, ["nome", "tipo", "pratica", "cliente", "note"]);
-    return `${viewToolbar("Nuovo documento", "new-document", `<p class="toolbar-note">Inserisci un link Google Drive o un collegamento esterno</p>`)}<section class="panel"><div class="document-list">${rows.length ? rows.map((d) => `<article class="document-row"><span class="file-icon">PDF</span><div><strong>${esc(d.nome)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${d.url ? `<a class="btn soft" href="${esc(d.url)}" target="_blank" rel="noopener">Apri ↗</a>` : `<span class="placeholder-pill">Link da inserire</span>`}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}">Modifica</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}">×</button></div></article>`).join("") : emptyState("Nessun documento", "Collega preventivi, contratti e documenti cliente.", "Nuovo documento", "new-document")}</div></section>`;
+    const uploadNote = api.isFastMode() ? `<p class="toolbar-note fast-upload-note">Caricamento file non disponibile in Modalità Rapida. Passa alla Modalità Standard per aggiungere documenti.</p>` : `<p class="toolbar-note">Carica PDF, immagini o file Office direttamente nell’archivio Seemax</p>`;
+    return `${viewToolbar("Carica documento", api.isFastMode() ? "" : "new-document", uploadNote)}<section class="panel"><div class="document-list">${rows.length ? rows.map((d) => `<article class="document-row"><span class="file-icon">${esc(String(d.file_type || d.nome || "FILE").includes("pdf") ? "PDF" : "FILE")}</span><div><strong>${esc(d.nome)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${d.url ? `<a class="btn soft" href="${esc(d.url)}" target="_blank" rel="noopener">Apri file ↗</a>` : `<span class="placeholder-pill">File non disponibile</span>`}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}">Modifica</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}">×</button></div></article>`).join("") : emptyState("Nessun documento", api.isFastMode() ? "Passa alla Modalità Standard per caricare il primo file." : "Carica il primo file dal tuo dispositivo.", api.isFastMode() ? "" : "Carica documento", "new-document")}</div></section>`;
   }
 
   function renderActivities() {
@@ -288,7 +309,7 @@
   function renderSettings() {
     const s = state.data ? state.data.settings : {};
     const status = api.status();
-    return `<div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><form id="settingsForm" class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label><div class="form-actions full"><button class="btn primary" type="submit">Salva impostazioni</button></div></form></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Google Sheets</h3></div>${badge(status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.demo ? "Demo locale" : "Database Google Sheets"}</dd></div><div><dt>Endpoint</dt><dd>${status.configured ? "Configurato" : "Placeholder da sostituire"}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Per modificare il collegamento apri <code>assets/js/config.js</code>. Le istruzioni complete sono nella cartella <code>docs</code>.</p><div class="stack-actions"><button class="btn soft" data-action="test-database">Verifica collegamento</button>${status.demo ? `<button class="btn ghost" data-action="export-demo">Esporta dati demo</button><button class="btn danger-outline" data-action="reset-demo">Ripristina demo</button>` : ""}</div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Placeholder da completare</span><h3>Controllo prima della pubblicazione</h3></div></div><div class="checklist"><label><input type="checkbox"> Inserire URL Apps Script in <code>config.js</code></label><label><input type="checkbox"> Sostituire telefono, email e sede aziendale</label><label><input type="checkbox"> Inserire loghi e immagini prodotto definitive</label><label><input type="checkbox"> Verificare account agenti nel foglio AGENTI</label><label><input type="checkbox"> Pubblicare il repository con GitHub Pages</label></div></section></div>`;
+    return `<div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><form id="settingsForm" class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label><div class="form-actions full"><button class="btn primary" type="submit">Salva impostazioni</button></div></form></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Google Sheets</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Google Sheets"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono sempre memorizzate sul dispositivo e non rallentano il database. In Modalità Rapida le altre modifiche vengono accodate fino a “SALVA TUTTO”.</p><div class="stack-actions"><button class="btn soft" data-action="test-database">Verifica collegamento</button>${status.demo ? `<button class="btn ghost" data-action="export-demo">Esporta dati demo</button><button class="btn danger-outline" data-action="reset-demo">Ripristina demo</button>` : ""}</div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Placeholder da completare</span><h3>Controllo prima della pubblicazione</h3></div></div><div class="checklist"><label><input type="checkbox"> Inserire URL Apps Script in <code>config.js</code></label><label><input type="checkbox"> Sostituire telefono, email e sede aziendale</label><label><input type="checkbox"> Inserire loghi e immagini prodotto definitive</label><label><input type="checkbox"> Verificare account agenti nel foglio AGENTI</label><label><input type="checkbox"> Pubblicare il repository con GitHub Pages</label></div></section></div>`;
   }
 
   function filterRows(rows, fields) {
@@ -319,7 +340,10 @@
   function openPractice(id, clientId) {
     const record = state.data.practices.find((p) => p.id === id) || {};
     const client = state.data.clients.find((c) => c.id === (clientId || record.clientId));
-    const number = record.numero || api.nextPracticeNumber();
+    const session = api.getSession() || {};
+    const prefix = initials(session.displayName || session.nome_visualizzato || session.username).replace(/[^A-Z0-9]/g, "").slice(0, 2) || "SM";
+    const existingNumbers = state.data.practices.map((p) => String(p.numero || "")).filter((number) => number.startsWith(prefix)).map((number) => Number(number.slice(prefix.length))).filter(Number.isFinite);
+    const number = record.numero || prefix + String((existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1).padStart(4, "0");
     const inferredType = record.finanziaria === "Grenke" ? "NOLEGGIO" : record.finanziaria === "IFIS" ? "LEASING" : "ACQUISTO";
     const practiceType = String(record.tipo_pratica || inferredType).toUpperCase();
     const allowedStatuses = practiceType === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
@@ -327,27 +351,97 @@
     const selectedClient = state.data.clients.find((c) => c.id === selectedClientId);
     const clientField = record.id
       ? `${field("Cliente", "cliente_display", record.cliente || (selectedClient && selectedClient.ragioneSociale) || "", { readonly: true })}<input type="hidden" name="clientId" value="${esc(selectedClientId)}">`
-      : field("Cliente", "clientId", selectedClientId, { required: true, options: ["", ...state.data.clients.map((c) => c.id)] }).replace(/>(cli-[^<]+)</g, (m, value) => `>${esc((state.data.clients.find((c) => c.id === value) || {}).ragioneSociale || value)}<`);
-    const fields = field("Numero pratica", "numero", number, { required: true, readonly: number !== "AUTO" }) + clientField +
+      : `<label>Cliente<select name="clientId" required><option value="">Seleziona cliente</option>${state.data.clients.map((c) => `<option value="${esc(c.id)}" ${c.id === selectedClientId ? "selected" : ""}>${esc(c.ragioneSociale)}</option>`).join("")}</select></label>`;
+    let inventoryRows = [];
+    try { inventoryRows = JSON.parse(record.righe_magazzino_json || "[]"); } catch (error) { inventoryRows = []; }
+    const selectedProductId = (inventoryRows[0] && inventoryRows[0].product_id) || "";
+    const productOptions = state.data.products.filter((p) => String(p.attivo || "SI").toUpperCase() === "SI");
+    const selectedProduct = productOptions.find((p) => p.id === selectedProductId) || productOptions[0] || {};
+    const measure = String(record.misure_display || "").match(/([\d.,]+)\s*[x×]\s*([\d.,]+)/i);
+    const width = measure ? Number(measure[1].replace(",", ".")) : Number(selectedProduct.cabX || 50) / 100;
+    const height = measure ? Number(measure[2].replace(",", ".")) : Number(selectedProduct.cabY || 50) / 100;
+    const bifacial = String(record.bifacciale || "NO").toUpperCase();
+    const statusField = !api.isAdmin()
+      ? `${field("Stato (gestibile dall’admin)", "stato_display", record.stato || "Inserita", { readonly: true })}<input type="hidden" name="stato" value="${esc(record.stato || "Inserita")}">`
+      : field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses, readonly: !api.isAdmin() });
+    const technicalFields = `<fieldset class="practice-configurator full"><legend>Configurazione display</legend><div class="form-grid">
+      <label>Display di riferimento<select name="product_id" required>${productOptions.map((p) => `<option value="${esc(p.id)}" ${p.id === selectedProduct.id ? "selected" : ""}>${esc(p.nome)} · cabinet ${esc(p.cabX)}×${esc(p.cabY)} cm</option>`).join("")}</select></label>
+      ${field("Inserimento misura", "measure_mode", "GUIDATA", { options: ["GUIDATA", "LIBERA"] })}
+      ${field("Larghezza display (m)", "display_width", width, { type: "number", min: 0.01, step: "0.01" })}
+      ${field("Altezza display (m)", "display_height", height, { type: "number", min: 0.01, step: "0.01" })}
+      ${field("Bifacciale", "bifacciale", bifacial, { options: ["NO", "SI"] })}
+      <label>Cabinet necessari<input name="cabinet_calculated" value="0" readonly><small id="cabinetAvailability" class="cabinet-availability"></small></label>
+      <div id="measureValidation" class="measure-validation full"></div>
+    </div></fieldset>`;
+    const fields = field("Identificativo pratica", "numero", number, { required: true, readonly: true }) + clientField +
       field("Tipo pratica", "tipo_pratica", practiceType, { options: ["ACQUISTO", "NOLEGGIO", "LEASING"] }) +
-      field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses }) + field("Finanziaria", "finanziaria", record.finanziaria || "Da definire", { options: FINANCE }) +
+      statusField + field("Finanziaria", "finanziaria", record.finanziaria || (practiceType === "NOLEGGIO" ? "Grenke" : practiceType === "LEASING" ? "IFIS" : "Da definire"), { options: FINANCE, readonly: practiceType !== "ACQUISTO" }) +
       field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) +
+      technicalFields +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
-      (record.modelli_display ? field("Modello display", "modelli_display", record.modelli_display, { readonly: true }) : "") +
-      (record.misure_display ? field("Misura preventivata", "misure_display", record.misure_display, { readonly: true }) : "") +
-      (record.cabinet_da_sottrarre ? field("Cabinet da sottrarre", "cabinet_da_sottrarre", record.cabinet_da_sottrarre, { readonly: true, full: true }) : "") +
-      (record.righe_magazzino_json ? `<input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json)}">` : "") +
+      `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}">` +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
       field("Note", "note", record.note || "", { type: "textarea", full: true });
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
     const typeSelect = document.querySelector('.entity-form select[name="tipo_pratica"]');
     const statusSelect = document.querySelector('.entity-form select[name="stato"]');
-    if (typeSelect && statusSelect) typeSelect.addEventListener("change", () => {
-      const current = statusSelect.value;
-      const options = typeSelect.value === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
-      statusSelect.innerHTML = options.map((status) => `<option value="${status}" ${status === current ? "selected" : ""}>${status}</option>`).join("");
-      if (!options.includes(current)) statusSelect.value = "Sospesa";
+    const financeSelect = document.querySelector('.entity-form select[name="finanziaria"]');
+    if (typeSelect) typeSelect.addEventListener("change", () => {
+      if (financeSelect) {
+        financeSelect.value = typeSelect.value === "NOLEGGIO" ? "Grenke" : typeSelect.value === "LEASING" ? "IFIS" : "Da definire";
+        financeSelect.disabled = typeSelect.value !== "ACQUISTO";
+      }
+      if (statusSelect) {
+        const current = statusSelect.value;
+        const options = typeSelect.value === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
+        statusSelect.innerHTML = options.map((status) => `<option value="${status}" ${status === current ? "selected" : ""}>${status}</option>`).join("");
+        if (!options.includes(current)) statusSelect.value = "Sospesa";
+      }
     });
+    bindPracticeCalculator(productOptions);
+  }
+
+  function bindPracticeCalculator(products) {
+    const form = document.querySelector(".entity-form[data-entity='practices']");
+    if (!form) return;
+    const product = form.elements.product_id;
+    const mode = form.elements.measure_mode;
+    const width = form.elements.display_width;
+    const height = form.elements.display_height;
+    const bifacial = form.elements.bifacciale;
+    const cabinets = form.elements.cabinet_calculated;
+    const validation = $("measureValidation");
+    const availability = $("cabinetAvailability");
+    function calculate(snap) {
+      const p = products.find((item) => item.id === product.value) || {};
+      const stepX = Number(p.cabX || 50) / 100;
+      const stepY = Number(p.cabY || 50) / 100;
+      if (mode.value === "GUIDATA") {
+        width.step = stepX; height.step = stepY;
+        if (snap) {
+          width.value = (Math.max(1, Math.round(Number(width.value || stepX) / stepX)) * stepX).toFixed(2);
+          height.value = (Math.max(1, Math.round(Number(height.value || stepY) / stepY)) * stepY).toFixed(2);
+        }
+      } else { width.step = "0.01"; height.step = "0.01"; }
+      const x = Math.max(1, Math.ceil((Number(width.value || 0) - 1e-8) / stepX));
+      const y = Math.max(1, Math.ceil((Number(height.value || 0) - 1e-8) / stepY));
+      const faces = bifacial.value === "SI" ? 2 : 1;
+      const count = x * y * faces;
+      const exactX = Math.abs(Number(width.value || 0) / stepX - Math.round(Number(width.value || 0) / stepX)) < 0.001;
+      const exactY = Math.abs(Number(height.value || 0) / stepY - Math.round(Number(height.value || 0) / stepY)) < 0.001;
+      cabinets.value = count;
+      const stock = Number(p.giacenza_attuale || 0);
+      availability.textContent = `${stock} disponibili · ${count} necessari`;
+      availability.className = `cabinet-availability ${count > stock ? "insufficient" : "available"}`;
+      validation.innerHTML = count > stock ? `<strong>Giacenza insufficiente:</strong> mancano ${count - stock} cabinet. Puoi comunque inserire la pratica.` : (!exactX || !exactY) ? `<strong>Misura non multipla:</strong> la configurazione reale sarà ${x * stepX}×${y * stepY} m (${count} cabinet${faces === 2 ? ", bifacciale" : ""}).` : `Misura realizzabile esattamente con ${count} cabinet.`;
+      form.elements.modelli_display.value = String(p.nome || "").split(" - ")[0];
+      form.elements.misure_display.value = `${Number(width.value || 0).toFixed(2)}x${Number(height.value || 0).toFixed(2)}`;
+      form.elements.cabinet_da_sottrarre.value = `${p.nome}: ${count}`;
+      form.elements.righe_magazzino_json.value = JSON.stringify([{ product_id: p.id, quantita: count, descrizione: p.nome }]);
+    }
+    [product, mode, width, height, bifacial].forEach((element) => element && element.addEventListener("change", () => calculate(true)));
+    [width, height].forEach((element) => element && element.addEventListener("input", () => calculate(false)));
+    calculate(true);
   }
 
   function updateNotificationBell() {
@@ -400,7 +494,11 @@
 
   function openDocument(id) {
     const r = state.data.documents.find((d) => d.id === id) || {};
-    const fields = field("Nome documento", "nome", r.nome, { required: true, full: true }) + field("Tipo", "tipo", r.tipo || "Preventivo", { options: ["Preventivo", "Contratto", "Documento cliente", "Documento finanziaria", "Installazione", "Altro"] }) + field("Pratica", "practiceId", r.practiceId || "", { options: ["", ...state.data.practices.map((p) => p.id)] }) + field("Link Google Drive / URL", "url", r.url, { type: "url", full: true }) + field("Data", "data", r.data || new Date().toISOString().slice(0, 10), { type: "date" }) + field("Note", "note", r.note, { type: "textarea", full: true });
+    if (!id && api.isFastMode()) { toast("Il caricamento dei file è disponibile soltanto in Modalità Standard.", "danger"); return; }
+    const fileField = api.isFastMode()
+      ? `<div class="full fast-upload-note">Il file non può essere sostituito mentre è attiva la Modalità Rapida.</div>`
+      : `<label class="full upload-field">File dal dispositivo${r.url ? `<small>Il file attuale resta invariato se non ne selezioni uno nuovo.</small>` : `<small>Massimo 8 MB. Il file sarà archiviato nel Drive Seemax.</small>`}<input name="document_file" type="file" ${r.url ? "" : "required"} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt"></label>`;
+    const fields = field("Nome documento", "nome", r.nome, { required: true, full: true }) + field("Tipo", "tipo", r.tipo || "Preventivo", { options: ["Preventivo", "Contratto", "Documento cliente", "Documento finanziaria", "Installazione", "Altro"] }) + field("Pratica", "practiceId", r.practiceId || "", { options: ["", ...state.data.practices.map((p) => p.id)] }) + fileField + field("Data", "data", r.data || new Date().toISOString().slice(0, 10), { type: "date" }) + field("Note", "note", r.note, { type: "textarea", full: true });
     openModal(r.id ? "Modifica documento" : "Nuovo documento", formShell("documents", r.id, fields), { wide: true, kicker: "Archivio documentale" });
   }
 
@@ -427,8 +525,16 @@
     const practices = state.data.practices || [];
     const activities = state.data.activities || [];
     const open = practices.filter((p) => !["Completata", "Bocciata"].includes(p.stato));
+    const session = api.getSession() || {};
+    const completed = practices.filter((p) => p.stato === "Completata");
+    const previousRevenue = (state.data.dashboard && state.data.dashboard.revenue) || {};
     state.data.dashboard = {
       totals: { clients: (state.data.clients || []).length, practices: open.length, value: open.reduce((sum, p) => sum + Number(p.valore || 0), 0), activities: activities.filter((a) => a.stato !== "Completata").length },
+      revenue: {
+        personal: completed.filter((p) => String(p.agent_username || "") === String(session.username || "") || (!p.agent_username && p.agente === (session.displayName || session.nome_visualizzato))).reduce((sum, p) => sum + Number(p.valore || 0), 0),
+        company: api.isAdmin() ? completed.reduce((sum, p) => sum + Number(p.valore || 0), 0) : Number(previousRevenue.company || 0),
+        target: Number((state.data.settings || {}).obiettivo_fatturato || previousRevenue.target || 0)
+      },
       recentPractices: practices.slice().sort((a, b) => String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || ""))).slice(0, 5),
       nextActivities: activities.filter((a) => a.stato !== "Completata").sort((a, b) => String(a.scadenza || "").localeCompare(String(b.scadenza || ""))).slice(0, 6),
       pipeline: STATUSES.map((status) => ({ status, count: practices.filter((p) => p.stato === status).length, value: practices.filter((p) => p.stato === status).reduce((sum, p) => sum + Number(p.valore || 0), 0) }))
@@ -447,6 +553,12 @@
     const entity = form.dataset.entity;
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const record = { ...current, ...serializeForm(form) };
+    delete record.cabinet_calculated;
+    delete record.measure_mode;
+    delete record.display_width;
+    delete record.display_height;
+    delete record.product_id;
+    delete record.stato_display;
     if (form.dataset.id) record.id = form.dataset.id;
     const now = new Date().toISOString().slice(0, 10);
     if (entity === "clients") record.creatoIl = record.creatoIl || now;
@@ -454,13 +566,28 @@
       const client = state.data.clients.find((c) => c.id === record.clientId);
       record.cliente = client ? client.ragioneSociale : record.cliente;
       record.agente = record.agente || ((api.getSession() || {}).displayName || "");
+      record.agent_username = record.agent_username || ((api.getSession() || {}).username || "");
+      record.finanziaria = record.tipo_pratica === "NOLEGGIO" ? "Grenke" : record.tipo_pratica === "LEASING" ? "IFIS" : (record.finanziaria || "Da definire");
+      if (!api.isAdmin() && !current.id) record.stato = "Inserita";
       record.aggiornatoIl = now;
       record.id = record.id || "PR-" + record.numero;
+      if (!current.id) record.nuova_pratica = "SI";
     }
     if (entity === "documents") {
+      delete record.document_file;
       const practice = state.data.practices.find((p) => p.id === record.practiceId);
       record.pratica = practice ? practice.numero : "";
       record.cliente = practice ? practice.cliente : "";
+      const file = form.elements.document_file && form.elements.document_file.files[0];
+      if (file) {
+        if (api.isFastMode()) { toast("Il caricamento dei file è disponibile soltanto in Modalità Standard.", "danger"); return; }
+        if (file.size > 8 * 1024 * 1024) { toast("Il file supera il limite di 8 MB.", "danger"); return; }
+        record.file_base64 = await readFileAsDataUrl(file);
+        record.file_name = file.name;
+        record.file_type = file.type || "application/octet-stream";
+        record.file_size = file.size;
+        if (!record.nome) record.nome = file.name;
+      }
     }
     if (entity === "users") {
       record.id = record.id || record.username;
@@ -471,11 +598,21 @@
       const saved = await api.upsert(entity, record);
       if (saved.__notifications) { state.data.notifications = saved.__notifications; delete saved.__notifications; updateNotificationBell(); }
       replaceLocalEntity(entity, saved);
+      setConnectionState();
       closeModal();
       renderRoute();
       toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
     } catch (error) { toast(error.message, "danger"); }
     finally { setLoading(false); }
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Impossibile leggere il file selezionato."));
+      reader.readAsDataURL(file);
+    });
   }
 
   async function removeEntity(entity, id) {
@@ -492,6 +629,81 @@
     if (!record) return;
     const saved = await api.upsert("activities", { ...record, stato: record.stato === "Completata" ? "Aperta" : "Completata" });
     replaceLocalEntity("activities", saved); renderRoute(); toast("Attività aggiornata.");
+  }
+
+  function updateModeControls() {
+    const fast = api.isFastMode();
+    const count = api.pendingOperations().length;
+    const label = $("workModeLabel");
+    const switchButton = $("modeSwitchButton");
+    const saveButton = $("saveAllButton");
+    if (!label || !switchButton || !saveButton) return;
+    label.textContent = fast ? "RAPIDA" : "STANDARD";
+    label.className = `mode-indicator ${fast ? "fast" : "standard"}`;
+    switchButton.textContent = fast ? "Modalità Standard" : "Modalità Rapida";
+    switchButton.dataset.action = fast ? "disable-fast-mode" : "enable-fast-mode";
+    saveButton.classList.toggle("is-hidden", !fast);
+    $("pendingCount").textContent = count;
+    saveButton.disabled = count === 0;
+  }
+
+  function openFastModeWarning() {
+    const body = `<div class="fast-mode-warning"><span class="fast-bolt">⚡</span><h3>Lavoro locale ad alta velocità</h3><p>Il Management Suite non comunicherà costantemente con il Database. Tutti i dati saranno salvati localmente su questo dispositivo e dovranno essere caricati manualmente tramite <strong>SALVA TUTTO</strong>.</p><div class="warning-callout"><strong>Quotation Planner disponibile con archivio limitato</strong><span>Il calcolatore resterà utilizzabile, ma non sarà possibile salvare o caricare preventivi dall’archivio online. Anche il caricamento di documenti nel gestionale sarà temporaneamente disabilitato.</span></div><ul><li>Le modifiche restano su questo browser fino alla sincronizzazione.</li><li>Non cancellare dati del browser prima di usare SALVA TUTTO.</li><li>Le Attività restano locali in entrambe le modalità.</li></ul><div class="form-actions"><button class="btn ghost" data-action="close-modal">Annulla</button><button class="btn primary" data-action="confirm-fast-mode">Attiva Modalità Rapida</button></div></div>`;
+    openModal("Attivare la Modalità Rapida?", body, { kicker: "Avviso operativo" });
+  }
+
+  function enableFastMode() {
+    api.setFastMode(true);
+    closeModal();
+    updateModeControls();
+    setConnectionState();
+    renderRoute();
+    toast("Modalità Rapida attiva.");
+  }
+
+  function disableFastMode() {
+    const pending = api.pendingOperations().length;
+    if (pending) {
+      toast(`Prima usa SALVA TUTTO: ci sono ${pending} elementi da trasferire.`, "danger");
+      return;
+    }
+    api.setFastMode(false);
+    updateModeControls();
+    setConnectionState();
+    renderRoute();
+    toast("Modalità Standard attiva.");
+  }
+
+  function operationLabel(operation) {
+    if (!operation) return "Completamento sincronizzazione";
+    if (operation.type === "settings") return "Impostazioni generali";
+    const labels = { practices: "Pratica", clients: "Cliente", products: "Prodotto", documents: "Documento", users: "Agente" };
+    const record = operation.record || {};
+    return `${operation.type === "remove" ? "Eliminazione" : labels[operation.entity] || operation.entity}: ${record.numero || record.nome || record.ragioneSociale || record.username || operation.id || "elemento"}`;
+  }
+
+  async function syncAll() {
+    const total = api.pendingOperations().length;
+    if (!total) { toast("Non ci sono elementi da salvare."); return; }
+    const layer = $("syncLayer");
+    layer.classList.remove("is-hidden");
+    try {
+      await api.syncAll(({ index, total: count, operation, done }) => {
+        const percent = count ? Math.round((index / count) * 100) : 100;
+        $("syncProgressBar").style.width = `${done ? 100 : percent}%`;
+        $("syncProgressText").textContent = done ? `${count} elementi salvati` : `${index + 1} di ${count}`;
+        $("syncCurrentItem").textContent = done ? "Sincronizzazione completata." : operationLabel(operation);
+      });
+      await loadAll();
+      renderRoute();
+      toast("Tutto il lavoro locale è stato salvato nel database.");
+    } catch (error) {
+      toast(`Sincronizzazione interrotta: ${error.message}`, "danger");
+    } finally {
+      setTimeout(() => layer.classList.add("is-hidden"), 500);
+      updateModeControls();
+      setConnectionState();
+    }
   }
 
   function searchEverywhere(query) {
@@ -512,6 +724,10 @@
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
       "close-modal": closeModal,
       "open-notifications": openNotifications,
+      "enable-fast-mode": openFastModeWarning,
+      "confirm-fast-mode": enableFastMode,
+      "disable-fast-mode": disableFastMode,
+      "sync-all": syncAll,
       "reload": async () => { await loadAll(); renderRoute(); },
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.ping(); setConnectionState(); toast(response.ok ? "Collegamento funzionante." : "Collegamento non disponibile.", response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
@@ -547,7 +763,16 @@
     if (event.target.matches(".entity-form")) { event.preventDefault(); await saveEntity(event.target); return; }
     if (event.target.id === "settingsForm") {
       event.preventDefault();
-      try { await api.saveSettings(serializeForm(event.target)); await loadAll(); renderRoute(); toast("Impostazioni salvate."); }
+      try {
+        const values = serializeForm(event.target);
+        await api.saveSettings(values);
+        state.data.settings = { ...(state.data.settings || {}), ...values };
+        updateLocalDashboard();
+        if (!api.isFastMode()) await loadAll();
+        renderRoute();
+        setConnectionState();
+        toast(api.isFastMode() ? "Impostazioni salvate localmente. Usa SALVA TUTTO." : "Impostazioni salvate.");
+      }
       catch (error) { toast(error.message, "danger"); }
     }
   });

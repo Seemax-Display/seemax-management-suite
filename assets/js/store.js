@@ -75,9 +75,11 @@
   }
 
   function nextPracticeNumber() {
-    const year = String(new Date().getFullYear()).slice(-2);
-    const nums = list("practices").map((item) => Number(String(item.numero || "").split("-")[0])).filter(Number.isFinite);
-    return String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, "0") + "-" + year;
+    const session = getSession() || {};
+    const parts = String(session.displayName || session.nome_visualizzato || session.username || "SM").trim().split(/\s+/);
+    const prefix = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : String(parts[0] || "SM").slice(0, 2)).toUpperCase();
+    const nums = list("practices").map((item) => String(item.numero || "")).filter((number) => number.startsWith(prefix)).map((number) => Number(number.slice(prefix.length))).filter(Number.isFinite);
+    return prefix + String((nums.length ? Math.max(...nums) : 0) + 1).padStart(4, "0");
   }
 
   function dashboard() {
@@ -92,6 +94,11 @@
     }));
     return clone({
       totals: { clients: db.clients.length, practices: open.length, value, activities: due.length },
+      revenue: {
+        personal: db.practices.filter((p) => p.stato === "Completata" && (!p.agent_username || p.agent_username === ((getSession() || {}).username))).reduce((sum, p) => sum + Number(p.valore || 0), 0),
+        company: db.practices.filter((p) => p.stato === "Completata").reduce((sum, p) => sum + Number(p.valore || 0), 0),
+        target: Number((db.settings || {}).obiettivo_fatturato || 0)
+      },
       recentPractices: db.practices.slice().sort((a, b) => String(b.aggiornatoIl).localeCompare(String(a.aggiornatoIl))).slice(0, 5),
       nextActivities: due.slice().sort((a, b) => String(a.scadenza).localeCompare(String(b.scadenza))).slice(0, 6),
       pipeline

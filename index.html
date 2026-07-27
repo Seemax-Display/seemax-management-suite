@@ -67,6 +67,11 @@
         <div class="page-heading"><span id="pageEyebrow">Seemax Management</span><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Panoramica commerciale e operativa</p></div>
         <div class="topbar-actions">
           <label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Cerca cliente o pratica…" aria-label="Ricerca globale"></label>
+          <div class="mode-controls">
+            <span id="workModeLabel" class="mode-indicator">STANDARD</span>
+            <button id="modeSwitchButton" class="btn ghost" data-action="enable-fast-mode">Modalità Rapida</button>
+            <button id="saveAllButton" class="btn soft is-hidden" data-action="sync-all">SALVA TUTTO <i id="pendingCount">0</i></button>
+          </div>
           <button id="installAppButton" class="btn ghost is-hidden">Installa App</button>
           <button id="quickAddButton" class="btn primary">＋ Nuova pratica</button>
           <button id="notificationButton" class="notification-button" data-action="open-notifications" aria-label="Notifiche"><span>🔔</span><i id="notificationDot"></i></button>
@@ -81,6 +86,9 @@
   <div id="modalRoot"></div>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
   <div id="loadingLayer" class="loading-layer is-hidden" aria-live="assertive"><div class="spinner"></div><strong>Operazione in corso…</strong></div>
+  <div id="syncLayer" class="sync-layer is-hidden" aria-live="assertive">
+    <section><span class="section-kicker">Sincronizzazione database</span><h2>SALVA TUTTO</h2><div class="sync-progress"><i id="syncProgressBar"></i></div><strong id="syncProgressText">Preparazione…</strong><p id="syncCurrentItem">Attendi mentre trasferiamo il lavoro locale.</p></section>
+  </div>
 
   <script src="assets/js/config.js"></script>
   <script src="assets/js/seed.js"></script>
