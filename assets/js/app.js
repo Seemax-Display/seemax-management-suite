@@ -4,7 +4,7 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "" };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "numero", practiceDirection: "desc", practicePage: 1 };
   let installPrompt = null;
 
   const NAV = [
@@ -245,24 +245,58 @@
     return `<button class="activity-item" data-action="edit-activity" data-id="${esc(item.id)}"><i class="${overdue ? "overdue" : ""}"></i><div><strong>${esc(item.titolo)}</strong><span>${esc(item.tipo)} · ${dateIt(item.scadenza)}</span></div>${badge(item.stato)}</button>`;
   }
 
-  function practiceTable(rows, compact = false) {
+  function practiceTable(rows, compact = false, showAgent = false) {
     if (!rows.length) return emptyState("Nessuna pratica", "Crea la prima pratica per iniziare.", "Nuova pratica", "new-practice");
-    return `<div class="table-wrap"><table class="practice-table"><thead><tr><th>Pratica</th><th>Cliente</th><th>Tipologia</th><th>Stato</th><th>Finanziaria</th><th>Valore</th><th></th></tr></thead><tbody>${rows.map((p) => `<tr class="practice-row practice-${slug(p.stato)}"><td><strong>${esc(p.numero)}</strong><small>${dateIt(p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td><td><button class="table-action" data-action="edit-practice" data-id="${esc(p.id)}">Apri</button>${compact || p.stato === "Completata" ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="practice-table"><thead><tr><th>Pratica</th><th>Cliente</th><th>Tipologia</th><th>Stato</th><th>Finanziaria</th><th>Valore</th>${showAgent ? "<th>Agente</th>" : ""}<th></th></tr></thead><tbody>${rows.map((p) => `<tr class="practice-row practice-${slug(p.stato)}"><td><strong>${esc(p.numero)}</strong><small>${dateIt(p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td>${showAgent ? `<td>${esc(p.agente || p.agent_username || "—")}</td>` : ""}<td><button class="table-action" data-action="edit-practice" data-id="${esc(p.id)}">Apri</button>${compact || p.stato === "Completata" ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`).join("")}</tbody></table></div>`;
   }
 
   function renderPractices() {
-    let rows = filterRows(state.data.practices, ["numero", "cliente", "titolo", "stato", "finanziaria", "agente"]);
+    let rows = (state.data.practices || []).slice();
+    const query = String(state.practiceQuery || "").trim().toLowerCase();
+    const searchableFields = api.isAdmin() ? ["numero", "id", "cliente", "titolo", "agente", "agent_username"] : ["numero", "id", "cliente", "titolo"];
+    if (query) rows = rows.filter((row) => searchableFields.some((key) => String(row[key] || "").toLowerCase().includes(query)));
     if (state.filterStatus) rows = rows.filter((p) => p.stato === state.filterStatus);
+    const sortKey = state.practiceSort || "numero";
+    const direction = state.practiceDirection === "asc" ? 1 : -1;
+    const statusOrder = Object.fromEntries(STATUSES.map((status, index) => [status, index]));
+    rows.sort((left, right) => {
+      if (sortKey === "valore") return (Number(left.valore || 0) - Number(right.valore || 0)) * direction;
+      if (sortKey === "stato") return ((statusOrder[left.stato] ?? 99) - (statusOrder[right.stato] ?? 99)) * direction;
+      const value = (record) => sortKey === "numero" ? record.numero : sortKey === "cliente" ? record.cliente : sortKey === "tipo" ? record.tipo_pratica : sortKey === "finanziaria" ? record.finanziaria : record.agente || record.agent_username;
+      return String(value(left) || "").localeCompare(String(value(right) || ""), "it", { numeric: true, sensitivity: "base" }) * direction;
+    });
+    const pageSize = 10;
+    const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+    state.practicePage = Math.min(Math.max(1, Number(state.practicePage || 1)), pageCount);
+    const start = (state.practicePage - 1) * pageSize;
+    const visibleRows = rows.slice(start, start + pageSize);
     const chips = STATUSES.map((s) => `<button class="filter-chip ${state.filterStatus === s ? "active" : ""}" data-filter-status="${esc(s)}">${esc(s)} <strong>${state.data.practices.filter((p) => p.stato === s).length}</strong></button>`).join("");
-    return `${viewToolbar("Nuova pratica", "new-practice", `<div class="filter-strip"><button class="filter-chip ${state.filterStatus ? "" : "active"}" data-filter-status="">Tutte <strong>${state.data.practices.length}</strong></button>${chips}</div>`)}<section class="panel">${practiceTable(rows)}</section>`;
+    const sortOptions = [
+      ["stato", "Esito / stato"], ["numero", "ID pratica"], ["cliente", "Nome cliente"],
+      ["tipo", "Tipologia"], ["finanziaria", "Finanziaria"], ["valore", "Valore"]
+    ].concat(api.isAdmin() ? [["agente", "Agente"]] : []);
+    const controls = `<div class="practice-controls">
+      <label class="practice-search"><span>⌕</span><input id="practiceSearch" value="${esc(state.practiceQuery || "")}" placeholder="${api.isAdmin() ? "Cerca per ID, intestazione o agente…" : "Cerca per ID o intestazione…"}" aria-label="Cerca pratiche"></label>
+      <label>Ordina per<select id="practiceSort">${sortOptions.map(([value, label]) => `<option value="${value}" ${state.practiceSort === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+      <label>Ordine<select id="practiceDirection"><option value="asc" ${state.practiceDirection === "asc" ? "selected" : ""}>Crescente</option><option value="desc" ${state.practiceDirection === "desc" ? "selected" : ""}>Decrescente</option></select></label>
+    </div>`;
+    const pagination = rows.length > pageSize ? `<nav class="practice-pagination" aria-label="Pagine pratiche">
+      <button class="btn ghost" data-practice-page="${state.practicePage - 1}" ${state.practicePage === 1 ? "disabled" : ""}>← Precedente</button>
+      <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => `<button class="${page === state.practicePage ? "active" : ""}" data-practice-page="${page}" aria-label="Pagina ${page}">${page}</button>`).join("")}</div>
+      <button class="btn ghost" data-practice-page="${state.practicePage + 1}" ${state.practicePage === pageCount ? "disabled" : ""}>Successiva →</button>
+    </nav>` : "";
+    const range = rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} di ${rows.length} pratiche` : "0 pratiche";
+    return `${viewToolbar("Nuova pratica", "new-practice", `<div class="filter-strip"><button class="filter-chip ${state.filterStatus ? "" : "active"}" data-filter-status="">Tutte <strong>${state.data.practices.length}</strong></button>${chips}</div>`)}${controls}<section class="panel"><div class="practice-result-count">${range}</div>${visibleRows.length ? practiceTable(visibleRows, false, api.isAdmin()) : emptyState("Nessuna pratica trovata", "Modifica ricerca, filtro o ordinamento.", "", "")}${pagination}</section>`;
   }
 
   function renderClients() {
     const rows = filterRows(state.data.clients, ["ragioneSociale", "referente", "piva", "email", "telefono", "citta"]);
     return `${viewToolbar("Nuovo cliente", "new-client", `<p class="toolbar-note">${rows.length} clienti visualizzati</p>`)}<div class="card-grid">${rows.length ? rows.map((c) => {
       const count = state.data.practices.filter((p) => p.clientId === c.id).length;
-      const locked = state.data.practices.some((p) => p.clientId === c.id && p.stato === "Completata");
-      return `<article class="client-card"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)}</h3><p>${esc(c.referente || "Referente non indicato")}</p></div>${locked ? `<span class="locked-record" title="Cliente collegato a una pratica completata">🔒</span>` : `<button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button>`}</div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}">Apri anagrafica</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}">＋ Pratica</button></div></article>`;
+      const locked = String(c.ha_pratiche_collegate || "NO").toUpperCase() === "SI" || state.data.practices.some((p) => p.clientId === c.id);
+      const canEdit = api.isAdmin() || String(c.puo_modificare || "NO").toUpperCase() === "SI";
+      const shared = String(c.condiviso || "NO").toUpperCase() === "SI";
+      return `<article class="client-card ${shared ? "shared-client" : ""}"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)} ${shared ? `<span class="shared-client-badge">CONDIVISO</span>` : ""}</h3><p>${esc(c.referente || "Referente non indicato")}</p>${shared ? `<small>Creato da: ${esc(c.creato_da_nome || "Utente Seemax")}</small>` : ""}</div>${locked ? `<span class="locked-record" title="Cliente collegato a una pratica: eliminazione disabilitata">🔒</span>` : canEdit ? `<button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button>` : `<span class="locked-record" title="Cliente consultabile ma modificabile soltanto dal creatore">◉</span>`}</div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche personali</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}">${canEdit ? "Apri anagrafica" : "Consulta anagrafica"}</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}">＋ Pratica</button></div></article>`;
     }).join("") : emptyState("Nessun cliente", "Aggiungi la prima anagrafica.", "Nuovo cliente", "new-client")}</div>`;
   }
 
@@ -369,8 +403,8 @@
     const height = measure ? Number(measure[2].replace(",", ".")) : Number(selectedProduct.cabY || 50) / 100;
     const bifacial = String(record.bifacciale || "NO").toUpperCase();
     const statusField = !api.isAdmin()
-      ? `${field("Stato (gestibile dall’admin)", "stato_display", record.stato || "Inserita", { readonly: true })}<input type="hidden" name="stato" value="${esc(record.stato || "Inserita")}">`
-      : field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses, readonly: !api.isAdmin() });
+      ? `<input type="hidden" name="stato" value="${esc(record.stato || "Inserita")}">`
+      : field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses });
     const technicalFields = `<fieldset class="practice-configurator full"><legend>Configurazione display</legend><div class="form-grid">
       <label>Display di riferimento<select name="product_id" required>${logicalProducts.map((p) => `<option value="${esc(p.id)}" ${p.id === selectedProduct.id ? "selected" : ""}>${esc(p.nome)}${p.unifiedP391 ? " · composizione automatica 50×100 + 50×50 cm" : ` · cabinet ${esc(p.cabX)}×${esc(p.cabY)} cm`}</option>`).join("")}</select></label>
       ${field("Larghezza display (m)", "display_width", width, { type: "number", min: 0, step: "any" })}
@@ -506,14 +540,17 @@
 
   function openClient(id) {
     const r = state.data.clients.find((c) => c.id === id) || {};
+    const session = api.getSession() || {};
+    const owner = String(r.creato_da_username || r.agent_username || "");
+    const canEdit = !r.id || api.isAdmin() || String(r.puo_modificare || "NO").toUpperCase() === "SI" || owner === String(session.username || "");
     const fields = field("Ragione sociale", "ragioneSociale", r.ragioneSociale, { required: true, full: true }) +
       field("Referente", "referente", r.referente) +
       field("Email", "email", r.email, { type: "email" }) +
       window.SeemaxClientTools.renderFields(r) +
       field("Note commerciali", "note", r.note, { type: "textarea", full: true });
-    openModal(r.id ? "Modifica cliente" : "Nuovo cliente", formShell("clients", r.id, fields), { wide: true, kicker: "Anagrafica cliente" });
+    openModal(r.id ? (canEdit ? "Modifica cliente" : "Anagrafica condivisa") : "Nuovo cliente", formShell("clients", r.id, fields, canEdit ? "Salva cliente" : "Consultazione"), { wide: true, kicker: canEdit ? "Anagrafica cliente" : "Cliente condiviso", subtitle: !canEdit ? `Creato da ${r.creato_da_nome || "un altro utente"}. Puoi utilizzarlo nelle tue pratiche, ma non modificarlo.` : "" });
     const form = document.querySelector(".entity-form[data-entity='clients']");
-    if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast);
+    if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast, !canEdit);
   }
 
   function openProduct(id) {
@@ -830,7 +867,9 @@
 
   document.addEventListener("click", async (event) => {
     const filterTarget = event.target.closest("[data-filter-status]");
-    if (filterTarget) { state.filterStatus = filterTarget.dataset.filterStatus || ""; renderRoute(); return; }
+    if (filterTarget) { state.filterStatus = filterTarget.dataset.filterStatus || ""; state.practicePage = 1; renderRoute(); return; }
+    const practicePageTarget = event.target.closest("[data-practice-page]");
+    if (practicePageTarget && !practicePageTarget.disabled) { state.practicePage = Number(practicePageTarget.dataset.practicePage || 1); renderRoute(); return; }
     const routeTarget = event.target.closest("[data-route]");
     if (routeTarget) { go(routeTarget.dataset.route); return; }
     const actionTarget = event.target.closest("[data-action]");
@@ -840,6 +879,22 @@
       const account = config.demoAccounts[demoTarget.dataset.demoLogin === "admin" ? 0 : 1];
       $("loginUsername").value = account.username; $("loginKey").value = account.key; $("loginForm").requestSubmit();
     }
+  });
+
+  document.addEventListener("input", (event) => {
+    if (event.target.id !== "practiceSearch") return;
+    state.practiceQuery = event.target.value;
+    state.practicePage = 1;
+    renderRoute();
+    requestAnimationFrame(() => {
+      const input = $("practiceSearch");
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    });
+  });
+
+  document.addEventListener("change", (event) => {
+    if (event.target.id === "practiceSort") { state.practiceSort = event.target.value; state.practicePage = 1; renderRoute(); }
+    if (event.target.id === "practiceDirection") { state.practiceDirection = event.target.value; state.practicePage = 1; renderRoute(); }
   });
 
   document.addEventListener("submit", async (event) => {

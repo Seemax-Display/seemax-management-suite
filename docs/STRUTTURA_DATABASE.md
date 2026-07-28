@@ -6,6 +6,8 @@
 
 Contiene le anagrafiche aziendali e i relativi contatti. `id` identifica il cliente nelle pratiche. Dalla versione 1.7 comprende inoltre gli esiti distinti della P.IVA (`piva_formalmente_valida`, `piva_vies_valida`, `piva_verifica_ade`), IBAN, telefono internazionale e la gerarchia geografica Regione/Provincia/Comune/CAP.
 
+La privacy è regolata da `condiviso`, `creato_da_username`, `creato_da_nome` e `condiviso_il`. Con `condiviso=NO` il cliente è restituito soltanto al creatore e agli admin; con `condiviso=SI` è consultabile da tutti gli utenti attivi. Il backend impedisce la cancellazione di qualsiasi cliente il cui `id` compare in una pratica.
+
 ### PRATICHE
 
 Ogni riga rappresenta un’opportunità o lavoro. Gli stati previsti sono:
@@ -17,6 +19,8 @@ Ogni riga rappresenta un’opportunità o lavoro. Gli stati previsti sono:
 5. Completata
 
 Le colonne `modelli_display`, `misure_display`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito l'impegno di magazzino. Per il P3.91 unificato sono disponibili anche `p391_unificato`, `p391_cabinet_50100` e `p391_cabinet_5050`; lo scarico continua a usare le righe JSON separate, quindi resta atomico e idempotente.
+
+Le colonne `archiviata` e `archiviata_il` vengono valorizzate quando una pratica passa a `Bocciata`. `agent_username` determina il proprietario e impedisce agli agenti di leggere o modificare pratiche altrui; lo stato è modificabile esclusivamente dagli amministratori.
 
 ### DOCUMENTI
 

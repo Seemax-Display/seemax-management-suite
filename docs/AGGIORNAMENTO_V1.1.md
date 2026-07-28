@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.7.0
+# Aggiornamento Seemax Management Suite 1.8.0
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -10,7 +10,7 @@ Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche 
 
 ## 1. Aggiornare GitHub
 
-Carica nel repository tutti i file della versione 1.1, mantenendo la stessa struttura delle cartelle. In particolare devono essere presenti:
+Carica nel repository tutti i file della versione 1.8.0, mantenendo la stessa struttura delle cartelle. In particolare devono essere presenti:
 
 - `quotation-planner/index.html`;
 - `assets/catalog/` con le immagini prodotto;
@@ -48,7 +48,7 @@ La funzione aggiorna le colonne senza cancellare clienti, agenti o pratiche, cre
 5. Prendi nota della giacenza del prodotto.
 6. Porta la pratica su **Accettata**: la giacenza deve diminuire una sola volta.
 7. Salva nuovamente la pratica senza cambiare stato: la giacenza non deve diminuire ancora.
-8. Porta la pratica su **Annullata**: la giacenza deve essere ripristinata.
+8. Porta la pratica su **Sospesa**: la giacenza deve essere ripristinata.
 
 Per uno schermo unificato controlla entrambe le righe P3.91: il gestionale sottrae separatamente i cabinet 0.50×1.00 e 0.50×0.50.
 
@@ -126,6 +126,22 @@ Esempio: un P3.91 da **1,00×1,50 m** richiede 2 cabinet 50×100 e 2 cabinet 50�
 La verifica VIES negativa non blocca la creazione del cliente: indica soltanto che la P.IVA non risulta abilitata alle operazioni intracomunitarie. Il controllo formale della P.IVA, l’IBAN e il telefono non valido sono invece bloccanti quando i rispettivi campi vengono compilati.
 
 Durante l’aggiornamento, gli eventuali codici fiscali alfanumerici precedentemente conservati nella vecchia colonna “P.IVA / C.F.” vengono spostati automaticamente nella nuova colonna `codice_fiscale`, senza perdita del dato.
+
+## Novità 1.8 – Condivisione clienti e archivio pratiche
+
+- in creazione e modifica cliente è disponibile la scelta **Condividi cliente**, inizialmente disattivata;
+- un cliente privato è visibile soltanto al creatore e agli amministratori;
+- un cliente condiviso è consultabile e selezionabile da tutti gli utenti attivi, mostra il nome del creatore e resta modificabile soltanto dal creatore o da un amministratore;
+- nessun cliente collegato a una pratica può essere eliminato dal gestionale;
+- gli agenti non vedono il campo Stato e il server imposta automaticamente le nuove pratiche su `Inserita`;
+- soltanto gli amministratori possono variare lo stato;
+- le email di esito usano l'oggetto `ESITO PRATICA [ID] - Seemax Management Suite`;
+- `Accettata` e `Completata` producono un esito positivo, `Bocciata` un esito negativo e archivia automaticamente la pratica; `Sospesa` produce una comunicazione temporanea;
+- la sezione Pratiche permette ricerca per ID e cliente, oppure anche per agente agli amministratori;
+- sono disponibili ordinamento per stato, ID, cliente, tipologia, finanziaria, valore e, per gli amministratori, agente;
+- vengono mostrate al massimo 10 pratiche per pagina.
+
+La funzione `upgradeSeemaxV11` aggiunge a `CLIENTI` i campi `condiviso`, `creato_da_username`, `creato_da_nome` e `condiviso_il`. Aggiunge inoltre a `PRATICHE` i campi `archiviata` e `archiviata_il`, senza cancellare i dati esistenti.
 
 ## Regole di magazzino
 

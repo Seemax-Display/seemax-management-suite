@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.7.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.8.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -24,8 +24,8 @@ var ENTITY_SHEETS = {
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
-  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "note", "creatoIl", "agent_username", "aggiornatoIl"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "aggiornatoIl", "creatoIl"],
+  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "aggiornatoIl", "creatoIl"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
@@ -50,6 +50,7 @@ function setupSeemaxDatabase() {
   backfillPracticeInventoryV12_();
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
+  migrateClientSharingV18_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
   styleSheets_();
@@ -65,9 +66,10 @@ function upgradeSeemaxV11() {
   backfillPracticeInventoryV12_();
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.7.0");
+  migrateClientSharingV18_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.8.0");
   styleSheets_();
-  return "SEEMAX v1.7.0 configurato: anagrafica cliente professionale, verifiche fiscali, IBAN, telefono internazionale e località italiane.";
+  return "SEEMAX v1.8.0 configurato: condivisione clienti, protezioni agenti, email esito e archivio pratiche avanzato.";
 }
 
 function doGet(e) {
@@ -168,16 +170,32 @@ function managementUpsert_(p) {
   payload.aggiornatoIl = new Date().toISOString();
   if (entity === "practices") {
     var previousPractice = payload.id ? findRowObject_("PRATICHE", "id", payload.id) : null;
+    if (!isAdmin_(user) && previousPractice && String(previousPractice.agent_username || "") !== String(user.username)) {
+      throw new Error("Non sei autorizzato a modificare questa pratica.");
+    }
+    payload.agent_username = previousPractice && previousPractice.agent_username || user.username;
+    payload.agente = previousPractice && previousPractice.agente || userDisplayName_(user);
     if (!isAdmin_(user) && previousPractice && normalizePracticeStatus_(previousPractice.stato || "Inserita") !== normalizePracticeStatus_(payload.stato || previousPractice.stato || "Inserita")) {
       throw new Error("Solo l'amministratore può modificare lo stato di una pratica.");
     }
     if (!isAdmin_(user) && !previousPractice) payload.stato = "Inserita";
+    var practiceClient = findRowObject_("CLIENTI", "id", payload.clientId || previousPractice && previousPractice.clientId || "");
+    if (!practiceClient || !canAccessClient_(practiceClient, user)) throw new Error("Cliente non disponibile o non autorizzato.");
     var practiceRow = upsertPracticeWithInventory_(payload, user);
     if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) createPracticeStatusNotification_(previousPractice, practiceRow, user);
     log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
     return { ok: true, row: practiceRow, notifications: listNotificationsForUser_(user) };
   }
-  if (entity === "clients") validateClientFiscalData_(payload);
+  if (entity === "clients") {
+    var existingClient = payload.id ? findRowObject_("CLIENTI", "id", payload.id) : null;
+    if (existingClient && !canEditClient_(existingClient, user)) throw new Error("Questo cliente può essere modificato soltanto dal creatore o da un amministratore.");
+    payload.creato_da_username = existingClient && existingClient.creato_da_username || existingClient && existingClient.agent_username || user.username;
+    payload.creato_da_nome = existingClient && existingClient.creato_da_nome || userDisplayName_(findRowObject_("AGENTI", "username", payload.creato_da_username) || user);
+    payload.agent_username = payload.creato_da_username;
+    payload.condiviso = String(payload.condiviso || existingClient && existingClient.condiviso || "NO").toUpperCase() === "SI" ? "SI" : "NO";
+    payload.condiviso_il = payload.condiviso === "SI" ? (existingClient && existingClient.condiviso_il || new Date().toISOString()) : "";
+    validateClientFiscalData_(payload, user);
+  }
   if (entity === "users") {
     payload.id = payload.username;
     if (!payload.chiave_id_agente) {
@@ -241,14 +259,14 @@ function managementVerifyVat_(p) {
   };
 }
 
-function validateClientFiscalData_(payload) {
+function validateClientFiscalData_(payload, user) {
   var vat = String(payload.piva || "").replace(/\D/g, "");
   var iban = String(payload.iban || "").replace(/\s+/g, "").toUpperCase();
   if (vat && !validItalianVat_(vat)) throw new Error("Partita IVA formalmente non valida.");
   if (iban && !validIban_(iban)) throw new Error("IBAN formalmente non valido.");
   if (vat) {
     var duplicate = rowsToObjects_(sheet_("CLIENTI")).filter(function (row) {
-      return String(row.id || "") !== String(payload.id || "") && String(row.piva || "").replace(/\D/g, "") === vat;
+      return canAccessClient_(row, user) && String(row.id || "") !== String(payload.id || "") && String(row.piva || "").replace(/\D/g, "") === vat;
     })[0];
     if (duplicate) throw new Error("Partita IVA già associata al cliente " + (duplicate.ragioneSociale || duplicate.id) + ".");
   }
@@ -269,6 +287,20 @@ function migrateClientFiscalV17_() {
       client.piva_formalmente_valida = "NO";
       upsertObject_("CLIENTI", "id", client.id, client);
     }
+  });
+}
+
+function migrateClientSharingV18_() {
+  rowsToObjects_(sheet_("CLIENTI")).forEach(function (client) {
+    var changed = false;
+    if (!client.creato_da_username && client.agent_username) { client.creato_da_username = client.agent_username; changed = true; }
+    if (!client.creato_da_username) { client.creato_da_username = "admin"; changed = true; }
+    if (!client.creato_da_nome) {
+      client.creato_da_nome = userDisplayName_(findRowObject_("AGENTI", "username", client.creato_da_username) || { username: client.creato_da_username });
+      changed = true;
+    }
+    if (!client.condiviso) { client.condiviso = "NO"; changed = true; }
+    if (changed) upsertObject_("CLIENTI", "id", client.id, client);
   });
 }
 
@@ -365,7 +397,7 @@ function managementCreateFromQuote_(p) {
 }
 
 function findClientForQuote_(payload, user) {
-  var rows = rowsToObjects_(sheet_("CLIENTI"));
+  var rows = rowsToObjects_(sheet_("CLIENTI")).filter(function (row) { return canAccessClient_(row, user); });
   var vat = normalizeKey_(payload.cliente_piva_cf);
   var email = normalizeKey_(payload.cliente_email);
   var company = normalizeKey_(payload.cliente_azienda || payload.cliente_referente);
@@ -374,7 +406,10 @@ function findClientForQuote_(payload, user) {
     if (email && normalizeKey_(row.email) === email) return true;
     return company && normalizeKey_(row.ragioneSociale) === company;
   })[0];
-  var record = found || { id: uid_("cli"), creatoIl: new Date().toISOString() };
+  var record = found || {
+    id: uid_("cli"), creatoIl: new Date().toISOString(), condiviso: "NO",
+    creato_da_username: user.username, creato_da_nome: userDisplayName_(user)
+  };
   record.ragioneSociale = String(payload.cliente_azienda || payload.cliente_referente || record.ragioneSociale || "Cliente S.Q.P.");
   record.referente = String(payload.cliente_referente || record.referente || "");
   record.piva = String(payload.cliente_piva_cf || record.piva || "");
@@ -382,6 +417,8 @@ function findClientForQuote_(payload, user) {
   record.telefono = String(payload.cliente_telefono || record.telefono || "");
   record.citta = String(payload.cliente_localita || record.citta || "");
   record.agent_username = record.agent_username || user.username;
+  record.creato_da_username = record.creato_da_username || record.agent_username || user.username;
+  record.creato_da_nome = record.creato_da_nome || userDisplayName_(user);
   record.aggiornatoIl = new Date().toISOString();
   return upsertObject_("CLIENTI", "id", record.id, record);
 }
@@ -428,6 +465,8 @@ function upsertPracticeWithInventory_(payload, user) {
     var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
     var nextStatus = normalizePracticeStatus_(payload.stato || existing && existing.stato || "Inserita");
     payload.stato = nextStatus;
+    payload.archiviata = nextStatus === "Bocciata" ? "SI" : "NO";
+    payload.archiviata_il = nextStatus === "Bocciata" ? (existing && existing.archiviata_il || new Date().toISOString()) : "";
     var inferredType = String(payload.finanziaria || existing && existing.finanziaria || "") === "Grenke" ? "NOLEGGIO" : (String(payload.finanziaria || existing && existing.finanziaria || "") === "IFIS" ? "LEASING" : "ACQUISTO");
     var practiceType = String(payload.tipo_pratica || existing && existing.tipo_pratica || inferredType).toUpperCase();
     payload.tipo_pratica = practiceType;
@@ -517,7 +556,29 @@ function createPracticeStatusNotification_(before, after, actor) {
   var email = String(recipient.email || "").trim();
   if (email) {
     try {
-      MailApp.sendEmail({ to: email, subject: "Seemax Management · " + title, name: "Seemax Management Suite", htmlBody: "<p>" + escapeHtml_(message) + "</p><p>Accedi al gestionale per visualizzare la pratica.</p>" });
+      var state = String(after.stato || "");
+      var outcome = state.toUpperCase();
+      var practiceId = String(after.numero || after.id || "");
+      var clientName = String(after.cliente || "cliente");
+      var recipientName = userDisplayName_(recipient);
+      var subject = "ESITO PRATICA " + practiceId + " - Seemax Management Suite";
+      var emailText = "";
+      if (state === "Accettata" || state === "Completata") {
+        emailText = "Gentile " + recipientName + ", siamo felici di informarti che la pratica " + practiceId + " intestata a " + clientName + " ha avuto esito: " + outcome + ".\n\nPuoi dunque continuare a monitorare lo stato della pratica direttamente in App o dal gestionale.";
+      } else if (state === "Bocciata") {
+        emailText = "Gentile " + recipientName + ", ci dispiace informarti che la pratica " + practiceId + " intestata a " + clientName + " ha avuto esito: " + outcome + ".\n\nPertanto non sarà più possibile continuare e la pratica sarà automaticamente archiviata.";
+      } else if (state === "Sospesa") {
+        emailText = "Gentile " + recipientName + ", ti informiamo che la pratica " + practiceId + " intestata a " + clientName + " è stata temporaneamente sospesa.\n\nRiceverai una nuova comunicazione quando lo stato della pratica verrà aggiornato.";
+      }
+      if (emailText) {
+        MailApp.sendEmail({
+          to: email,
+          subject: subject,
+          name: "Seemax Management Suite",
+          body: emailText,
+          htmlBody: "<p>" + escapeHtml_(emailText).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>") + "</p>"
+        });
+      }
     } catch (error) { log_(actor, "EMAIL_NOTIFICATION_ERROR", "notifications", id, String(error && error.message || error)); }
   }
 }
@@ -643,8 +704,10 @@ function managementRemove_(p) {
     if (practice && String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") throw new Error("Prima di eliminare la pratica, impostala come Sospesa per ripristinare le giacenze.");
   }
   if (entity === "clients") {
-    var completedPractice = rowsToObjects_(sheet_("PRATICHE")).filter(function (row) { return String(row.clientId || "") === id && String(row.stato || "") === "Completata"; })[0];
-    if (completedPractice) throw new Error("Il cliente è collegato a una pratica completata e può essere eliminato solo dal Foglio Google.");
+    var clientToRemove = findRowObject_("CLIENTI", "id", id);
+    if (clientToRemove && !canEditClient_(clientToRemove, user)) throw new Error("Questo cliente può essere eliminato soltanto dal creatore o da un amministratore.");
+    var linkedPractice = rowsToObjects_(sheet_("PRATICHE")).filter(function (row) { return String(row.clientId || "") === id; })[0];
+    if (linkedPractice) throw new Error("Il cliente è collegato a una pratica e non può essere eliminato dal Management Suite.");
   }
   var removed = removeEntity_(entity, id, user);
   log_(user, "DELETE", entity, id, "Eliminazione da Management Suite");
@@ -671,6 +734,15 @@ function listEntity_(entity, user) {
   if (entity === "users" && !isAdmin_(user)) return [publicUser_(user)];
   if (entity === "movements" && !isAdmin_(user)) return [];
   var rows = rowsToObjects_(sheet_(sheetName));
+  if (entity === "clients") {
+    var linkedClientIds = {};
+    rowsToObjects_(sheet_("PRATICHE")).forEach(function (practice) { if (practice.clientId) linkedClientIds[String(practice.clientId)] = true; });
+    rows = rows.filter(function (row) { return canAccessClient_(row, user); }).map(function (row) {
+      row.ha_pratiche_collegate = linkedClientIds[String(row.id)] ? "SI" : "NO";
+      row.puo_modificare = canEditClient_(row, user) ? "SI" : "NO";
+      return row;
+    });
+  }
   if (!isAdmin_(user) && ["practices", "documents", "activities"].indexOf(entity) >= 0) {
     rows = rows.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
   }
@@ -925,6 +997,23 @@ function publicUser_(user) {
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
+
+function userDisplayName_(user) {
+  return String(user && (user.nome_visualizzato || user.displayName || user.username) || "Utente");
+}
+
+function clientOwner_(client) {
+  return String(client && (client.creato_da_username || client.agent_username) || "");
+}
+
+function canAccessClient_(client, user) {
+  if (isAdmin_(user)) return true;
+  return clientOwner_(client) === String(user && user.username || "") || String(client && client.condiviso || "NO").toUpperCase() === "SI";
+}
+
+function canEditClient_(client, user) {
+  return isAdmin_(user) || clientOwner_(client) === String(user && user.username || "");
+}
 
 function assertWritePermission_(entity, user) {
   if (["products", "users", "movements"].indexOf(entity) >= 0 && !isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");

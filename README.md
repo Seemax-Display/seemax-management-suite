@@ -7,7 +7,9 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - dashboard commerciale con indicatori e pipeline;
 - gestione clienti;
 - anagrafica clienti con controllo P.IVA, VIES, IBAN, telefono internazionale e località italiane collegate;
+- clienti privati o condivisi, con attribuzione al creatore e protezione dei clienti collegati a pratiche;
 - gestione pratiche e relativi stati;
+- ricerca, ordinamento e paginazione delle pratiche (10 risultati per pagina);
 - catalogo Ledwall con immagini, schede tecniche, listini, promozioni e giacenze;
 - inserimento diretto di pratiche Acquisto/Noleggio/Leasing dal riepilogo S.Q.P.;
 - scarico automatico e tracciato del magazzino allo stato Accettata;
@@ -39,7 +41,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 1.7.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge l’anagrafica cliente professionale oltre alle correzioni di upload, P3.91 e Modalità Rapida.
+Per aggiornare un'installazione già operativa alla versione 1.8.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge privacy e condivisione clienti, permessi pratiche, notifiche email di esito, ricerca, ordinamento e paginazione.
 
 ## Placeholder
 

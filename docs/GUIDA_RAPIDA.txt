@@ -1,4 +1,4 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 1.8
 
 NOVITÀ VERSIONE 1.5
 - MODALITÀ STANDARD: ogni modifica viene salvata subito nel database.
@@ -8,6 +8,10 @@ NOVITÀ VERSIONE 1.5
 - DOCUMENTI: selezionare direttamente il file in Modalità Standard; il caricamento è sospeso in Modalità Rapida.
 - STATI PRATICA: soltanto un amministratore può modificarli.
 - OBIETTIVO FATTURATO: valore iniziale 500.000 euro, modificabile da Impostazioni.
+- CLIENTI: privati per impostazione iniziale; attivare Condividi cliente per renderli consultabili agli altri utenti.
+- PROTEZIONE CLIENTI: un cliente collegato anche a una sola pratica non può essere eliminato dal gestionale.
+- PRATICHE: ricerca e ordinamento disponibili; massimo 10 risultati per pagina.
+- AGENTI: non vedono né modificano lo Stato. Gli esiti vengono comunicati tramite campanella ed email.
 
 1) PROVA
    Pubblica i file su GitHub Pages.

@@ -271,6 +271,30 @@ body { font-size: 16px; }
 .field-validation.warning { color: #a16207; }
 .verification-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
 .verification-actions .btn { min-height: 42px; }
+.client-sharing-section { border-color: #93c5fd; background: #eff6ff; }
+.share-client-row { display: flex; align-items: center; gap: 10px; }
+.share-client-choice { display: inline-flex; flex-direction: row !important; align-items: center; gap: 9px; margin: 0; font-size: 14px; font-weight: 950; cursor: pointer; }
+.share-client-choice input { width: 20px; height: 20px; margin: 0; accent-color: var(--brand); }
+.info-mark { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid #93c5fd; border-radius: 50%; color: #1d4ed8; background: #fff; font-family: Georgia, serif; font-size: 15px; font-weight: 900; cursor: pointer; }
+.share-client-info { margin: 12px 0 0; border: 1px solid #bfdbfe; border-radius: 12px; padding: 12px 13px; color: #334155; background: #fff; font-size: 13px; line-height: 1.55; }
+.client-author { display: block; margin-top: 10px; color: #475569; font-size: 12px; }
+.shared-client { border-color: #93c5fd; }
+.shared-client-badge { display: inline-flex; vertical-align: middle; margin-left: 5px; border-radius: 999px; padding: 3px 6px; color: #1d4ed8; background: #dbeafe; font-size: 8px; font-weight: 950; letter-spacing: .05em; }
+.client-top > div > small { display: block; margin-top: 4px; color: #64748b; font-size: 11px; font-weight: 750; }
+.read-only-client input:disabled, .read-only-client select:disabled, .read-only-client textarea:disabled { opacity: 1; color: #334155; -webkit-text-fill-color: #334155; background: #f1f5f9; }
+
+.practice-controls { display: grid; grid-template-columns: minmax(280px, 1fr) 220px 170px; gap: 12px; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 17px; padding: 14px; background: #fff; box-shadow: var(--shadow-soft); }
+.practice-controls label { display: grid; gap: 6px; color: #475569; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+.practice-controls input, .practice-controls select { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; color: var(--ink); background: #f8fafc; font: inherit; font-size: 13px; font-weight: 750; text-transform: none; letter-spacing: 0; }
+.practice-search { position: relative; }
+.practice-search > span { position: absolute; z-index: 1; left: 13px; bottom: 12px; color: #64748b; font-size: 18px; }
+.practice-search input { padding-left: 38px; }
+.practice-result-count { margin: 0 0 10px; color: #64748b; font-size: 12px; font-weight: 850; }
+.practice-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.practice-pagination > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.practice-pagination > div button { min-width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 10px; color: #334155; background: #fff; font-weight: 900; cursor: pointer; }
+.practice-pagination > div button.active { color: #fff; border-color: var(--brand); background: var(--brand); }
+.practice-pagination button:disabled { opacity: .45; cursor: default; }
 
 .fast-mode-warning { text-align: left; }
 .fast-bolt { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 18px; color: #92400e; background: #fef3c7; font-size: 28px; }
@@ -301,9 +325,14 @@ body { font-size: 16px; }
   .mode-indicator { display: inline-flex; }.mode-controls .btn { flex: 1; }
   .workspace { padding-bottom: 90px; }
   .sidebar-mode-mobile { display: grid !important; }
+  .practice-controls { grid-template-columns: 1fr 1fr; }
+  .practice-search { grid-column: 1 / -1; }
 }
 @media (max-width: 620px) {
   .revenue-grid { grid-template-columns: 1fr; }
   .revenue-card strong { font-size: 21px; }
   .mode-controls .btn { display: inline-flex; }
+  .practice-controls { grid-template-columns: 1fr; }
+  .practice-search { grid-column: auto; }
+  .practice-pagination { align-items: stretch; flex-direction: column; }
 }
