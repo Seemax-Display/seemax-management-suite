@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.9.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.0.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -465,10 +465,12 @@ function requiredDocumentsForPractice_(type) {
 
 function findClientForQuote_(payload, user) {
   var rows = rowsToObjects_(sheet_("CLIENTI")).filter(function (row) { return canAccessClient_(row, user); });
+  var selectedId = String(payload.cliente_id_gestionale || "").trim();
+  var selected = selectedId ? rows.filter(function (row) { return String(row.id || "") === selectedId; })[0] : null;
   var vat = normalizeKey_(payload.cliente_piva_cf);
   var email = normalizeKey_(payload.cliente_email);
   var company = normalizeKey_(payload.cliente_azienda || payload.cliente_referente);
-  var found = rows.filter(function (row) {
+  var found = selected || rows.filter(function (row) {
     if (vat && normalizeKey_(row.piva) === vat) return true;
     if (email && normalizeKey_(row.email) === email) return true;
     return company && normalizeKey_(row.ragioneSociale) === company;

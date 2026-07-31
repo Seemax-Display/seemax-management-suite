@@ -1,8 +1,9 @@
-const CACHE = "seemax-management-v1-9-1";
+const CACHE = "seemax-management-v2-0-0";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
-  "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/vendor/libphonenumber-min.js",
+  "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/js/planner-native.js",
+  "./assets/vendor/libphonenumber-min.js", "./quotation-planner/index.html",
   "./assets/data/italy-locations.json", "./assets/icons/icon.svg", "./manifest.webmanifest"
 ];
 

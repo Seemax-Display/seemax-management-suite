@@ -22,7 +22,9 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - documenti e media caricati direttamente e archiviati su Google Drive;
 - attività, scadenze e appuntamenti;
 - gestione agenti e ruoli ADMIN/AGENTE;
-- Quotation Planner originale integrato;
+- Quotation Planner montato nativamente nel gestionale, senza iframe;
+- sessione unica Management Suite/S.Q.P. senza un secondo accesso;
+- importazione dei clienti visibili nel Planner oppure compilazione manuale;
 - modalità demo locale;
 - PWA installabile da browser;
 - backend Apps Script già predisposto.
@@ -45,7 +47,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 1.9.1 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge i moduli dedicati Acquisto, Noleggio e Leasing con allegati, obbligatorietà configurabile e caricamento ottimizzato.
+Per aggiornare un'installazione già operativa alla versione 2.0.0 segui [docs/AGGIORNAMENTO_V2.0.md](docs/AGGIORNAMENTO_V2.0.md). La procedura mantiene i dati esistenti; la versione 2.0 rende inoltre il Quotation Planner parte nativa dell'interfaccia e condivide sessione e anagrafiche del gestionale.
 
 ## Placeholder
 
@@ -61,6 +63,7 @@ assets/js/seed.js             Dati dimostrativi
 assets/js/store.js            Database locale demo
 assets/js/api.js              Collegamento Google Apps Script
 assets/js/app.js              Funzioni del gestionale
+assets/js/planner-native.js   Runtime nativo del Quotation Planner
 quotation-planner/index.html  Quotation Planner originale
 apps-script/Code.gs           Backend e setup Google Sheets
 docs/                         Guide operative

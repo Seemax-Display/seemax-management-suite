@@ -2025,8 +2025,19 @@
     function setupDatabaseTest(){
       const btn = $('btnDatabaseRefresh');
       if(btn) btn.addEventListener('click', () => loadDatabaseConfig({showAlert:true}));
-      setDatabaseStatus('locale', 'Il Planner userà il listino locale finché il database online non sarà caricato.');
-      setTimeout(() => loadDatabaseConfig({showAlert:false}), 600);
+      const nativeContext = window.SEEMAX_NATIVE_CONTEXT;
+      if(nativeContext && Array.isArray(nativeContext.products)){
+        applyDatabaseConfig({
+          ok:true,
+          prodotti:nativeContext.products,
+          impostazioni:nativeContext.settings || {},
+          version:nativeContext.version || 'management-suite'
+        });
+        setDatabaseStatus('online', 'Catalogo e impostazioni condivisi con il Seemax Management Suite.');
+      }else{
+        setDatabaseStatus('locale', 'Il Planner userà il listino locale finché il database online non sarà caricato.');
+        setTimeout(() => loadDatabaseConfig({showAlert:false}), 600);
+      }
       if(SQP_DATABASE.autoCheckMs) setInterval(checkDatabaseVersion, SQP_DATABASE.autoCheckMs);
     }
 
@@ -4652,6 +4663,7 @@
         preventivo_id:quoteNumberLabel(),
         data_preventivo:quoteToday(),
         agente_nome:val('agentName'),
+        cliente_id_gestionale:val('suiteClientSource'),
         cliente_azienda:val('clientCompany'),
         cliente_referente:val('clientName'),
         cliente_piva_cf:val('clientVat'),

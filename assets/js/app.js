@@ -194,6 +194,16 @@
     if (!state.data && state.route !== "settings") return;
     const renders = { dashboard: renderDashboard, practices: renderPractices, clients: renderClients, catalog: renderCatalog, planner: renderPlanner, documents: renderDocuments, activities: renderActivities, users: renderUsers, settings: renderSettings };
     $("viewContainer").innerHTML = renders[state.route]();
+    if (state.route === "planner" && window.SeemaxNativePlanner) {
+      window.SeemaxNativePlanner.mount($("nativePlannerRoot"), {
+        session: api.getSession(),
+        clients: state.data.clients || [],
+        products: state.data.products || [],
+        settings: state.data.settings || {},
+        version: config.version,
+        fastMode: api.isFastMode()
+      });
+    }
   }
 
   function emptyState(title, text, button, action) {
@@ -330,8 +340,7 @@
   }
 
   function renderPlanner() {
-    const fast = api.isFastMode() ? "&fast=1" : "";
-    return `${api.isFastMode() ? `<div class="planner-fast-notice"><strong>Modalità Rapida attiva</strong><span>Il Planner è utilizzabile normalmente. Sono disabilitati soltanto il salvataggio e il caricamento dei preventivi dall’archivio online.</span></div>` : ""}<div class="planner-shell planner-native"><iframe id="plannerFrame" title="Seemax Quotation Planner integrato" src="${esc(config.quotationPlannerPath)}?integrated=1${fast}"></iframe></div>`;
+    return `${api.isFastMode() ? `<div class="planner-fast-notice"><strong>Modalità Rapida attiva</strong><span>Il Planner resta utilizzabile. Salvataggio e caricamento dei preventivi online rimangono temporaneamente disabilitati.</span></div>` : ""}<div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
   }
 
   function renderDocuments() {
@@ -1081,6 +1090,7 @@
       "disable-fast-mode": disableFastMode,
       "sync-all": syncAll,
       "reload": async () => { await loadAll(); renderRoute(); },
+      "reload-planner": () => { if (state.route === "planner") renderRoute(); },
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.ping(); setConnectionState(); toast(response.ok ? "Collegamento funzionante." : "Collegamento non disponibile.", response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
       "reset-demo": async () => { if (confirm("Ripristinare tutti i dati dimostrativi?")) { api.resetDemo(); await loadAll(); renderRoute(); toast("Dati demo ripristinati."); } }
