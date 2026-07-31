@@ -45,7 +45,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 1.9.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge i moduli dedicati Acquisto, Noleggio e Leasing con allegati e obbligatorietà configurabile.
+Per aggiornare un'installazione già operativa alla versione 1.9.1 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge i moduli dedicati Acquisto, Noleggio e Leasing con allegati, obbligatorietà configurabile e caricamento ottimizzato.
 
 ## Placeholder
 

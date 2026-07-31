@@ -204,6 +204,17 @@
     return jsonp("management_verify_vat", { ...authParams(), vatNumber: String(vatNumber || "").replace(/\D/g, "") }, 30000);
   }
 
+  async function updatePracticeDocuments(practiceId, documentsJson) {
+    if (config.demoMode) {
+      const current = demo.list("practices").find((row) => String(row.id) === String(practiceId)) || { id: practiceId };
+      return demo.upsert("practices", { ...current, documenti_caricati_json: documentsJson, aggiornatoIl: new Date().toISOString() });
+    }
+    const response = await jsonp("management_update_practice_documents", {
+      ...authParams(), practice_id: practiceId, documenti_caricati_json: documentsJson
+    }, 20000);
+    return response.row || {};
+  }
+
   async function saveSettings(values) {
     if (isFastMode()) {
       queueOperation({ type: "settings", values });
@@ -242,7 +253,7 @@
            il risultato tramite management_upload_status. */
         setTimeout(() => iframe.remove(), 120000);
         resolve({ ok: true, pending: true, requestId });
-      }, 2500);
+      }, 1200);
       function finish(error, result) {
         if (done) return;
         done = true;
@@ -277,7 +288,7 @@
       } catch (error) {
         lastError = error;
       }
-      await new Promise((resolve) => setTimeout(resolve, 900));
+      await new Promise((resolve) => setTimeout(resolve, 700));
     }
     throw new Error(lastError && lastError.message
       ? `Il file non è stato confermato dal database: ${lastError.message}`
@@ -317,5 +328,5 @@
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length }; }
 
-  window.SeemaxApi = { login, logout, ping, bootstrap, list, upsert, remove, getSettings, saveSettings, verifyVat, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, bootstrap, list, upsert, remove, getSettings, saveSettings, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

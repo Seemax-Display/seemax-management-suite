@@ -780,7 +780,8 @@
       ? Array.from(form.querySelectorAll("[data-practice-document]")).filter((input) => input.files && input.files[0]).map((input) => ({
         key: input.dataset.practiceDocument,
         label: input.dataset.documentLabel,
-        file: input.files[0]
+        file: input.files[0],
+        input
       }))
       : [];
     if (entity === "practices" && api.isFastMode()) {
@@ -869,11 +870,18 @@
     }
     setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
     try {
+      const preparedAttachmentsPromise = entity === "practices" && practiceAttachments.length
+        ? Promise.all(practiceAttachments.map(async (attachment) => ({
+          ...attachment,
+          file_base64: await readFileAsDataUrl(attachment.file)
+        })))
+        : Promise.resolve([]);
       let saved = await api.upsert(entity, record);
       if (entity === "practices" && practiceAttachments.length) {
-        const uploaded = [];
-        for (let index = 0; index < practiceAttachments.length; index += 1) {
-          const attachment = practiceAttachments[index];
+        const preparedAttachments = await preparedAttachmentsPromise;
+        let completedUploads = 0;
+        setLoading(true, `Caricamento documenti: 0 di ${preparedAttachments.length}…`);
+        const uploadResults = await mapWithConcurrency(preparedAttachments, 3, async (attachment) => {
           const documentRecord = {
             practiceId: saved.id,
             pratica: saved.numero,
@@ -883,18 +891,39 @@
             tipo_pratica_documento: attachment.key,
             data: new Date().toISOString().slice(0, 10),
             agent_username: saved.agent_username,
-            file_base64: await readFileAsDataUrl(attachment.file),
+            file_base64: attachment.file_base64,
             file_name: attachment.file.name,
             file_type: attachment.file.type || "application/octet-stream",
             file_size: attachment.file.size,
             note: `Allegato ${saved.tipo_pratica || "pratica"}`
           };
-          const uploadedDocument = await api.upsert("documents", documentRecord);
-          uploaded.push({ tipo: attachment.key, document_id: uploadedDocument.id, nome: uploadedDocument.nome, url: uploadedDocument.url });
-          replaceLocalEntity("documents", uploadedDocument);
-        }
+          try {
+            const uploadedDocument = await api.upsert("documents", documentRecord);
+            attachment.input.value = "";
+            replaceLocalEntity("documents", uploadedDocument);
+            return { ok: true, attachment, document: uploadedDocument };
+          } catch (error) {
+            return { ok: false, attachment, error };
+          } finally {
+            completedUploads += 1;
+            setLoading(true, `Caricamento documenti: ${completedUploads} di ${preparedAttachments.length}…`);
+          }
+        });
+        const successfulUploads = uploadResults.filter((result) => result.ok);
+        const failedUploads = uploadResults.filter((result) => !result.ok);
+        const uploaded = successfulUploads.map(({ attachment, document }) => ({ tipo: attachment.key, document_id: document.id, nome: document.nome, url: document.url }));
         const previousUploaded = (() => { try { return JSON.parse(saved.documenti_caricati_json || "[]"); } catch (error) { return []; } })();
-        saved = await api.upsert("practices", { ...saved, nuova_pratica: "NO", documenti_caricati_json: JSON.stringify(previousUploaded.concat(uploaded)) });
+        const mergedUploads = previousUploaded.filter((previous) => !uploaded.some((currentUpload) => currentUpload.tipo === previous.tipo)).concat(uploaded);
+        setLoading(true, "Finalizzazione pratica…");
+        saved = await api.updatePracticeDocuments(saved.id, JSON.stringify(mergedUploads));
+        if (failedUploads.length) {
+          replaceLocalEntity(entity, saved);
+          setConnectionState();
+          closeModal();
+          renderRoute();
+          toast(`Pratica salvata. Non è stato possibile caricare: ${failedUploads.map((result) => result.attachment.label).join(", ")}. Riapri la pratica per riprovare.`, "danger");
+          return;
+        }
       }
       if (saved.__notifications) { state.data.notifications = saved.__notifications; delete saved.__notifications; updateNotificationBell(); }
       replaceLocalEntity(entity, saved);
@@ -913,6 +942,20 @@
       reader.onerror = () => reject(new Error("Impossibile leggere il file selezionato."));
       reader.readAsDataURL(file);
     });
+  }
+
+  async function mapWithConcurrency(items, concurrency, worker) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    const runners = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await worker(items[index], index);
+      }
+    });
+    await Promise.all(runners);
+    return results;
   }
 
   async function removeEntity(entity, id) {

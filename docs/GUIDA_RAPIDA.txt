@@ -1,4 +1,4 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 1.9
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 1.9.1
 
 NOVITÀ VERSIONE 1.5
 - MODALITÀ STANDARD: ogni modifica viene salvata subito nel database.
@@ -16,6 +16,7 @@ NOVITÀ VERSIONE 1.5
 - ACQUISTO: scegliere obbligatoriamente Per Me oppure Per Cliente.
 - DOCUMENTI PRATICA: gli allegati vengono salvati in Drive e collegati automaticamente alla pratica.
 - CAMPI OBBLIGATORI: un admin li gestisce da Impostazioni; nel Foglio Google corrispondono alle chiavi req_... con valore SI/NO.
+- SALVATAGGIO PRATICA: gli allegati vengono caricati in parallelo con avanzamento visibile; un singolo errore non annulla gli altri file già salvati.
 
 1) PROVA
    Pubblica i file su GitHub Pages.

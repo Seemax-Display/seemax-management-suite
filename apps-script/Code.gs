@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.9.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.9.1";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -51,6 +51,7 @@ function setupSeemaxDatabase() {
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
+  managementDocumentsFolder_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
   styleSheets_();
@@ -67,9 +68,10 @@ function upgradeSeemaxV11() {
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.9.0");
+  managementDocumentsFolder_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.9.1");
   styleSheets_();
-  return "SEEMAX v1.9.0 configurato: flussi Acquisto, Noleggio e Leasing con campi obbligatori configurabili.";
+  return "SEEMAX v1.9.1 configurato: salvataggio pratiche e allegati ottimizzato.";
 }
 
 function doGet(e) {
@@ -113,6 +115,7 @@ function routeGet_(action, p) {
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
     case "management_upload_document": return managementUploadDocument_(p);
     case "management_upload_status": return managementUploadStatus_(p);
+    case "management_update_practice_documents": return managementUpdatePracticeDocuments_(p);
     case "management_verify_vat": return managementVerifyVat_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
@@ -213,7 +216,17 @@ function managementUpsert_(p) {
       if (existingUser) payload.chiave_id_agente = existingUser.chiave_id_agente;
     }
   }
-  var row = upsertEntity_(entity, payload);
+  var documentLock = null;
+  var row;
+  try {
+    if (entity === "documents") {
+      documentLock = LockService.getScriptLock();
+      documentLock.waitLock(20000);
+    }
+    row = upsertEntity_(entity, payload);
+  } finally {
+    if (documentLock) documentLock.releaseLock();
+  }
   log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
   return { ok: true, row: entity === "users" ? publicUser_(row) : row };
 }
@@ -230,9 +243,7 @@ function managementUploadDocument_(p) {
     if (!raw) throw new Error("File mancante.");
     var bytes = Utilities.base64Decode(raw);
     if (bytes.length > 8 * 1024 * 1024) throw new Error("Il file supera il limite di 8 MB.");
-    var folderName = "SEEMAX MANAGEMENT DOCUMENTI";
-    var folders = DriveApp.getFoldersByName(folderName);
-    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+    var folder = managementDocumentsFolder_();
     var file = folder.createFile(Utilities.newBlob(bytes, mimeType, filename));
     file.setDescription("Caricato da " + (user.nome_visualizzato || user.username) + " tramite Seemax Management Suite");
     try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (sharingError) { /* alcuni domini Workspace impediscono la condivisione pubblica */ }
@@ -243,6 +254,19 @@ function managementUploadDocument_(p) {
     cacheUploadResult_(requestId, { ok: false, error: String(error && error.message ? error.message : error) });
     throw error;
   }
+}
+
+function managementDocumentsFolder_() {
+  var properties = PropertiesService.getScriptProperties();
+  var cachedId = String(properties.getProperty("MANAGEMENT_DOCUMENTS_FOLDER_ID") || "");
+  if (cachedId) {
+    try { return DriveApp.getFolderById(cachedId); } catch (error) { properties.deleteProperty("MANAGEMENT_DOCUMENTS_FOLDER_ID"); }
+  }
+  var folderName = "SEEMAX MANAGEMENT DOCUMENTI";
+  var folders = DriveApp.getFoldersByName(folderName);
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+  properties.setProperty("MANAGEMENT_DOCUMENTS_FOLDER_ID", folder.getId());
+  return folder;
 }
 
 function managementVerifyVat_(p) {
@@ -352,6 +376,19 @@ function managementUploadStatus_(p) {
   if (!requestId) throw new Error("Identificativo upload mancante.");
   var raw = CacheService.getScriptCache().get("management_upload_" + requestId);
   return { ok: true, completed: !!raw, upload: raw ? parseJson_(raw, {}) : null };
+}
+
+function managementUpdatePracticeDocuments_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  var practiceId = String(p.practice_id || "");
+  var practice = findRowObject_("PRATICHE", "id", practiceId);
+  if (!practice) throw new Error("Pratica non trovata.");
+  if (!isAdmin_(user) && String(practice.agent_username || "") !== String(user.username)) throw new Error("Non sei autorizzato ad aggiornare questa pratica.");
+  practice.documenti_caricati_json = String(p.documenti_caricati_json || "[]");
+  practice.aggiornatoIl = new Date().toISOString();
+  var saved = upsertObject_("PRATICHE", "id", practice.id, practice);
+  log_(user, "UPDATE_DOCUMENTS", "practices", practice.id, "Riepilogo allegati pratica aggiornato");
+  return { ok: true, row: saved };
 }
 
 function managementCreateFromQuote_(p) {

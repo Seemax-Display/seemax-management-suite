@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.9.0
+# Aggiornamento Seemax Management Suite 1.9.1
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -10,7 +10,7 @@ Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche 
 
 ## 1. Aggiornare GitHub
 
-Carica nel repository tutti i file della versione 1.9.0, mantenendo la stessa struttura delle cartelle. In particolare devono essere presenti:
+Carica nel repository tutti i file della versione 1.9.1, mantenendo la stessa struttura delle cartelle. In particolare devono essere presenti:
 
 - `quotation-planner/index.html`;
 - `assets/catalog/` con le immagini prodotto;
@@ -157,6 +157,16 @@ La funzione `upgradeSeemaxV11` aggiunge a `CLIENTI` i campi `condiviso`, `creato
 - le stesse regole possono essere modificate nel foglio `IMPOSTAZIONI`, impostando il valore della relativa chiave `req_...` su `SI` oppure `NO`.
 
 Le nuove colonne vengono aggiunte a `PRATICHE` e `DOCUMENTI` eseguendo nuovamente `upgradeSeemaxV11`; nessuna riga esistente viene cancellata.
+
+### Ottimizzazione 1.9.1
+
+- i file vengono letti localmente mentre la pratica viene registrata;
+- fino a tre allegati vengono trasferiti contemporaneamente;
+- l’avanzamento mostra quanti documenti sono stati completati;
+- il riepilogo allegati usa un aggiornamento leggero e non riesegue l’intero flusso della pratica;
+- l’ID della cartella Drive viene memorizzato per evitare una nuova ricerca a ogni file;
+- le scritture parallele nel foglio `DOCUMENTI` sono protette per impedire sovrascritture;
+- se un singolo allegato fallisce, la pratica e gli altri documenti restano salvati e viene indicato esattamente quale file ricaricare.
 
 ## Regole di magazzino
 
