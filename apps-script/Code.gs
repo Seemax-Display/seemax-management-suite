@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-1.8.0";
+var SEEMAX_VERSION = "seemax-management-suite-1.9.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -25,8 +25,8 @@ var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "valore", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "aggiornatoIl", "creatoIl"],
-  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "aggiornatoIl", "creatoIl"],
+  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
@@ -67,9 +67,9 @@ function upgradeSeemaxV11() {
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.8.0");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.9.0");
   styleSheets_();
-  return "SEEMAX v1.8.0 configurato: condivisione clienti, protezioni agenti, email esito e archivio pratiche avanzato.";
+  return "SEEMAX v1.9.0 configurato: flussi Acquisto, Noleggio e Leasing con campi obbligatori configurabili.";
 }
 
 function doGet(e) {
@@ -179,8 +179,18 @@ function managementUpsert_(p) {
       throw new Error("Solo l'amministratore può modificare lo stato di una pratica.");
     }
     if (!isAdmin_(user) && !previousPractice) payload.stato = "Inserita";
+    var isPersonalPurchase = String(payload.tipo_pratica || "").toUpperCase() === "ACQUISTO" && String(payload.destinatario_ordine || "").toUpperCase() === "PER ME";
     var practiceClient = findRowObject_("CLIENTI", "id", payload.clientId || previousPractice && previousPractice.clientId || "");
-    if (!practiceClient || !canAccessClient_(practiceClient, user)) throw new Error("Cliente non disponibile o non autorizzato.");
+    if (!isPersonalPurchase && (!practiceClient || !canAccessClient_(practiceClient, user))) throw new Error("Cliente non disponibile o non autorizzato.");
+    if (isPersonalPurchase) {
+      payload.clientId = "";
+      payload.cliente = userDisplayName_(user);
+      payload.intestatario_nome = userDisplayName_(user);
+      payload.intestatario_email = String(user.email || "");
+      payload.intestatario_telefono = String(user.telefono || "");
+      payload.valore_provvigione = 0;
+    }
+    validatePracticeRequiredFields_(payload);
     var practiceRow = upsertPracticeWithInventory_(payload, user);
     if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) createPracticeStatusNotification_(previousPractice, practiceRow, user);
     log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
@@ -375,7 +385,16 @@ function managementCreateFromQuote_(p) {
     stato: "Inserita",
     finanziaria: finance,
     tipo_pratica: type,
+    destinatario_ordine: type === "ACQUISTO" ? "PER CLIENTE" : "",
     valore: Number(payload.valore || 0),
+    valore_provvigione: Number(payload.valore_provvigione || 0),
+    numero_rate: String(payload.numero_rate || ""),
+    periodicita_pagamento: String(payload.periodicita_pagamento || ""),
+    indirizzo_installazione_tipo: type === "ACQUISTO" ? "PRESSO ALTRO INDIRIZZO" : "COME INDIRIZZO CLIENTE",
+    installazione_comune: String(payload.cliente_localita || ""),
+    gestione_ledwall: "",
+    documenti_richiesti_json: JSON.stringify(requiredDocumentsForPractice_(type)),
+    documenti_caricati_json: "[]",
     agente: user.nome_visualizzato || user.username,
     agent_username: user.username,
     prossimoPasso: type === "ACQUISTO" ? "Attendere accettazione cliente" : "Raccogliere documentazione finanziaria",
@@ -394,6 +413,17 @@ function managementCreateFromQuote_(p) {
   practice = upsertObject_("PRATICHE", "id", practice.id, practice);
   log_(user, "CREATE_FROM_QUOTE", "practices", practice.id, "Pratica " + type + " creata dal S.Q.P. preventivo " + practice.preventivo_id);
   return { ok: true, practice: practice, client: client };
+}
+
+function requiredDocumentsForPractice_(type) {
+  var normalized = String(type || "").toUpperCase();
+  var settings = getSettings_();
+  var fields = normalized === "NOLEGGIO"
+    ? ["documento_identita", "tessera_sanitaria", "visura", "altra_documentazione"]
+    : normalized === "LEASING"
+      ? ["documento_identita", "tessera_sanitaria", "preventivo_seemax", "preventivo_ifis", "visura", "altra_documentazione"]
+      : [];
+  return fields.filter(function (field) { return practiceRequired_(normalized, field, settings); });
 }
 
 function findClientForQuote_(payload, user) {
@@ -1036,6 +1066,34 @@ function getKeyValueSheet_(sheetName) {
 
 function setSetting_(key, value, note) { return upsertObject_("IMPOSTAZIONI", "chiave", key, { chiave: key, valore: value, note: note || "" }); }
 
+function practiceRequired_(type, field, settings) {
+  var key = "req_" + String(type || "").toLowerCase() + "_" + String(field || "").toLowerCase();
+  return String((settings || getSettings_())[key] || "NO").toUpperCase() === "SI";
+}
+
+function validatePracticeRequiredFields_(practice) {
+  var type = String(practice.tipo_pratica || "").toUpperCase();
+  var settings = getSettings_();
+  var labels = {
+    destinatario_ordine: "Destinatario ordine", clientId: "Cliente", valore: "Valore pratica",
+    valore_provvigione: "Valore provvigione", numero_rate: "Numero di rate",
+    periodicita_pagamento: "Mensilità", indirizzo_installazione_tipo: "Scelta indirizzo di installazione",
+    installazione_regione: "Regione di installazione", installazione_provincia: "Provincia di installazione",
+    installazione_comune: "Comune di installazione", installazione_cap: "CAP di installazione",
+    installazione_localita: "Località di installazione", installazione_indirizzo: "Indirizzo di installazione",
+    installazione_civico: "Civico di installazione",
+    gestione_ledwall: "Gestione del Ledwall", cloud_username: "Username Cloud", cloud_password: "Password Cloud"
+  };
+  var fields = Object.keys(labels);
+  fields.forEach(function (field) {
+    if (!practiceRequired_(type, field, settings)) return;
+    if (field === "clientId" && type === "ACQUISTO" && String(practice.destinatario_ordine || "").toUpperCase() === "PER ME") return;
+    if (field.indexOf("installazione_") === 0 && field !== "indirizzo_installazione_tipo" && String(practice.indirizzo_installazione_tipo || "").toUpperCase() === "COME INDIRIZZO CLIENTE") return;
+    if ((field === "cloud_username" || field === "cloud_password") && String(practice.gestione_ledwall || "").toUpperCase() !== "IN CLOUD") return;
+    if (!String(practice[field] || "").trim()) throw new Error("Campo obbligatorio mancante: " + labels[field] + ".");
+  });
+}
+
 function migrateRevenueTargetV151_() {
   var current = Number(getSettings_().obiettivo_fatturato || 0);
   if (!current || current === 100000) setSetting_("obiettivo_fatturato", 500000, "Obiettivo iniziale Management Suite v1.5.1");
@@ -1069,7 +1127,64 @@ function seedSettings_() {
     numero_preventivo_iniziale: 1,
     numero_preventivo_admin_iniziale: 1,
     numero_preventivo_agenti_iniziale: 1,
-    obiettivo_fatturato: 500000
+    obiettivo_fatturato: 500000,
+    req_acquisto_destinatario_ordine: "SI",
+    req_acquisto_clientid: "SI",
+    req_acquisto_valore: "SI",
+    req_acquisto_valore_provvigione: "NO",
+    req_acquisto_installazione_regione: "NO",
+    req_acquisto_installazione_provincia: "NO",
+    req_acquisto_installazione_comune: "SI",
+    req_acquisto_installazione_cap: "SI",
+    req_acquisto_installazione_localita: "NO",
+    req_acquisto_installazione_indirizzo: "SI",
+    req_acquisto_installazione_civico: "SI",
+    req_acquisto_gestione_ledwall: "SI",
+    req_acquisto_cloud_username: "NO",
+    req_acquisto_cloud_password: "NO",
+    req_acquisto_note: "NO",
+    req_noleggio_clientid: "SI",
+    req_noleggio_valore: "SI",
+    req_noleggio_valore_provvigione: "SI",
+    req_noleggio_numero_rate: "SI",
+    req_noleggio_periodicita_pagamento: "SI",
+    req_noleggio_indirizzo_installazione_tipo: "SI",
+    req_noleggio_installazione_regione: "NO",
+    req_noleggio_installazione_provincia: "NO",
+    req_noleggio_installazione_comune: "SI",
+    req_noleggio_installazione_cap: "SI",
+    req_noleggio_installazione_localita: "NO",
+    req_noleggio_installazione_indirizzo: "SI",
+    req_noleggio_installazione_civico: "SI",
+    req_noleggio_gestione_ledwall: "SI",
+    req_noleggio_cloud_username: "NO",
+    req_noleggio_cloud_password: "NO",
+    req_noleggio_documento_identita: "SI",
+    req_noleggio_tessera_sanitaria: "SI",
+    req_noleggio_visura: "SI",
+    req_noleggio_altra_documentazione: "NO",
+    req_leasing_clientid: "SI",
+    req_leasing_valore: "SI",
+    req_leasing_valore_provvigione: "SI",
+    req_leasing_numero_rate: "SI",
+    req_leasing_periodicita_pagamento: "SI",
+    req_leasing_indirizzo_installazione_tipo: "SI",
+    req_leasing_installazione_regione: "NO",
+    req_leasing_installazione_provincia: "NO",
+    req_leasing_installazione_comune: "SI",
+    req_leasing_installazione_cap: "SI",
+    req_leasing_installazione_localita: "NO",
+    req_leasing_installazione_indirizzo: "SI",
+    req_leasing_installazione_civico: "SI",
+    req_leasing_gestione_ledwall: "SI",
+    req_leasing_cloud_username: "NO",
+    req_leasing_cloud_password: "NO",
+    req_leasing_documento_identita: "SI",
+    req_leasing_tessera_sanitaria: "SI",
+    req_leasing_preventivo_seemax: "SI",
+    req_leasing_preventivo_ifis: "SI",
+    req_leasing_visura: "SI",
+    req_leasing_altra_documentazione: "NO"
   };
   var current = getSettings_();
   Object.keys(defaults).forEach(function (key) { if (current[key] === undefined || current[key] === "") setSetting_(key, defaults[key], "Valore iniziale Seemax Management Suite"); });

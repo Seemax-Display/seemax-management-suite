@@ -1,4 +1,4 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 1.8
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 1.9
 
 NOVITÀ VERSIONE 1.5
 - MODALITÀ STANDARD: ogni modifica viene salvata subito nel database.
@@ -12,6 +12,10 @@ NOVITÀ VERSIONE 1.5
 - PROTEZIONE CLIENTI: un cliente collegato anche a una sola pratica non può essere eliminato dal gestionale.
 - PRATICHE: ricerca e ordinamento disponibili; massimo 10 risultati per pagina.
 - AGENTI: non vedono né modificano lo Stato. Gli esiti vengono comunicati tramite campanella ed email.
+- NUOVA PRATICA: scegliere prima Acquisto, Noleggio o Leasing tramite le tre card.
+- ACQUISTO: scegliere obbligatoriamente Per Me oppure Per Cliente.
+- DOCUMENTI PRATICA: gli allegati vengono salvati in Drive e collegati automaticamente alla pratica.
+- CAMPI OBBLIGATORI: un admin li gestisce da Impostazioni; nel Foglio Google corrispondono alle chiavi req_... con valore SI/NO.
 
 1) PROVA
    Pubblica i file su GitHub Pages.

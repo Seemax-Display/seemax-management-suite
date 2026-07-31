@@ -43,7 +43,15 @@
       telefono_commerciale: "INSERISCI_TELEFONO",
       numero_preventivo_admin_iniziale: 1,
       numero_preventivo_agenti_iniziale: 1,
-      obiettivo_fatturato: 500000
+      obiettivo_fatturato: 500000,
+      req_acquisto_destinatario_ordine: "SI", req_acquisto_clientid: "SI", req_acquisto_valore: "SI", req_acquisto_valore_provvigione: "NO",
+      req_acquisto_installazione_regione: "NO", req_acquisto_installazione_provincia: "NO", req_acquisto_installazione_comune: "SI", req_acquisto_installazione_cap: "SI", req_acquisto_installazione_localita: "NO", req_acquisto_installazione_indirizzo: "SI", req_acquisto_installazione_civico: "SI", req_acquisto_gestione_ledwall: "SI", req_acquisto_cloud_username: "NO", req_acquisto_cloud_password: "NO", req_acquisto_note: "NO",
+      req_noleggio_clientid: "SI", req_noleggio_valore: "SI", req_noleggio_valore_provvigione: "SI", req_noleggio_numero_rate: "SI", req_noleggio_periodicita_pagamento: "SI",
+      req_noleggio_indirizzo_installazione_tipo: "SI", req_noleggio_installazione_regione: "NO", req_noleggio_installazione_provincia: "NO", req_noleggio_installazione_comune: "SI", req_noleggio_installazione_cap: "SI", req_noleggio_installazione_localita: "NO", req_noleggio_installazione_indirizzo: "SI", req_noleggio_installazione_civico: "SI", req_noleggio_gestione_ledwall: "SI", req_noleggio_cloud_username: "NO", req_noleggio_cloud_password: "NO",
+      req_noleggio_documento_identita: "SI", req_noleggio_tessera_sanitaria: "SI", req_noleggio_visura: "SI", req_noleggio_altra_documentazione: "NO",
+      req_leasing_clientid: "SI", req_leasing_valore: "SI", req_leasing_valore_provvigione: "SI", req_leasing_numero_rate: "SI", req_leasing_periodicita_pagamento: "SI",
+      req_leasing_indirizzo_installazione_tipo: "SI", req_leasing_installazione_regione: "NO", req_leasing_installazione_provincia: "NO", req_leasing_installazione_comune: "SI", req_leasing_installazione_cap: "SI", req_leasing_installazione_localita: "NO", req_leasing_installazione_indirizzo: "SI", req_leasing_installazione_civico: "SI", req_leasing_gestione_ledwall: "SI", req_leasing_cloud_username: "NO", req_leasing_cloud_password: "NO",
+      req_leasing_documento_identita: "SI", req_leasing_tessera_sanitaria: "SI", req_leasing_preventivo_seemax: "SI", req_leasing_preventivo_ifis: "SI", req_leasing_visura: "SI", req_leasing_altra_documentazione: "NO"
     }
   };
 })();

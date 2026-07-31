@@ -4638,7 +4638,15 @@
     function practicePayloadFromSummary(type){
       saveActiveLedQuoteFromForm();
       const led = currentLedArchiveDetails();
-      const total = admin ? led.totals.totale_led_cliente : led.totals.totale_led_agente;
+      const purchaseTotal = admin ? led.totals.totale_led_cliente : led.totals.totale_led_agente;
+      const grenke = currentGrenkeArchiveDetails();
+      const ifis = currentIfisArchiveDetails();
+      const periodicityLabel = value => Number(value) === 2 ? 'Bimestrale' : Number(value) === 3 ? 'Trimestrale' : 'Mensile';
+      const practiceValue = type === 'NOLEGGIO'
+        ? (grenke.grenke_importo || purchaseTotal)
+        : type === 'LEASING'
+          ? (ifis.ifis_importo_bene || purchaseTotal)
+          : purchaseTotal;
       return {
         tipo_pratica:type,
         preventivo_id:quoteNumberLabel(),
@@ -4651,7 +4659,12 @@
         cliente_telefono:val('clientPhone'),
         cliente_localita:val('clientCity'),
         note:val('projectNotes'),
-        valore:archiveNumber(total),
+        valore:archiveNumber(practiceValue),
+        valore_provvigione:archiveNumber(led.totals.totale_provvigione || 0),
+        numero_rate:type === 'NOLEGGIO' ? grenke.grenke_durata : type === 'LEASING' ? ifis.ifis_durata : '',
+        periodicita_pagamento:type === 'NOLEGGIO'
+          ? (String(grenke.grenke_modalita || '').toLowerCase() === 'trimestrale' ? 'Trimestrale' : String(grenke.grenke_modalita || '').toLowerCase() === 'bimestrale' ? 'Bimestrale' : 'Mensile')
+          : type === 'LEASING' ? periodicityLabel(ifis.ifis_periodicita) : '',
         righe:led.items
       };
     }

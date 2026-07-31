@@ -336,3 +336,31 @@ body { font-size: 16px; }
   .practice-search { grid-column: auto; }
   .practice-pagination { align-items: stretch; flex-direction: column; }
 }
+
+/* Pratiche guidate 1.9 */
+.practice-type-intro{margin:0 0 18px;color:var(--muted)}
+.practice-type-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.practice-type-card{appearance:none;text-align:left;border:1px solid #d7e2f0;border-radius:20px;background:#fff;padding:24px;display:flex;flex-direction:column;gap:10px;min-height:205px;cursor:pointer;transition:.2s ease;box-shadow:0 12px 30px rgba(13,48,91,.08);color:#102746}
+.practice-type-card:hover{transform:translateY(-4px);border-color:#2b73dc;box-shadow:0 18px 38px rgba(13,69,145,.16)}
+.practice-type-card>span{width:50px;height:50px;border-radius:15px;display:grid;place-items:center;background:#eaf3ff;color:#1260d6;font-size:24px;font-weight:900}
+.practice-type-card.rental>span{background:#e9f8f7;color:#087f78}.practice-type-card.leasing>span{background:#f2edff;color:#6941c6}
+.practice-type-card strong{font-size:20px}.practice-type-card small{font-size:14px;line-height:1.5;color:#60738e}
+.practice-kind-banner{display:flex;align-items:center;gap:14px;border-radius:16px;padding:15px 18px;background:#eef5ff;border:1px solid #cfe0f8}
+.practice-kind-banner>span{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#1260d6;color:#fff;font-size:20px;font-weight:900}
+.practice-kind-banner div{display:flex;flex-direction:column}.practice-kind-banner small{font-size:10px;letter-spacing:.16em;color:#5c7594}.practice-kind-banner strong{font-size:18px}
+.practice-kind-banner .btn{margin-left:auto}.practice-kind-banner.noleggio{background:#edfafa}.practice-kind-banner.noleggio>span{background:#07847b}.practice-kind-banner.leasing{background:#f5f1ff}.practice-kind-banner.leasing>span{background:#6941c6}
+.practice-section{border:1px solid #d9e4f1;border-radius:16px;padding:18px;background:#fbfdff}.practice-section legend,.practice-configurator legend{padding:0 8px;font-size:15px;font-weight:900;color:#124d9f}
+.destination-grid,.address-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.choice-card{display:flex!important;flex-direction:row!important;align-items:flex-start!important;gap:12px;border:1px solid #d8e2ef;border-radius:14px;background:#fff;padding:15px;cursor:pointer}
+.choice-card:has(input:checked){border-color:#2370dc;background:#eff6ff;box-shadow:0 0 0 2px rgba(35,112,220,.08)}
+.choice-card input{width:18px!important;height:18px!important;margin-top:2px;accent-color:#1764d8}.choice-card span{display:flex;flex-direction:column;gap:4px}.choice-card strong{font-size:15px}.choice-card small{font-size:12px;color:#61728a;line-height:1.4}
+.required-mark,.optional-mark{display:inline-flex;margin-left:6px;font-style:normal;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:3px 6px;background:#feecec;color:#b42318;vertical-align:middle}.optional-mark{background:#edf2f7;color:#607087}
+.field-help{font-size:13px;color:#64758d;margin:0}.field-help a{font-weight:800;color:#1260d6}
+.practice-upload-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.practice-upload{border:1px dashed #bdcee2;border-radius:14px;padding:14px;background:#fff}.practice-upload input{margin-top:9px}.uploaded-file{display:block;color:#078447!important;font-weight:800;margin:5px 0}
+.required-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.required-settings-group{border:1px solid #dae4ef;border-radius:16px;padding:15px}.required-settings-group legend{padding:0 8px;font-weight:900;color:#124d9f}.required-settings-list{display:grid;gap:8px}.required-settings-list label{display:flex!important;flex-direction:row!important;align-items:center!important;gap:10px;border:1px solid #e3eaf2;border-radius:11px;padding:10px;background:#f9fbfe}.required-settings-list input[type=checkbox]{width:18px!important;height:18px!important;accent-color:#1764d8}.required-settings-list span{display:flex;flex-direction:column}.required-settings-list small{font-size:10px;color:#74839a}
+
+@media(max-width:900px){
+  .practice-type-grid,.required-settings-grid{grid-template-columns:1fr}
+  .destination-grid,.address-choice,.practice-upload-grid{grid-template-columns:1fr}
+  .practice-kind-banner{align-items:flex-start;flex-wrap:wrap}.practice-kind-banner .btn{margin-left:0}
+}

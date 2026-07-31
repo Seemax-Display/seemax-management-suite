@@ -9,6 +9,10 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - anagrafica clienti con controllo P.IVA, VIES, IBAN, telefono internazionale e località italiane collegate;
 - clienti privati o condivisi, con attribuzione al creatore e protezione dei clienti collegati a pratiche;
 - gestione pratiche e relativi stati;
+- creazione guidata con scelta iniziale Acquisto, Noleggio o Leasing e moduli dedicati;
+- destinatario ordine “Per Me” o “Per Cliente”, indirizzo installazione e gestione tecnica Ledwall;
+- documentazione finanziaria caricabile direttamente nella pratica;
+- obbligatorietà dei campi configurabile dagli admin o dal foglio `IMPOSTAZIONI`;
 - ricerca, ordinamento e paginazione delle pratiche (10 risultati per pagina);
 - catalogo Ledwall con immagini, schede tecniche, listini, promozioni e giacenze;
 - inserimento diretto di pratiche Acquisto/Noleggio/Leasing dal riepilogo S.Q.P.;
@@ -41,7 +45,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 1.8.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge privacy e condivisione clienti, permessi pratiche, notifiche email di esito, ricerca, ordinamento e paginazione.
+Per aggiornare un'installazione già operativa alla versione 1.9.0 segui [docs/AGGIORNAMENTO_V1.1.md](docs/AGGIORNAMENTO_V1.1.md). La procedura mantiene i dati esistenti e aggiunge i moduli dedicati Acquisto, Noleggio e Leasing con allegati e obbligatorietà configurabile.
 
 ## Placeholder
 

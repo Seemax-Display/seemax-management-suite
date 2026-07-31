@@ -1,4 +1,4 @@
-# Aggiornamento Seemax Management Suite 1.8.0
+# Aggiornamento Seemax Management Suite 1.9.0
 
 Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche del gestionale e introduce la gestione automatica delle giacenze.
 
@@ -10,7 +10,7 @@ Questa versione collega il riepilogo del Seemax Quotation Planner alle pratiche 
 
 ## 1. Aggiornare GitHub
 
-Carica nel repository tutti i file della versione 1.8.0, mantenendo la stessa struttura delle cartelle. In particolare devono essere presenti:
+Carica nel repository tutti i file della versione 1.9.0, mantenendo la stessa struttura delle cartelle. In particolare devono essere presenti:
 
 - `quotation-planner/index.html`;
 - `assets/catalog/` con le immagini prodotto;
@@ -142,6 +142,21 @@ Durante l’aggiornamento, gli eventuali codici fiscali alfanumerici precedentem
 - vengono mostrate al massimo 10 pratiche per pagina.
 
 La funzione `upgradeSeemaxV11` aggiunge a `CLIENTI` i campi `condiviso`, `creato_da_username`, `creato_da_nome` e `condiviso_il`. Aggiunge inoltre a `PRATICHE` i campi `archiviata` e `archiviata_il`, senza cancellare i dati esistenti.
+
+## Novità 1.9 – Pratiche guidate
+
+- il comando **Nuova pratica** apre tre card: Acquisto, Noleggio e Leasing;
+- Acquisto distingue ordini **Per Me** e **Per Cliente**;
+- Noleggio usa Grenke, rate 24/30/36/48/60 e periodicità mensile, bimestrale o trimestrale;
+- Leasing usa IFIS, rate 32/42/48/54/60/66/72 e periodicità mensile, bimestrale o trimestrale;
+- ogni pratica registra indirizzo di installazione, modalità di gestione del Ledwall ed eventuali credenziali Cloud;
+- scegliendo `In Cloud` appaiono username, password e il collegamento alla registrazione Led Cloud;
+- i documenti vengono caricati nel Drive Seemax e collegati automaticamente alla pratica;
+- il Quotation Planner trasferisce valore pratica, provvigione, durata e periodicità quando disponibili;
+- gli admin possono rendere obbligatorio o facoltativo ogni nuovo campo dalla sezione Impostazioni;
+- le stesse regole possono essere modificate nel foglio `IMPOSTAZIONI`, impostando il valore della relativa chiave `req_...` su `SI` oppure `NO`.
+
+Le nuove colonne vengono aggiunte a `PRATICHE` e `DOCUMENTI` eseguendo nuovamente `upgradeSeemaxV11`; nessuna riga esistente viene cancellata.
 
 ## Regole di magazzino
 

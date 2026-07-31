@@ -22,9 +22,11 @@ Le colonne `modelli_display`, `misure_display`, `cabinet_da_sottrarre` e `righe_
 
 Le colonne `archiviata` e `archiviata_il` vengono valorizzate quando una pratica passa a `Bocciata`. `agent_username` determina il proprietario e impedisce agli agenti di leggere o modificare pratiche altrui; lo stato è modificabile esclusivamente dagli amministratori.
 
+Dalla versione 1.9 la riga contiene inoltre destinatario dell'ordine, intestatario, provvigione, rate, periodicità, indirizzo di installazione, modalità di gestione del Ledwall, credenziali Cloud e riepilogo dei documenti richiesti/caricati. I campi restano nella stessa tabella per consentire filtri e controlli diretti da Google Fogli.
+
 ### DOCUMENTI
 
-Registra nome, tipologia, ID e collegamento Google Drive del file caricato. `practiceId` collega il file alla pratica. I byte del file non vengono inseriti nel Foglio: restano nella cartella Drive `SEEMAX MANAGEMENT DOCUMENTI`.
+Registra nome, tipologia, ID e collegamento Google Drive del file caricato. `practiceId` collega il file alla pratica e `tipo_pratica_documento` distingue documento d'identità, tessera sanitaria, visura, preventivo Seemax, preventivo IFIS o altra documentazione. I byte del file non vengono inseriti nel Foglio: restano nella cartella Drive `SEEMAX MANAGEMENT DOCUMENTI`.
 
 ### ATTIVITA
 
@@ -54,7 +56,7 @@ Archivio tecnico dei preventivi S.Q.P. Il backend aggiunge automaticamente event
 
 ### IMPOSTAZIONI
 
-Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni, versione della configurazione e `obiettivo_fatturato`.
+Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni, versione della configurazione e `obiettivo_fatturato`. Le chiavi che iniziano con `req_acquisto_`, `req_noleggio_` o `req_leasing_` controllano l'obbligatorietà dei campi: usare esclusivamente `SI` o `NO`.
 
 ## Relazioni principali
 

@@ -34,6 +34,22 @@
   const STATUSES = ["Inserita", "Accettata", "Sospesa", "Bocciata", "Completata"];
   const FINANCE = ["Da definire", "Grenke", "IFIS", "Acquisto diretto", "Altro"];
   const ENTITY_LABELS = { practices: "pratica", clients: "cliente", products: "prodotto", documents: "documento", activities: "attività", users: "agente" };
+  const PRACTICE_DOCUMENTS = {
+    NOLEGGIO: [
+      ["documento_identita", "Documento di Identità"],
+      ["tessera_sanitaria", "Tessera Sanitaria"],
+      ["visura", "Visura"],
+      ["altra_documentazione", "Altra Documentazione"]
+    ],
+    LEASING: [
+      ["documento_identita", "Documento di Identità"],
+      ["tessera_sanitaria", "Tessera Sanitaria"],
+      ["preventivo_seemax", "Preventivo Seemax"],
+      ["preventivo_ifis", "Preventivo IFIS (interno)"],
+      ["visura", "Visura"],
+      ["altra_documentazione", "Altra Documentazione"]
+    ]
+  };
   const TECH_SPECS = {
     "P2.5": ["Pixel pitch: 2.5", "Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 160.000 pixel/m²", "LED: SMD1415", "Cabinet: Alluminio Rental", "Dimensioni cabinet: 0.64×0.64 m", "Peso cabinet: 4 kg / 6,3 kg", "Scala di grigi: 16384", "Temperatura: da -20° a +60°", "Protezione: IP65", "Consumo medio: 350 W/m²", "Consumo massimo: 700 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 2,5 m", "Luminosità: 4500–5000 cd/m²", "Refresh: 1920–3840 Hz"],
     "P3": ["Pixel pitch: 3", "Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 110.592 pixel/m²", "LED: SMD1921", "Cabinet: Alluminio Rental", "Dimensioni cabinet: 0.57×0.57 m", "Peso cabinet: 9,5 kg", "Scala di grigi: 16384", "Temperatura: da -20° a +60°", "Protezione: IP65", "Consumo medio: 300 W/m²", "Consumo massimo: 700 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 3 m", "Luminosità: 5000–5500 cd/m²", "Refresh: 1920–3840 Hz"],
@@ -343,7 +359,17 @@
   function renderSettings() {
     const s = state.data ? state.data.settings : {};
     const status = api.status();
-    return `<div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><form id="settingsForm" class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label><div class="form-actions full"><button class="btn primary" type="submit">Salva impostazioni</button></div></form></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Google Sheets</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Google Sheets"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono sempre memorizzate sul dispositivo e non rallentano il database. In Modalità Rapida le altre modifiche vengono accodate fino a “SALVA TUTTO”.</p><div class="stack-actions"><button class="btn soft" data-action="test-database">Verifica collegamento</button>${status.demo ? `<button class="btn ghost" data-action="export-demo">Esporta dati demo</button><button class="btn danger-outline" data-action="reset-demo">Ripristina demo</button>` : ""}</div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Placeholder da completare</span><h3>Controllo prima della pubblicazione</h3></div></div><div class="checklist"><label><input type="checkbox"> Inserire URL Apps Script in <code>config.js</code></label><label><input type="checkbox"> Sostituire telefono, email e sede aziendale</label><label><input type="checkbox"> Inserire loghi e immagini prodotto definitive</label><label><input type="checkbox"> Verificare account agenti nel foglio AGENTI</label><label><input type="checkbox"> Pubblicare il repository con GitHub Pages</label></div></section></div>`;
+    const groups = {
+      ACQUISTO: [["destinatario_ordine", "Destinatario ordine"], ["clientid", "Cliente (se Per Cliente)"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["installazione_regione", "Regione installazione"], ["installazione_provincia", "Provincia installazione"], ["installazione_comune", "Comune installazione"], ["installazione_cap", "CAP installazione"], ["installazione_localita", "Località installazione"], ["installazione_indirizzo", "Indirizzo installazione"], ["installazione_civico", "Civico installazione"], ["gestione_ledwall", "Gestione Ledwall"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ["note", "Note installazione"]],
+      NOLEGGIO: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.NOLEGGIO],
+      LEASING: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.LEASING]
+    };
+    const requirements = Object.entries(groups).map(([type, fields]) => `<fieldset class="required-settings-group"><legend>${type}</legend><div class="required-settings-list">${fields.map(([key, label]) => {
+      const settingKey = `req_${type.toLowerCase()}_${key}`;
+      const checked = String(s[settingKey] || "NO").toUpperCase() === "SI";
+      return `<label><input type="hidden" name="${esc(settingKey)}" value="NO"><input type="checkbox" name="${esc(settingKey)}" value="SI" ${checked ? "checked" : ""}><span><strong>${esc(label)}</strong><small>${checked ? "Attualmente obbligatorio" : "Attualmente facoltativo"}</small></span></label>`;
+    }).join("")}</div></fieldset>`).join("");
+    return `<form id="settingsForm"><div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Google Sheets</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Google Sheets"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono sempre memorizzate sul dispositivo e non rallentano il database. In Modalità Rapida le altre modifiche vengono accodate fino a “SALVA TUTTO”.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Le stesse impostazioni sono modificabili nel foglio IMPOSTAZIONI usando SI oppure NO.</p></div></div><div class="required-settings-grid">${requirements}</div><div class="form-actions"><button class="btn primary" type="submit">Salva tutte le impostazioni</button></div></section></div></form>`;
   }
 
   function filterRows(rows, fields) {
@@ -362,16 +388,35 @@
   function field(label, name, value = "", options = {}) {
     const attrs = [options.required ? "required" : "", options.readonly ? "readonly" : "", options.min !== undefined ? `min="${options.min}"` : "", options.step ? `step="${options.step}"` : ""].filter(Boolean).join(" ");
     const cls = options.full ? "full" : "";
-    if (options.type === "textarea") return `<label class="${cls}">${esc(label)}<textarea name="${name}" ${attrs}>${esc(value)}</textarea></label>`;
-    if (options.options) return `<label class="${cls}">${esc(label)}<select name="${name}" ${attrs}>${options.options.map((opt) => `<option value="${esc(opt)}" ${String(opt) === String(value) ? "selected" : ""}>${esc(opt)}</option>`).join("")}</select></label>`;
-    return `<label class="${cls}">${esc(label)}<input name="${name}" type="${options.type || "text"}" value="${esc(value)}" ${attrs}></label>`;
+    const marker = options.required ? requiredMark(true) : "";
+    if (options.type === "textarea") return `<label class="${cls}">${esc(label)}${marker}<textarea name="${name}" ${attrs}>${esc(value)}</textarea></label>`;
+    if (options.options) return `<label class="${cls}">${esc(label)}${marker}<select name="${name}" ${attrs}>${options.options.map((opt) => `<option value="${esc(opt)}" ${String(opt) === String(value) ? "selected" : ""}>${esc(opt)}</option>`).join("")}</select></label>`;
+    return `<label class="${cls}">${esc(label)}${marker}<input name="${name}" type="${options.type || "text"}" value="${esc(value)}" ${attrs}></label>`;
   }
 
   function formShell(entity, id, fields, submitLabel = "Salva") {
     return `<form class="entity-form form-grid" data-entity="${entity}" data-id="${esc(id || "")}">${fields}<div class="form-actions full"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">${esc(submitLabel)}</button></div></form>`;
   }
 
-  function openPractice(id, clientId) {
+  function practiceRequired(type, field) {
+    return String((state.data.settings || {})[`req_${String(type || "").toLowerCase()}_${String(field || "").toLowerCase()}`] || "NO").toUpperCase() === "SI";
+  }
+
+  function requiredMark(required) {
+    return required ? `<em class="required-mark">Obbligatorio</em>` : `<em class="optional-mark">Facoltativo</em>`;
+  }
+
+  function openPracticeTypeChooser(clientId) {
+    const body = `<div class="practice-type-intro"><p>Scegli la tipologia da inserire. Il modulo mostrerà soltanto i dati necessari per quella pratica.</p></div>
+      <div class="practice-type-grid">
+        <button type="button" class="practice-type-card purchase" data-action="choose-practice-type" data-type="ACQUISTO" data-client-id="${esc(clientId || "")}"><span>▣</span><strong>Pratica di acquisto</strong><small>Ordine per il cliente oppure intestato all’agente.</small></button>
+        <button type="button" class="practice-type-card rental" data-action="choose-practice-type" data-type="NOLEGGIO" data-client-id="${esc(clientId || "")}"><span>↻</span><strong>Pratica di noleggio</strong><small>Contratto Grenke da 24 a 60 mesi.</small></button>
+        <button type="button" class="practice-type-card leasing" data-action="choose-practice-type" data-type="LEASING" data-client-id="${esc(clientId || "")}"><span>€</span><strong>Pratica di leasing</strong><small>Leasing IFIS da 32 a 72 mesi.</small></button>
+      </div>`;
+    openModal("Nuova pratica", body, { wide: true, kicker: "Scegli la tipologia", subtitle: "Acquisto, Noleggio operativo o Leasing" });
+  }
+
+  function openPractice(id, clientId, selectedType) {
     const record = state.data.practices.find((p) => p.id === id) || {};
     const client = state.data.clients.find((c) => c.id === (clientId || record.clientId));
     const session = api.getSession() || {};
@@ -379,13 +424,14 @@
     const existingNumbers = state.data.practices.map((p) => String(p.numero || "")).filter((number) => number.startsWith(prefix)).map((number) => Number(number.slice(prefix.length))).filter(Number.isFinite);
     const number = record.numero || prefix + String((existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1).padStart(4, "0");
     const inferredType = record.finanziaria === "Grenke" ? "NOLEGGIO" : record.finanziaria === "IFIS" ? "LEASING" : "ACQUISTO";
-    const practiceType = String(record.tipo_pratica || inferredType).toUpperCase();
+    const practiceType = String(record.tipo_pratica || selectedType || inferredType).toUpperCase();
     const allowedStatuses = practiceType === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
     const selectedClientId = record.clientId || clientId || "";
     const selectedClient = state.data.clients.find((c) => c.id === selectedClientId);
+    const clientIsRequired = practiceRequired(practiceType, "clientid");
     const clientField = record.id
       ? `${field("Cliente", "cliente_display", record.cliente || (selectedClient && selectedClient.ragioneSociale) || "", { readonly: true })}<input type="hidden" name="clientId" value="${esc(selectedClientId)}">`
-      : `<label>Cliente<select name="clientId" required><option value="">Seleziona cliente</option>${state.data.clients.map((c) => `<option value="${esc(c.id)}" ${c.id === selectedClientId ? "selected" : ""}>${esc(c.ragioneSociale)}</option>`).join("")}</select></label>`;
+      : `<label>Cliente ${requiredMark(clientIsRequired)}<select name="clientId" ${clientIsRequired ? "required" : ""}><option value="">Seleziona cliente</option>${state.data.clients.map((c) => `<option value="${esc(c.id)}" ${c.id === selectedClientId ? "selected" : ""}>${esc(c.ragioneSociale)}</option>`).join("")}</select></label>`;
     let inventoryRows = [];
     try { inventoryRows = JSON.parse(record.righe_magazzino_json || "[]"); } catch (error) { inventoryRows = []; }
     const selectedProductId = (inventoryRows[0] && inventoryRows[0].product_id) || "";
@@ -405,6 +451,67 @@
     const statusField = !api.isAdmin()
       ? `<input type="hidden" name="stato" value="${esc(record.stato || "Inserita")}">`
       : field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses });
+    const destination = String(record.destinatario_ordine || "PER CLIENTE").toUpperCase();
+    const finance = practiceType === "NOLEGGIO" ? "Grenke" : practiceType === "LEASING" ? "IFIS" : "Acquisto diretto";
+    const addressType = String(record.indirizzo_installazione_tipo || (practiceType === "ACQUISTO" ? "PRESSO ALTRO INDIRIZZO" : "COME INDIRIZZO CLIENTE")).toUpperCase();
+    const management = record.gestione_ledwall || "";
+    const req = (name) => practiceRequired(practiceType, name);
+    const typeSummary = `<div class="practice-kind-banner ${practiceType.toLowerCase()} full"><span>${practiceType === "ACQUISTO" ? "▣" : practiceType === "NOLEGGIO" ? "↻" : "€"}</span><div><small>TIPOLOGIA PRATICA</small><strong>${esc(practiceType)}</strong></div>${record.id ? "" : `<button type="button" class="btn ghost" data-action="back-practice-types">Cambia tipologia</button>`}</div>
+      <input type="hidden" name="tipo_pratica" value="${esc(practiceType)}"><input type="hidden" name="finanziaria" value="${esc(finance)}">`;
+    const purchaseDestination = practiceType !== "ACQUISTO" ? "" : `<fieldset class="practice-section full"><legend>Destinatario ordine ${requiredMark(req("destinatario_ordine"))}</legend>
+      <div class="destination-grid">
+        <label class="choice-card"><input type="radio" name="destinatario_ordine" value="PER ME" ${destination === "PER ME" ? "checked" : ""} ${req("destinatario_ordine") ? "required" : ""}><span><strong>Per Me</strong><small>La fattura finale sarà intestata all’agente connesso.</small></span></label>
+        <label class="choice-card"><input type="radio" name="destinatario_ordine" value="PER CLIENTE" ${destination !== "PER ME" ? "checked" : ""}><span><strong>Per Cliente</strong><small>L’ordine e la fattura saranno intestati al cliente selezionato.</small></span></label>
+      </div>
+    </fieldset>`;
+    const personalData = `<div class="conditional-section full" data-visible-when-destination="PER ME"><fieldset class="practice-section"><legend>Dati personali</legend><div class="form-grid">
+      ${field("Intestatario ordine", "intestatario_nome", record.intestatario_nome || session.displayName || session.nome_visualizzato || session.username, { readonly: true })}
+      ${field("Email", "intestatario_email", record.intestatario_email || session.email || "", { readonly: true, type: "email" })}
+      ${field("Telefono", "intestatario_telefono", record.intestatario_telefono || session.telefono || session.phone || "", { readonly: true })}
+      <p class="field-help full">La pratica e la fattura finale saranno intestate all’utente collegato.</p>
+    </div></fieldset></div>`;
+    const customerData = `<div class="conditional-section full" data-visible-when-destination="PER CLIENTE"><fieldset class="practice-section"><legend>Dati del cliente</legend><div class="form-grid">${clientField}</div></fieldset></div>`;
+    const valueFields = `<fieldset class="practice-section full"><legend>Valori pratica</legend><div class="form-grid">
+      ${field("Valore pratica (IVA esclusa)", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01", required: req("valore") })}
+      <label class="conditional-section" data-visible-when-commission="YES">Valore provvigione ${requiredMark(req("valore_provvigione"))}<input name="valore_provvigione" type="number" min="0" step="0.01" value="${esc(record.valore_provvigione || 0)}" ${req("valore_provvigione") ? "required" : ""}><small>Compilato automaticamente quando disponibile nel preventivo S.Q.P.</small></label>
+    </div></fieldset>`;
+    const standardRates = practiceType === "NOLEGGIO" ? ["24", "30", "36", "48", "60"] : ["32", "42", "48", "54", "60", "66", "72"];
+    const currentRate = String(record.numero_rate || "");
+    const rateOptions = currentRate && !standardRates.includes(currentRate) ? [currentRate, ...standardRates] : standardRates;
+    const financeFields = practiceType === "ACQUISTO" ? "" : `<fieldset class="practice-section full"><legend>Condizioni ${practiceType === "NOLEGGIO" ? "Grenke" : "IFIS"}</legend><div class="form-grid">
+      ${field("Numero di rate selezionate", "numero_rate", record.numero_rate || (practiceType === "NOLEGGIO" ? "36" : "60"), { options: rateOptions, required: req("numero_rate") })}
+      ${field("Mensilità", "periodicita_pagamento", record.periodicita_pagamento || "Mensile", { options: ["Mensile", "Bimestrale", "Trimestrale"], required: req("periodicita_pagamento") })}
+    </div></fieldset>`;
+    const addressChoice = practiceType === "ACQUISTO" ? `<input type="hidden" name="indirizzo_installazione_tipo" value="PRESSO ALTRO INDIRIZZO">` : `<div class="address-choice full">
+      <label class="choice-card compact"><input type="radio" name="indirizzo_installazione_tipo" value="COME INDIRIZZO CLIENTE" ${addressType === "COME INDIRIZZO CLIENTE" ? "checked" : ""} ${req("indirizzo_installazione_tipo") ? "required" : ""}><span><strong>Come indirizzo cliente</strong><small>Usa la sede registrata nell’anagrafica.</small></span></label>
+      <label class="choice-card compact"><input type="radio" name="indirizzo_installazione_tipo" value="PRESSO ALTRO INDIRIZZO" ${addressType !== "COME INDIRIZZO CLIENTE" ? "checked" : ""}><span><strong>Presso altro indirizzo</strong><small>Inserisci una sede di installazione differente.</small></span></label>
+    </div>`;
+    const addressFields = `<fieldset class="practice-section full"><legend>Indirizzo di installazione</legend><div class="form-grid">${addressChoice}
+      <div class="form-grid full conditional-section installation-address-fields" data-visible-when-address="PRESSO ALTRO INDIRIZZO">
+        ${field("Regione", "installazione_regione", record.installazione_regione || "", { required: req("installazione_regione") })}
+        ${field("Provincia", "installazione_provincia", record.installazione_provincia || "", { required: req("installazione_provincia") })}
+        ${field("Comune / Città", "installazione_comune", record.installazione_comune || "", { required: req("installazione_comune") })}
+        ${field("CAP", "installazione_cap", record.installazione_cap || "", { required: req("installazione_cap") })}
+        ${field("Località / Frazione", "installazione_localita", record.installazione_localita || "", { required: req("installazione_localita") })}
+        ${field("Indirizzo", "installazione_indirizzo", record.installazione_indirizzo || "", { required: req("installazione_indirizzo") })}
+        ${field("Civico", "installazione_civico", record.installazione_civico || "", { required: req("installazione_civico") })}
+      </div>
+    </div></fieldset>`;
+    const technicalManagement = `<fieldset class="practice-section full"><legend>Dettagli tecnici</legend><div class="form-grid">
+      ${field("Gestione del Ledwall", "gestione_ledwall", management, { options: ["", "In locale con cavo di rete", "In locale con Wi-Fi", "Via Smartphone", "In Cloud"], required: req("gestione_ledwall") })}
+      <div class="cloud-fields form-grid full conditional-section" data-visible-when-management="IN CLOUD">
+        ${field("Username Cloud", "cloud_username", record.cloud_username || "", { required: req("cloud_username") })}
+        ${field("Password Cloud", "cloud_password", record.cloud_password || "", { type: "password", required: req("cloud_password") })}
+        <p class="field-help full">Non hai ancora registrato un account? <a href="https://www.led-cloud.com/#/Account/Login" target="_blank" rel="noopener">Fallo adesso.</a></p>
+      </div>
+    </div></fieldset>`;
+    const existingDocuments = (state.data.documents || []).filter((doc) => String(doc.practiceId || "") === String(record.id || ""));
+    const uploadFields = (PRACTICE_DOCUMENTS[practiceType] || []).map(([key, label]) => {
+      const existing = existingDocuments.find((doc) => String(doc.tipo_pratica_documento || "") === key || String(doc.tipo || "").toLowerCase() === label.toLowerCase());
+      const required = req(key) && !existing;
+      return `<label class="practice-upload">${esc(label)} ${requiredMark(req(key))}${existing ? `<small class="uploaded-file">✓ Già caricato: ${esc(existing.nome || existing.file_name)}</small>` : ""}<input type="file" name="practice_file_${esc(key)}" data-practice-document="${esc(key)}" data-document-label="${esc(label)}" ${required ? "required" : ""} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"></label>`;
+    }).join("");
+    const uploads = uploadFields ? `<fieldset class="practice-section full"><legend>Documentazione della pratica</legend>${api.isFastMode() ? `<div class="fast-upload-note">Per allegare documenti passa alla Modalità Standard.</div>` : `<div class="practice-upload-grid">${uploadFields}</div>`}</fieldset>` : "";
     const technicalFields = `<fieldset class="practice-configurator full"><legend>Configurazione display</legend><div class="form-grid">
       <label>Display di riferimento<select name="product_id" required>${logicalProducts.map((p) => `<option value="${esc(p.id)}" ${p.id === selectedProduct.id ? "selected" : ""}>${esc(p.nome)}${p.unifiedP391 ? " · composizione automatica 50×100 + 50×50 cm" : ` · cabinet ${esc(p.cabX)}×${esc(p.cabY)} cm`}</option>`).join("")}</select></label>
       ${field("Larghezza display (m)", "display_width", width, { type: "number", min: 0, step: "any" })}
@@ -413,36 +520,56 @@
       <label>Cabinet necessari<input name="cabinet_calculated" value="0" readonly><small id="cabinetAvailability" class="cabinet-availability"></small></label>
       <div id="measureValidation" class="measure-validation full"></div>
     </div></fieldset>`;
-    const fields = field("Identificativo pratica", "numero", number, { required: true, readonly: true }) + clientField +
-      field("Tipo pratica", "tipo_pratica", practiceType, { options: ["ACQUISTO", "NOLEGGIO", "LEASING"] }) +
-      statusField + field("Finanziaria", "finanziaria", record.finanziaria || (practiceType === "NOLEGGIO" ? "Grenke" : practiceType === "LEASING" ? "IFIS" : "Da definire"), { options: FINANCE, readonly: practiceType !== "ACQUISTO" }) +
-      field("Valore IVA esclusa", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01" }) +
-      technicalFields +
+    const identityFields = `<fieldset class="practice-section full"><legend>Identificazione</legend><div class="form-grid">${field("Identificativo pratica", "numero", number, { required: true, readonly: true })}${statusField}</div></fieldset>`;
+    const fields = typeSummary + (practiceType === "ACQUISTO" ? purchaseDestination + identityFields : identityFields) +
+      technicalFields + valueFields + financeFields +
+      (practiceType === "ACQUISTO" ? personalData + customerData : customerData) +
+      addressFields + technicalManagement + uploads +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
       `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}"><input type="hidden" name="p391_unificato" value="${esc(record.p391_unificato || "NO")}"><input type="hidden" name="p391_cabinet_50100" value="${esc(record.p391_cabinet_50100 || "0")}"><input type="hidden" name="p391_cabinet_5050" value="${esc(record.p391_cabinet_5050 || "0")}">` +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
-      field("Note", "note", record.note || "", { type: "textarea", full: true });
+      field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") });
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
-    const typeSelect = document.querySelector('.entity-form select[name="tipo_pratica"]');
-    const statusSelect = document.querySelector('.entity-form select[name="stato"]');
-    const financeSelect = document.querySelector('.entity-form select[name="finanziaria"]');
-    const updatePracticeType = () => {
-      if (financeSelect) {
-        financeSelect.value = typeSelect.value === "NOLEGGIO" ? "Grenke" : typeSelect.value === "LEASING" ? "IFIS" : "Da definire";
-        financeSelect.disabled = typeSelect.value !== "ACQUISTO";
-      }
-      if (statusSelect) {
-        const current = statusSelect.value;
-        const options = typeSelect.value === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
-        statusSelect.innerHTML = options.map((status) => `<option value="${status}" ${status === current ? "selected" : ""}>${status}</option>`).join("");
-        if (!options.includes(current)) statusSelect.value = "Sospesa";
+    bindPracticeConditionalFields(practiceType);
+    bindPracticeCalculator(logicalProducts, productOptions);
+  }
+
+  function bindPracticeConditionalFields(practiceType) {
+    const form = document.querySelector(".entity-form[data-entity='practices']");
+    if (!form) return;
+    const refresh = () => {
+      const destination = form.querySelector("[name='destinatario_ordine']:checked")?.value || "PER CLIENTE";
+      const address = form.querySelector("[name='indirizzo_installazione_tipo']:checked")?.value || form.elements.indirizzo_installazione_tipo?.value || "PRESSO ALTRO INDIRIZZO";
+      const management = String(form.elements.gestione_ledwall?.value || "").toUpperCase();
+      form.querySelectorAll("[data-visible-when-destination]").forEach((node) => node.classList.toggle("is-hidden", practiceType === "ACQUISTO" && node.dataset.visibleWhenDestination !== destination));
+      form.querySelectorAll("[data-visible-when-address]").forEach((node) => {
+        const hidden = node.dataset.visibleWhenAddress !== address;
+        node.classList.toggle("is-hidden", hidden);
+        node.querySelectorAll("input,select,textarea").forEach((input) => {
+          if (hidden) { if (input.dataset.wasRequired === undefined) input.dataset.wasRequired = input.required ? "1" : "0"; input.required = false; }
+          else if (input.dataset.wasRequired === "1") input.required = true;
+        });
+      });
+      form.querySelectorAll("[data-visible-when-management]").forEach((node) => {
+        const hidden = node.dataset.visibleWhenManagement !== management;
+        node.classList.toggle("is-hidden", hidden);
+        node.querySelectorAll("input,select,textarea").forEach((input) => {
+          if (hidden) { if (input.dataset.wasRequired === undefined) input.dataset.wasRequired = input.required ? "1" : "0"; input.required = false; }
+          else if (input.dataset.wasRequired === "1") input.required = true;
+        });
+      });
+      form.querySelectorAll("[data-visible-when-commission]").forEach((node) => node.classList.toggle("is-hidden", practiceType === "ACQUISTO" && destination === "PER ME"));
+      const clientSelect = form.elements.clientId;
+      if (clientSelect && practiceType === "ACQUISTO") {
+        const personal = destination === "PER ME";
+        if (personal) { if (clientSelect.dataset.wasRequired === undefined) clientSelect.dataset.wasRequired = clientSelect.required ? "1" : "0"; clientSelect.required = false; }
+        else if (clientSelect.dataset.wasRequired === "1") clientSelect.required = true;
       }
     };
-    if (typeSelect) {
-      typeSelect.addEventListener("change", updatePracticeType);
-      if (!record.id) updatePracticeType();
-    }
-    bindPracticeCalculator(logicalProducts, productOptions);
+    form.addEventListener("change", (event) => {
+      if (["destinatario_ordine", "indirizzo_installazione_tipo", "gestione_ledwall"].includes(event.target.name)) refresh();
+    });
+    refresh();
   }
 
   function bindPracticeCalculator(products, inventoryProducts) {
@@ -649,6 +776,27 @@
       toast("Inserisci larghezza e altezza maggiori di zero.", "danger");
       return;
     }
+    const practiceAttachments = entity === "practices"
+      ? Array.from(form.querySelectorAll("[data-practice-document]")).filter((input) => input.files && input.files[0]).map((input) => ({
+        key: input.dataset.practiceDocument,
+        label: input.dataset.documentLabel,
+        file: input.files[0]
+      }))
+      : [];
+    if (entity === "practices" && api.isFastMode()) {
+      const type = String(form.elements.tipo_pratica?.value || "").toUpperCase();
+      const existingTypes = (state.data.documents || []).filter((doc) => String(doc.practiceId || "") === String(form.dataset.id || "")).map((doc) => doc.tipo_pratica_documento);
+      const missingRequiredDocument = (PRACTICE_DOCUMENTS[type] || []).find(([key]) => practiceRequired(type, key) && !existingTypes.includes(key));
+      if (missingRequiredDocument) {
+        toast("Questa pratica richiede documenti obbligatori. Passa alla Modalità Standard per allegarli.", "danger");
+        return;
+      }
+    }
+    const oversizedAttachment = practiceAttachments.find((item) => item.file.size > 8 * 1024 * 1024);
+    if (oversizedAttachment) {
+      toast(`${oversizedAttachment.label}: il file supera il limite di 8 MB.`, "danger");
+      return;
+    }
     if (entity === "clients") {
       if (form.elements.piva?.value && (form.elements.piva_formalmente_valida?.value !== "SI" || form.elements.piva_duplicata?.value === "SI")) {
         toast("La Partita IVA non è formalmente valida oppure è già presente nel gestionale.", "danger");
@@ -668,6 +816,7 @@
     }
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const record = { ...current, ...serializeForm(form) };
+    Object.keys(record).filter((key) => key.startsWith("practice_file_")).forEach((key) => delete record[key]);
     delete record.cabinet_calculated;
     delete record.display_width;
     delete record.display_height;
@@ -686,7 +835,9 @@
     }
     if (entity === "practices") {
       const client = state.data.clients.find((c) => c.id === record.clientId);
-      record.cliente = client ? client.ragioneSociale : record.cliente;
+      const personalPurchase = record.tipo_pratica === "ACQUISTO" && record.destinatario_ordine === "PER ME";
+      record.cliente = personalPurchase ? (record.intestatario_nome || (api.getSession() || {}).displayName || "") : (client ? client.ragioneSociale : record.cliente);
+      if (personalPurchase) { record.clientId = ""; record.valore_provvigione = 0; }
       record.agente = record.agente || ((api.getSession() || {}).displayName || "");
       record.agent_username = record.agent_username || ((api.getSession() || {}).username || "");
       record.finanziaria = record.tipo_pratica === "NOLEGGIO" ? "Grenke" : record.tipo_pratica === "LEASING" ? "IFIS" : (record.finanziaria || "Da definire");
@@ -694,6 +845,7 @@
       record.aggiornatoIl = now;
       record.id = record.id || "PR-" + record.numero;
       if (!current.id) record.nuova_pratica = "SI";
+      record.documenti_richiesti_json = JSON.stringify((PRACTICE_DOCUMENTS[record.tipo_pratica] || []).filter(([key]) => practiceRequired(record.tipo_pratica, key)).map(([key]) => key));
     }
     if (entity === "documents") {
       delete record.document_file;
@@ -717,7 +869,33 @@
     }
     setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
     try {
-      const saved = await api.upsert(entity, record);
+      let saved = await api.upsert(entity, record);
+      if (entity === "practices" && practiceAttachments.length) {
+        const uploaded = [];
+        for (let index = 0; index < practiceAttachments.length; index += 1) {
+          const attachment = practiceAttachments[index];
+          const documentRecord = {
+            practiceId: saved.id,
+            pratica: saved.numero,
+            cliente: saved.cliente,
+            nome: attachment.file.name,
+            tipo: attachment.label,
+            tipo_pratica_documento: attachment.key,
+            data: new Date().toISOString().slice(0, 10),
+            agent_username: saved.agent_username,
+            file_base64: await readFileAsDataUrl(attachment.file),
+            file_name: attachment.file.name,
+            file_type: attachment.file.type || "application/octet-stream",
+            file_size: attachment.file.size,
+            note: `Allegato ${saved.tipo_pratica || "pratica"}`
+          };
+          const uploadedDocument = await api.upsert("documents", documentRecord);
+          uploaded.push({ tipo: attachment.key, document_id: uploadedDocument.id, nome: uploadedDocument.nome, url: uploadedDocument.url });
+          replaceLocalEntity("documents", uploadedDocument);
+        }
+        const previousUploaded = (() => { try { return JSON.parse(saved.documenti_caricati_json || "[]"); } catch (error) { return []; } })();
+        saved = await api.upsert("practices", { ...saved, nuova_pratica: "NO", documenti_caricati_json: JSON.stringify(previousUploaded.concat(uploaded)) });
+      }
       if (saved.__notifications) { state.data.notifications = saved.__notifications; delete saved.__notifications; updateNotificationBell(); }
       replaceLocalEntity(entity, saved);
       setConnectionState();
@@ -843,10 +1021,12 @@
     openModal("Risultati ricerca", `<div class="search-results"><h3>Pratiche</h3>${practices.length ? practices.map((p) => `<button data-action="edit-practice" data-id="${esc(p.id)}"><span>▣</span><div><strong>${esc(p.numero)} · ${esc(p.cliente)}</strong><small>${esc(p.titolo)}</small></div>${badge(p.stato)}</button>`).join("") : `<p>Nessuna pratica trovata.</p>`}<h3>Clienti</h3>${clients.length ? clients.map((c) => `<button data-action="edit-client" data-id="${esc(c.id)}"><span>♙</span><div><strong>${esc(c.ragioneSociale)}</strong><small>${esc(c.referente || c.citta || "")}</small></div></button>`).join("") : `<p>Nessun cliente trovato.</p>`}</div>`, { wide: true, kicker: `Ricerca: ${query}` });
   }
 
-  async function handleAction(action, id) {
+  async function handleAction(action, id, data = {}) {
     const handlers = {
-      "new-practice": () => openPractice(), "edit-practice": () => openPractice(id), "delete-practice": () => removeEntity("practices", id),
-      "new-client": () => openClient(), "edit-client": () => openClient(id), "delete-client": () => removeEntity("clients", id), "new-practice-client": () => openPractice(null, id),
+      "new-practice": () => openPracticeTypeChooser(), "edit-practice": () => openPractice(id), "delete-practice": () => removeEntity("practices", id),
+      "new-client": () => openClient(), "edit-client": () => openClient(id), "delete-client": () => removeEntity("clients", id), "new-practice-client": () => openPracticeTypeChooser(id),
+      "choose-practice-type": () => openPractice(null, data.clientId || "", data.type),
+      "back-practice-types": () => openPracticeTypeChooser(),
       "new-product": () => openProduct(), "edit-product": () => openProduct(id), "product-tech": () => openProductTech(id), "delete-product": () => removeEntity("products", id),
       "new-document": () => openDocument(), "edit-document": () => openDocument(id), "delete-document": () => removeEntity("documents", id),
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
@@ -873,7 +1053,7 @@
     const routeTarget = event.target.closest("[data-route]");
     if (routeTarget) { go(routeTarget.dataset.route); return; }
     const actionTarget = event.target.closest("[data-action]");
-    if (actionTarget) { await handleAction(actionTarget.dataset.action, actionTarget.dataset.id); return; }
+    if (actionTarget) { await handleAction(actionTarget.dataset.action, actionTarget.dataset.id, actionTarget.dataset); return; }
     const demoTarget = event.target.closest("[data-demo-login]");
     if (demoTarget) {
       const account = config.demoAccounts[demoTarget.dataset.demoLogin === "admin" ? 0 : 1];
@@ -925,7 +1105,7 @@
   });
 
   $("logoutButton").addEventListener("click", () => { api.logout(); state.data = null; showLogin(); });
-  $("quickAddButton").addEventListener("click", () => openPractice());
+  $("quickAddButton").addEventListener("click", () => openPracticeTypeChooser());
   $("openSidebar").addEventListener("click", () => $("sidebar").classList.add("open"));
   $("closeSidebar").addEventListener("click", () => $("sidebar").classList.remove("open"));
   $("globalSearch").addEventListener("keydown", (event) => { if (event.key === "Enter") searchEverywhere(event.currentTarget.value); });
