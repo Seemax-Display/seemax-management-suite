@@ -4695,6 +4695,7 @@
         hideCalcLoading();
         const label = response.existing ? 'già presente' : 'creata correttamente';
         await sqpAlert(`La pratica ${safe(response.practice.numero)} è ${label} nel gestionale.`, {title:'Pratica inserita'});
+        window.dispatchEvent(new CustomEvent('seemax:practice-created', {detail:{practice:response.practice, existing:!!response.existing}}));
       }catch(err){
         hideCalcLoading();
         await sqpAlert('Non riesco a inserire la pratica: ' + (err && err.message ? err.message : err), {title:'Inserimento non riuscito', theme:'lite'});

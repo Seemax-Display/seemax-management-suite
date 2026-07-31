@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.0.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.1.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -69,7 +69,7 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.9.1");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.1.0");
   styleSheets_();
   return "SEEMAX v1.9.1 configurato: salvataggio pratiche e allegati ottimizzato.";
 }

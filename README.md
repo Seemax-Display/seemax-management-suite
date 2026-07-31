@@ -20,6 +20,7 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - workflow pratiche semplificato: Inserita, Accettata, Sospesa, Bocciata e Completata;
 - notifiche interne con campanella ed email gratuita all'agente responsabile;
 - documenti e media caricati direttamente e archiviati su Google Drive;
+- cartelle documentali locali, trascinamento desktop e spostamento con pressione prolungata su smartphone;
 - attività, scadenze e appuntamenti;
 - gestione agenti e ruoli ADMIN/AGENTE;
 - Quotation Planner montato nativamente nel gestionale, senza iframe;
@@ -47,7 +48,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.0.0 segui [docs/AGGIORNAMENTO_V2.0.md](docs/AGGIORNAMENTO_V2.0.md). La procedura mantiene i dati esistenti; la versione 2.0 rende inoltre il Quotation Planner parte nativa dell'interfaccia e condivide sessione e anagrafiche del gestionale.
+Per aggiornare un'installazione già operativa alla versione 2.1.0 segui [docs/AGGIORNAMENTO_V2.1.md](docs/AGGIORNAMENTO_V2.1.md). La procedura mantiene i dati esistenti e introduce i perfezionamenti del Planner e l’archivio documentale organizzabile localmente.
 
 ## Placeholder
 

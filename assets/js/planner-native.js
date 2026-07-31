@@ -33,7 +33,7 @@
     };
   }
 
-  function windowProxy(scopedDocument, locationState, listeners) {
+  function windowProxy(scopedDocument, locationState, listeners, container) {
     return new Proxy(window, {
       get(target, property) {
         if (property === "document") return scopedDocument;
@@ -44,7 +44,11 @@
           listeners.push([type, listener, options]);
         };
         if (property === "removeEventListener") return (type, listener, options) => target.removeEventListener(type, listener, options);
-        if (property === "scrollTo" || property === "scroll") return (options) => scopedDocument.scrollingElement.scrollTo({ top: Number((options || {}).top || 0), behavior: (options || {}).behavior || "auto" });
+        if (property === "scrollTo" || property === "scroll") return (options) => {
+          const requestedTop = typeof options === "number" ? options : Number((options || {}).top || 0);
+          const anchor = container.getBoundingClientRect().top + target.scrollY - 105;
+          target.scrollTo({ top: Math.max(0, anchor + requestedTop), behavior: (options || {}).behavior || "auto" });
+        };
         const value = target[property];
         return typeof value === "function" ? value.bind(target) : value;
       }
@@ -104,6 +108,10 @@
       const shadow = container.attachShadow({ mode: "open" });
       shadow.innerHTML = `<style>${scopedCss(styles)}
         :host{display:block;min-height:720px}.sqp-native-body{min-height:720px;background:transparent}
+        #btnDatabaseRefresh,#btnAgentLogin,#btnAgentLogout{display:none!important}
+        .view#view-grenke.active,.view#view-ifis.active{width:auto!important;margin:22px 24px 38px!important;padding:5px!important}
+        .grenke-shell,.ifis-shell{padding:2px}
+        @media(max-width:760px){.view#view-grenke.active,.view#view-ifis.active{margin:12px 10px 28px!important;padding:3px!important}}
         .suite-client-import{border:1px solid #93c5fd;border-radius:16px;padding:14px;background:#eff6ff}
         .suite-client-choice{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr);gap:12px;align-items:center}
         .suite-client-choice span{font-size:13px;line-height:1.45;color:#475569}
@@ -117,7 +125,10 @@
       const listeners = [];
       window.SEEMAX_NATIVE_CONTEXT = context;
       const execute = new Function("document", "window", "location", "history", applicationScript);
-      execute(scopedDocument, windowProxy(scopedDocument, locationState, listeners), locationState, scopedHistory);
+      execute(scopedDocument, windowProxy(scopedDocument, locationState, listeners, container), locationState, scopedHistory);
+      ["btnDatabaseRefresh", "btnAgentLogin", "btnAgentLogout"].forEach((id) => {
+        const control = shadow.getElementById(id); if (control) control.remove();
+      });
       const lifecycle = new MutationObserver(() => {
         if (container.isConnected) return;
         listeners.forEach(([type, listener, options]) => window.removeEventListener(type, listener, options));

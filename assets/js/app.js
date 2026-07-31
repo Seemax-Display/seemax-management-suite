@@ -4,19 +4,24 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "numero", practiceDirection: "desc", practicePage: 1 };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "numero", practiceDirection: "desc", practicePage: 1, documentFolderId: "" };
   let installPrompt = null;
+  let heldDocumentId = "";
+  let documentHoldTimer = null;
+  let documentHoldStart = null;
+  let pendingDocumentFolderId = "";
+  let pendingDocumentFile = null;
 
   const NAV = [
-    { id: "dashboard", icon: "⌂", label: "Dashboard", sub: "Panoramica" },
-    { id: "practices", icon: "▣", label: "Pratiche", sub: "Pipeline commerciale" },
-    { id: "clients", icon: "♙", label: "Clienti", sub: "Anagrafiche e contatti" },
-    { id: "catalog", icon: "▦", label: "Catalogo", sub: "Prodotti e listini" },
-    { id: "planner", icon: "▤", label: "Quotation Planner", sub: "Preventivi Ledwall" },
-    { id: "documents", icon: "▱", label: "Documenti", sub: "PDF e allegati" },
-    { id: "activities", icon: "✓", label: "Attività", sub: "Scadenze operative" },
-    { id: "users", icon: "♟", label: "Agenti", sub: "Accessi e ruoli", adminOnly: true },
-    { id: "settings", icon: "⚙", label: "Impostazioni", sub: "Azienda e database", adminOnly: true }
+    { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
+    { id: "practices", icon: "📋", label: "Pratiche", sub: "Pipeline commerciale" },
+    { id: "clients", icon: "👥", label: "Clienti", sub: "Anagrafiche e contatti" },
+    { id: "catalog", icon: "🖥️", label: "Catalogo", sub: "Prodotti e listini" },
+    { id: "planner", icon: "🧮", label: "Quotation Planner", sub: "Preventivi Ledwall" },
+    { id: "documents", icon: "🗂️", label: "Documenti", sub: "PDF e allegati" },
+    { id: "activities", icon: "✅", label: "Attività", sub: "Scadenze operative" },
+    { id: "users", icon: "🧑‍💼", label: "Agenti", sub: "Accessi e ruoli", adminOnly: true },
+    { id: "settings", icon: "⚙️", label: "Impostazioni", sub: "Azienda e database", adminOnly: true }
   ];
 
   const ROUTE_META = {
@@ -179,6 +184,7 @@
   function go(route, updateHash = true) {
     const allowed = visibleNav().some((item) => item.id === route);
     state.route = allowed ? route : "dashboard";
+    if (state.route !== "documents") heldDocumentId = "";
     if (updateHash) history.replaceState(null, "", "#" + state.route);
     const meta = ROUTE_META[state.route];
     $("pageTitle").textContent = meta[0];
@@ -207,7 +213,7 @@
   }
 
   function emptyState(title, text, button, action) {
-    return `<div class="empty-state"><span>◇</span><h3>${esc(title)}</h3><p>${esc(text)}</p>${button ? `<button class="btn primary" data-action="${action}">${esc(button)}</button>` : ""}</div>`;
+    return `<div class="empty-state"><span>✨</span><h3>${esc(title)}</h3><p>${esc(text)}</p>${button ? `<button class="btn primary" data-action="${action}">${esc(button)}</button>` : ""}</div>`;
   }
 
   function viewToolbar(label, action, extra = "") {
@@ -225,10 +231,10 @@
         <div class="welcome-actions"><button class="btn white" data-action="new-practice">＋ Nuova pratica</button><button class="btn glass" data-route="planner">Apri Quotation Planner</button></div>
       </div>
       <div class="kpi-grid">
-        ${kpi("Clienti registrati", totals.clients, "♙", "blue", "clients")}
-        ${kpi("Pratiche aperte", totals.practices, "▣", "violet", "practices")}
-        ${kpi("Valore pipeline", euros(totals.value), "€", "green", "practices")}
-        ${kpi("Attività aperte", totals.activities, "✓", "orange", "activities")}
+        ${kpi("Clienti registrati", totals.clients, "👥", "blue", "clients")}
+        ${kpi("Pratiche aperte", totals.practices, "📋", "violet", "practices")}
+        ${kpi("Valore pipeline", euros(totals.value), "💶", "green", "practices")}
+        ${kpi("Attività aperte", totals.activities, "✅", "orange", "activities")}
       </div>
       <section class="revenue-panel">
         <div class="panel-head"><div><span class="section-kicker">Fatturato</span><h3>Avanzamento verso l’obiettivo</h3></div><span class="revenue-target">Obiettivo ${euros(revenue.target || 0)}</span></div>
@@ -343,10 +349,61 @@
     return `${api.isFastMode() ? `<div class="planner-fast-notice"><strong>Modalità Rapida attiva</strong><span>Il Planner resta utilizzabile. Salvataggio e caricamento dei preventivi online rimangono temporaneamente disabilitati.</span></div>` : ""}<div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
   }
 
+  function documentLibraryKey() {
+    const session = api.getSession() || {};
+    return `SEEMAX_DOCUMENT_LIBRARY_V1_${session.username || "local"}`;
+  }
+
+  function documentLibrary() {
+    try {
+      const value = JSON.parse(localStorage.getItem(documentLibraryKey()) || "{}");
+      return { folders: Array.isArray(value.folders) ? value.folders : [], placements: value.placements && typeof value.placements === "object" ? value.placements : {} };
+    } catch (error) { return { folders: [], placements: {} }; }
+  }
+
+  function saveDocumentLibrary(value) {
+    localStorage.setItem(documentLibraryKey(), JSON.stringify(value));
+  }
+
+  function moveDocumentLocal(documentId, folderId) {
+    const library = documentLibrary();
+    if (folderId) library.placements[documentId] = folderId;
+    else delete library.placements[documentId];
+    saveDocumentLibrary(library);
+    heldDocumentId = "";
+    renderRoute();
+    toast(folderId ? "Documento spostato nella cartella." : "Documento spostato nell’archivio principale.");
+  }
+
+  function documentEmoji(document) {
+    const value = String(document.file_type || document.nome || "").toLowerCase();
+    if (value.includes("pdf")) return "📕";
+    if (/\.(png|jpe?g|webp|gif)$/.test(value) || value.includes("image")) return "🖼️";
+    if (/\.(xls|xlsx|csv)$/.test(value) || value.includes("sheet")) return "📊";
+    if (/\.(doc|docx)$/.test(value) || value.includes("word")) return "📝";
+    return "📄";
+  }
+
+  function openDocumentFolderModal() {
+    openModal("Nuova cartella", `<form id="documentFolderForm" class="form-grid"><label class="full">Nome della cartella<input name="folder_name" maxlength="60" required autofocus placeholder="Es. Contratti 2026"></label><p class="field-help full">La cartella organizza visivamente i documenti soltanto su questo dispositivo. I file nel Drive non vengono spostati.</p><div class="form-actions full"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Crea cartella</button></div></form>`, { kicker: "Archivio locale" });
+  }
+
   function renderDocuments() {
-    const rows = filterRows(state.data.documents, ["nome", "tipo", "pratica", "cliente", "note"]);
+    const allRows = filterRows(state.data.documents, ["nome", "tipo", "pratica", "cliente", "note"]);
+    const library = documentLibrary();
+    const currentFolder = library.folders.find((folder) => folder.id === state.documentFolderId);
+    if (state.documentFolderId && !currentFolder) state.documentFolderId = "";
+    const rows = allRows.filter((document) => String(library.placements[document.id] || "") === String(state.documentFolderId || ""));
     const uploadNote = api.isFastMode() ? `<p class="toolbar-note fast-upload-note">Caricamento file non disponibile in Modalità Rapida. Passa alla Modalità Standard per aggiungere documenti.</p>` : `<p class="toolbar-note">Carica PDF, immagini o file Office direttamente nell’archivio Seemax</p>`;
-    return `${viewToolbar("Carica documento", api.isFastMode() ? "" : "new-document", uploadNote)}<section class="panel"><div class="document-list">${rows.length ? rows.map((d) => `<article class="document-row"><span class="file-icon">${esc(String(d.file_type || d.nome || "FILE").includes("pdf") ? "PDF" : "FILE")}</span><div><strong>${esc(d.nome)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${d.url ? `<a class="btn soft" href="${esc(d.url)}" target="_blank" rel="noopener">Apri file ↗</a>` : `<span class="placeholder-pill">File non disponibile</span>`}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}">Modifica</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}">×</button></div></article>`).join("") : emptyState("Nessun documento", api.isFastMode() ? "Passa alla Modalità Standard per caricare il primo file." : "Carica il primo file dal tuo dispositivo.", api.isFastMode() ? "" : "Carica documento", "new-document")}</div></section>`;
+    const toolbar = `<div class="view-toolbar document-toolbar"><div>${uploadNote}</div><div class="document-toolbar-actions"><button class="btn ghost" data-action="new-document-folder">📁 Nuova cartella</button>${api.isFastMode() ? "" : `<button class="btn primary" data-action="new-document" data-folder-id="${esc(state.documentFolderId)}">＋ Carica documento</button>`}</div></div>`;
+    const breadcrumb = `<div class="document-breadcrumb"><button data-action="document-root" class="${state.documentFolderId ? "" : "active"}">🗂️ Documenti</button>${currentFolder ? `<span>›</span><strong>📁 ${esc(currentFolder.name)}</strong>` : ""}${heldDocumentId ? `<button class="cancel-document-move" data-action="cancel-document-move">✕ Annulla spostamento</button>` : `<small>Premi un file per 2 secondi e poi scegli una cartella.</small>`}</div>`;
+    const folders = !state.documentFolderId ? `<div class="document-folder-grid">${library.folders.map((folder) => {
+      const count = state.data.documents.filter((document) => library.placements[document.id] === folder.id).length;
+      return `<article class="document-folder ${heldDocumentId ? "awaiting-drop" : ""}" data-action="open-document-folder" data-folder-id="${esc(folder.id)}" data-document-folder="${esc(folder.id)}"><span>📁</span><div><strong>${esc(folder.name)}</strong><small>${count} ${count === 1 ? "elemento" : "elementi"}</small></div><button class="folder-delete" data-action="delete-document-folder" data-folder-id="${esc(folder.id)}" aria-label="Elimina cartella">×</button></article>`;
+    }).join("")}${library.folders.length ? "" : `<div class="folder-empty"><span>📂</span><p>Crea cartelle per organizzare visivamente i documenti.</p></div>`}</div>` : "";
+    const rootDrop = currentFolder ? `<div class="current-folder-head"><button class="btn ghost" data-action="document-root">← Archivio principale</button><div><span>📁</span><strong>${esc(currentFolder.name)}</strong><small>Trascina qui file esterni oppure documenti già caricati.</small></div></div>` : "";
+    const list = rows.length ? rows.map((d) => `<article class="document-row document-draggable ${heldDocumentId === d.id ? "picked-up" : ""}" draggable="true" data-document-drag="${esc(d.id)}"><span class="file-icon document-emoji">${documentEmoji(d)}</span><div><strong>${esc(d.nome)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${d.url ? `<a class="btn soft" href="${esc(d.url)}" target="_blank" rel="noopener">Apri file ↗</a>` : `<span class="placeholder-pill">File non disponibile</span>`}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}">Modifica</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}">×</button></div></article>`).join("") : emptyState("Cartella vuota", api.isFastMode() ? "Nessun documento presente." : "Carica o trascina qui il primo file.", api.isFastMode() ? "" : "Carica documento", "new-document");
+    return `${toolbar}${breadcrumb}${folders}<section class="panel document-drop-zone" data-document-folder="${esc(state.documentFolderId)}">${rootDrop}<div class="document-list">${list}</div></section>`;
   }
 
   function renderActivities() {
@@ -418,9 +475,9 @@
   function openPracticeTypeChooser(clientId) {
     const body = `<div class="practice-type-intro"><p>Scegli la tipologia da inserire. Il modulo mostrerà soltanto i dati necessari per quella pratica.</p></div>
       <div class="practice-type-grid">
-        <button type="button" class="practice-type-card purchase" data-action="choose-practice-type" data-type="ACQUISTO" data-client-id="${esc(clientId || "")}"><span>▣</span><strong>Pratica di acquisto</strong><small>Ordine per il cliente oppure intestato all’agente.</small></button>
-        <button type="button" class="practice-type-card rental" data-action="choose-practice-type" data-type="NOLEGGIO" data-client-id="${esc(clientId || "")}"><span>↻</span><strong>Pratica di noleggio</strong><small>Contratto Grenke da 24 a 60 mesi.</small></button>
-        <button type="button" class="practice-type-card leasing" data-action="choose-practice-type" data-type="LEASING" data-client-id="${esc(clientId || "")}"><span>€</span><strong>Pratica di leasing</strong><small>Leasing IFIS da 32 a 72 mesi.</small></button>
+        <button type="button" class="practice-type-card purchase" data-action="choose-practice-type" data-type="ACQUISTO" data-client-id="${esc(clientId || "")}"><span>🛒</span><strong>Pratica di acquisto</strong><small>Ordine per il cliente oppure intestato all’agente.</small></button>
+        <button type="button" class="practice-type-card rental" data-action="choose-practice-type" data-type="NOLEGGIO" data-client-id="${esc(clientId || "")}"><span>🔄</span><strong>Pratica di noleggio</strong><small>Contratto Grenke da 24 a 60 mesi.</small></button>
+        <button type="button" class="practice-type-card leasing" data-action="choose-practice-type" data-type="LEASING" data-client-id="${esc(clientId || "")}"><span>🏦</span><strong>Pratica di leasing</strong><small>Leasing IFIS da 32 a 72 mesi.</small></button>
       </div>`;
     openModal("Nuova pratica", body, { wide: true, kicker: "Scegli la tipologia", subtitle: "Acquisto, Noleggio operativo o Leasing" });
   }
@@ -465,7 +522,7 @@
     const addressType = String(record.indirizzo_installazione_tipo || (practiceType === "ACQUISTO" ? "PRESSO ALTRO INDIRIZZO" : "COME INDIRIZZO CLIENTE")).toUpperCase();
     const management = record.gestione_ledwall || "";
     const req = (name) => practiceRequired(practiceType, name);
-    const typeSummary = `<div class="practice-kind-banner ${practiceType.toLowerCase()} full"><span>${practiceType === "ACQUISTO" ? "▣" : practiceType === "NOLEGGIO" ? "↻" : "€"}</span><div><small>TIPOLOGIA PRATICA</small><strong>${esc(practiceType)}</strong></div>${record.id ? "" : `<button type="button" class="btn ghost" data-action="back-practice-types">Cambia tipologia</button>`}</div>
+    const typeSummary = `<div class="practice-kind-banner ${practiceType.toLowerCase()} full"><span>${practiceType === "ACQUISTO" ? "🛒" : practiceType === "NOLEGGIO" ? "🔄" : "🏦"}</span><div><small>TIPOLOGIA PRATICA</small><strong>${esc(practiceType)}</strong></div>${record.id ? "" : `<button type="button" class="btn ghost" data-action="back-practice-types">Cambia tipologia</button>`}</div>
       <input type="hidden" name="tipo_pratica" value="${esc(practiceType)}"><input type="hidden" name="finanziaria" value="${esc(finance)}">`;
     const purchaseDestination = practiceType !== "ACQUISTO" ? "" : `<fieldset class="practice-section full"><legend>Destinatario ordine ${requiredMark(req("destinatario_ordine"))}</legend>
       <div class="destination-grid">
@@ -716,14 +773,24 @@
     openModal(`Scheda tecnica ${p.nome}`, body, { wide: true, kicker: "Catalogo Seemax" });
   }
 
-  function openDocument(id) {
+  function openDocument(id, folderId = state.documentFolderId, droppedFile = null) {
     const r = state.data.documents.find((d) => d.id === id) || {};
     if (!id && api.isFastMode()) { toast("Il caricamento dei file è disponibile soltanto in Modalità Standard.", "danger"); return; }
+    if (!id) { pendingDocumentFolderId = folderId || ""; pendingDocumentFile = droppedFile || null; }
     const fileField = api.isFastMode()
       ? `<div class="full fast-upload-note">Il file non può essere sostituito mentre è attiva la Modalità Rapida.</div>`
       : `<label class="full upload-field">File dal dispositivo${r.url ? `<small>Il file attuale resta invariato se non ne selezioni uno nuovo.</small>` : `<small>Massimo 8 MB. Il file sarà archiviato nel Drive Seemax.</small>`}<input name="document_file" type="file" ${r.url ? "" : "required"} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt"></label>`;
     const fields = field("Nome documento", "nome", r.nome, { required: true, full: true }) + field("Tipo", "tipo", r.tipo || "Preventivo", { options: ["Preventivo", "Contratto", "Documento cliente", "Documento finanziaria", "Installazione", "Altro"] }) + field("Pratica", "practiceId", r.practiceId || "", { options: ["", ...state.data.practices.map((p) => p.id)] }) + fileField + field("Data", "data", r.data || new Date().toISOString().slice(0, 10), { type: "date" }) + field("Note", "note", r.note, { type: "textarea", full: true });
     openModal(r.id ? "Modifica documento" : "Nuovo documento", formShell("documents", r.id, fields), { wide: true, kicker: "Archivio documentale" });
+    if (!id && pendingDocumentFile) requestAnimationFrame(() => {
+      const form = document.querySelector(".entity-form[data-entity='documents']");
+      const input = form && form.elements.document_file;
+      if (!input) return;
+      const transfer = new DataTransfer();
+      transfer.items.add(pendingDocumentFile);
+      input.files = transfer.files;
+      if (!form.elements.nome.value) form.elements.nome.value = pendingDocumentFile.name;
+    });
   }
 
   function openActivity(id) {
@@ -935,6 +1002,13 @@
         }
       }
       if (saved.__notifications) { state.data.notifications = saved.__notifications; delete saved.__notifications; updateNotificationBell(); }
+      if (entity === "documents" && !form.dataset.id) {
+        const library = documentLibrary();
+        if (pendingDocumentFolderId) library.placements[saved.id] = pendingDocumentFolderId;
+        saveDocumentLibrary(library);
+        pendingDocumentFolderId = "";
+        pendingDocumentFile = null;
+      }
       replaceLocalEntity(entity, saved);
       setConnectionState();
       closeModal();
@@ -971,7 +1045,12 @@
     const label = ENTITY_LABELS[entity] || "elemento";
     if (!confirm(`Eliminare definitivamente questo ${label}?`)) return;
     setLoading(true, "Eliminazione…");
-    try { await api.remove(entity, id); state.data[entity] = (state.data[entity] || []).filter((item) => String(item.id || item.username) !== String(id)); updateLocalDashboard(); renderRoute(); toast(`${label} eliminato.`); }
+    try {
+      await api.remove(entity, id);
+      state.data[entity] = (state.data[entity] || []).filter((item) => String(item.id || item.username) !== String(id));
+      if (entity === "documents") { const library = documentLibrary(); delete library.placements[id]; saveDocumentLibrary(library); }
+      updateLocalDashboard(); renderRoute(); toast(`${label} eliminato.`);
+    }
     catch (error) { toast(error.message, "danger"); }
     finally { setLoading(false); }
   }
@@ -1070,7 +1149,7 @@
     if (q.length < 2) return;
     const clients = state.data.clients.filter((c) => [c.ragioneSociale, c.referente, c.piva].some((v) => String(v || "").toLowerCase().includes(q))).slice(0, 6);
     const practices = state.data.practices.filter((p) => [p.numero, p.cliente, p.titolo].some((v) => String(v || "").toLowerCase().includes(q))).slice(0, 8);
-    openModal("Risultati ricerca", `<div class="search-results"><h3>Pratiche</h3>${practices.length ? practices.map((p) => `<button data-action="edit-practice" data-id="${esc(p.id)}"><span>▣</span><div><strong>${esc(p.numero)} · ${esc(p.cliente)}</strong><small>${esc(p.titolo)}</small></div>${badge(p.stato)}</button>`).join("") : `<p>Nessuna pratica trovata.</p>`}<h3>Clienti</h3>${clients.length ? clients.map((c) => `<button data-action="edit-client" data-id="${esc(c.id)}"><span>♙</span><div><strong>${esc(c.ragioneSociale)}</strong><small>${esc(c.referente || c.citta || "")}</small></div></button>`).join("") : `<p>Nessun cliente trovato.</p>`}</div>`, { wide: true, kicker: `Ricerca: ${query}` });
+    openModal("Risultati ricerca", `<div class="search-results"><h3>Pratiche</h3>${practices.length ? practices.map((p) => `<button data-action="edit-practice" data-id="${esc(p.id)}"><span>📋</span><div><strong>${esc(p.numero)} · ${esc(p.cliente)}</strong><small>${esc(p.titolo)}</small></div>${badge(p.stato)}</button>`).join("") : `<p>Nessuna pratica trovata.</p>`}<h3>Clienti</h3>${clients.length ? clients.map((c) => `<button data-action="edit-client" data-id="${esc(c.id)}"><span>👥</span><div><strong>${esc(c.ragioneSociale)}</strong><small>${esc(c.referente || c.citta || "")}</small></div></button>`).join("") : `<p>Nessun cliente trovato.</p>`}</div>`, { wide: true, kicker: `Ricerca: ${query}` });
   }
 
   async function handleAction(action, id, data = {}) {
@@ -1080,7 +1159,25 @@
       "choose-practice-type": () => openPractice(null, data.clientId || "", data.type),
       "back-practice-types": () => openPracticeTypeChooser(),
       "new-product": () => openProduct(), "edit-product": () => openProduct(id), "product-tech": () => openProductTech(id), "delete-product": () => removeEntity("products", id),
-      "new-document": () => openDocument(), "edit-document": () => openDocument(id), "delete-document": () => removeEntity("documents", id),
+      "new-document": () => openDocument(null, data.folderId || state.documentFolderId), "edit-document": () => openDocument(id), "delete-document": () => removeEntity("documents", id),
+      "new-document-folder": openDocumentFolderModal,
+      "open-document-folder": () => {
+        if (heldDocumentId) moveDocumentLocal(heldDocumentId, data.folderId);
+        else { state.documentFolderId = data.folderId || ""; renderRoute(); }
+      },
+      "document-root": () => {
+        if (heldDocumentId) moveDocumentLocal(heldDocumentId, "");
+        else { state.documentFolderId = ""; renderRoute(); }
+      },
+      "cancel-document-move": () => { heldDocumentId = ""; renderRoute(); },
+      "delete-document-folder": () => {
+        const library = documentLibrary();
+        const folder = library.folders.find((item) => item.id === data.folderId);
+        if (!folder || !confirm(`Eliminare la cartella “${folder.name}”? I documenti torneranno nell’archivio principale.`)) return;
+        library.folders = library.folders.filter((item) => item.id !== data.folderId);
+        Object.keys(library.placements).forEach((documentId) => { if (library.placements[documentId] === data.folderId) delete library.placements[documentId]; });
+        saveDocumentLibrary(library); renderRoute(); toast("Cartella locale eliminata.");
+      },
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
       "close-modal": closeModal,
@@ -1130,6 +1227,64 @@
     if (event.target.id === "practiceDirection") { state.practiceDirection = event.target.value; state.practicePage = 1; renderRoute(); }
   });
 
+  document.addEventListener("pointerdown", (event) => {
+    const row = event.target.closest("[data-document-drag]");
+    if (!row || event.target.closest("button,a,input,select,textarea")) return;
+    clearTimeout(documentHoldTimer);
+    documentHoldStart = { x: event.clientX, y: event.clientY };
+    documentHoldTimer = setTimeout(() => {
+      heldDocumentId = row.dataset.documentDrag;
+      row.classList.add("picked-up");
+      document.querySelectorAll("[data-document-folder]").forEach((folder) => folder.classList.add("awaiting-drop"));
+      if (navigator.vibrate) navigator.vibrate(45);
+      toast("Documento selezionato: trascinalo o tocca una cartella.", "info");
+    }, 2000);
+  });
+
+  document.addEventListener("pointermove", (event) => {
+    if (!documentHoldStart || heldDocumentId) return;
+    if (Math.hypot(event.clientX - documentHoldStart.x, event.clientY - documentHoldStart.y) > 12) {
+      clearTimeout(documentHoldTimer); documentHoldStart = null;
+    }
+  });
+
+  ["pointerup", "pointercancel"].forEach((type) => document.addEventListener(type, () => {
+    clearTimeout(documentHoldTimer); documentHoldTimer = null; documentHoldStart = null;
+  }));
+
+  document.addEventListener("dragstart", (event) => {
+    const row = event.target.closest("[data-document-drag]");
+    if (!row || heldDocumentId !== row.dataset.documentDrag) { event.preventDefault(); return; }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/seemax-document", heldDocumentId);
+    row.classList.add("dragging");
+  });
+
+  document.addEventListener("dragover", (event) => {
+    const folder = event.target.closest("[data-document-folder]");
+    if (!folder) return;
+    event.preventDefault(); folder.classList.add("drag-over");
+  });
+
+  document.addEventListener("dragleave", (event) => {
+    const folder = event.target.closest("[data-document-folder]");
+    if (folder) folder.classList.remove("drag-over");
+  });
+
+  document.addEventListener("drop", (event) => {
+    const folder = event.target.closest("[data-document-folder]");
+    if (!folder) return;
+    event.preventDefault();
+    const folderId = folder.dataset.documentFolder || "";
+    if (event.dataTransfer.files && event.dataTransfer.files[0]) {
+      heldDocumentId = "";
+      openDocument(null, folderId, event.dataTransfer.files[0]);
+      return;
+    }
+    const documentId = event.dataTransfer.getData("text/seemax-document") || heldDocumentId;
+    if (documentId) moveDocumentLocal(documentId, folderId);
+  });
+
   document.addEventListener("submit", async (event) => {
     if (event.target.id === "loginForm") {
       event.preventDefault();
@@ -1138,6 +1293,16 @@
       try { await api.login($("loginUsername").value, $("loginKey").value); await showApp(); }
       catch (error) { $("loginError").textContent = error.message; }
       finally { setLoading(false); }
+      return;
+    }
+    if (event.target.id === "documentFolderForm") {
+      event.preventDefault();
+      const name = String(event.target.elements.folder_name.value || "").trim();
+      if (!name) return;
+      const library = documentLibrary();
+      library.folders.push({ id: `folder-${Date.now().toString(36)}`, name, createdAt: new Date().toISOString() });
+      saveDocumentLibrary(library);
+      closeModal(); renderRoute(); toast("Cartella creata sul dispositivo.");
       return;
     }
     if (event.target.matches(".entity-form")) { event.preventDefault(); await saveEntity(event.target); return; }
@@ -1167,6 +1332,13 @@
   });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { closeModal(); $("sidebar").classList.remove("open"); } });
   window.addEventListener("hashchange", () => { if (api.getSession()) go(location.hash.replace("#", "") || "dashboard", false); });
+  window.addEventListener("seemax:practice-created", async (event) => {
+    await loadAll();
+    state.practiceQuery = String((event.detail && event.detail.practice && event.detail.practice.numero) || "");
+    state.practicePage = 1;
+    go("practices");
+    toast("Pratica inserita: elenco aggiornato automaticamente.");
+  });
   window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); installPrompt = event; $("installAppButton").classList.remove("is-hidden"); });
   $("installAppButton").addEventListener("click", async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $("installAppButton").classList.add("is-hidden"); });
 
