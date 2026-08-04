@@ -10,11 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.6.2";
-var RUNTIME_DB_CACHE_ = null;
-var RUNTIME_SHEET_CACHE_ = {};
-var RUNTIME_TABLE_CACHE_ = {};
-var RUNTIME_DEFERRED_EMAILS_ = [];
+var SEEMAX_VERSION = "seemax-management-suite-1.9.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -26,12 +22,12 @@ var ENTITY_SHEETS = {
 };
 
 var SHEET_SCHEMAS = {
-  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id", "record_version", "request_token", "aggiornato_da"],
-  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
-  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
+  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
+  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "aggiornatoIl", "creatoIl"],
+  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
+  ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
@@ -55,7 +51,6 @@ function setupSeemaxDatabase() {
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
-  managementDocumentsFolder_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
   styleSheets_();
@@ -72,22 +67,12 @@ function upgradeSeemaxV11() {
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
-  managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.2 · Layout Grenke e IFIS");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v1.9.0");
   styleSheets_();
-  return "SEEMAX v2.6.2 configurato: area finanziaria Grenke e IFIS estesa.";
-}
-
-function upgradeSeemaxV24() {
-  var ss = db_();
-  Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.2 · Layout Grenke e IFIS");
-  styleSheets_();
-  return "SEEMAX v2.6.2 configurato: protezione multiutente e area finanziaria Grenke e IFIS estesa.";
+  return "SEEMAX v1.9.0 configurato: flussi Acquisto, Noleggio e Leasing con campi obbligatori configurabili.";
 }
 
 function doGet(e) {
-  resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
   var callback = sanitizeCallback_(p.callback);
   try {
@@ -100,7 +85,6 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
   var requestId = String(p.requestId || "");
   var result;
@@ -119,7 +103,6 @@ function routeGet_(action, p) {
   switch (action) {
     case "ping": return { ok: true, version: SEEMAX_VERSION, serverTime: new Date().toISOString() };
     case "management_login": return managementLogin_(p);
-    case "management_health": return managementHealth_(p);
     case "management_bootstrap": return managementBootstrap_(p);
     case "management_list": return managementList_(p);
     case "management_upsert": return managementUpsert_(p);
@@ -130,7 +113,6 @@ function routeGet_(action, p) {
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
     case "management_upload_document": return managementUploadDocument_(p);
     case "management_upload_status": return managementUploadStatus_(p);
-    case "management_update_practice_documents": return managementUpdatePracticeDocuments_(p);
     case "management_verify_vat": return managementVerifyVat_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
@@ -147,62 +129,24 @@ function routeGet_(action, p) {
 /* ========================= MANAGEMENT APP ========================= */
 
 function managementLogin_(p) {
-  return withMutationLock_(function () { return managementLoginLocked_(p); });
-}
-
-function managementLoginLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   touchLogin_(user.username);
-  return { ok: true, user: publicUser_(user), version: SEEMAX_VERSION };
+  return { ok: true, user: publicUser_(user) };
 }
 
 function managementBootstrap_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
-  var products = rowsToObjects_(sheet_("PRODOTTI_LED"));
-  var allPractices = rowsToObjects_(sheet_("PRATICHE"));
-  var allClients = rowsToObjects_(sheet_("CLIENTI"));
-  var allUsers = rowsToObjects_(sheet_("AGENTI"));
-  var linkedClientIds = {};
-  allPractices.forEach(function (practice) { if (practice.clientId) linkedClientIds[String(practice.clientId)] = true; });
-  var clients = allClients.filter(function (row) { return canAccessClient_(row, user); }).map(function (row) {
-    row.ha_pratiche_collegate = linkedClientIds[String(row.id)] ? "SI" : "NO";
-    row.puo_modificare = canEditClient_(row, user) ? "SI" : "NO";
-    return row;
-  });
-  var practices = isAdmin_(user) ? allPractices : allPractices.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
-  var allDocuments = rowsToObjects_(sheet_("DOCUMENTI"));
-  var documents = isAdmin_(user) ? allDocuments : allDocuments.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
+  var products = listEntity_("products", user);
+  var clients = listEntity_("clients", user);
+  var practices = listEntity_("practices", user);
+  var documents = listEntity_("documents", user);
   var activities = [];
-  var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(user)];
+  var users = isAdmin_(user) ? listEntity_("users", user).map(publicUser_) : [publicUser_(user)];
   var settings = getSettings_();
   var notifications = listNotificationsForUser_(user);
   var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, settings: settings, notifications: notifications };
-  data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
+  data.dashboard = dashboard_(data, user);
   return { ok: true, data: data, user: publicUser_(user), version: SEEMAX_VERSION };
-}
-
-function managementHealth_(p) {
-  var started = new Date().getTime();
-  var user = authenticate_(p.agent_username, p.agent_key);
-  var ss = db_();
-  var required = ["AGENTI", "CLIENTI", "PRATICHE", "PRODOTTI_LED", "DOCUMENTI", "IMPOSTAZIONI"];
-  var sheets = {};
-  var missing = [];
-  required.forEach(function (name) {
-    var current = ss.getSheetByName(name);
-    if (!current) missing.push(name);
-    else sheets[name] = Math.max(0, current.getLastRow() - 1);
-  });
-  return {
-    ok: missing.length === 0,
-    version: SEEMAX_VERSION,
-    database_name: ss.getName(),
-    spreadsheet_suffix: String(ss.getId()).slice(-6),
-    sheets: sheets,
-    missing_sheets: missing,
-    user: user.username,
-    elapsed_ms: new Date().getTime() - started
-  };
 }
 
 function managementList_(p) {
@@ -214,10 +158,6 @@ function managementList_(p) {
 }
 
 function managementUpsert_(p) {
-  return withMutationLock_(function () { return managementUpsertLocked_(p); });
-}
-
-function managementUpsertLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var entity = String(p.entity || "");
   assertWritePermission_(entity, user);
@@ -273,7 +213,7 @@ function managementUpsertLocked_(p) {
       if (existingUser) payload.chiave_id_agente = existingUser.chiave_id_agente;
     }
   }
-  var row = upsertEntity_(entity, payload, user);
+  var row = upsertEntity_(entity, payload);
   log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
   return { ok: true, row: entity === "users" ? publicUser_(row) : row };
 }
@@ -290,7 +230,9 @@ function managementUploadDocument_(p) {
     if (!raw) throw new Error("File mancante.");
     var bytes = Utilities.base64Decode(raw);
     if (bytes.length > 8 * 1024 * 1024) throw new Error("Il file supera il limite di 8 MB.");
-    var folder = managementDocumentsFolder_();
+    var folderName = "SEEMAX MANAGEMENT DOCUMENTI";
+    var folders = DriveApp.getFoldersByName(folderName);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
     var file = folder.createFile(Utilities.newBlob(bytes, mimeType, filename));
     file.setDescription("Caricato da " + (user.nome_visualizzato || user.username) + " tramite Seemax Management Suite");
     try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (sharingError) { /* alcuni domini Workspace impediscono la condivisione pubblica */ }
@@ -301,19 +243,6 @@ function managementUploadDocument_(p) {
     cacheUploadResult_(requestId, { ok: false, error: String(error && error.message ? error.message : error) });
     throw error;
   }
-}
-
-function managementDocumentsFolder_() {
-  var properties = PropertiesService.getScriptProperties();
-  var cachedId = String(properties.getProperty("MANAGEMENT_DOCUMENTS_FOLDER_ID") || "");
-  if (cachedId) {
-    try { return DriveApp.getFolderById(cachedId); } catch (error) { properties.deleteProperty("MANAGEMENT_DOCUMENTS_FOLDER_ID"); }
-  }
-  var folderName = "SEEMAX MANAGEMENT DOCUMENTI";
-  var folders = DriveApp.getFoldersByName(folderName);
-  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-  properties.setProperty("MANAGEMENT_DOCUMENTS_FOLDER_ID", folder.getId());
-  return folder;
 }
 
 function managementVerifyVat_(p) {
@@ -425,29 +354,7 @@ function managementUploadStatus_(p) {
   return { ok: true, completed: !!raw, upload: raw ? parseJson_(raw, {}) : null };
 }
 
-function managementUpdatePracticeDocuments_(p) {
-  return withMutationLock_(function () { return managementUpdatePracticeDocumentsLocked_(p); });
-}
-
-function managementUpdatePracticeDocumentsLocked_(p) {
-  var user = authenticate_(p.agent_username, p.agent_key);
-  var practiceId = String(p.practice_id || "");
-  var practice = findRowObject_("PRATICHE", "id", practiceId);
-  if (!practice) throw new Error("Pratica non trovata.");
-  if (!isAdmin_(user) && String(practice.agent_username || "") !== String(user.username)) throw new Error("Non sei autorizzato ad aggiornare questa pratica.");
-  practice.documenti_caricati_json = String(p.documenti_caricati_json || "[]");
-  practice.expected_record_version = Number(practice.record_version || 0);
-  prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
-  var saved = upsertObject_("PRATICHE", "id", practice.id, practice);
-  log_(user, "UPDATE_DOCUMENTS", "practices", practice.id, "Riepilogo allegati pratica aggiornato");
-  return { ok: true, row: saved };
-}
-
 function managementCreateFromQuote_(p) {
-  return withMutationLock_(function () { return managementCreateFromQuoteLocked_(p); });
-}
-
-function managementCreateFromQuoteLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var payload = parseJson_(p.payload, {});
   var type = String(payload.tipo_pratica || "").toUpperCase();
@@ -503,9 +410,7 @@ function managementCreateFromQuoteLocked_(p) {
     creatoIl: new Date().toISOString(),
     aggiornatoIl: new Date().toISOString()
   };
-  var version = prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
-  if (version.duplicate) practice = version.duplicate;
-  else practice = upsertObject_("PRATICHE", "id", practice.id, practice);
+  practice = upsertObject_("PRATICHE", "id", practice.id, practice);
   log_(user, "CREATE_FROM_QUOTE", "practices", practice.id, "Pratica " + type + " creata dal S.Q.P. preventivo " + practice.preventivo_id);
   return { ok: true, practice: practice, client: client };
 }
@@ -523,12 +428,10 @@ function requiredDocumentsForPractice_(type) {
 
 function findClientForQuote_(payload, user) {
   var rows = rowsToObjects_(sheet_("CLIENTI")).filter(function (row) { return canAccessClient_(row, user); });
-  var selectedId = String(payload.cliente_id_gestionale || "").trim();
-  var selected = selectedId ? rows.filter(function (row) { return String(row.id || "") === selectedId; })[0] : null;
   var vat = normalizeKey_(payload.cliente_piva_cf);
   var email = normalizeKey_(payload.cliente_email);
   var company = normalizeKey_(payload.cliente_azienda || payload.cliente_referente);
-  var found = selected || rows.filter(function (row) {
+  var found = rows.filter(function (row) {
     if (vat && normalizeKey_(row.piva) === vat) return true;
     if (email && normalizeKey_(row.email) === email) return true;
     return company && normalizeKey_(row.ragioneSociale) === company;
@@ -546,8 +449,7 @@ function findClientForQuote_(payload, user) {
   record.agent_username = record.agent_username || user.username;
   record.creato_da_username = record.creato_da_username || record.agent_username || user.username;
   record.creato_da_nome = record.creato_da_nome || userDisplayName_(user);
-  record.expected_record_version = Number(record.record_version || 0);
-  prepareVersionedRecord_("CLIENTI", "id", record.id, record, user);
+  record.aggiornatoIl = new Date().toISOString();
   return upsertObject_("CLIENTI", "id", record.id, record);
 }
 
@@ -578,23 +480,21 @@ function nextPracticeIdentifier_(user) {
 }
 
 function upsertPracticeWithInventory_(payload, user) {
-  if (String(payload.nuova_pratica || "NO").toUpperCase() === "SI") {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (String(payload.nuova_pratica || "NO").toUpperCase() === "SI") {
       payload.numero = nextPracticeIdentifier_(user);
       payload.id = "PR-" + payload.numero;
       delete payload.nuova_pratica;
-  }
-  if (!payload.numero || String(payload.numero).toUpperCase() === "AUTO") payload.numero = nextPracticeIdentifier_(user);
-  payload.id = payload.id || "PR-" + payload.numero;
-  if (!payload.id) payload.id = uid_("pra");
-  var version = prepareVersionedRecord_("PRATICHE", "id", payload.id, payload, user);
-  if (version.duplicate) return version.duplicate;
-  var existing = version.existing;
+    }
+    if (!payload.numero || String(payload.numero).toUpperCase() === "AUTO") payload.numero = nextPracticeIdentifier_(user);
+    payload.id = payload.id || "PR-" + payload.numero;
+    if (!payload.id) payload.id = uid_("pra");
+    var existing = findRowObject_("PRATICHE", "id", payload.id);
     var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
     var nextStatus = normalizePracticeStatus_(payload.stato || existing && existing.stato || "Inserita");
     payload.stato = nextStatus;
-    if (nextStatus === "Completata") {
-      payload.completataIl = existing && String(existing.stato || "") === "Completata" && existing.completataIl ? existing.completataIl : new Date().toISOString();
-    } else if (existing) payload.completataIl = existing.completataIl || "";
     payload.archiviata = nextStatus === "Bocciata" ? "SI" : "NO";
     payload.archiviata_il = nextStatus === "Bocciata" ? (existing && existing.archiviata_il || new Date().toISOString()) : "";
     var inferredType = String(payload.finanziaria || existing && existing.finanziaria || "") === "Grenke" ? "NOLEGGIO" : (String(payload.finanziaria || existing && existing.finanziaria || "") === "IFIS" ? "LEASING" : "ACQUISTO");
@@ -623,7 +523,8 @@ function upsertPracticeWithInventory_(payload, user) {
       payload.magazzino_applicato_il = existing.magazzino_applicato_il || "";
       payload.magazzino_stornato_il = existing.magazzino_stornato_il || "";
     }
-  return upsertObject_("PRATICHE", "id", payload.id, payload);
+    return upsertObject_("PRATICHE", "id", payload.id, payload);
+  } finally { lock.releaseLock(); }
 }
 
 function normalizePracticeStatus_(status) {
@@ -656,29 +557,16 @@ function listNotificationsForUser_(user) {
 }
 
 function managementMarkNotificationsRead_(p) {
-  return withMutationLock_(function () { return managementMarkNotificationsReadLocked_(p); });
-}
-
-function managementMarkNotificationsReadLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
-  var sheet = sheet_("NOTIFICHE");
-  var table = tableData_(sheet);
-  var headers = table.headers;
-  var recipientIndex = headers.indexOf("recipient_username"), readIndex = headers.indexOf("letta"), readAtIndex = headers.indexOf("letta_il");
+  var rows = listNotificationsForUser_(user);
   var now = new Date().toISOString();
-  var changed = false;
-  for (var rowIndex = 1; rowIndex < table.values.length; rowIndex++) {
-    var row = table.values[rowIndex];
-    if (String(row[recipientIndex] || "") === String(user.username || "") && String(row[readIndex] || "NO").toUpperCase() !== "SI") {
-      row[readIndex] = "SI";
-      if (readAtIndex >= 0) row[readAtIndex] = now;
-      changed = true;
+  rows.forEach(function (row) {
+    if (String(row.letta || "NO").toUpperCase() !== "SI") {
+      row.letta = "SI";
+      row.letta_il = now;
+      upsertObject_("NOTIFICHE", "id", row.id, row);
     }
-  }
-  if (changed) {
-    sheet.getRange(2, 1, table.values.length - 1, headers.length).setValues(table.values.slice(1));
-    refreshTableObjects_(table);
-  }
+  });
   return { ok: true, notifications: listNotificationsForUser_(user) };
 }
 
@@ -713,13 +601,13 @@ function createPracticeStatusNotification_(before, after, actor) {
         emailText = "Gentile " + recipientName + ", ti informiamo che la pratica " + practiceId + " intestata a " + clientName + " è stata temporaneamente sospesa.\n\nRiceverai una nuova comunicazione quando lo stato della pratica verrà aggiornato.";
       }
       if (emailText) {
-        RUNTIME_DEFERRED_EMAILS_.push({ actor: actor, notificationId: id, message: {
+        MailApp.sendEmail({
           to: email,
           subject: subject,
           name: "Seemax Management Suite",
           body: emailText,
           htmlBody: "<p>" + escapeHtml_(emailText).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>") + "</p>"
-        } });
+        });
       }
     } catch (error) { log_(actor, "EMAIL_NOTIFICATION_ERROR", "notifications", id, String(error && error.message || error)); }
   }
@@ -746,8 +634,7 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
     var delta = direction * Number(line.quantita || 0);
     var after = before + delta;
     product.giacenza_attuale = after;
-    product.expected_record_version = Number(product.record_version || 0);
-    prepareVersionedRecord_("PRODOTTI_LED", "id", product.id, product, user);
+    product.aggiornatoIl = new Date().toISOString();
     upsertObject_("PRODOTTI_LED", "id", product.id, product);
     var movementId = uid_("mov");
     upsertObject_("MOVIMENTI_MAGAZZINO", "id", movementId, {
@@ -835,21 +722,11 @@ function canonicalProductId_(value, cabX, cabY) {
 function normalizeKey_(value) { return String(value || "").trim().toLowerCase().replace(/\s+/g, " "); }
 
 function managementRemove_(p) {
-  return withMutationLock_(function () { return managementRemoveLocked_(p); });
-}
-
-function managementRemoveLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var entity = String(p.entity || "");
   assertWritePermission_(entity, user);
   var id = String(p.id || "");
   if (!id) throw new Error("ID mancante.");
-  var sheetName = ENTITY_SHEETS[entity];
-  var idField = entity === "users" ? "username" : "id";
-  var currentRecord = sheetName ? findRowObject_(sheetName, idField, id) : null;
-  var currentVersion = Number(currentRecord && currentRecord.record_version || 0);
-  var expectedVersion = Number(p.expected_record_version || 0);
-  if (currentRecord && currentVersion > 0 && currentVersion !== expectedVersion) throw new Error("CONFLICT_RECORD: l'elemento è stato modificato prima dell'eliminazione.");
   if (entity === "users" && id === user.username) throw new Error("Non puoi eliminare l'account attualmente collegato.");
   if (entity === "practices") {
     var practice = findRowObject_("PRATICHE", "id", id);
@@ -873,22 +750,12 @@ function managementSettings_(p) {
 }
 
 function managementSaveSettings_(p) {
-  return withMutationLock_(function () { return managementSaveSettingsLocked_(p); });
-}
-
-function managementSaveSettingsLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
   var values = parseJson_(p.payload, {});
-  var currentSettings = getSettings_();
-  var currentRevision = Number(currentSettings.settings_revision || 0);
-  var expectedRevision = Number(values.expected_settings_revision || 0);
-  if (currentRevision > 0 && expectedRevision !== currentRevision) throw new Error("CONFLICT_RECORD: le impostazioni sono state aggiornate da un altro amministratore.");
-  delete values.expected_settings_revision;
-  values.settings_revision = currentRevision + 1;
-  var settings = upsertSettingsBatch_(values, "Aggiornato da Management Suite");
+  Object.keys(values).forEach(function (key) { setSetting_(key, values[key], "Aggiornato da Management Suite"); });
   log_(user, "UPDATE", "settings", "IMPOSTAZIONI", "Impostazioni generali aggiornate");
-  return { ok: true, settings: settings };
+  return { ok: true, settings: getSettings_() };
 }
 
 function listEntity_(entity, user) {
@@ -912,13 +779,11 @@ function listEntity_(entity, user) {
   return rows;
 }
 
-function upsertEntity_(entity, record, user) {
+function upsertEntity_(entity, record) {
   var sheetName = ENTITY_SHEETS[entity];
   var idField = entity === "users" ? "username" : "id";
   if (!sheetName) throw new Error("Entità non supportata.");
   if (!record[idField]) record[idField] = uid_(entity.substring(0, 3));
-  var version = prepareVersionedRecord_(sheetName, idField, String(record[idField]), record, user);
-  if (version.duplicate) return version.duplicate;
   return upsertObject_(sheetName, idField, String(record[idField]), record);
 }
 
@@ -926,7 +791,7 @@ function removeEntity_(entity, id, user) {
   var sheetName = ENTITY_SHEETS[entity];
   var idField = entity === "users" ? "username" : "id";
   var sheet = sheet_(sheetName);
-  var data = tableData_(sheet).values;
+  var data = sheet.getDataRange().getValues();
   if (!data.length) return false;
   var headers = data[0].map(String);
   var idIndex = headers.indexOf(idField);
@@ -935,14 +800,13 @@ function removeEntity_(entity, id, user) {
     if (String(data[i][idIndex]) === String(id)) {
       if (!isAdmin_(user) && agentIndex >= 0 && data[i][agentIndex] && String(data[i][agentIndex]) !== String(user.username)) throw new Error("Record non autorizzato.");
       sheet.deleteRow(i + 1);
-      invalidateTable_(sheetName);
       return true;
     }
   }
   return false;
 }
 
-function dashboard_(data, user, allPracticeRows, allClientRows, allUserRows) {
+function dashboard_(data, user) {
   var practices = data.practices || [];
   var activities = data.activities || [];
   var open = practices.filter(function (p) { return ["Bocciata", "Completata"].indexOf(String(p.stato)) < 0; });
@@ -951,7 +815,7 @@ function dashboard_(data, user, allPracticeRows, allClientRows, allUserRows) {
     var rows = practices.filter(function (p) { return String(p.stato) === status; });
     return { status: status, count: rows.length, value: rows.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0) };
   });
-  var allPractices = allPracticeRows || rowsToObjects_(sheet_("PRATICHE"));
+  var allPractices = rowsToObjects_(sheet_("PRATICHE"));
   var completedAll = allPractices.filter(function (p) { return String(p.stato) === "Completata"; });
   var completedPersonal = completedAll.filter(function (p) { return String(p.agent_username || "") === String(user.username || ""); });
   var target = Number((data.settings || {}).obiettivo_fatturato || 0);
@@ -964,107 +828,8 @@ function dashboard_(data, user, allPracticeRows, allClientRows, allUserRows) {
     },
     recentPractices: practices.slice().sort(function (a, b) { return String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || "")); }).slice(0, 5),
     nextActivities: activities.filter(function (a) { return String(a.stato) !== "Completata"; }).sort(function (a, b) { return String(a.scadenza || "").localeCompare(String(b.scadenza || "")); }).slice(0, 6),
-    pipeline: pipeline,
-    agentOfMonth: agentOfMonth_(allPractices, allClientRows || rowsToObjects_(sheet_("CLIENTI")), user, allUserRows)
+    pipeline: pipeline
   };
-}
-
-function practiceCompletionDate_(practice) {
-  var raw = practice.completataIl || practice.aggiornatoIl || practice.creatoIl || "";
-  var date = raw ? new Date(raw) : null;
-  return date && !isNaN(date.getTime()) ? date : null;
-}
-
-function monthKey_(date) {
-  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
-}
-
-function monthLabel_(key) {
-  var parts = String(key).split("-");
-  var months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
-  return (months[Number(parts[1]) - 1] || key) + " " + parts[0];
-}
-
-function agentOfMonth_(practices, clients, currentUser, userRows) {
-  var completed = (practices || []).filter(function (practice) {
-    return String(practice.stato || "") === "Completata" && practiceCompletionDate_(practice);
-  });
-  var users = {};
-  (userRows || rowsToObjects_(sheet_("AGENTI"))).forEach(function (row) { users[String(row.username || "")] = row.nome_visualizzato || row.username; });
-  var grouped = {};
-  completed.forEach(function (practice) {
-    var date = practiceCompletionDate_(practice);
-    var key = monthKey_(date);
-    var username = String(practice.agent_username || practice.agente || "Non assegnato");
-    var groupKey = key + "|" + username;
-    if (!grouped[groupKey]) grouped[groupKey] = { period: key, agent_username: username, agent: users[username] || practice.agente || username, total: 0, count: 0, practices: [] };
-    grouped[groupKey].total += Number(practice.valore || 0);
-    grouped[groupKey].count += 1;
-    grouped[groupKey].practices.push({ id: practice.numero || practice.id || "—", client: practice.cliente || "—", type: String(practice.tipo_pratica || "ACQUISTO").toUpperCase(), value: Number(practice.valore || 0) });
-  });
-  var byMonth = {};
-  Object.keys(grouped).forEach(function (key) {
-    var row = grouped[key];
-    row.practices.sort(function (a, b) { return b.value - a.value; });
-    row.topPractice = row.practices[0] || null;
-    if (!byMonth[row.period]) byMonth[row.period] = [];
-    byMonth[row.period].push(row);
-  });
-  var history = Object.keys(byMonth).sort().reverse().map(function (period) {
-    var ranking = byMonth[period].sort(function (a, b) { return b.total - a.total || b.count - a.count || String(a.agent).localeCompare(String(b.agent)); });
-    var winner = ranking[0];
-    return { period: period, label: monthLabel_(period), agent: winner.agent, agent_username: winner.agent_username, total: winner.total, count: winner.count, topPractice: winner.topPractice };
-  });
-  var now = new Date();
-  var previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  var previousKey = monthKey_(previous);
-  var referenceCompleted = completed.filter(function (practice) { return monthKey_(practiceCompletionDate_(practice)) === previousKey; });
-  var types = ["ACQUISTO", "NOLEGGIO", "LEASING"];
-  var leaders = {};
-  types.concat(["COMPLESSIVO"]).forEach(function (type) {
-    var totals = {};
-    referenceCompleted.filter(function (practice) { return type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type; }).forEach(function (practice) {
-      var username = String(practice.agent_username || practice.agente || "Non assegnato");
-      if (!totals[username]) totals[username] = { agent: users[username] || practice.agente || username, total: 0, count: 0 };
-      totals[username].total += Number(practice.valore || 0);
-      totals[username].count += 1;
-    });
-    leaders[type] = Object.keys(totals).map(function (username) { var value = totals[username]; value.agent_username = username; return value; }).sort(function (a, b) { return b.total - a.total || b.count - a.count; })[0] || null;
-    if (leaders[type]) {
-      var leaderPractices = referenceCompleted.filter(function (practice) { return String(practice.agent_username || practice.agente || "Non assegnato") === leaders[type].agent_username && (type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type); }).sort(function (a, b) { return Number(b.valore || 0) - Number(a.valore || 0); });
-      var leaderPractice = leaderPractices[0];
-      leaders[type].topPractice = leaderPractice ? { id: leaderPractice.numero || leaderPractice.id || "—", client: leaderPractice.cliente || "—", value: Number(leaderPractice.valore || 0) } : null;
-    }
-  });
-  var award = history.filter(function (row) { return row.period === previousKey; })[0] || null;
-  var username = String(currentUser && currentUser.username || "");
-  var ownCompleted = completed.filter(function (practice) { return String(practice.agent_username || "") === username; });
-  var ownPractices = (practices || []).filter(function (practice) { return String(practice.agent_username || "") === username; });
-  var ownClients = (clients || []).filter(function (client) { return String(client.creato_da_username || client.agent_username || "") === username; });
-  var ownWinningPeriods = history.filter(function (row) { return String(row.agent_username || "") === username; }).map(function (row) { return row.period; }).sort();
-  var maxStreak = 0, streak = 0, previousIndex = null;
-  ownWinningPeriods.forEach(function (period) {
-    var parts = period.split("-");
-    var index = Number(parts[0]) * 12 + Number(parts[1]);
-    streak = previousIndex !== null && index === previousIndex + 1 ? streak + 1 : 1;
-    maxStreak = Math.max(maxStreak, streak); previousIndex = index;
-  });
-  var countType = function (type) { return ownPractices.filter(function (practice) { return String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type; }).length; };
-  var maxValue = ownCompleted.reduce(function (max, practice) { return Math.max(max, Number(practice.valore || 0)); }, 0);
-  var ownRevenue = ownCompleted.reduce(function (sum, practice) { return sum + Number(practice.valore || 0); }, 0);
-  var achievements = [
-    { id: "month_1", icon: "🏆", title: "Agente del mese", description: "Conquista il primo posto in un mese.", current: ownWinningPeriods.length, target: 1 },
-    { id: "month_streak_3", icon: "👑", title: "Tripletta d’oro", description: "Agente del mese per 3 mesi consecutivi.", current: maxStreak, target: 3 },
-    { id: "practice_50k", icon: "💎", title: "Pratica Elite", description: "Completa una pratica da almeno 50.000 €.", current: maxValue, target: 50000, currency: true },
-    { id: "practice_100k", icon: "🚀", title: "Pratica Legend", description: "Completa una pratica da almeno 100.000 €.", current: maxValue, target: 100000, currency: true },
-    { id: "clients_10", icon: "🤝", title: "Network Builder", description: "Crea 10 clienti.", current: ownClients.length, target: 10 },
-    { id: "purchase_5", icon: "🛒", title: "Specialista Acquisto", description: "Inserisci 5 pratiche di acquisto.", current: countType("ACQUISTO"), target: 5 },
-    { id: "rental_5", icon: "🔄", title: "Specialista Noleggio", description: "Inserisci 5 pratiche di noleggio.", current: countType("NOLEGGIO"), target: 5 },
-    { id: "leasing_5", icon: "🏦", title: "Specialista Leasing", description: "Inserisci 5 pratiche di leasing.", current: countType("LEASING"), target: 5 },
-    { id: "completed_10", icon: "✅", title: "Closer", description: "Completa 10 pratiche.", current: ownCompleted.length, target: 10 },
-    { id: "revenue_250k", icon: "🌟", title: "Quarto di milione", description: "Raggiungi 250.000 € di fatturato completato.", current: ownRevenue, target: 250000, currency: true }
-  ].map(function (achievement) { achievement.unlocked = Number(achievement.current || 0) >= achievement.target; return achievement; });
-  return { currentPeriod: monthKey_(now), awardPeriod: previousKey, referenceLabel: monthLabel_(previousKey), award: award, history: history, leaders: leaders, isCurrentUserWinner: !!award && String(award.agent_username || "") === username, achievements: achievements };
 }
 
 /* ========================= QUOTATION PLANNER ========================= */
@@ -1149,10 +914,6 @@ function loadQuotePublic_(p) {
 }
 
 function deleteQuoteAgent_(p) {
-  return withMutationLock_(function () { return deleteQuoteAgentLocked_(p); });
-}
-
-function deleteQuoteAgentLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var row = findRowObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", p.id_preventivo);
   if (!row || row.deleted_at) throw new Error("Preventivo non trovato.");
@@ -1167,80 +928,18 @@ function deleteQuoteAgentLocked_(p) {
 /* ========================= DATABASE HELPERS ========================= */
 
 function db_() {
-  if (RUNTIME_DB_CACHE_) return RUNTIME_DB_CACHE_;
   var id = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
-  if (id) { RUNTIME_DB_CACHE_ = SpreadsheetApp.openById(id); return RUNTIME_DB_CACHE_; }
+  if (id) return SpreadsheetApp.openById(id);
   var active = SpreadsheetApp.getActiveSpreadsheet();
   if (!active) throw new Error("Database non inizializzato. Esegui setupSeemaxDatabase().");
   PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", active.getId());
-  RUNTIME_DB_CACHE_ = active;
-  return RUNTIME_DB_CACHE_;
-}
-
-function resetRuntimeCaches_() {
-  RUNTIME_DB_CACHE_ = null;
-  RUNTIME_SHEET_CACHE_ = {};
-  RUNTIME_TABLE_CACHE_ = {};
-  RUNTIME_DEFERRED_EMAILS_ = [];
-}
-
-function withMutationLock_(callback) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(45000);
-  var result;
-  var failure = null;
-  try {
-    /* Una richiesta può avere letto dati prima di ottenere il lock: tutte le
-       tabelle vengono quindi rilette dentro la sezione critica. */
-    RUNTIME_TABLE_CACHE_ = {};
-    result = callback();
-  } catch (error) {
-    failure = error;
-  } finally {
-    lock.releaseLock();
-  }
-  if (failure) throw failure;
-  flushDeferredEmails_();
-  return result;
-}
-
-function flushDeferredEmails_() {
-  var queue = RUNTIME_DEFERRED_EMAILS_.splice(0);
-  queue.forEach(function (item) {
-    try { MailApp.sendEmail(item.message); }
-    catch (error) { log_(item.actor, "EMAIL_NOTIFICATION_ERROR", "notifications", item.notificationId, String(error && error.message || error)); }
-  });
-}
-
-function prepareVersionedRecord_(sheetName, keyField, keyValue, record, user) {
-  invalidateTable_(sheetName);
-  var existing = findRowObject_(sheetName, keyField, keyValue);
-  var requestToken = String(record.request_token || "");
-  if (!existing && requestToken) {
-    var duplicate = rowsToObjects_(sheet_(sheetName)).filter(function (row) { return String(row.request_token || "") === requestToken; })[0];
-    if (duplicate) return { duplicate: duplicate, existing: duplicate };
-  }
-  var currentVersion = Number(existing && existing.record_version || 0);
-  var expectedVersion = Number(record.expected_record_version || 0);
-  if (existing && requestToken && String(existing.request_token || "") === requestToken && expectedVersion < currentVersion) {
-    return { duplicate: existing, existing: existing };
-  }
-  if (existing && currentVersion > 0 && expectedVersion !== currentVersion) {
-    throw new Error("CONFLICT_RECORD: l'elemento è stato aggiornato da " + String(existing.aggiornato_da || "un altro utente") + ".");
-  }
-  delete record.expected_record_version;
-  record.record_version = currentVersion + 1;
-  record.aggiornato_da = String(user && (user.nome_visualizzato || user.username) || "Sistema");
-  record.aggiornatoIl = new Date().toISOString();
-  return { duplicate: null, existing: existing };
+  return active;
 }
 
 function sheet_(name) {
-  if (RUNTIME_SHEET_CACHE_[name]) return RUNTIME_SHEET_CACHE_[name];
   var ss = db_();
   var sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ensureSheet_(ss, name, SHEET_SCHEMAS[name] || []);
-  RUNTIME_SHEET_CACHE_[name] = sheet;
   return sheet;
 }
 
@@ -1266,35 +965,15 @@ function ensureSheet_(ss, name, schema) {
   return sheet;
 }
 
-function tableData_(sheet) {
-  var name = sheet.getName();
-  if (RUNTIME_TABLE_CACHE_[name]) return RUNTIME_TABLE_CACHE_[name];
+function rowsToObjects_(sheet) {
   var values = sheet.getDataRange().getValues();
-  var headers = values.length ? values[0].map(String) : [];
-  var objects = values.length < 2 ? [] : values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
+  if (values.length < 2) return [];
+  var headers = values[0].map(String);
+  return values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
     var obj = {};
     headers.forEach(function (header, index) { if (header) obj[header] = serializable_(row[index]); });
     return obj;
   });
-  RUNTIME_TABLE_CACHE_[name] = { values: values, headers: headers, objects: objects };
-  return RUNTIME_TABLE_CACHE_[name];
-}
-
-function refreshTableObjects_(table) {
-  var headers = table.headers;
-  table.objects = table.values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
-    var object = {}; headers.forEach(function (header, index) { if (header) object[header] = serializable_(row[index]); }); return object;
-  });
-  return table;
-}
-
-function invalidateTable_(sheetName) { delete RUNTIME_TABLE_CACHE_[sheetName]; }
-
-function rowsToObjects_(sheet) {
-  var table = tableData_(sheet);
-  if (table.values.length < 2) return [];
-  /* La copia evita che modifiche temporanee contaminino la cache della richiesta. */
-  return table.objects.map(function (row) { var copy = {}; Object.keys(row).forEach(function (key) { copy[key] = row[key]; }); return copy; });
 }
 
 function serializable_(value) {
@@ -1310,16 +989,15 @@ function findRowObject_(sheetName, keyField, keyValue) {
 
 function upsertObject_(sheetName, keyField, keyValue, record) {
   var sheet = sheet_(sheetName);
-  var table = tableData_(sheet);
-  var headers = table.headers.slice();
-  var newHeaders = Object.keys(record).filter(function (key) { return headers.indexOf(key) < 0; });
-  if (newHeaders.length) {
-    var startColumn = headers.length + 1;
-    headers = headers.concat(newHeaders);
-    sheet.getRange(1, startColumn, 1, newHeaders.length).setValues([newHeaders]).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold");
-    table.values.forEach(function (row) { while (row.length < headers.length) row.push(""); });
-  }
-  var data = table.values;
+  var lastColumn = sheet.getLastColumn();
+  var headers = lastColumn ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String) : [];
+  Object.keys(record).forEach(function (key) {
+    if (headers.indexOf(key) < 0) {
+      headers.push(key);
+      sheet.getRange(1, headers.length).setValue(key).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold");
+    }
+  });
+  var data = sheet.getDataRange().getValues();
   var keyIndex = headers.indexOf(keyField);
   var rowIndex = -1;
   for (var i = 1; i < data.length; i++) if (String(data[i][keyIndex]) === String(keyValue)) { rowIndex = i + 1; break; }
@@ -1328,18 +1006,10 @@ function upsertObject_(sheetName, keyField, keyValue, record) {
     if (record[header] !== undefined) return record[header];
     return existing[index] !== undefined ? existing[index] : "";
   });
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
-    table.values[rowIndex - 1] = values.slice();
-  } else {
-    rowIndex = Math.max(2, table.values.length + 1);
-    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
-    table.values.push(values.slice());
-  }
+  if (rowIndex > 0) sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
+  else { rowIndex = Math.max(2, sheet.getLastRow() + 1); sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]); }
   var result = {};
   headers.forEach(function (header, index) { result[header] = serializable_(values[index]); });
-  table.headers = headers;
-  refreshTableObjects_(table);
   return result;
 }
 
@@ -1347,22 +1017,13 @@ function authenticate_(username, key) {
   username = String(username || "").trim();
   key = String(key || "").trim();
   if (!username || !key) throw new Error("Credenziali mancanti.");
-  var digest = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, username + "|" + key)).replace(/=+$/g, "");
-  var cacheKey = "auth_" + digest;
-  var cached = CacheService.getScriptCache().get(cacheKey);
-  if (cached) {
-    var cachedUser = parseJson_(cached, null);
-    if (cachedUser && String(cachedUser.stato || "ATTIVO").toUpperCase() === "ATTIVO") return cachedUser;
-  }
   var user = findRowObject_("AGENTI", "username", username);
   if (!user || String(user.chiave_id_agente || "") !== key || String(user.stato || "ATTIVO").toUpperCase() !== "ATTIVO") throw new Error("Nome utente o Chiave ID non corretti.");
-  var cacheUser = {}; Object.keys(user).forEach(function (field) { if (field !== "chiave_id_agente") cacheUser[field] = user[field]; });
-  CacheService.getScriptCache().put(cacheKey, JSON.stringify(cacheUser), 45);
   return user;
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), note: user.note || "", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), note: user.note || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
@@ -1404,30 +1065,6 @@ function getKeyValueSheet_(sheetName) {
 }
 
 function setSetting_(key, value, note) { return upsertObject_("IMPOSTAZIONI", "chiave", key, { chiave: key, valore: value, note: note || "" }); }
-
-function upsertSettingsBatch_(values, note) {
-  var sheet = sheet_("IMPOSTAZIONI");
-  var table = tableData_(sheet);
-  var headers = table.headers;
-  var keyIndex = headers.indexOf("chiave"), valueIndex = headers.indexOf("valore"), noteIndex = headers.indexOf("note");
-  if (keyIndex < 0 || valueIndex < 0) throw new Error("Foglio IMPOSTAZIONI non configurato correttamente.");
-  var rowByKey = {};
-  for (var rowIndex = 1; rowIndex < table.values.length; rowIndex++) rowByKey[String(table.values[rowIndex][keyIndex] || "")] = rowIndex;
-  Object.keys(values || {}).forEach(function (key) {
-    var index = rowByKey[key];
-    if (index === undefined) {
-      var row = headers.map(function () { return ""; });
-      row[keyIndex] = key; table.values.push(row); index = table.values.length - 1; rowByKey[key] = index;
-    }
-    table.values[index][valueIndex] = values[key];
-    if (noteIndex >= 0) table.values[index][noteIndex] = note || "";
-  });
-  if (table.values.length > 1) sheet.getRange(2, 1, table.values.length - 1, headers.length).setValues(table.values.slice(1));
-  refreshTableObjects_(table);
-  var result = {};
-  table.objects.forEach(function (row) { if (row.chiave) result[row.chiave] = row.valore; });
-  return result;
-}
 
 function practiceRequired_(type, field, settings) {
   var key = "req_" + String(type || "").toLowerCase() + "_" + String(field || "").toLowerCase();
