@@ -139,7 +139,7 @@
       if (local.length) data.activities = local; else setLocalActivities(data.activities || []);
       return applyPending(data);
     }
-    const response = await jsonp("management_bootstrap", authParams(), 20000);
+    const response = await jsonp("management_bootstrap", authParams(), 45000);
     const data = response.data;
     const local = localActivities();
     data.activities = local.length ? local : [];

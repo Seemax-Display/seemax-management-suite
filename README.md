@@ -48,7 +48,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.2.0 segui [docs/AGGIORNAMENTO_V2.2.md](docs/AGGIORNAMENTO_V2.2.md). La procedura mantiene i dati esistenti e introduce la funzione “Agente del mese”.
+Per aggiornare un'installazione già operativa alla versione 2.2.1 segui [docs/AGGIORNAMENTO_V2.2.md](docs/AGGIORNAMENTO_V2.2.md). La procedura mantiene i dati esistenti e introduce la funzione “Agente del mese”.
 
 ## Placeholder
 

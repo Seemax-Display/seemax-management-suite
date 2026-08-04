@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.2.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.2.1";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -69,9 +69,9 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.2.0 · Agente del mese");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.2.1 · Bootstrap ottimizzato");
   styleSheets_();
-  return "SEEMAX v2.2.0 configurato: Agente del mese e bacheca trofei attivi.";
+  return "SEEMAX v2.2.1 configurato: Agente del mese attivo e accesso ottimizzato.";
 }
 
 function doGet(e) {
@@ -139,16 +139,26 @@ function managementLogin_(p) {
 
 function managementBootstrap_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
-  var products = listEntity_("products", user);
-  var clients = listEntity_("clients", user);
-  var practices = listEntity_("practices", user);
-  var documents = listEntity_("documents", user);
+  var products = rowsToObjects_(sheet_("PRODOTTI_LED"));
+  var allPractices = rowsToObjects_(sheet_("PRATICHE"));
+  var allClients = rowsToObjects_(sheet_("CLIENTI"));
+  var allUsers = rowsToObjects_(sheet_("AGENTI"));
+  var linkedClientIds = {};
+  allPractices.forEach(function (practice) { if (practice.clientId) linkedClientIds[String(practice.clientId)] = true; });
+  var clients = allClients.filter(function (row) { return canAccessClient_(row, user); }).map(function (row) {
+    row.ha_pratiche_collegate = linkedClientIds[String(row.id)] ? "SI" : "NO";
+    row.puo_modificare = canEditClient_(row, user) ? "SI" : "NO";
+    return row;
+  });
+  var practices = isAdmin_(user) ? allPractices : allPractices.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
+  var allDocuments = rowsToObjects_(sheet_("DOCUMENTI"));
+  var documents = isAdmin_(user) ? allDocuments : allDocuments.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
   var activities = [];
-  var users = isAdmin_(user) ? listEntity_("users", user).map(publicUser_) : [publicUser_(user)];
+  var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(user)];
   var settings = getSettings_();
   var notifications = listNotificationsForUser_(user);
   var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, settings: settings, notifications: notifications };
-  data.dashboard = dashboard_(data, user);
+  data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
   return { ok: true, data: data, user: publicUser_(user), version: SEEMAX_VERSION };
 }
 
@@ -848,7 +858,7 @@ function removeEntity_(entity, id, user) {
   return false;
 }
 
-function dashboard_(data, user) {
+function dashboard_(data, user, allPracticeRows, allClientRows, allUserRows) {
   var practices = data.practices || [];
   var activities = data.activities || [];
   var open = practices.filter(function (p) { return ["Bocciata", "Completata"].indexOf(String(p.stato)) < 0; });
@@ -857,7 +867,7 @@ function dashboard_(data, user) {
     var rows = practices.filter(function (p) { return String(p.stato) === status; });
     return { status: status, count: rows.length, value: rows.reduce(function (sum, p) { return sum + Number(p.valore || 0); }, 0) };
   });
-  var allPractices = rowsToObjects_(sheet_("PRATICHE"));
+  var allPractices = allPracticeRows || rowsToObjects_(sheet_("PRATICHE"));
   var completedAll = allPractices.filter(function (p) { return String(p.stato) === "Completata"; });
   var completedPersonal = completedAll.filter(function (p) { return String(p.agent_username || "") === String(user.username || ""); });
   var target = Number((data.settings || {}).obiettivo_fatturato || 0);
@@ -871,7 +881,7 @@ function dashboard_(data, user) {
     recentPractices: practices.slice().sort(function (a, b) { return String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || "")); }).slice(0, 5),
     nextActivities: activities.filter(function (a) { return String(a.stato) !== "Completata"; }).sort(function (a, b) { return String(a.scadenza || "").localeCompare(String(b.scadenza || "")); }).slice(0, 6),
     pipeline: pipeline,
-    agentOfMonth: agentOfMonth_(allPractices, rowsToObjects_(sheet_("CLIENTI")), user)
+    agentOfMonth: agentOfMonth_(allPractices, allClientRows || rowsToObjects_(sheet_("CLIENTI")), user, allUserRows)
   };
 }
 
@@ -891,12 +901,12 @@ function monthLabel_(key) {
   return (months[Number(parts[1]) - 1] || key) + " " + parts[0];
 }
 
-function agentOfMonth_(practices, clients, currentUser) {
+function agentOfMonth_(practices, clients, currentUser, userRows) {
   var completed = (practices || []).filter(function (practice) {
     return String(practice.stato || "") === "Completata" && practiceCompletionDate_(practice);
   });
   var users = {};
-  rowsToObjects_(sheet_("AGENTI")).forEach(function (row) { users[String(row.username || "")] = row.nome_visualizzato || row.username; });
+  (userRows || rowsToObjects_(sheet_("AGENTI"))).forEach(function (row) { users[String(row.username || "")] = row.nome_visualizzato || row.username; });
   var grouped = {};
   completed.forEach(function (practice) {
     var date = practiceCompletionDate_(practice);

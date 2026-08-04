@@ -1,4 +1,6 @@
-# Aggiornamento Seemax Management Suite 2.2.0
+# Aggiornamento Seemax Management Suite 2.2.1
+
+Patch 2.2.1: il caricamento iniziale legge una sola volta Pratiche, Clienti e Agenti. È stato inoltre esteso il tempo massimo del bootstrap per database particolarmente popolati.
 
 ## Novità: Agente del mese
 
@@ -27,7 +29,7 @@ Il messaggio automatico viene mostrato una sola volta per utente e dispositivo n
 
 ## Installazione
 
-1. Sostituire i file pubblicati su GitHub con quelli della versione 2.2.0.
+1. Sostituire i file pubblicati su GitHub con quelli della versione 2.2.1.
 2. Sostituire `Code.gs` nell’editor Google Apps Script.
 3. Eseguire una volta `setupSeemaxDatabase()` per aggiungere la colonna `completataIl` senza cancellare i dati esistenti.
 4. Creare una nuova distribuzione dell’Applicazione Web mantenendo lo stesso livello di accesso.
