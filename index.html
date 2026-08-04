@@ -89,6 +89,13 @@
 
   <div id="modalRoot"></div>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+  <aside id="uploadCenter" class="upload-center is-hidden" aria-live="polite">
+    <button id="uploadCenterSummary" class="upload-center-summary" type="button" data-action="toggle-upload-center" aria-expanded="false">
+      <span id="uploadCenterIcon">⬆️</span><div><strong id="uploadCenterTitle">Caricamento documenti</strong><small id="uploadCenterSubtitle">Preparazione…</small></div><em id="uploadCenterPercent">0%</em>
+      <i class="upload-center-bar"><b id="uploadCenterBar"></b></i>
+    </button>
+    <section id="uploadCenterDetails" class="upload-center-details is-hidden"><header><strong>Trasferimenti documenti</strong><button type="button" data-action="dismiss-upload-center" aria-label="Nascondi">×</button></header><div id="uploadCenterList"></div><p>Non chiudere o ricaricare la pagina finché i trasferimenti non sono terminati.</p></section>
+  </aside>
   <div id="loadingLayer" class="loading-layer is-hidden" aria-live="assertive"><div class="spinner"></div><strong>Operazione in corso…</strong></div>
   <div id="syncLayer" class="sync-layer is-hidden" aria-live="assertive">
     <section><span class="section-kicker">Sincronizzazione database</span><h2>SALVA TUTTO</h2><div class="sync-progress"><i id="syncProgressBar"></i></div><strong id="syncProgressText">Preparazione…</strong><p id="syncCurrentItem">Attendi mentre trasferiamo il lavoro locale.</p></section>

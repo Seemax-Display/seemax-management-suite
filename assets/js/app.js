@@ -12,6 +12,7 @@
   let pendingDocumentFolderId = "";
   let pendingDocumentFile = null;
   let clientToolsPromise = null;
+  const uploadState = { batches: new Map(), expanded: false };
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -105,6 +106,75 @@
     setTimeout(() => item.classList.add("show"), 20);
     setTimeout(() => { item.classList.remove("show"); setTimeout(() => item.remove(), 250); }, 3500);
   }
+
+  function hasActiveUploads() {
+    return Array.from(uploadState.batches.values()).some((batch) => batch.status === "active");
+  }
+
+  function startUploadBatch(practice, attachments) {
+    Array.from(uploadState.batches.entries()).forEach(([batchId, batch]) => { if (batch.status !== "active") uploadState.batches.delete(batchId); });
+    const id = `upload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    uploadState.batches.set(id, {
+      id, status: "active", practice: practice.numero || practice.id || "Pratica", phase: "Preparazione documenti",
+      files: attachments.map((item, index) => ({ id: `${item.key}-${index}`, key: item.key, name: item.file.name, status: "pending", label: item.label }))
+    });
+    renderUploadCenter();
+    return id;
+  }
+
+  function updateUploadFile(batchId, key, status, detail = "") {
+    const batch = uploadState.batches.get(batchId);
+    if (!batch) return;
+    const file = batch.files.find((item) => item.key === key && !["done", "failed"].includes(item.status)) || batch.files.find((item) => item.key === key);
+    if (file) { file.status = status; file.detail = detail; }
+    renderUploadCenter();
+  }
+
+  function setUploadPhase(batchId, phase) {
+    const batch = uploadState.batches.get(batchId);
+    if (batch) { batch.phase = phase; renderUploadCenter(); }
+  }
+
+  function finishUploadBatch(batchId) {
+    const batch = uploadState.batches.get(batchId);
+    if (!batch) return;
+    batch.status = batch.files.some((file) => file.status === "failed") ? "failed" : "complete";
+    batch.phase = batch.status === "complete" ? "Tutti i documenti sono stati caricati" : "Completato con alcuni errori";
+    renderUploadCenter();
+  }
+
+  function renderUploadCenter() {
+    const center = $("uploadCenter");
+    if (!center) return;
+    const batches = Array.from(uploadState.batches.values());
+    center.classList.toggle("is-hidden", !batches.length);
+    if (!batches.length) return;
+    const files = batches.flatMap((batch) => batch.files.map((file) => ({ ...file, practice: batch.practice })));
+    const completed = files.filter((file) => ["done", "failed"].includes(file.status)).length;
+    const failed = files.filter((file) => file.status === "failed").length;
+    const activeBatch = batches.find((batch) => batch.status === "active") || batches[batches.length - 1];
+    const percent = files.length ? Math.round(completed / files.length * 100) : 100;
+    center.classList.toggle("complete", !hasActiveUploads() && !failed);
+    center.classList.toggle("failed", !hasActiveUploads() && failed > 0);
+    $("uploadCenterIcon").textContent = hasActiveUploads() ? "⬆️" : failed ? "⚠️" : "✅";
+    $("uploadCenterTitle").textContent = hasActiveUploads() ? `Upload documenti · ${activeBatch.practice}` : failed ? "Upload terminato con errori" : "Upload completato";
+    $("uploadCenterSubtitle").textContent = hasActiveUploads() ? `${activeBatch.phase} · ${Math.max(0, files.length - completed)} rimanenti` : `${completed - failed} caricati${failed ? ` · ${failed} non riusciti` : ""}`;
+    $("uploadCenterPercent").textContent = `${percent}%`;
+    $("uploadCenterBar").style.width = `${percent}%`;
+    $("uploadCenterSummary").setAttribute("aria-expanded", uploadState.expanded ? "true" : "false");
+    $("uploadCenterDetails").classList.toggle("is-hidden", !uploadState.expanded);
+    $("uploadCenterList").innerHTML = files.map((file) => {
+      const icon = file.status === "done" ? "✅" : file.status === "failed" ? "❌" : file.status === "uploading" ? "⏳" : "🕓";
+      const label = file.status === "done" ? "Caricato" : file.status === "failed" ? (file.detail || "Errore") : file.status === "uploading" ? "In caricamento" : "In attesa";
+      return `<div class="upload-file-row"><span>${icon}</span><strong title="${esc(file.name)}">${esc(file.name)}</strong><small>${esc(label)}</small></div>`;
+    }).join("");
+  }
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!hasActiveUploads()) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
 
   function download(name, content, type = "application/json") {
     const link = document.createElement("a");
@@ -1067,6 +1137,7 @@
       if (!record.chiave_id_agente) delete record.chiave_id_agente;
     }
     setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
+    let activeUploadBatchId = "";
     try {
       const preparedAttachmentsPromise = entity === "practices" && practiceAttachments.length
         ? Promise.all(practiceAttachments.map(async (attachment) => ({
@@ -1076,6 +1147,8 @@
         : Promise.resolve([]);
       let saved = await api.upsert(entity, record);
       if (entity === "practices" && practiceAttachments.length) {
+        const uploadBatchId = startUploadBatch(saved, practiceAttachments);
+        activeUploadBatchId = uploadBatchId;
         replaceLocalEntity(entity, saved);
         closeModal();
         renderRoute();
@@ -1084,6 +1157,7 @@
         const preparedAttachments = await preparedAttachmentsPromise;
         let completedUploads = 0;
         const uploadResults = await mapWithConcurrency(preparedAttachments, 3, async (attachment) => {
+          updateUploadFile(uploadBatchId, attachment.key, "uploading");
           const documentRecord = {
             practiceId: saved.id,
             pratica: saved.numero,
@@ -1103,8 +1177,10 @@
             const uploadedDocument = await api.upsert("documents", documentRecord);
             attachment.input.value = "";
             replaceLocalEntity("documents", uploadedDocument);
+            updateUploadFile(uploadBatchId, attachment.key, "done");
             return { ok: true, attachment, document: uploadedDocument };
           } catch (error) {
+            updateUploadFile(uploadBatchId, attachment.key, "failed", error.message || "Errore");
             return { ok: false, attachment, error };
           } finally {
             completedUploads += 1;
@@ -1116,7 +1192,10 @@
         const uploaded = successfulUploads.map(({ attachment, document }) => ({ tipo: attachment.key, document_id: document.id, nome: document.nome, url: document.url }));
         const previousUploaded = (() => { try { return JSON.parse(saved.documenti_caricati_json || "[]"); } catch (error) { return []; } })();
         const mergedUploads = previousUploaded.filter((previous) => !uploaded.some((currentUpload) => currentUpload.tipo === previous.tipo)).concat(uploaded);
+        setUploadPhase(uploadBatchId, "Finalizzazione pratica");
         saved = await api.updatePracticeDocuments(saved.id, JSON.stringify(mergedUploads));
+        finishUploadBatch(uploadBatchId);
+        activeUploadBatchId = "";
         if (failedUploads.length) {
           replaceLocalEntity(entity, saved);
           setConnectionState();
@@ -1140,6 +1219,11 @@
       renderRoute();
       toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
     } catch (error) {
+      if (activeUploadBatchId) {
+        const failedBatch = uploadState.batches.get(activeUploadBatchId);
+        if (failedBatch) failedBatch.files.forEach((file) => { if (!["done", "failed"].includes(file.status)) { file.status = "failed"; file.detail = "Trasferimento interrotto"; } });
+        finishUploadBatch(activeUploadBatchId);
+      }
       if (String(error.message || "").includes("CONFLICT_RECORD")) {
         toast("Questo elemento è stato modificato da un altro utente. I dati sono stati aggiornati: riaprilo e applica nuovamente la modifica.", "danger");
         closeModal();
@@ -1342,6 +1426,11 @@
       "agent-month-details": openAgentMonthDetails,
       "preview-agent-month": () => openAgentMonthWelcome(true),
       "trophy-board": openTrophyBoard,
+      "toggle-upload-center": () => { uploadState.expanded = !uploadState.expanded; renderUploadCenter(); },
+      "dismiss-upload-center": () => {
+        Array.from(uploadState.batches.entries()).forEach(([batchId, batch]) => { if (batch.status !== "active") uploadState.batches.delete(batchId); });
+        uploadState.expanded = false; renderUploadCenter();
+      },
       "enable-fast-mode": openFastModeWarning,
       "confirm-fast-mode": enableFastMode,
       "disable-fast-mode": disableFastMode,
@@ -1499,7 +1588,10 @@
     }
   });
 
-  $("logoutButton").addEventListener("click", () => { api.logout(); state.data = null; showLogin(); });
+  $("logoutButton").addEventListener("click", () => {
+    if (hasActiveUploads()) { toast("Attendi il completamento dei documenti prima di uscire.", "danger"); uploadState.expanded = true; renderUploadCenter(); return; }
+    api.logout(); state.data = null; showLogin();
+  });
   $("quickAddButton").addEventListener("click", () => openPracticeTypeChooser());
   $("openSidebar").addEventListener("click", () => $("sidebar").classList.add("open"));
   $("closeSidebar").addEventListener("click", () => $("sidebar").classList.remove("open"));
