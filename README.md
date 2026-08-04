@@ -29,6 +29,9 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - modalità demo locale;
 - PWA installabile da browser;
 - backend Apps Script già predisposto.
+- avvio accelerato con cache locale per utente e aggiornamento del database in background;
+- backend ottimizzato con letture per richiesta e salvataggi aggregati;
+- Planner alleggerito di oltre il 90% separando immagini e codice.
 
 ## Prova immediata
 
@@ -48,7 +51,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.2.1 segui [docs/AGGIORNAMENTO_V2.2.md](docs/AGGIORNAMENTO_V2.2.md). La procedura mantiene i dati esistenti e introduce la funzione “Agente del mese”.
+Per aggiornare un'installazione già operativa alla versione 2.3.0 segui [docs/AGGIORNAMENTO_V2.3.md](docs/AGGIORNAMENTO_V2.3.md). L’analisi tecnica è disponibile in [docs/AUDIT_PRESTAZIONI_V2.3.md](docs/AUDIT_PRESTAZIONI_V2.3.md).
 
 ## Placeholder
 

@@ -11,6 +11,7 @@
   let documentHoldStart = null;
   let pendingDocumentFolderId = "";
   let pendingDocumentFile = null;
+  let clientToolsPromise = null;
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -113,6 +114,27 @@
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
 
+  function loadScriptOnce(src, ready) {
+    if (ready()) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[data-lazy-src="${src}"]`);
+      if (existing) { existing.addEventListener("load", resolve, { once: true }); existing.addEventListener("error", () => reject(new Error(`Risorsa non disponibile: ${src}`)), { once: true }); return; }
+      const script = document.createElement("script");
+      script.src = `${src}?v=${encodeURIComponent(config.version)}`;
+      script.dataset.lazySrc = src;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`Risorsa non disponibile: ${src}`));
+      document.body.appendChild(script);
+    });
+  }
+
+  function ensureClientTools() {
+    if (window.SeemaxClientTools) return Promise.resolve();
+    clientToolsPromise = clientToolsPromise || loadScriptOnce("assets/vendor/libphonenumber-min.js", () => !!window.libphonenumber)
+      .then(() => loadScriptOnce("assets/js/client-tools.js", () => !!window.SeemaxClientTools));
+    return clientToolsPromise;
+  }
+
   function visibleNav() { return NAV.filter((item) => !item.adminOnly || api.isAdmin()); }
 
   function renderNav() {
@@ -137,8 +159,8 @@
     } else banner.className = "connection-banner is-hidden";
   }
 
-  async function loadAll() {
-    setLoading(true, "Caricamento database…");
+  async function loadAll(showLoader = true) {
+    if (showLoader) setLoading(true, "Caricamento database…");
     try {
       state.data = await api.bootstrap();
       if (api.isFastMode()) updateLocalDashboard();
@@ -148,7 +170,7 @@
     } catch (error) {
       setConnectionState();
       throw error;
-    } finally { setLoading(false); }
+    } finally { if (showLoader) setLoading(false); }
   }
 
   function setUser() {
@@ -164,9 +186,24 @@
     $("app").classList.remove("is-hidden");
     setUser();
     renderNav();
+    const cached = !config.demoMode && api.cachedBootstrap ? api.cachedBootstrap() : null;
     try {
-      await loadAll();
-      go(location.hash.replace("#", "") || "dashboard", false);
+      if (!cached) {
+        await loadAll();
+        go(location.hash.replace("#", "") || "dashboard", false);
+      } else {
+        state.data = cached;
+        if (api.isFastMode()) updateLocalDashboard();
+        applyChampionTheme(); updateNotificationBell(); setConnectionState();
+        go(location.hash.replace("#", "") || "dashboard", false);
+        try {
+          await loadAll(false);
+          renderRoute();
+        } catch (refreshError) {
+          setConnectionState();
+          toast("Dati locali disponibili. Il database verrà aggiornato al prossimo collegamento.", "warning");
+        }
+      }
       setTimeout(showMonthlyAwardIfNeeded, 350);
     } catch (error) {
       toast(error.message, "danger");
@@ -791,7 +828,11 @@
     }
   }
 
-  function openClient(id) {
+  async function openClient(id) {
+    setLoading(true, "Preparazione anagrafica cliente…");
+    try { await ensureClientTools(); }
+    catch (error) { toast(error.message, "danger"); return; }
+    finally { setLoading(false); }
     const r = state.data.clients.find((c) => c.id === id) || {};
     const session = api.getSession() || {};
     const owner = String(r.creato_da_username || r.agent_username || "");
@@ -899,6 +940,14 @@
     if (index >= 0) rows[index] = { ...rows[index], ...row };
     else rows.unshift(row);
     updateLocalDashboard();
+    scheduleBootstrapCache();
+  }
+
+  let bootstrapCacheTimer = 0;
+  function scheduleBootstrapCache() {
+    if (config.demoMode || !api.saveBootstrapCache) return;
+    clearTimeout(bootstrapCacheTimer);
+    bootstrapCacheTimer = setTimeout(() => api.saveBootstrapCache(state.data), 250);
   }
 
   async function saveEntity(form) {
@@ -1110,7 +1159,7 @@
       await api.remove(entity, id);
       state.data[entity] = (state.data[entity] || []).filter((item) => String(item.id || item.username) !== String(id));
       if (entity === "documents") { const library = documentLibrary(); delete library.placements[id]; saveDocumentLibrary(library); }
-      updateLocalDashboard(); renderRoute(); toast(`${label} eliminato.`);
+      updateLocalDashboard(); scheduleBootstrapCache(); renderRoute(); toast(`${label} eliminato.`);
     }
     catch (error) { toast(error.message, "danger"); }
     finally { setLoading(false); }
@@ -1386,7 +1435,7 @@
         await api.saveSettings(values);
         state.data.settings = { ...(state.data.settings || {}), ...values };
         updateLocalDashboard();
-        if (!api.isFastMode()) await loadAll();
+        scheduleBootstrapCache();
         renderRoute();
         setConnectionState();
         toast(api.isFastMode() ? "Impostazioni salvate localmente. Usa SALVA TUTTO." : "Impostazioni salvate.");

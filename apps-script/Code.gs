@@ -10,7 +10,10 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.2.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.3.0";
+var RUNTIME_DB_CACHE_ = null;
+var RUNTIME_SHEET_CACHE_ = {};
+var RUNTIME_TABLE_CACHE_ = {};
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -69,12 +72,13 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.2.1 · Bootstrap ottimizzato");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.3.0 · Prestazioni ottimizzate");
   styleSheets_();
-  return "SEEMAX v2.2.1 configurato: Agente del mese attivo e accesso ottimizzato.";
+  return "SEEMAX v2.3.0 configurato: cache, letture e salvataggi ottimizzati.";
 }
 
 function doGet(e) {
+  resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
   var callback = sanitizeCallback_(p.callback);
   try {
@@ -87,6 +91,7 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
   var requestId = String(p.requestId || "");
   var result;
@@ -610,15 +615,24 @@ function listNotificationsForUser_(user) {
 
 function managementMarkNotificationsRead_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
-  var rows = listNotificationsForUser_(user);
+  var sheet = sheet_("NOTIFICHE");
+  var table = tableData_(sheet);
+  var headers = table.headers;
+  var recipientIndex = headers.indexOf("recipient_username"), readIndex = headers.indexOf("letta"), readAtIndex = headers.indexOf("letta_il");
   var now = new Date().toISOString();
-  rows.forEach(function (row) {
-    if (String(row.letta || "NO").toUpperCase() !== "SI") {
-      row.letta = "SI";
-      row.letta_il = now;
-      upsertObject_("NOTIFICHE", "id", row.id, row);
+  var changed = false;
+  for (var rowIndex = 1; rowIndex < table.values.length; rowIndex++) {
+    var row = table.values[rowIndex];
+    if (String(row[recipientIndex] || "") === String(user.username || "") && String(row[readIndex] || "NO").toUpperCase() !== "SI") {
+      row[readIndex] = "SI";
+      if (readAtIndex >= 0) row[readAtIndex] = now;
+      changed = true;
     }
-  });
+  }
+  if (changed) {
+    sheet.getRange(2, 1, table.values.length - 1, headers.length).setValues(table.values.slice(1));
+    refreshTableObjects_(table);
+  }
   return { ok: true, notifications: listNotificationsForUser_(user) };
 }
 
@@ -805,9 +819,9 @@ function managementSaveSettings_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
   var values = parseJson_(p.payload, {});
-  Object.keys(values).forEach(function (key) { setSetting_(key, values[key], "Aggiornato da Management Suite"); });
+  var settings = upsertSettingsBatch_(values, "Aggiornato da Management Suite");
   log_(user, "UPDATE", "settings", "IMPOSTAZIONI", "Impostazioni generali aggiornate");
-  return { ok: true, settings: getSettings_() };
+  return { ok: true, settings: settings };
 }
 
 function listEntity_(entity, user) {
@@ -843,7 +857,7 @@ function removeEntity_(entity, id, user) {
   var sheetName = ENTITY_SHEETS[entity];
   var idField = entity === "users" ? "username" : "id";
   var sheet = sheet_(sheetName);
-  var data = sheet.getDataRange().getValues();
+  var data = tableData_(sheet).values;
   if (!data.length) return false;
   var headers = data[0].map(String);
   var idIndex = headers.indexOf(idField);
@@ -852,6 +866,7 @@ function removeEntity_(entity, id, user) {
     if (String(data[i][idIndex]) === String(id)) {
       if (!isAdmin_(user) && agentIndex >= 0 && data[i][agentIndex] && String(data[i][agentIndex]) !== String(user.username)) throw new Error("Record non autorizzato.");
       sheet.deleteRow(i + 1);
+      invalidateTable_(sheetName);
       return true;
     }
   }
@@ -1078,18 +1093,28 @@ function deleteQuoteAgent_(p) {
 /* ========================= DATABASE HELPERS ========================= */
 
 function db_() {
+  if (RUNTIME_DB_CACHE_) return RUNTIME_DB_CACHE_;
   var id = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
-  if (id) return SpreadsheetApp.openById(id);
+  if (id) { RUNTIME_DB_CACHE_ = SpreadsheetApp.openById(id); return RUNTIME_DB_CACHE_; }
   var active = SpreadsheetApp.getActiveSpreadsheet();
   if (!active) throw new Error("Database non inizializzato. Esegui setupSeemaxDatabase().");
   PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", active.getId());
-  return active;
+  RUNTIME_DB_CACHE_ = active;
+  return RUNTIME_DB_CACHE_;
+}
+
+function resetRuntimeCaches_() {
+  RUNTIME_DB_CACHE_ = null;
+  RUNTIME_SHEET_CACHE_ = {};
+  RUNTIME_TABLE_CACHE_ = {};
 }
 
 function sheet_(name) {
+  if (RUNTIME_SHEET_CACHE_[name]) return RUNTIME_SHEET_CACHE_[name];
   var ss = db_();
   var sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ensureSheet_(ss, name, SHEET_SCHEMAS[name] || []);
+  RUNTIME_SHEET_CACHE_[name] = sheet;
   return sheet;
 }
 
@@ -1115,15 +1140,35 @@ function ensureSheet_(ss, name, schema) {
   return sheet;
 }
 
-function rowsToObjects_(sheet) {
+function tableData_(sheet) {
+  var name = sheet.getName();
+  if (RUNTIME_TABLE_CACHE_[name]) return RUNTIME_TABLE_CACHE_[name];
   var values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-  var headers = values[0].map(String);
-  return values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
+  var headers = values.length ? values[0].map(String) : [];
+  var objects = values.length < 2 ? [] : values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
     var obj = {};
     headers.forEach(function (header, index) { if (header) obj[header] = serializable_(row[index]); });
     return obj;
   });
+  RUNTIME_TABLE_CACHE_[name] = { values: values, headers: headers, objects: objects };
+  return RUNTIME_TABLE_CACHE_[name];
+}
+
+function refreshTableObjects_(table) {
+  var headers = table.headers;
+  table.objects = table.values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
+    var object = {}; headers.forEach(function (header, index) { if (header) object[header] = serializable_(row[index]); }); return object;
+  });
+  return table;
+}
+
+function invalidateTable_(sheetName) { delete RUNTIME_TABLE_CACHE_[sheetName]; }
+
+function rowsToObjects_(sheet) {
+  var table = tableData_(sheet);
+  if (table.values.length < 2) return [];
+  /* La copia evita che modifiche temporanee contaminino la cache della richiesta. */
+  return table.objects.map(function (row) { var copy = {}; Object.keys(row).forEach(function (key) { copy[key] = row[key]; }); return copy; });
 }
 
 function serializable_(value) {
@@ -1139,15 +1184,16 @@ function findRowObject_(sheetName, keyField, keyValue) {
 
 function upsertObject_(sheetName, keyField, keyValue, record) {
   var sheet = sheet_(sheetName);
-  var lastColumn = sheet.getLastColumn();
-  var headers = lastColumn ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String) : [];
-  Object.keys(record).forEach(function (key) {
-    if (headers.indexOf(key) < 0) {
-      headers.push(key);
-      sheet.getRange(1, headers.length).setValue(key).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold");
-    }
-  });
-  var data = sheet.getDataRange().getValues();
+  var table = tableData_(sheet);
+  var headers = table.headers.slice();
+  var newHeaders = Object.keys(record).filter(function (key) { return headers.indexOf(key) < 0; });
+  if (newHeaders.length) {
+    var startColumn = headers.length + 1;
+    headers = headers.concat(newHeaders);
+    sheet.getRange(1, startColumn, 1, newHeaders.length).setValues([newHeaders]).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold");
+    table.values.forEach(function (row) { while (row.length < headers.length) row.push(""); });
+  }
+  var data = table.values;
   var keyIndex = headers.indexOf(keyField);
   var rowIndex = -1;
   for (var i = 1; i < data.length; i++) if (String(data[i][keyIndex]) === String(keyValue)) { rowIndex = i + 1; break; }
@@ -1156,10 +1202,18 @@ function upsertObject_(sheetName, keyField, keyValue, record) {
     if (record[header] !== undefined) return record[header];
     return existing[index] !== undefined ? existing[index] : "";
   });
-  if (rowIndex > 0) sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
-  else { rowIndex = Math.max(2, sheet.getLastRow() + 1); sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]); }
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
+    table.values[rowIndex - 1] = values.slice();
+  } else {
+    rowIndex = Math.max(2, table.values.length + 1);
+    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
+    table.values.push(values.slice());
+  }
   var result = {};
   headers.forEach(function (header, index) { result[header] = serializable_(values[index]); });
+  table.headers = headers;
+  refreshTableObjects_(table);
   return result;
 }
 
@@ -1167,8 +1221,17 @@ function authenticate_(username, key) {
   username = String(username || "").trim();
   key = String(key || "").trim();
   if (!username || !key) throw new Error("Credenziali mancanti.");
+  var digest = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, username + "|" + key)).replace(/=+$/g, "");
+  var cacheKey = "auth_" + digest;
+  var cached = CacheService.getScriptCache().get(cacheKey);
+  if (cached) {
+    var cachedUser = parseJson_(cached, null);
+    if (cachedUser && String(cachedUser.stato || "ATTIVO").toUpperCase() === "ATTIVO") return cachedUser;
+  }
   var user = findRowObject_("AGENTI", "username", username);
   if (!user || String(user.chiave_id_agente || "") !== key || String(user.stato || "ATTIVO").toUpperCase() !== "ATTIVO") throw new Error("Nome utente o Chiave ID non corretti.");
+  var cacheUser = {}; Object.keys(user).forEach(function (field) { if (field !== "chiave_id_agente") cacheUser[field] = user[field]; });
+  CacheService.getScriptCache().put(cacheKey, JSON.stringify(cacheUser), 45);
   return user;
 }
 
@@ -1215,6 +1278,30 @@ function getKeyValueSheet_(sheetName) {
 }
 
 function setSetting_(key, value, note) { return upsertObject_("IMPOSTAZIONI", "chiave", key, { chiave: key, valore: value, note: note || "" }); }
+
+function upsertSettingsBatch_(values, note) {
+  var sheet = sheet_("IMPOSTAZIONI");
+  var table = tableData_(sheet);
+  var headers = table.headers;
+  var keyIndex = headers.indexOf("chiave"), valueIndex = headers.indexOf("valore"), noteIndex = headers.indexOf("note");
+  if (keyIndex < 0 || valueIndex < 0) throw new Error("Foglio IMPOSTAZIONI non configurato correttamente.");
+  var rowByKey = {};
+  for (var rowIndex = 1; rowIndex < table.values.length; rowIndex++) rowByKey[String(table.values[rowIndex][keyIndex] || "")] = rowIndex;
+  Object.keys(values || {}).forEach(function (key) {
+    var index = rowByKey[key];
+    if (index === undefined) {
+      var row = headers.map(function () { return ""; });
+      row[keyIndex] = key; table.values.push(row); index = table.values.length - 1; rowByKey[key] = index;
+    }
+    table.values[index][valueIndex] = values[key];
+    if (noteIndex >= 0) table.values[index][noteIndex] = note || "";
+  });
+  if (table.values.length > 1) sheet.getRange(2, 1, table.values.length - 1, headers.length).setValues(table.values.slice(1));
+  refreshTableObjects_(table);
+  var result = {};
+  table.objects.forEach(function (row) { if (row.chiave) result[row.chiave] = row.valore; });
+  return result;
+}
 
 function practiceRequired_(type, field, settings) {
   var key = "req_" + String(type || "").toLowerCase() + "_" + String(field || "").toLowerCase();

@@ -95,7 +95,7 @@
     container.dataset.plannerMounted = "1";
     container.innerHTML = `<div class="sqp-native-loading"><span></span><strong>Avvio Quotation Planner integrato…</strong><small>Caricamento del motore di calcolo Seemax</small></div>`;
     try {
-      sourcePromise = sourcePromise || fetch(SOURCE, { cache: "no-cache" }).then((response) => {
+      sourcePromise = sourcePromise || fetch(`${SOURCE}?v=${encodeURIComponent(context.version || "current")}`, { cache: "default" }).then((response) => {
         if (!response.ok) throw new Error(`File Planner non disponibile (${response.status})`);
         return response.text();
       });

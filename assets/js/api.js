@@ -6,6 +6,7 @@
   const FAST_MODE_KEY = "SEEMAX_MANAGEMENT_FAST_MODE_V1";
   const FAST_QUEUE_KEY = "SEEMAX_MANAGEMENT_FAST_QUEUE_V1";
   const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
+  const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_V1_";
   let session = demo.getSession();
   let online = !!config.demoMode;
 
@@ -108,6 +109,17 @@
     return session ? { agent_username: session.username, agent_key: session.key } : {};
   }
 
+  function bootstrapCacheKey() { return BOOTSTRAP_CACHE_PREFIX + String((session || {}).username || "anonymous"); }
+  function cachedBootstrap(maxAgeMs = 12 * 60 * 60 * 1000) {
+    const cached = readLocal(bootstrapCacheKey(), null);
+    if (!cached || !cached.data || Date.now() - Number(cached.savedAt || 0) > maxAgeMs) return null;
+    return applyPending(cached.data);
+  }
+  function saveBootstrapCache(data) {
+    try { writeLocal(bootstrapCacheKey(), { savedAt: Date.now(), data }); } catch (error) { /* cache opzionale */ }
+    return data;
+  }
+
   async function login(username, key) {
     let user;
     if (config.demoMode) user = demo.login(username, key);
@@ -143,6 +155,7 @@
     const data = response.data;
     const local = localActivities();
     data.activities = local.length ? local : [];
+    saveBootstrapCache(data);
     return applyPending(data);
   }
 
@@ -253,7 +266,7 @@
            il risultato tramite management_upload_status. */
         setTimeout(() => iframe.remove(), 120000);
         resolve({ ok: true, pending: true, requestId });
-      }, 1200);
+      }, 4000);
       function finish(error, result) {
         if (done) return;
         done = true;
@@ -288,7 +301,7 @@
       } catch (error) {
         lastError = error;
       }
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
     throw new Error(lastError && lastError.message
       ? `Il file non è stato confermato dal database: ${lastError.message}`
@@ -328,5 +341,5 @@
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length }; }
 
-  window.SeemaxApi = { login, logout, ping, bootstrap, list, upsert, remove, getSettings, saveSettings, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();
