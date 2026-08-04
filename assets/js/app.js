@@ -441,17 +441,23 @@
 
   function go(route, updateHash = true) {
     const allowed = visibleNav().some((item) => item.id === route);
-    state.route = allowed ? route : "dashboard";
-    if (state.route !== "documents") heldDocumentId = "";
-    if (updateHash) history.replaceState(null, "", "#" + state.route);
-    const meta = ROUTE_META[state.route];
-    $("pageTitle").textContent = meta[0];
-    $("pageSubtitle").textContent = meta[1];
-    $("pageEyebrow").textContent = state.route === "planner" ? "Strumento integrato" : "Seemax Management";
-    renderNav();
-    renderRoute(true);
-    $("sidebar").classList.remove("open");
-    $("viewContainer").focus({ preventScroll: true });
+    const nextRoute = allowed ? route : "dashboard";
+    const changed = state.route !== nextRoute;
+    const applyRoute = () => {
+      state.route = nextRoute;
+      if (state.route !== "documents") heldDocumentId = "";
+      if (updateHash) history.replaceState(null, "", "#" + state.route);
+      const meta = ROUTE_META[state.route];
+      $("pageTitle").textContent = meta[0];
+      $("pageSubtitle").textContent = meta[1];
+      $("pageEyebrow").textContent = state.route === "planner" ? "Strumento integrato" : "Seemax Management";
+      renderNav();
+      renderRoute(true);
+      $("sidebar").classList.remove("open");
+      $("viewContainer").focus({ preventScroll: true });
+    };
+    if (changed && document.startViewTransition && !tutorialState.active) document.startViewTransition(applyRoute);
+    else applyRoute();
   }
 
   function renderRoute(animate = false) {
@@ -468,7 +474,7 @@
         fastMode: api.isFastMode()
       });
     }
-    if (animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (animate) {
       const view = $("viewContainer");
       view.classList.remove("route-enter");
       void view.offsetWidth;
@@ -1372,8 +1378,9 @@
       setConnectionState();
       closeModal();
       renderRoute();
-      if (!celebrationShown) celebrateSavedEntity(entity, saved, current);
-      toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
+      setLoading(false);
+      if (!celebrationShown) celebrationShown = celebrateSavedEntity(entity, saved, current);
+      if (!celebrationShown) toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
     } catch (error) {
       if (activeUploadBatchId) {
         const failedBatch = uploadState.batches.get(activeUploadBatchId);

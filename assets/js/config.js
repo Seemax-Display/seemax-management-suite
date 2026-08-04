@@ -6,7 +6,7 @@
  */
 window.SEEMAX_APP_CONFIG = {
   appName: "Seemax Management Suite",
-  version: "2.6.0",
+  version: "2.6.1",
   demoMode: false,
   appsScriptUrl: "https://script.google.com/macros/s/AKfycbxNBdyg27CBYRu9M1FRFCw3Sm701hUZ5UQTyHPI3cE3AuoW8LaBRx_E6TLOoAxzHQCf/exec",
   company: {

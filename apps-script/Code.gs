@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.6.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.6.1";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.0 · Micro-interazioni");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.1 · Transizioni e loader");
   styleSheets_();
-  return "SEEMAX v2.6.0 configurato: Super Tutorial e micro-interazioni.";
+  return "SEEMAX v2.6.1 configurato: transizioni, loader e conferme animate.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.0 · Micro-interazioni");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.1 · Transizioni e loader");
   styleSheets_();
-  return "SEEMAX v2.6.0 configurato: protezione multiutente, diagnostica, Super Tutorial e micro-interazioni.";
+  return "SEEMAX v2.6.1 configurato: protezione multiutente, transizioni, loader e conferme animate.";
 }
 
 function doGet(e) {
