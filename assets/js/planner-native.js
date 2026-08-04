@@ -109,9 +109,17 @@
       shadow.innerHTML = `<style>${scopedCss(styles)}
         :host{display:block;min-height:720px}.sqp-native-body{min-height:720px;background:transparent}
         #btnDatabaseRefresh,#btnAgentLogin,#btnAgentLogout{display:none!important}
-        .view#view-grenke.active,.view#view-ifis.active{width:auto!important;margin:22px 24px 38px!important;padding:5px!important}
-        .grenke-shell,.ifis-shell{padding:2px}
-        @media(max-width:760px){.view#view-grenke.active,.view#view-ifis.active{margin:12px 10px 28px!important;padding:3px!important}}
+        .view#view-grenke.active,.view#view-ifis.active{width:100%!important;max-width:none!important;box-sizing:border-box;margin:0!important;padding:24px 20px 38px!important;overflow:visible!important}
+        #view-grenke .finance-switch,#view-ifis .finance-switch{margin-bottom:16px!important}
+        .grenke-shell,.ifis-shell{width:100%;box-sizing:border-box;padding:12px!important;gap:18px!important;align-items:stretch!important;border:1px solid #d8e3f0;border-radius:24px;background:linear-gradient(180deg,#f8fbff 0%,#f1f6fc 100%);box-shadow:0 16px 42px rgba(8,26,49,.10)}
+        .grenke-shell{grid-template-columns:minmax(0,1fr) clamp(285px,22vw,340px)!important}
+        .ifis-shell{grid-template-columns:minmax(0,1fr) clamp(300px,23vw,360px)!important}
+        .grenke-panel,.ifis-panel{width:100%;min-width:0;height:100%;box-sizing:border-box}
+        .grenke-panel .gp-body,.ifis-panel .ifis-body{padding:20px!important}
+        .grenke-selection-note{padding:8px 2px 2px;line-height:1.45}
+        .grenke-shell .aside-stack,.ifis-shell .aside-stack{min-width:0;height:100%}
+        @media(max-width:1040px){.grenke-shell,.ifis-shell{grid-template-columns:minmax(0,1fr) 290px!important}}
+        @media(max-width:760px){.view#view-grenke.active,.view#view-ifis.active{padding:12px 8px 28px!important}.grenke-shell,.ifis-shell{grid-template-columns:1fr!important;padding:8px!important;gap:12px!important;border-radius:19px}.grenke-panel .gp-body,.ifis-panel .ifis-body{padding:15px!important}}
         .suite-client-import{border:1px solid #93c5fd;border-radius:16px;padding:14px;background:#eff6ff}
         .suite-client-choice{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr);gap:12px;align-items:center}
         .suite-client-choice span{font-size:13px;line-height:1.45;color:#475569}

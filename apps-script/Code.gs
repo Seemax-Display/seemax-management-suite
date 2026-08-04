@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.6.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.6.2";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.1 · Transizioni e loader");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.2 · Layout Grenke e IFIS");
   styleSheets_();
-  return "SEEMAX v2.6.1 configurato: transizioni, loader e conferme animate.";
+  return "SEEMAX v2.6.2 configurato: area finanziaria Grenke e IFIS estesa.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.1 · Transizioni e loader");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.2 · Layout Grenke e IFIS");
   styleSheets_();
-  return "SEEMAX v2.6.1 configurato: protezione multiutente, transizioni, loader e conferme animate.";
+  return "SEEMAX v2.6.2 configurato: protezione multiutente e area finanziaria Grenke e IFIS estesa.";
 }
 
 function doGet(e) {

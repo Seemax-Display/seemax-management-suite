@@ -743,6 +743,28 @@
     .ifis-spese-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ifis-fee{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:10px}.ifis-fee span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.10em;color:rgba(255,255,255,.70);font-weight:950;margin-bottom:5px}.ifis-fee strong{font-size:14px}
     .finance-provider-badge{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:950;color:var(--brand-3)}
 
+    /* AREA FINANZIARIA ESTESA: cornice esterna e pannelli interni Grenke / IFIS */
+    #view-grenke,#view-ifis{width:100%;max-width:none;box-sizing:border-box;padding:24px 20px 38px}
+    #view-grenke .finance-switch,#view-ifis .finance-switch{margin-bottom:16px}
+    .grenke-shell,.ifis-shell{
+      width:100%;box-sizing:border-box;padding:12px;gap:18px;align-items:stretch;
+      border:1px solid #d8e3f0;border-radius:24px;
+      background:linear-gradient(180deg,#f8fbff 0%,#f1f6fc 100%);
+      box-shadow:0 16px 42px rgba(8,26,49,.10)
+    }
+    .grenke-shell{grid-template-columns:minmax(0,1fr) clamp(285px,22vw,340px)}
+    .ifis-shell{grid-template-columns:minmax(0,1fr) clamp(300px,23vw,360px)}
+    .grenke-panel,.ifis-panel{width:100%;min-width:0;height:100%;box-sizing:border-box}
+    .grenke-panel .gp-body,.ifis-panel .ifis-body{padding:20px}
+    .grenke-selection-note{padding:8px 2px 2px;line-height:1.45}
+    .grenke-shell .aside-stack,.ifis-shell .aside-stack{min-width:0;height:100%}
+    @media (max-width:1040px){.grenke-shell,.ifis-shell{grid-template-columns:minmax(0,1fr) 290px}}
+    @media (max-width:760px){
+      #view-grenke,#view-ifis{padding:12px 8px 28px}
+      .grenke-shell,.ifis-shell{grid-template-columns:1fr;padding:8px;gap:12px;border-radius:19px}
+      .grenke-panel .gp-body,.ifis-panel .ifis-body{padding:15px}
+    }
+
     @media (max-width:1120px){.draft-mobile-panel{display:flex}.draft-side-actions{display:none}}
     @media (max-width:640px){.draft-name-row{grid-template-columns:1fr}.draft-slot-top{flex-direction:column}.draft-slot-actions{justify-content:flex-start}.draft-modal-panel{padding:15px;border-radius:20px}}
 
