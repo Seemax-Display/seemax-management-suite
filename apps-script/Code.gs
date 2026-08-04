@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.4.3";
+var SEEMAX_VERSION = "seemax-management-suite-2.4.4";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.3 · Classifiche mensili isolate");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.4 · Rifiniture interfaccia");
   styleSheets_();
-  return "SEEMAX v2.4.3 configurato: concorrenza, upload e classifiche mensili isolate.";
+  return "SEEMAX v2.4.4 configurato: concorrenza, upload e rifiniture interfaccia.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.3 · Classifiche mensili isolate");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.4 · Rifiniture interfaccia");
   styleSheets_();
-  return "SEEMAX v2.4.3 configurato: protezione multiutente, diagnostica, upload e classifiche mensili isolate.";
+  return "SEEMAX v2.4.4 configurato: protezione multiutente, diagnostica, upload e rifiniture interfaccia.";
 }
 
 function doGet(e) {
