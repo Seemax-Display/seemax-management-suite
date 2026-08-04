@@ -5,6 +5,7 @@
     d.setDate(d.getDate() + offset);
     return d.toISOString().slice(0, 10);
   };
+  const previousMonthIso = () => new Date(today.getFullYear(), today.getMonth() - 1, 15, 12, 0, 0).toISOString();
 
   window.SEEMAX_DEMO_SEED = {
     products: [
@@ -24,7 +25,7 @@
     practices: [
       { id: "PR-001-26", numero: "001-26", clientId: "cli-demo-1", cliente: "Farmacia Piazza Centro", titolo: "Ledwall P3.91 2×1 m", stato: "Inserita", tipo_pratica: "NOLEGGIO", finanziaria: "Grenke", valore: 6500, agente: "Agente Dimostrativo", agent_username: "agente.demo", scadenza: iso(5), prossimoPasso: "Richiamare il cliente", note: "In attesa di conferma", aggiornatoIl: iso(-1) },
       { id: "PR-002-26", numero: "002-26", clientId: "cli-demo-2", cliente: "Boutique Etna SRL", titolo: "Ledwall P2.5 3,20×1,92 m", stato: "Accettata", tipo_pratica: "LEASING", finanziaria: "IFIS", valore: 10500, agente: "Agente Dimostrativo", agent_username: "agente.demo", scadenza: iso(2), prossimoPasso: "Ricevere visura camerale", note: "Documentazione parziale", aggiornatoIl: iso(-2) },
-      { id: "PR-003-26", numero: "003-26", clientId: "cli-demo-3", cliente: "Centro Gomme Demo", titolo: "Sopralluogo e studio fattibilità", stato: "Completata", tipo_pratica: "ACQUISTO", finanziaria: "Da definire", valore: 5000, agente: "David Failla", agent_username: "admin.demo", scadenza: iso(8), prossimoPasso: "Fissare sopralluogo", note: "", aggiornatoIl: iso(0) }
+      { id: "PR-003-26", numero: "003-26", clientId: "cli-demo-3", cliente: "Centro Gomme Demo", titolo: "Sopralluogo e studio fattibilità", stato: "Completata", tipo_pratica: "ACQUISTO", finanziaria: "Da definire", valore: 5000, agente: "David Failla", agent_username: "admin.demo", scadenza: iso(8), prossimoPasso: "Fissare sopralluogo", note: "", completataIl: previousMonthIso(), aggiornatoIl: iso(0) }
     ],
     documents: [
       { id: "doc-demo-1", practiceId: "PR-001-26", pratica: "001-26", cliente: "Farmacia Piazza Centro", nome: "Preventivo Ledwall.pdf", tipo: "Preventivo", url: "", data: iso(-1), note: "Placeholder: aggiungere link Google Drive" },

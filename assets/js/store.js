@@ -101,8 +101,73 @@
       },
       recentPractices: db.practices.slice().sort((a, b) => String(b.aggiornatoIl).localeCompare(String(a.aggiornatoIl))).slice(0, 5),
       nextActivities: due.slice().sort((a, b) => String(a.scadenza).localeCompare(String(b.scadenza))).slice(0, 6),
-      pipeline
+      pipeline,
+      agentOfMonth: agentOfMonth(db.practices, db.users, db.clients, getSession())
     });
+  }
+
+  function agentOfMonth(practices, users, clients, currentUser) {
+    const names = Object.fromEntries((users || []).map((user) => [String(user.username || ""), user.nome_visualizzato || user.username]));
+    const monthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const monthLabel = (key) => {
+      const [year, month] = key.split("-").map(Number);
+      return new Date(year, month - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" }).replace(/^./, (letter) => letter.toUpperCase());
+    };
+    const completed = (practices || []).filter((practice) => practice.stato === "Completata" && !Number.isNaN(new Date(practice.completataIl || practice.aggiornatoIl || practice.creatoIl).getTime()));
+    const groups = {};
+    completed.forEach((practice) => {
+      const period = monthKey(new Date(practice.completataIl || practice.aggiornatoIl || practice.creatoIl));
+      const username = String(practice.agent_username || practice.agente || "Non assegnato");
+      const key = `${period}|${username}`;
+      groups[key] ||= { period, agent_username: username, agent: names[username] || practice.agente || username, total: 0, count: 0, practices: [] };
+      groups[key].total += Number(practice.valore || 0); groups[key].count += 1;
+      groups[key].practices.push({ id: practice.numero || practice.id || "—", client: practice.cliente || "—", type: String(practice.tipo_pratica || "ACQUISTO").toUpperCase(), value: Number(practice.valore || 0) });
+    });
+    const months = {};
+    Object.values(groups).forEach((group) => { group.practices.sort((a, b) => b.value - a.value); group.topPractice = group.practices[0] || null; (months[group.period] ||= []).push(group); });
+    const history = Object.keys(months).sort().reverse().map((period) => {
+      const winner = months[period].sort((a, b) => b.total - a.total || b.count - a.count)[0];
+      return { period, label: monthLabel(period), agent: winner.agent, agent_username: winner.agent_username, total: winner.total, count: winner.count, topPractice: winner.topPractice };
+    });
+    const now = new Date(); const previousKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    const leaders = {};
+    ["ACQUISTO", "NOLEGGIO", "LEASING", "COMPLESSIVO"].forEach((type) => {
+      const totals = {};
+      completed.filter((practice) => type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type).forEach((practice) => {
+        const username = String(practice.agent_username || practice.agente || "Non assegnato");
+        totals[username] ||= { agent: names[username] || practice.agente || username, total: 0, count: 0 };
+        totals[username].total += Number(practice.valore || 0); totals[username].count += 1;
+      });
+      leaders[type] = Object.entries(totals).map(([agent_username, value]) => ({ ...value, agent_username })).sort((a, b) => b.total - a.total || b.count - a.count)[0] || null;
+      if (leaders[type]) {
+        const practice = completed.filter((item) => String(item.agent_username || item.agente || "Non assegnato") === leaders[type].agent_username && (type === "COMPLESSIVO" || String(item.tipo_pratica || "ACQUISTO").toUpperCase() === type)).sort((a, b) => Number(b.valore || 0) - Number(a.valore || 0))[0];
+        leaders[type].topPractice = practice ? { id: practice.numero || practice.id || "—", client: practice.cliente || "—", value: Number(practice.valore || 0) } : null;
+      }
+    });
+    const award = history.find((row) => row.period === previousKey) || null;
+    const username = String((currentUser || {}).username || "");
+    const ownCompleted = completed.filter((practice) => String(practice.agent_username || "") === username);
+    const ownPractices = (practices || []).filter((practice) => String(practice.agent_username || "") === username);
+    const ownClients = (clients || []).filter((client) => String(client.creato_da_username || client.agent_username || "") === username);
+    const winningPeriods = history.filter((row) => String(row.agent_username || "") === username).map((row) => row.period).sort();
+    let maxStreak = 0, streak = 0, previousIndex = null;
+    winningPeriods.forEach((period) => { const [year, month] = period.split("-").map(Number); const index = year * 12 + month; streak = previousIndex !== null && index === previousIndex + 1 ? streak + 1 : 1; maxStreak = Math.max(maxStreak, streak); previousIndex = index; });
+    const countType = (type) => ownPractices.filter((practice) => String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type).length;
+    const maxValue = ownCompleted.reduce((max, practice) => Math.max(max, Number(practice.valore || 0)), 0);
+    const ownRevenue = ownCompleted.reduce((sum, practice) => sum + Number(practice.valore || 0), 0);
+    const achievements = [
+      ["month_1","🏆","Agente del mese","Conquista il primo posto in un mese.",winningPeriods.length,1],
+      ["month_streak_3","👑","Tripletta d’oro","Agente del mese per 3 mesi consecutivi.",maxStreak,3],
+      ["practice_50k","💎","Pratica Elite","Completa una pratica da almeno 50.000 €.",maxValue,50000,true],
+      ["practice_100k","🚀","Pratica Legend","Completa una pratica da almeno 100.000 €.",maxValue,100000,true],
+      ["clients_10","🤝","Network Builder","Crea 10 clienti.",ownClients.length,10],
+      ["purchase_5","🛒","Specialista Acquisto","Inserisci 5 pratiche di acquisto.",countType("ACQUISTO"),5],
+      ["rental_5","🔄","Specialista Noleggio","Inserisci 5 pratiche di noleggio.",countType("NOLEGGIO"),5],
+      ["leasing_5","🏦","Specialista Leasing","Inserisci 5 pratiche di leasing.",countType("LEASING"),5],
+      ["completed_10","✅","Closer","Completa 10 pratiche.",ownCompleted.length,10],
+      ["revenue_250k","🌟","Quarto di milione","Raggiungi 250.000 € di fatturato completato.",ownRevenue,250000,true]
+    ].map(([id,icon,title,description,current,target,currency=false]) => ({ id,icon,title,description,current,target,currency,unlocked:Number(current || 0) >= target }));
+    return { currentPeriod: monthKey(now), awardPeriod: previousKey, award, history, leaders, isCurrentUserWinner: !!award && String(award.agent_username || "") === username, achievements };
   }
 
   function bootstrap() {

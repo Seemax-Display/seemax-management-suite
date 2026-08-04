@@ -142,6 +142,7 @@
     try {
       state.data = await api.bootstrap();
       if (api.isFastMode()) updateLocalDashboard();
+      applyChampionTheme();
       updateNotificationBell();
       setConnectionState();
     } catch (error) {
@@ -166,6 +167,7 @@
     try {
       await loadAll();
       go(location.hash.replace("#", "") || "dashboard", false);
+      setTimeout(showMonthlyAwardIfNeeded, 350);
     } catch (error) {
       toast(error.message, "danger");
       $("viewContainer").innerHTML = emptyState("Database non disponibile", "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
@@ -243,6 +245,7 @@
           ${revenueCard("Fatturato complessivo Seemax", revenue.company, revenue.target, "Tutte le pratiche completate")}
         </div>
       </section>
+      ${agentOfMonthDashboardCard(d.agentOfMonth)}
       <div class="dashboard-grid">
         <section class="panel span-7">
           <div class="panel-head"><div><span class="section-kicker">Pipeline</span><h3>Stato delle pratiche</h3></div><button class="text-button" data-route="practices">Vedi tutte →</button></div>
@@ -266,6 +269,63 @@
     const percent = Math.round(ratio * 100);
     const hue = Math.round(ratio * 120);
     return `<article class="revenue-card" style="--revenue-hue:${hue};--revenue-progress:${percent}%"><div><span>${esc(label)}</span><strong>${euros(amount)}</strong><small>${esc(note)}</small></div><em>${percent}%</em><div class="revenue-progress"><i></i></div></article>`;
+  }
+
+  function agentOfMonthDashboardCard(data) {
+    const award = data && data.award;
+    return `<section class="agent-month-dashboard ${data && data.isCurrentUserWinner ? "personal-win" : ""}"><div class="agent-month-medal">🏆</div><div><span class="section-kicker">Agente del mese</span><h3>${award ? esc(award.agent) : "Classifica mensile"}</h3><p>${award ? `${esc(award.label)} · ${euros(award.total)} di fatturato completato` : "Lo storico si popolerà con le pratiche completate."}</p></div><div class="agent-month-actions"><button class="btn ghost" data-action="trophy-board">Bacheca trofei</button><button class="btn soft" data-action="agent-month-details">Maggiori dettagli</button></div></section>`;
+  }
+
+  function applyChampionTheme() {
+    const winner = !!(state.data && state.data.dashboard && state.data.dashboard.agentOfMonth && state.data.dashboard.agentOfMonth.isCurrentUserWinner);
+    $("app").classList.toggle("agent-month-champion", winner);
+    $("userMenuButton").classList.toggle("month-champion", winner);
+    $("userMenuButton").title = winner ? "Agente del mese · Emblema Gold" : "Profilo utente";
+  }
+
+  function showMonthlyAwardIfNeeded() {
+    const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
+    if (!data || !data.award) return;
+    const session = api.getSession() || {};
+    const key = `SEEMAX_AGENT_MONTH_SEEN_${session.username || "user"}_${data.currentPeriod}`;
+    if (localStorage.getItem(key) === "1") return;
+    localStorage.setItem(key, "1");
+    openAgentMonthWelcome();
+  }
+
+  function openAgentMonthWelcome() {
+    const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
+    const award = data && data.award;
+    if (!award) { openAgentMonthDetails(); return; }
+    const top = award.topPractice || {};
+    const body = `<div class="agent-month-welcome"><div class="agent-month-trophy">🏆</div><span class="agent-month-label">AGENTE DEL MESE</span><h3>${esc(award.agent)}</h3><p class="agent-month-period">Risultato di ${esc(award.label)}</p><div class="agent-month-winning-practice"><small>PRATICA DI MAGGIOR VALORE</small><strong>${esc(top.id || "—")} · ${esc(top.client || "—")}</strong><span>${euros(top.value || 0)}</span></div><div class="agent-month-total"><span>Fatturato totale completato</span><strong>${euros(award.total)}</strong><small>${award.count} ${award.count === 1 ? "pratica completata" : "pratiche completate"}</small></div><div class="form-actions"><button class="btn ghost" data-action="close-modal">Continua</button><button class="btn primary" data-action="agent-month-details">Maggiori dettagli</button></div></div>`;
+    openModal("Benvenuto nel nuovo mese!", body, { wide: true, kicker: "Seemax celebra i risultati" });
+  }
+
+  function openAgentMonthDetails() {
+    const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
+    if (!data) return;
+    const leaderNames = { ACQUISTO: "Acquisto", NOLEGGIO: "Noleggio", LEASING: "Leasing", COMPLESSIVO: "Complessivo" };
+    const leaders = Object.keys(leaderNames).map((type) => {
+      const row = (data.leaders || {})[type];
+      return `<article class="agent-leader-card ${type.toLowerCase()}"><span>${type === "ACQUISTO" ? "🛒" : type === "NOLEGGIO" ? "🔄" : type === "LEASING" ? "🏦" : "🏆"}</span><div><small>${leaderNames[type]}</small><strong>${row ? esc(row.agent) : "Nessun risultato"}</strong><em>${row ? euros(row.total) : "—"}</em>${row ? `<p>${row.count} pratiche completate${row.topPractice ? ` · Top ${esc(row.topPractice.id)} (${euros(row.topPractice.value)})` : ""}</p>` : ""}</div></article>`;
+    }).join("");
+    const history = (data.history || []).map((row) => `<tr><td><strong>${esc(row.label)}</strong></td><td>${esc(row.agent)}</td><td>${esc((row.topPractice || {}).id || "—")}<small>${esc((row.topPractice || {}).client || "")}</small></td><td>${row.count}</td><td><strong>${euros(row.total)}</strong></td></tr>`).join("");
+    const body = `<div class="agent-month-details"><div class="agent-detail-actions"><button class="btn gold" data-action="trophy-board">🏅 Apri la mia bacheca trofei</button></div><section><span class="section-kicker">Record complessivi</span><h3>Leader per tipologia</h3><div class="agent-leaders-grid">${leaders}</div></section><section><span class="section-kicker">Albo d’oro</span><h3>Agenti del mese</h3>${history ? `<div class="table-wrap"><table><thead><tr><th>Mese</th><th>Agente</th><th>Pratica principale</th><th>Pratiche</th><th>Fatturato</th></tr></thead><tbody>${history}</tbody></table></div>` : emptyState("Nessun mese disponibile", "Completa una pratica per iniziare la classifica.")}</section><p class="agent-month-note">Il calcolo considera esclusivamente il valore delle pratiche in stato COMPLETATA. Le provvigioni non vengono conteggiate.</p></div>`;
+    openModal("Agente del mese", body, { wide: true, kicker: "Classifiche Seemax", subtitle: "Risultati mensili e record complessivi" });
+  }
+
+  function openTrophyBoard() {
+    const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
+    const achievements = (data && data.achievements) || [];
+    const unlocked = achievements.filter((item) => item.unlocked).length;
+    const cards = achievements.map((item) => {
+      const percent = Math.min(100, Math.round(Number(item.current || 0) / Number(item.target || 1) * 100));
+      const progress = item.currency ? `${euros(item.current)} / ${euros(item.target)}` : `${item.current} / ${item.target}`;
+      return `<article class="trophy-slot ${item.unlocked ? "unlocked" : "locked"}"><div class="trophy-icon">${item.unlocked ? item.icon : "🔒"}</div><div><small>${item.unlocked ? "TROFEO SBLOCCATO" : "OBIETTIVO IN CORSO"}</small><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><div class="trophy-progress"><i style="width:${percent}%"></i></div><strong>${progress}</strong></div></article>`;
+    }).join("");
+    const body = `<div class="trophy-board"><div class="trophy-board-head"><span>🏅</span><div><h3>${unlocked} trofei sbloccati su ${achievements.length}</h3><p>Ogni risultato viene aggiornato automaticamente dai dati delle tue pratiche e dei tuoi clienti.</p></div></div><div class="trophy-grid">${cards}</div></div>`;
+    openModal("La mia bacheca trofei", body, { wide: true, kicker: "Obiettivi e riconoscimenti" });
   }
 
   function kpi(label, value, icon, tone, route) {
@@ -828,7 +888,8 @@
       },
       recentPractices: practices.slice().sort((a, b) => String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || ""))).slice(0, 5),
       nextActivities: activities.filter((a) => a.stato !== "Completata").sort((a, b) => String(a.scadenza || "").localeCompare(String(b.scadenza || ""))).slice(0, 6),
-      pipeline: STATUSES.map((status) => ({ status, count: practices.filter((p) => p.stato === status).length, value: practices.filter((p) => p.stato === status).reduce((sum, p) => sum + Number(p.valore || 0), 0) }))
+      pipeline: STATUSES.map((status) => ({ status, count: practices.filter((p) => p.stato === status).length, value: practices.filter((p) => p.stato === status).reduce((sum, p) => sum + Number(p.valore || 0), 0) })),
+      agentOfMonth: state.data.dashboard && state.data.dashboard.agentOfMonth
     };
   }
 
@@ -1182,6 +1243,8 @@
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
       "close-modal": closeModal,
       "open-notifications": openNotifications,
+      "agent-month-details": openAgentMonthDetails,
+      "trophy-board": openTrophyBoard,
       "enable-fast-mode": openFastModeWarning,
       "confirm-fast-mode": enableFastMode,
       "disable-fast-mode": disableFastMode,

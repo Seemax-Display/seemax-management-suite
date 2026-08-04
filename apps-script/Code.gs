@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.1.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.2.0";
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -25,7 +25,7 @@ var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "aggiornatoIl", "creatoIl"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
@@ -69,9 +69,9 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.1.1");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.2.0 · Agente del mese");
   styleSheets_();
-  return "SEEMAX v1.9.1 configurato: salvataggio pratiche e allegati ottimizzato.";
+  return "SEEMAX v2.2.0 configurato: Agente del mese e bacheca trofei attivi.";
 }
 
 function doGet(e) {
@@ -534,6 +534,9 @@ function upsertPracticeWithInventory_(payload, user) {
     var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
     var nextStatus = normalizePracticeStatus_(payload.stato || existing && existing.stato || "Inserita");
     payload.stato = nextStatus;
+    if (nextStatus === "Completata") {
+      payload.completataIl = existing && String(existing.stato || "") === "Completata" && existing.completataIl ? existing.completataIl : new Date().toISOString();
+    } else if (existing) payload.completataIl = existing.completataIl || "";
     payload.archiviata = nextStatus === "Bocciata" ? "SI" : "NO";
     payload.archiviata_il = nextStatus === "Bocciata" ? (existing && existing.archiviata_il || new Date().toISOString()) : "";
     var inferredType = String(payload.finanziaria || existing && existing.finanziaria || "") === "Grenke" ? "NOLEGGIO" : (String(payload.finanziaria || existing && existing.finanziaria || "") === "IFIS" ? "LEASING" : "ACQUISTO");
@@ -867,8 +870,106 @@ function dashboard_(data, user) {
     },
     recentPractices: practices.slice().sort(function (a, b) { return String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || "")); }).slice(0, 5),
     nextActivities: activities.filter(function (a) { return String(a.stato) !== "Completata"; }).sort(function (a, b) { return String(a.scadenza || "").localeCompare(String(b.scadenza || "")); }).slice(0, 6),
-    pipeline: pipeline
+    pipeline: pipeline,
+    agentOfMonth: agentOfMonth_(allPractices, rowsToObjects_(sheet_("CLIENTI")), user)
   };
+}
+
+function practiceCompletionDate_(practice) {
+  var raw = practice.completataIl || practice.aggiornatoIl || practice.creatoIl || "";
+  var date = raw ? new Date(raw) : null;
+  return date && !isNaN(date.getTime()) ? date : null;
+}
+
+function monthKey_(date) {
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
+}
+
+function monthLabel_(key) {
+  var parts = String(key).split("-");
+  var months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  return (months[Number(parts[1]) - 1] || key) + " " + parts[0];
+}
+
+function agentOfMonth_(practices, clients, currentUser) {
+  var completed = (practices || []).filter(function (practice) {
+    return String(practice.stato || "") === "Completata" && practiceCompletionDate_(practice);
+  });
+  var users = {};
+  rowsToObjects_(sheet_("AGENTI")).forEach(function (row) { users[String(row.username || "")] = row.nome_visualizzato || row.username; });
+  var grouped = {};
+  completed.forEach(function (practice) {
+    var date = practiceCompletionDate_(practice);
+    var key = monthKey_(date);
+    var username = String(practice.agent_username || practice.agente || "Non assegnato");
+    var groupKey = key + "|" + username;
+    if (!grouped[groupKey]) grouped[groupKey] = { period: key, agent_username: username, agent: users[username] || practice.agente || username, total: 0, count: 0, practices: [] };
+    grouped[groupKey].total += Number(practice.valore || 0);
+    grouped[groupKey].count += 1;
+    grouped[groupKey].practices.push({ id: practice.numero || practice.id || "—", client: practice.cliente || "—", type: String(practice.tipo_pratica || "ACQUISTO").toUpperCase(), value: Number(practice.valore || 0) });
+  });
+  var byMonth = {};
+  Object.keys(grouped).forEach(function (key) {
+    var row = grouped[key];
+    row.practices.sort(function (a, b) { return b.value - a.value; });
+    row.topPractice = row.practices[0] || null;
+    if (!byMonth[row.period]) byMonth[row.period] = [];
+    byMonth[row.period].push(row);
+  });
+  var history = Object.keys(byMonth).sort().reverse().map(function (period) {
+    var ranking = byMonth[period].sort(function (a, b) { return b.total - a.total || b.count - a.count || String(a.agent).localeCompare(String(b.agent)); });
+    var winner = ranking[0];
+    return { period: period, label: monthLabel_(period), agent: winner.agent, agent_username: winner.agent_username, total: winner.total, count: winner.count, topPractice: winner.topPractice };
+  });
+  var now = new Date();
+  var previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  var previousKey = monthKey_(previous);
+  var types = ["ACQUISTO", "NOLEGGIO", "LEASING"];
+  var leaders = {};
+  types.concat(["COMPLESSIVO"]).forEach(function (type) {
+    var totals = {};
+    completed.filter(function (practice) { return type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type; }).forEach(function (practice) {
+      var username = String(practice.agent_username || practice.agente || "Non assegnato");
+      if (!totals[username]) totals[username] = { agent: users[username] || practice.agente || username, total: 0, count: 0 };
+      totals[username].total += Number(practice.valore || 0);
+      totals[username].count += 1;
+    });
+    leaders[type] = Object.keys(totals).map(function (username) { var value = totals[username]; value.agent_username = username; return value; }).sort(function (a, b) { return b.total - a.total || b.count - a.count; })[0] || null;
+    if (leaders[type]) {
+      var leaderPractices = completed.filter(function (practice) { return String(practice.agent_username || practice.agente || "Non assegnato") === leaders[type].agent_username && (type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type); }).sort(function (a, b) { return Number(b.valore || 0) - Number(a.valore || 0); });
+      var leaderPractice = leaderPractices[0];
+      leaders[type].topPractice = leaderPractice ? { id: leaderPractice.numero || leaderPractice.id || "—", client: leaderPractice.cliente || "—", value: Number(leaderPractice.valore || 0) } : null;
+    }
+  });
+  var award = history.filter(function (row) { return row.period === previousKey; })[0] || null;
+  var username = String(currentUser && currentUser.username || "");
+  var ownCompleted = completed.filter(function (practice) { return String(practice.agent_username || "") === username; });
+  var ownPractices = (practices || []).filter(function (practice) { return String(practice.agent_username || "") === username; });
+  var ownClients = (clients || []).filter(function (client) { return String(client.creato_da_username || client.agent_username || "") === username; });
+  var ownWinningPeriods = history.filter(function (row) { return String(row.agent_username || "") === username; }).map(function (row) { return row.period; }).sort();
+  var maxStreak = 0, streak = 0, previousIndex = null;
+  ownWinningPeriods.forEach(function (period) {
+    var parts = period.split("-");
+    var index = Number(parts[0]) * 12 + Number(parts[1]);
+    streak = previousIndex !== null && index === previousIndex + 1 ? streak + 1 : 1;
+    maxStreak = Math.max(maxStreak, streak); previousIndex = index;
+  });
+  var countType = function (type) { return ownPractices.filter(function (practice) { return String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type; }).length; };
+  var maxValue = ownCompleted.reduce(function (max, practice) { return Math.max(max, Number(practice.valore || 0)); }, 0);
+  var ownRevenue = ownCompleted.reduce(function (sum, practice) { return sum + Number(practice.valore || 0); }, 0);
+  var achievements = [
+    { id: "month_1", icon: "🏆", title: "Agente del mese", description: "Conquista il primo posto in un mese.", current: ownWinningPeriods.length, target: 1 },
+    { id: "month_streak_3", icon: "👑", title: "Tripletta d’oro", description: "Agente del mese per 3 mesi consecutivi.", current: maxStreak, target: 3 },
+    { id: "practice_50k", icon: "💎", title: "Pratica Elite", description: "Completa una pratica da almeno 50.000 €.", current: maxValue, target: 50000, currency: true },
+    { id: "practice_100k", icon: "🚀", title: "Pratica Legend", description: "Completa una pratica da almeno 100.000 €.", current: maxValue, target: 100000, currency: true },
+    { id: "clients_10", icon: "🤝", title: "Network Builder", description: "Crea 10 clienti.", current: ownClients.length, target: 10 },
+    { id: "purchase_5", icon: "🛒", title: "Specialista Acquisto", description: "Inserisci 5 pratiche di acquisto.", current: countType("ACQUISTO"), target: 5 },
+    { id: "rental_5", icon: "🔄", title: "Specialista Noleggio", description: "Inserisci 5 pratiche di noleggio.", current: countType("NOLEGGIO"), target: 5 },
+    { id: "leasing_5", icon: "🏦", title: "Specialista Leasing", description: "Inserisci 5 pratiche di leasing.", current: countType("LEASING"), target: 5 },
+    { id: "completed_10", icon: "✅", title: "Closer", description: "Completa 10 pratiche.", current: ownCompleted.length, target: 10 },
+    { id: "revenue_250k", icon: "🌟", title: "Quarto di milione", description: "Raggiungi 250.000 € di fatturato completato.", current: ownRevenue, target: 250000, currency: true }
+  ].map(function (achievement) { achievement.unlocked = Number(achievement.current || 0) >= achievement.target; return achievement; });
+  return { currentPeriod: monthKey_(now), awardPeriod: previousKey, award: award, history: history, leaders: leaders, isCurrentUserWinner: !!award && String(award.agent_username || "") === username, achievements: achievements };
 }
 
 /* ========================= QUOTATION PLANNER ========================= */
