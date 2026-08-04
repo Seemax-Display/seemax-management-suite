@@ -1,5 +1,8 @@
 # Aggiornamento 2.1 — Planner e archivio Documenti
 
+Patch 2.1.1: il trascinamento con mouse è immediato; la pressione di due
+secondi resta riservata all’interazione touchscreen.
+
 ## Novità
 
 - maggiore margine sui quattro lati delle schermate Grenke e IFIS;

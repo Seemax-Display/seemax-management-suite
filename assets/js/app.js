@@ -396,7 +396,7 @@
     const rows = allRows.filter((document) => String(library.placements[document.id] || "") === String(state.documentFolderId || ""));
     const uploadNote = api.isFastMode() ? `<p class="toolbar-note fast-upload-note">Caricamento file non disponibile in Modalità Rapida. Passa alla Modalità Standard per aggiungere documenti.</p>` : `<p class="toolbar-note">Carica PDF, immagini o file Office direttamente nell’archivio Seemax</p>`;
     const toolbar = `<div class="view-toolbar document-toolbar"><div>${uploadNote}</div><div class="document-toolbar-actions"><button class="btn ghost" data-action="new-document-folder">📁 Nuova cartella</button>${api.isFastMode() ? "" : `<button class="btn primary" data-action="new-document" data-folder-id="${esc(state.documentFolderId)}">＋ Carica documento</button>`}</div></div>`;
-    const breadcrumb = `<div class="document-breadcrumb"><button data-action="document-root" class="${state.documentFolderId ? "" : "active"}">🗂️ Documenti</button>${currentFolder ? `<span>›</span><strong>📁 ${esc(currentFolder.name)}</strong>` : ""}${heldDocumentId ? `<button class="cancel-document-move" data-action="cancel-document-move">✕ Annulla spostamento</button>` : `<small>Premi un file per 2 secondi e poi scegli una cartella.</small>`}</div>`;
+    const breadcrumb = `<div class="document-breadcrumb"><button data-action="document-root" class="${state.documentFolderId ? "" : "active"}">🗂️ Documenti</button>${currentFolder ? `<span>›</span><strong>📁 ${esc(currentFolder.name)}</strong>` : ""}${heldDocumentId ? `<button class="cancel-document-move" data-action="cancel-document-move">✕ Annulla spostamento</button>` : `<small>Trascina con il mouse oppure premi per 2 secondi su smartphone.</small>`}</div>`;
     const folders = !state.documentFolderId ? `<div class="document-folder-grid">${library.folders.map((folder) => {
       const count = state.data.documents.filter((document) => library.placements[document.id] === folder.id).length;
       return `<article class="document-folder ${heldDocumentId ? "awaiting-drop" : ""}" data-action="open-document-folder" data-folder-id="${esc(folder.id)}" data-document-folder="${esc(folder.id)}"><span>📁</span><div><strong>${esc(folder.name)}</strong><small>${count} ${count === 1 ? "elemento" : "elementi"}</small></div><button class="folder-delete" data-action="delete-document-folder" data-folder-id="${esc(folder.id)}" aria-label="Elimina cartella">×</button></article>`;
@@ -1230,6 +1230,7 @@
   document.addEventListener("pointerdown", (event) => {
     const row = event.target.closest("[data-document-drag]");
     if (!row || event.target.closest("button,a,input,select,textarea")) return;
+    if (event.pointerType === "mouse") return;
     clearTimeout(documentHoldTimer);
     documentHoldStart = { x: event.clientX, y: event.clientY };
     documentHoldTimer = setTimeout(() => {
@@ -1254,10 +1255,19 @@
 
   document.addEventListener("dragstart", (event) => {
     const row = event.target.closest("[data-document-drag]");
-    if (!row || heldDocumentId !== row.dataset.documentDrag) { event.preventDefault(); return; }
+    if (!row || event.target.closest("button,a,input,select,textarea")) { event.preventDefault(); return; }
+    heldDocumentId = row.dataset.documentDrag;
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/seemax-document", heldDocumentId);
     row.classList.add("dragging");
+    document.querySelectorAll("[data-document-folder]").forEach((folder) => folder.classList.add("awaiting-drop"));
+  });
+
+  document.addEventListener("dragend", (event) => {
+    const row = event.target.closest("[data-document-drag]");
+    if (row) row.classList.remove("dragging");
+    document.querySelectorAll("[data-document-folder]").forEach((folder) => folder.classList.remove("awaiting-drop", "drag-over"));
+    heldDocumentId = "";
   });
 
   document.addEventListener("dragover", (event) => {
