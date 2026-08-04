@@ -14,6 +14,7 @@
   let clientToolsPromise = null;
   const uploadState = { batches: new Map(), expanded: false };
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
+  let pendingFirstAccessTutorial = false;
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -339,8 +340,14 @@
   }
 
   function scheduleFirstAccessExperience() {
-    if (!localStorage.getItem(tutorialStorageKey())) setTimeout(showTutorialWelcome, 350);
-    else setTimeout(showMonthlyAwardIfNeeded, 350);
+    const tutorialRequired = !localStorage.getItem(tutorialStorageKey());
+    setTimeout(() => {
+      if (showMonthlyAwardIfNeeded()) {
+        pendingFirstAccessTutorial = tutorialRequired;
+        return;
+      }
+      if (tutorialRequired) showTutorialWelcome();
+    }, 350);
   }
 
   function startTutorial() {
@@ -554,12 +561,13 @@
 
   function showMonthlyAwardIfNeeded() {
     const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
-    if (!data || !data.award) return;
+    if (!data || !data.award) return false;
     const session = api.getSession() || {};
     const key = `SEEMAX_AGENT_MONTH_SEEN_${session.username || "user"}_${data.currentPeriod}`;
-    if (localStorage.getItem(key) === "1") return;
+    if (localStorage.getItem(key) === "1") return false;
     localStorage.setItem(key, "1");
     openAgentMonthWelcome();
+    return true;
   }
 
   function openAgentMonthWelcome() {
@@ -779,7 +787,13 @@
     setTimeout(() => $("modalRoot").querySelector("input,select,textarea,button")?.focus(), 30);
   }
 
-  function closeModal() { $("modalRoot").innerHTML = ""; }
+  function closeModal() {
+    $("modalRoot").innerHTML = "";
+    if (pendingFirstAccessTutorial) {
+      pendingFirstAccessTutorial = false;
+      setTimeout(showTutorialWelcome, 280);
+    }
+  }
 
   function field(label, name, value = "", options = {}) {
     const attrs = [options.required ? "required" : "", options.readonly ? "readonly" : "", options.min !== undefined ? `min="${options.min}"` : "", options.step ? `step="${options.step}"` : ""].filter(Boolean).join(" ");
