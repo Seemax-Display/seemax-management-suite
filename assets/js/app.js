@@ -13,6 +13,7 @@
   let pendingDocumentFile = null;
   let clientToolsPromise = null;
   const uploadState = { batches: new Map(), expanded: false };
+  const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -99,12 +100,48 @@
   }
 
   function toast(message, tone = "success") {
+    if (tone === "danger") haptic("error");
     const item = document.createElement("div");
     item.className = `toast ${tone}`;
     item.innerHTML = `<span>${tone === "success" ? "✓" : tone === "danger" ? "!" : "i"}</span><strong>${esc(message)}</strong>`;
     $("toastRoot").appendChild(item);
     setTimeout(() => item.classList.add("show"), 20);
     setTimeout(() => { item.classList.remove("show"); setTimeout(() => item.remove(), 250); }, 3500);
+  }
+
+  function haptic(type = "tap") {
+    if (!navigator.vibrate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const patterns = { tap: 7, select: 11, success: [18, 35, 24], error: [24, 38, 24] };
+    try { navigator.vibrate(patterns[type] || patterns.tap); } catch (error) { /* dispositivo non compatibile */ }
+  }
+
+  function celebrateSuccess(icon, title, text) {
+    const root = $("celebrationRoot");
+    if (!root) return;
+    haptic("success");
+    root.innerHTML = `<section class="success-celebration"><div class="success-particles">${Array.from({ length: 10 }, (_, index) => `<i style="--particle:${index}"></i>`).join("")}</div><div class="success-icon"><span>${icon}</span><b>✓</b></div><small>OPERAZIONE COMPLETATA</small><h2>${esc(title)}</h2><p>${esc(text)}</p></section>`;
+    const panel = root.firstElementChild;
+    requestAnimationFrame(() => panel && panel.classList.add("visible"));
+    setTimeout(() => { if (!panel) return; panel.classList.remove("visible"); setTimeout(() => { if (root.contains(panel)) panel.remove(); }, 300); }, 1900);
+  }
+
+  function celebrateSavedEntity(entity, saved, current) {
+    const isNew = !current.id;
+    if (entity === "clients" && isNew) {
+      const shared = String(saved.condiviso || "NO").toUpperCase() === "SI";
+      celebrateSuccess(shared ? "🤝" : "👤", shared ? "Cliente creato e condiviso" : "Cliente creato", shared ? `${saved.ragioneSociale || "Il cliente"} è ora disponibile agli utenti autorizzati.` : `${saved.ragioneSociale || "Il cliente"} è stato aggiunto alla tua anagrafica.`);
+      return true;
+    }
+    if (entity === "clients" && String(current.condiviso || "NO").toUpperCase() !== "SI" && String(saved.condiviso || "NO").toUpperCase() === "SI") {
+      celebrateSuccess("🤝", "Cliente condiviso", `${saved.ragioneSociale || "Il cliente"} è ora disponibile agli altri agenti.`);
+      return true;
+    }
+    if (entity === "practices" && isNew) { celebrateSuccess("📋", "Pratica creata", `${saved.numero || "La nuova pratica"} è stata inserita correttamente.`); return true; }
+    if (entity === "practices" && current.stato && current.stato !== saved.stato) { celebrateSuccess("🔄", "Stato aggiornato", `${saved.numero || "La pratica"} è ora ${saved.stato || "aggiornata"}.`); return true; }
+    if (entity === "documents" && isNew) { celebrateSuccess("📎", "Documento archiviato", `${saved.nome || "Il documento"} è disponibile nell'archivio.`); return true; }
+    if (entity === "users" && isNew) { celebrateSuccess("👤", "Agente attivato", `${saved.nome_visualizzato || saved.username || "Il nuovo agente"} può accedere al Management Suite.`); return true; }
+    if (entity === "products" && isNew) { celebrateSuccess("🖥️", "Prodotto aggiunto", `${saved.nome || "Il prodotto"} è stato inserito nel catalogo.`); return true; }
+    return false;
   }
 
   function hasActiveUploads() {
@@ -254,6 +291,115 @@
     $("userInitials").textContent = initials(user.displayName || user.nome_visualizzato || user.username);
   }
 
+  function tutorialStorageKey() {
+    const user = api.getSession() || {};
+    return `SEEMAX_SUPER_TUTORIAL_${user.username || "utente"}`;
+  }
+
+  function tutorialSteps() {
+    const steps = [
+      { chapter: "Per iniziare", route: "dashboard", selector: ".topbar", title: "La barra principale", text: "Da qui puoi cercare informazioni, cambiare modalità di lavoro, creare una pratica, consultare le notifiche e aprire il tuo profilo." },
+      { chapter: "Per iniziare", selector: ".global-search", title: "Ricerca globale", text: "Cerca rapidamente una pratica tramite identificativo o intestazione e trova i clienti senza cambiare pagina." },
+      { chapter: "Per iniziare", selector: ".mode-controls", title: "Modalità Standard e Rapida", text: "La modalità Standard salva online ogni operazione. La modalità Rapida lavora localmente e ti permette di sincronizzare in seguito con SALVA TUTTO." },
+      { chapter: "Per iniziare", selector: "#quickAddButton", title: "Nuova pratica", text: "Questo comando apre subito la scelta tra Acquisto, Noleggio e Leasing. Il modulo si adatta automaticamente alla tipologia selezionata." },
+      { chapter: "Per iniziare", selector: "#notificationButton", title: "Centro notifiche", text: "Il pallino rosso segnala novità. Qui riceverai, tra le altre cose, gli aggiornamenti sullo stato delle pratiche di cui sei responsabile." },
+      { chapter: "Per iniziare", selector: "#userMenuButton", title: "Profilo connesso", text: "Mostra l'utente attualmente connesso, il suo ruolo e l'eventuale emblema Agente del mese." },
+      { chapter: "Navigazione", selector: ".main-nav", title: "Tutto in un unico menu", text: "Il menu laterale raccoglie ogni strumento del Management Suite. Le voci amministrative sono mostrate soltanto agli utenti autorizzati." },
+      { chapter: "Dashboard", route: "dashboard", selector: ".welcome-panel", title: "Il tuo centro operativo", text: "La Dashboard riassume ciò che richiede attenzione e offre accesso immediato alla creazione delle pratiche e al Quotation Planner." },
+      { chapter: "Dashboard", selector: ".kpi-grid", title: "Indicatori principali", text: "Controlla clienti registrati, pratiche aperte, valore della pipeline e attività ancora da completare." },
+      { chapter: "Dashboard", selector: ".revenue-panel", title: "Obiettivi di fatturato", text: "Le barre confrontano il fatturato personale e aziendale con l'obiettivo impostato. Vengono considerate le pratiche in stato COMPLETATA." },
+      { chapter: "Dashboard", selector: ".agent-month-dashboard", title: "Agente del mese e trofei", text: "Consulta il vincitore del mese di riferimento, le classifiche mensili e la tua bacheca degli obiettivi raggiunti." },
+      { chapter: "Dashboard", selector: ".dashboard-grid", title: "Pipeline, agenda e aggiornamenti", text: "Questa zona riunisce lo stato delle pratiche, le prossime attività e le pratiche aggiornate più recentemente." },
+      { chapter: "Pratiche", route: "practices", selector: ".view-toolbar", title: "Gestione delle pratiche", text: "Crea una nuova pratica e filtra immediatamente l'archivio per Inserita, Accettata, Sospesa, Bocciata o Completata." },
+      { chapter: "Pratiche", selector: ".practice-controls", title: "Ricerca e ordinamento", text: "Cerca per ID o intestazione e ordina per esito, identificativo, cliente, tipologia, finanziaria, valore e, per gli amministratori, agente." },
+      { chapter: "Pratiche", selector: ".practice-result-count", title: "Risultati e pagine", text: "Sono mostrati dieci elementi per pagina. Il contatore indica sempre quali risultati stai visualizzando." },
+      { chapter: "Pratiche", selector: ".panel", title: "Archivio pratiche", text: "Il contorno comunica visivamente lo stato. Apri una pratica per consultarla; solo un amministratore può modificarne l'esito." },
+      { chapter: "Clienti", route: "clients", selector: ".view-toolbar", title: "Anagrafiche clienti", text: "Crea un cliente completo di dati fiscali, contatti, IBAN e indirizzo. Puoi scegliere se condividerlo con gli altri agenti." },
+      { chapter: "Clienti", selector: ".card-grid", title: "Clienti personali e condivisi", text: "Le schede indicano chi ha creato il cliente e quante pratiche personali sono collegate. Un cliente collegato a una pratica non può essere eliminato." },
+      { chapter: "Catalogo", route: "catalog", selector: ".product-grid", title: "Catalogo e giacenze", text: "Consulta immagini, prezzi, promozioni, formati dei cabinet e disponibilità. Apri la scheda tecnica per tutti i dettagli del prodotto." },
+      { chapter: "Quotation Planner", route: "planner", selector: ".planner-shell", title: "Preventivi completamente integrati", text: "Configura il Ledwall, verifica cabinet e giacenze, calcola Acquisto, Grenke o IFIS e inserisci la pratica senza uscire dal Management Suite." },
+      { chapter: "Documenti", route: "documents", selector: ".document-toolbar", title: "Caricamento dei documenti", text: "Carica PDF, immagini e file Office. I trasferimenti avvengono in background e il centro upload mostra avanzamento e file rimanenti." },
+      { chapter: "Documenti", selector: ".document-breadcrumb", title: "Cartelle locali", text: "Le cartelle organizzano visivamente i documenti su questo dispositivo senza modificare la loro posizione generale nell'archivio." },
+      { chapter: "Documenti", selector: ".document-drop-zone", title: "Trascina e organizza", text: "Trascina un documento dentro una cartella con il mouse oppure tienilo premuto per due secondi sullo smartphone." },
+      { chapter: "Attività", route: "activities", selector: ".view-toolbar", title: "Agenda operativa", text: "Crea telefonate, appuntamenti e promemoria. Questa sezione resta locale per offrire una risposta immediata." },
+      { chapter: "Attività", selector: ".activity-columns", title: "Da fare e completate", text: "Spunta le attività concluse e consulta separatamente quelle ancora aperte e lo storico delle completate." }
+    ];
+    if (api.isAdmin()) steps.push(
+      { chapter: "Amministrazione", route: "users", selector: ".view-toolbar", title: "Agenti e accessi", text: "Crea e gestisci gli account, assegna i ruoli e attiva o disattiva l'accesso degli utenti." },
+      { chapter: "Amministrazione", selector: ".panel", title: "Elenco degli account", text: "Consulta username, contatti, ruolo e stato di ogni agente. Le modifiche sono riservate agli amministratori." },
+      { chapter: "Amministrazione", route: "settings", selector: ".settings-grid", title: "Impostazioni generali", text: "Configura obiettivo di fatturato, parametri aziendali, collegamento e obbligatorietà dei campi delle diverse pratiche." }
+    );
+    steps.push({ chapter: "Hai concluso", route: "dashboard", selector: "#tutorialButton", title: "Il tutorial rimane sempre disponibile", text: "Puoi riaprire questa guida in qualsiasi momento tramite il piccolo pulsante Tutorial nella barra superiore. Buon lavoro con Seemax Management Suite!" });
+    return steps;
+  }
+
+  function showTutorialWelcome() {
+    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>IL TUO NUOVO CENTRO OPERATIVO</span><h3>BENVENUTO IN SEEMAX MANAGEMENT SUITE!</h3><p>Seemax Management Suite raccoglie tutto ciò che conoscevi di Seemax For You e lo porta a un livello completamente nuovo. Niente più reindirizzamenti esterni, navigazioni eccessive o perdite di tempo: ora hai tutto a portata di click o di tocco.</p><p>Crea preventivi, controlla le giacenze direttamente nel calcolatore, registra clienti e pratiche, gestisci i documenti e monitora il tuo lavoro da un unico ambiente.</p><div class="form-actions"><button class="btn ghost" data-action="disable-tutorial">Disattiva tutorial</button><button class="btn primary" data-action="start-tutorial">Spiegami tutto</button></div></div>`;
+    openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
+  }
+
+  function scheduleFirstAccessExperience() {
+    if (!localStorage.getItem(tutorialStorageKey())) setTimeout(showTutorialWelcome, 350);
+    else setTimeout(showMonthlyAwardIfNeeded, 350);
+  }
+
+  function startTutorial() {
+    closeModal();
+    tutorialState.active = true;
+    tutorialState.index = 0;
+    tutorialState.steps = tutorialSteps();
+    tutorialState.previousRoute = state.route;
+    localStorage.setItem(tutorialStorageKey(), JSON.stringify({ status: "started", index: 0 }));
+    showTutorialStep();
+  }
+
+  function stopTutorial(completed = false) {
+    tutorialState.active = false;
+    $("tutorialRoot").innerHTML = "";
+    document.body.classList.remove("tutorial-active");
+    $("sidebar").classList.remove("open");
+    localStorage.setItem(tutorialStorageKey(), JSON.stringify({ status: completed ? "completed" : "interrupted", index: tutorialState.index }));
+    if (completed) { go("dashboard"); toast("Super Tutorial completato. Potrai riaprirlo quando vuoi."); setTimeout(showMonthlyAwardIfNeeded, 500); }
+  }
+
+  function showTutorialStep() {
+    if (!tutorialState.active) return;
+    const step = tutorialState.steps[tutorialState.index];
+    if (!step) { stopTutorial(true); return; }
+    if (step.route && state.route !== step.route) go(step.route);
+    const root = $("tutorialRoot");
+    root.innerHTML = `<div class="tutorial-layer" role="dialog" aria-modal="true" aria-label="Super Tutorial"><div class="tutorial-spotlight"></div><section class="tutorial-card"><header><span>${esc(step.chapter)}</span><strong>${tutorialState.index + 1} / ${tutorialState.steps.length}</strong></header><div class="tutorial-progress"><i style="width:${Math.round((tutorialState.index + 1) / tutorialState.steps.length * 100)}%"></i></div><h2>${esc(step.title)}</h2><p>${esc(step.text)}</p><footer><button class="btn ghost" data-action="stop-tutorial">Interrompi</button><div><button class="btn soft" data-action="tutorial-previous" ${tutorialState.index === 0 ? "disabled" : ""}>← Indietro</button><button class="btn primary" data-action="tutorial-next">${tutorialState.index === tutorialState.steps.length - 1 ? "Concludi" : "Avanti →"}</button></div></footer></section></div>`;
+    document.body.classList.add("tutorial-active");
+    const mobileNav = window.matchMedia("(max-width: 800px)").matches && step.selector === ".main-nav";
+    $("sidebar").classList.toggle("open", mobileNav);
+    setTimeout(() => positionTutorialSpotlight(step.selector), step.route === "planner" ? 180 : 40);
+  }
+
+  function positionTutorialSpotlight(selector) {
+    if (!tutorialState.active) return;
+    const target = document.querySelector(selector);
+    const spotlight = $("tutorialRoot").querySelector(".tutorial-spotlight");
+    if (!target || !spotlight) { spotlight && spotlight.classList.add("is-hidden"); return; }
+    target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    setTimeout(() => {
+      if (!tutorialState.active || !spotlight) return;
+      const rect = target.getBoundingClientRect();
+      const pad = 8;
+      spotlight.style.left = `${Math.max(6, rect.left - pad)}px`;
+      spotlight.style.top = `${Math.max(6, rect.top - pad)}px`;
+      spotlight.style.width = `${Math.min(innerWidth - 12, rect.width + pad * 2)}px`;
+      spotlight.style.height = `${Math.min(innerHeight - 12, rect.height + pad * 2)}px`;
+    }, 180);
+  }
+
+  function moveTutorial(direction) {
+    const next = tutorialState.index + direction;
+    if (next >= tutorialState.steps.length) { stopTutorial(true); return; }
+    tutorialState.index = Math.max(0, next);
+    localStorage.setItem(tutorialStorageKey(), JSON.stringify({ status: "started", index: tutorialState.index }));
+    showTutorialStep();
+  }
+
   async function showApp() {
     $("loginScreen").classList.add("is-hidden");
     $("app").classList.remove("is-hidden");
@@ -277,7 +423,7 @@
           toast("Dati locali disponibili. Il database verrà aggiornato al prossimo collegamento.", "warning");
         }
       }
-      setTimeout(showMonthlyAwardIfNeeded, 350);
+      scheduleFirstAccessExperience();
     } catch (error) {
       toast(error.message, "danger");
       $("viewContainer").innerHTML = emptyState("Database non disponibile", "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
@@ -303,12 +449,12 @@
     $("pageSubtitle").textContent = meta[1];
     $("pageEyebrow").textContent = state.route === "planner" ? "Strumento integrato" : "Seemax Management";
     renderNav();
-    renderRoute();
+    renderRoute(true);
     $("sidebar").classList.remove("open");
     $("viewContainer").focus({ preventScroll: true });
   }
 
-  function renderRoute() {
+  function renderRoute(animate = false) {
     if (!state.data && state.route !== "settings") return;
     const renders = { dashboard: renderDashboard, practices: renderPractices, clients: renderClients, catalog: renderCatalog, planner: renderPlanner, documents: renderDocuments, activities: renderActivities, users: renderUsers, settings: renderSettings };
     $("viewContainer").innerHTML = renders[state.route]();
@@ -321,6 +467,13 @@
         version: config.version,
         fastMode: api.isFastMode()
       });
+    }
+    if (animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const view = $("viewContainer");
+      view.classList.remove("route-enter");
+      void view.offsetWidth;
+      view.classList.add("route-enter");
+      setTimeout(() => view.classList.remove("route-enter"), 360);
     }
   }
 
@@ -1138,6 +1291,7 @@
     }
     setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
     let activeUploadBatchId = "";
+    let celebrationShown = false;
     try {
       const preparedAttachmentsPromise = entity === "practices" && practiceAttachments.length
         ? Promise.all(practiceAttachments.map(async (attachment) => ({
@@ -1153,6 +1307,7 @@
         closeModal();
         renderRoute();
         setLoading(false);
+        celebrationShown = celebrateSavedEntity(entity, saved, current);
         toast(`Pratica salvata. Caricamento di ${practiceAttachments.length} documenti in background: non chiudere la pagina.`, "info");
         const preparedAttachments = await preparedAttachmentsPromise;
         let completedUploads = 0;
@@ -1217,6 +1372,7 @@
       setConnectionState();
       closeModal();
       renderRoute();
+      if (!celebrationShown) celebrateSavedEntity(entity, saved, current);
       toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
     } catch (error) {
       if (activeUploadBatchId) {
@@ -1425,6 +1581,11 @@
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,
       "trophy-board": openTrophyBoard,
+      "start-tutorial": startTutorial,
+      "disable-tutorial": () => { localStorage.setItem(tutorialStorageKey(), JSON.stringify({ status: "disabled" })); closeModal(); setTimeout(showMonthlyAwardIfNeeded, 250); toast("Tutorial automatico disattivato. Puoi riaprirlo quando vuoi."); },
+      "stop-tutorial": () => stopTutorial(false),
+      "tutorial-previous": () => moveTutorial(-1),
+      "tutorial-next": () => moveTutorial(1),
       "toggle-upload-center": () => { uploadState.expanded = !uploadState.expanded; renderUploadCenter(); },
       "dismiss-upload-center": () => {
         Array.from(uploadState.batches.entries()).forEach(([batchId, batch]) => { if (batch.status !== "active") uploadState.batches.delete(batchId); });
@@ -1444,6 +1605,8 @@
   }
 
   document.addEventListener("click", async (event) => {
+    const interactive = event.target.closest("button:not(:disabled), a[href], [data-action], [data-route], .choice-card");
+    if (interactive) haptic(interactive.matches("[data-route], .choice-card") ? "select" : "tap");
     const filterTarget = event.target.closest("[data-filter-status]");
     if (filterTarget) { state.filterStatus = filterTarget.dataset.filterStatus || ""; state.practicePage = 1; renderRoute(); return; }
     const practicePageTarget = event.target.closest("[data-practice-page]");
@@ -1471,6 +1634,7 @@
   });
 
   document.addEventListener("change", (event) => {
+    if (event.target.matches("select,input[type='file']") || (event.target.matches("input[type='checkbox'],input[type='radio']") && !event.target.closest(".choice-card"))) haptic("select");
     if (event.target.id === "practiceSort") { state.practiceSort = event.target.value; state.practicePage = 1; renderRoute(); }
     if (event.target.id === "practiceDirection") { state.practiceDirection = event.target.value; state.practicePage = 1; renderRoute(); }
   });
@@ -1598,13 +1762,15 @@
   $("globalSearch").addEventListener("input", (event) => {
     if (["practices", "clients", "catalog", "documents", "activities", "users"].includes(state.route)) { state.search = event.target.value; renderRoute(); }
   });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape") { closeModal(); $("sidebar").classList.remove("open"); } });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") { if (tutorialState.active) stopTutorial(false); else closeModal(); $("sidebar").classList.remove("open"); } if (tutorialState.active && event.key === "ArrowRight") moveTutorial(1); if (tutorialState.active && event.key === "ArrowLeft") moveTutorial(-1); });
+  window.addEventListener("resize", () => { if (tutorialState.active) positionTutorialSpotlight(tutorialState.steps[tutorialState.index].selector); });
   window.addEventListener("hashchange", () => { if (api.getSession()) go(location.hash.replace("#", "") || "dashboard", false); });
   window.addEventListener("seemax:practice-created", async (event) => {
     await loadAll();
     state.practiceQuery = String((event.detail && event.detail.practice && event.detail.practice.numero) || "");
     state.practicePage = 1;
     go("practices");
+    celebrateSuccess("📋", "Pratica creata dal Planner", `${state.practiceQuery || "La nuova pratica"} è stata inserita e collegata al preventivo.`);
     toast("Pratica inserita: elenco aggiornato automaticamente.");
   });
   window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); installPrompt = event; $("installAppButton").classList.remove("is-hidden"); });

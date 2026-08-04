@@ -78,6 +78,7 @@
           </div>
           <button id="installAppButton" class="btn ghost is-hidden">Installa App</button>
           <button id="quickAddButton" class="btn primary">＋ Nuova pratica</button>
+          <button id="tutorialButton" class="tutorial-button" data-action="start-tutorial" aria-label="Apri il tutorial"><span>❔</span><strong>Tutorial</strong></button>
           <button id="notificationButton" class="notification-button" data-action="open-notifications" aria-label="Notifiche"><span>🔔</span><i id="notificationDot"></i></button>
           <button id="userMenuButton" class="user-chip" aria-label="Profilo utente"><span id="userInitials">DF</span><div><strong id="userName">Utente</strong><small id="userRole">AGENTE</small></div></button>
         </div>
@@ -88,6 +89,8 @@
   </div>
 
   <div id="modalRoot"></div>
+  <div id="tutorialRoot"></div>
+  <div id="celebrationRoot" class="celebration-root" aria-live="polite"></div>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
   <aside id="uploadCenter" class="upload-center is-hidden" aria-live="polite">
     <button id="uploadCenterSummary" class="upload-center-summary" type="button" data-action="toggle-upload-center" aria-expanded="false">
