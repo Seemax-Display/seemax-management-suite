@@ -156,6 +156,9 @@
     } else if (!status.online) {
       banner.className = "connection-banner danger";
       banner.innerHTML = `<strong>Database non disponibile.</strong> Controlla l’URL Apps Script e la pubblicazione della Web App.`;
+    } else if (status.serverVersion && !String(status.serverVersion).includes(String(config.version))) {
+      banner.className = "connection-banner danger";
+      banner.innerHTML = `<strong>Backend non aggiornato.</strong> Il sito usa la versione ${esc(config.version)}, mentre Apps Script risponde con ${esc(status.serverVersion)}. Pubblica una nuova versione del deployment.`;
     } else banner.className = "connection-banner is-hidden";
   }
 
@@ -330,13 +333,13 @@
     openAgentMonthWelcome();
   }
 
-  function openAgentMonthWelcome() {
+  function openAgentMonthWelcome(preview = false) {
     const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
-    const award = data && data.award;
+    const award = data && (data.award || (preview && (data.history || [])[0]));
     if (!award) { openAgentMonthDetails(); return; }
     const top = award.topPractice || {};
     const body = `<div class="agent-month-welcome"><div class="agent-month-trophy">🏆</div><span class="agent-month-label">AGENTE DEL MESE</span><h3>${esc(award.agent)}</h3><p class="agent-month-period">Risultato di ${esc(award.label)}</p><div class="agent-month-winning-practice"><small>PRATICA DI MAGGIOR VALORE</small><strong>${esc(top.id || "—")} · ${esc(top.client || "—")}</strong><span>${euros(top.value || 0)}</span></div><div class="agent-month-total"><span>Fatturato totale completato</span><strong>${euros(award.total)}</strong><small>${award.count} ${award.count === 1 ? "pratica completata" : "pratiche completate"}</small></div><div class="form-actions"><button class="btn ghost" data-action="close-modal">Continua</button><button class="btn primary" data-action="agent-month-details">Maggiori dettagli</button></div></div>`;
-    openModal("Benvenuto nel nuovo mese!", body, { wide: true, kicker: "Seemax celebra i risultati" });
+    openModal(preview ? "Anteprima · Benvenuto nel nuovo mese!" : "Benvenuto nel nuovo mese!", body, { wide: true, kicker: preview ? "Test amministratore · nessun dato modificato" : "Seemax celebra i risultati" });
   }
 
   function openAgentMonthDetails() {
@@ -348,7 +351,8 @@
       return `<article class="agent-leader-card ${type.toLowerCase()}"><span>${type === "ACQUISTO" ? "🛒" : type === "NOLEGGIO" ? "🔄" : type === "LEASING" ? "🏦" : "🏆"}</span><div><small>${leaderNames[type]}</small><strong>${row ? esc(row.agent) : "Nessun risultato"}</strong><em>${row ? euros(row.total) : "—"}</em>${row ? `<p>${row.count} pratiche completate${row.topPractice ? ` · Top ${esc(row.topPractice.id)} (${euros(row.topPractice.value)})` : ""}</p>` : ""}</div></article>`;
     }).join("");
     const history = (data.history || []).map((row) => `<tr><td><strong>${esc(row.label)}</strong></td><td>${esc(row.agent)}</td><td>${esc((row.topPractice || {}).id || "—")}<small>${esc((row.topPractice || {}).client || "")}</small></td><td>${row.count}</td><td><strong>${euros(row.total)}</strong></td></tr>`).join("");
-    const body = `<div class="agent-month-details"><div class="agent-detail-actions"><button class="btn gold" data-action="trophy-board">🏅 Apri la mia bacheca trofei</button></div><section><span class="section-kicker">Record complessivi</span><h3>Leader per tipologia</h3><div class="agent-leaders-grid">${leaders}</div></section><section><span class="section-kicker">Albo d’oro</span><h3>Agenti del mese</h3>${history ? `<div class="table-wrap"><table><thead><tr><th>Mese</th><th>Agente</th><th>Pratica principale</th><th>Pratiche</th><th>Fatturato</th></tr></thead><tbody>${history}</tbody></table></div>` : emptyState("Nessun mese disponibile", "Completa una pratica per iniziare la classifica.")}</section><p class="agent-month-note">Il calcolo considera esclusivamente il valore delle pratiche in stato COMPLETATA. Le provvigioni non vengono conteggiate.</p></div>`;
+    const previewButton = api.isAdmin() ? `<button class="btn soft" data-action="preview-agent-month">👁️ Prova messaggio iniziale</button>` : "";
+    const body = `<div class="agent-month-details"><div class="agent-detail-actions"><button class="btn gold" data-action="trophy-board">🏅 Apri la mia bacheca trofei</button>${previewButton}</div><section><span class="section-kicker">Record complessivi</span><h3>Leader per tipologia</h3><div class="agent-leaders-grid">${leaders}</div></section><section><span class="section-kicker">Albo d’oro</span><h3>Agenti del mese</h3>${history ? `<div class="table-wrap"><table><thead><tr><th>Mese</th><th>Agente</th><th>Pratica principale</th><th>Pratiche</th><th>Fatturato</th></tr></thead><tbody>${history}</tbody></table></div>` : emptyState("Nessun mese disponibile", "Completa una pratica per iniziare la classifica.")}</section><p class="agent-month-note">Il calcolo considera esclusivamente il valore delle pratiche in stato COMPLETATA. Le provvigioni non vengono conteggiate.</p></div>`;
     openModal("Agente del mese", body, { wide: true, kicker: "Classifiche Seemax", subtitle: "Risultati mensili e record complessivi" });
   }
 
@@ -557,8 +561,12 @@
     return `<label class="${cls}">${esc(label)}${marker}<input name="${name}" type="${options.type || "text"}" value="${esc(value)}" ${attrs}></label>`;
   }
 
-  function formShell(entity, id, fields, submitLabel = "Salva") {
-    return `<form class="entity-form form-grid" data-entity="${entity}" data-id="${esc(id || "")}">${fields}<div class="form-actions full"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">${esc(submitLabel)}</button></div></form>`;
+  function newRequestToken() {
+    return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function formShell(entity, id, fields, submitLabel = "Salva", recordVersion = 0) {
+    return `<form class="entity-form form-grid" data-entity="${entity}" data-id="${esc(id || "")}" data-record-version="${Number(recordVersion || 0)}" data-request-token="${newRequestToken()}">${fields}<div class="form-actions full"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">${esc(submitLabel)}</button></div></form>`;
   }
 
   function practiceRequired(type, field) {
@@ -692,7 +700,7 @@
       `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}"><input type="hidden" name="p391_unificato" value="${esc(record.p391_unificato || "NO")}"><input type="hidden" name="p391_cabinet_50100" value="${esc(record.p391_cabinet_50100 || "0")}"><input type="hidden" name="p391_cabinet_5050" value="${esc(record.p391_cabinet_5050 || "0")}">` +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
       field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") });
-    openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica"), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
+    openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica", record.record_version), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
     bindPracticeConditionalFields(practiceType);
     bindPracticeCalculator(logicalProducts, productOptions);
   }
@@ -842,7 +850,7 @@
       field("Email", "email", r.email, { type: "email" }) +
       window.SeemaxClientTools.renderFields(r) +
       field("Note commerciali", "note", r.note, { type: "textarea", full: true });
-    openModal(r.id ? (canEdit ? "Modifica cliente" : "Anagrafica condivisa") : "Nuovo cliente", formShell("clients", r.id, fields, canEdit ? "Salva cliente" : "Consultazione"), { wide: true, kicker: canEdit ? "Anagrafica cliente" : "Cliente condiviso", subtitle: !canEdit ? `Creato da ${r.creato_da_nome || "un altro utente"}. Puoi utilizzarlo nelle tue pratiche, ma non modificarlo.` : "" });
+    openModal(r.id ? (canEdit ? "Modifica cliente" : "Anagrafica condivisa") : "Nuovo cliente", formShell("clients", r.id, fields, canEdit ? "Salva cliente" : "Consultazione", r.record_version), { wide: true, kicker: canEdit ? "Anagrafica cliente" : "Cliente condiviso", subtitle: !canEdit ? `Creato da ${r.creato_da_nome || "un altro utente"}. Puoi utilizzarlo nelle tue pratiche, ma non modificarlo.` : "" });
     const form = document.querySelector(".entity-form[data-entity='clients']");
     if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast, !canEdit);
   }
@@ -859,7 +867,7 @@
       section("Giacenze", field("Giacenza iniziale", "giacenza_iniziale", r.giacenza_iniziale || 0, { type: "number", min: 0 }) + field("Giacenza attuale", "giacenza_attuale", r.giacenza_attuale || 0, { type: "number", min: 0 }) + field("Stato giacenza", "stato_giacenza", r.stato_giacenza || "DISPONIBILE", { options: ["DISPONIBILE", "IN ARRIVO", "SOLO SU ORDINAZIONE", "NON DISPONIBILE"] })) +
       section("Scheda tecnica", field("Pixel pitch", "tech_pixel_pitch", spec("tech_pixel_pitch", "Pixel pitch")) + field("Certificazione", "tech_certificazione", spec("tech_certificazione", "Certificazione")) + field("Modalità di utilizzo", "tech_utilizzo", spec("tech_utilizzo", "Modalità")) + field("Densità pixel", "tech_densita_pixel", spec("tech_densita_pixel", "Densità pixel")) + field("LED standard", "tech_led_standard", spec("tech_led_standard", "LED")) + field("Materiale cabinet", "tech_materiale_cabinet", spec("tech_materiale_cabinet", "Cabinet")) + field("Peso cabinet", "tech_peso_cabinet", spec("tech_peso_cabinet", "Peso cabinet")) + field("Scala di grigi", "tech_scala_grigi", spec("tech_scala_grigi", "Scala di grigi")) + field("Temperatura operativa", "tech_temperatura", spec("tech_temperatura", "Temperatura")) + field("Valore IP", "tech_ip", spec("tech_ip", "Protezione")) + field("Consumo medio", "tech_consumo_medio", spec("tech_consumo_medio", "Consumo medio")) + field("Consumo massimo", "tech_consumo_massimo", spec("tech_consumo_massimo", "Consumo massimo")) + field("Vita media", "tech_vita_media", spec("tech_vita_media", "Vita media")) + field("Visibilità", "tech_visibilita", spec("tech_visibilita", "Visibilità")) + field("Luminosità", "tech_luminosita", spec("tech_luminosita", "Luminosità")) + field("Frequenza aggiornamento", "tech_refresh", spec("tech_refresh", "Refresh"))) +
       section("Altro", field("Immagine prodotto", "immagine_url", r.immagine_url, { full: true }) + field("Link scheda tecnica", "scheda_url", r.scheda_url, { full: true }) + field("Informazioni agenti", "infoAgenti", r.infoAgenti, { type: "textarea", full: true }) + field("Informazioni amministrative", "infoAdmin", r.infoAdmin, { type: "textarea", full: true }) + field("Prodotto attivo", "attivo", r.attivo || "SI", { options: ["SI", "NO"] }));
-    openModal(r.id ? "Modifica prodotto" : "Nuovo prodotto", formShell("products", r.id, fields), { wide: true, kicker: "Catalogo Ledwall" });
+    openModal(r.id ? "Modifica prodotto" : "Nuovo prodotto", formShell("products", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Catalogo Ledwall" });
   }
 
   function openProductTech(id) {
@@ -882,7 +890,7 @@
       ? `<div class="full fast-upload-note">Il file non può essere sostituito mentre è attiva la Modalità Rapida.</div>`
       : `<label class="full upload-field">File dal dispositivo${r.url ? `<small>Il file attuale resta invariato se non ne selezioni uno nuovo.</small>` : `<small>Massimo 8 MB. Il file sarà archiviato nel Drive Seemax.</small>`}<input name="document_file" type="file" ${r.url ? "" : "required"} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt"></label>`;
     const fields = field("Nome documento", "nome", r.nome, { required: true, full: true }) + field("Tipo", "tipo", r.tipo || "Preventivo", { options: ["Preventivo", "Contratto", "Documento cliente", "Documento finanziaria", "Installazione", "Altro"] }) + field("Pratica", "practiceId", r.practiceId || "", { options: ["", ...state.data.practices.map((p) => p.id)] }) + fileField + field("Data", "data", r.data || new Date().toISOString().slice(0, 10), { type: "date" }) + field("Note", "note", r.note, { type: "textarea", full: true });
-    openModal(r.id ? "Modifica documento" : "Nuovo documento", formShell("documents", r.id, fields), { wide: true, kicker: "Archivio documentale" });
+    openModal(r.id ? "Modifica documento" : "Nuovo documento", formShell("documents", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Archivio documentale" });
     if (!id && pendingDocumentFile) requestAnimationFrame(() => {
       const form = document.querySelector(".entity-form[data-entity='documents']");
       const input = form && form.elements.document_file;
@@ -903,7 +911,7 @@
   function openUser(id) {
     const r = state.data.users.find((u) => (u.id || u.username) === id) || { ruolo: "AGENTE", stato: "ATTIVO" };
     const fields = field("Nome visualizzato", "nome_visualizzato", r.nome_visualizzato, { required: true }) + field("Username", "username", r.username, { required: true, readonly: !!r.username }) + field(r.id ? "Nuova Chiave ID (lascia vuoto per non cambiarla)" : "Chiave ID", "chiave_id_agente", "", { required: !r.id }) + field("Ruolo", "ruolo", r.ruolo, { options: ["AGENTE", "ADMIN"] }) + field("Email", "email", r.email, { type: "email" }) + field("Telefono", "telefono", r.telefono) + field("Stato", "stato", r.stato, { options: ["ATTIVO", "SOSPESO"] }) + field("Note", "note", r.note, { type: "textarea", full: true });
-    openModal(r.id ? "Modifica agente" : "Nuovo agente", formShell("users", r.id, fields), { wide: true, kicker: "Accessi S.Q.P." });
+    openModal(r.id ? "Modifica agente" : "Nuovo agente", formShell("users", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Accessi S.Q.P." });
   }
 
   function serializeForm(form) {
@@ -979,7 +987,7 @@
         return;
       }
     }
-    const oversizedAttachment = practiceAttachments.find((item) => item.file.size > 8 * 1024 * 1024);
+    const oversizedAttachment = practiceAttachments.find((item) => item.file.size > (item.file.type.startsWith("image/") ? 20 : 8) * 1024 * 1024);
     if (oversizedAttachment) {
       toast(`${oversizedAttachment.label}: il file supera il limite di 8 MB.`, "danger");
       return;
@@ -1003,6 +1011,8 @@
     }
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const record = { ...current, ...serializeForm(form) };
+    record.expected_record_version = Number(form.dataset.recordVersion || 0);
+    record.request_token = form.dataset.requestToken || newRequestToken();
     Object.keys(record).filter((key) => key.startsWith("practice_file_")).forEach((key) => delete record[key]);
     delete record.cabinet_calculated;
     delete record.display_width;
@@ -1042,11 +1052,13 @@
       const file = form.elements.document_file && form.elements.document_file.files[0];
       if (file) {
         if (api.isFastMode()) { toast("Il caricamento dei file è disponibile soltanto in Modalità Standard.", "danger"); return; }
-        if (file.size > 8 * 1024 * 1024) { toast("Il file supera il limite di 8 MB.", "danger"); return; }
-        record.file_base64 = await readFileAsDataUrl(file);
-        record.file_name = file.name;
-        record.file_type = file.type || "application/octet-stream";
-        record.file_size = file.size;
+        if (file.size > (file.type.startsWith("image/") ? 20 : 8) * 1024 * 1024) { toast("Il file supera il limite consentito.", "danger"); return; }
+        const preparedFile = await prepareFileForUpload(file);
+        if (preparedFile.size > 8 * 1024 * 1024) { toast("Non è stato possibile ridurre il file sotto il limite di 8 MB.", "danger"); return; }
+        record.file_base64 = preparedFile.dataUrl;
+        record.file_name = preparedFile.name;
+        record.file_type = preparedFile.type;
+        record.file_size = preparedFile.size;
         if (!record.nome) record.nome = file.name;
       }
     }
@@ -1059,14 +1071,18 @@
       const preparedAttachmentsPromise = entity === "practices" && practiceAttachments.length
         ? Promise.all(practiceAttachments.map(async (attachment) => ({
           ...attachment,
-          file_base64: await readFileAsDataUrl(attachment.file)
+          preparedFile: await prepareFileForUpload(attachment.file)
         })))
         : Promise.resolve([]);
       let saved = await api.upsert(entity, record);
       if (entity === "practices" && practiceAttachments.length) {
+        replaceLocalEntity(entity, saved);
+        closeModal();
+        renderRoute();
+        setLoading(false);
+        toast(`Pratica salvata. Caricamento di ${practiceAttachments.length} documenti in background: non chiudere la pagina.`, "info");
         const preparedAttachments = await preparedAttachmentsPromise;
         let completedUploads = 0;
-        setLoading(true, `Caricamento documenti: 0 di ${preparedAttachments.length}…`);
         const uploadResults = await mapWithConcurrency(preparedAttachments, 3, async (attachment) => {
           const documentRecord = {
             practiceId: saved.id,
@@ -1077,10 +1093,10 @@
             tipo_pratica_documento: attachment.key,
             data: new Date().toISOString().slice(0, 10),
             agent_username: saved.agent_username,
-            file_base64: attachment.file_base64,
-            file_name: attachment.file.name,
-            file_type: attachment.file.type || "application/octet-stream",
-            file_size: attachment.file.size,
+            file_base64: attachment.preparedFile.dataUrl,
+            file_name: attachment.preparedFile.name,
+            file_type: attachment.preparedFile.type,
+            file_size: attachment.preparedFile.size,
             note: `Allegato ${saved.tipo_pratica || "pratica"}`
           };
           try {
@@ -1092,7 +1108,7 @@
             return { ok: false, attachment, error };
           } finally {
             completedUploads += 1;
-            setLoading(true, `Caricamento documenti: ${completedUploads} di ${preparedAttachments.length}…`);
+            toast(`Documenti pratica: ${completedUploads} di ${preparedAttachments.length} completati.`, "info");
           }
         });
         const successfulUploads = uploadResults.filter((result) => result.ok);
@@ -1100,7 +1116,6 @@
         const uploaded = successfulUploads.map(({ attachment, document }) => ({ tipo: attachment.key, document_id: document.id, nome: document.nome, url: document.url }));
         const previousUploaded = (() => { try { return JSON.parse(saved.documenti_caricati_json || "[]"); } catch (error) { return []; } })();
         const mergedUploads = previousUploaded.filter((previous) => !uploaded.some((currentUpload) => currentUpload.tipo === previous.tipo)).concat(uploaded);
-        setLoading(true, "Finalizzazione pratica…");
         saved = await api.updatePracticeDocuments(saved.id, JSON.stringify(mergedUploads));
         if (failedUploads.length) {
           replaceLocalEntity(entity, saved);
@@ -1124,7 +1139,13 @@
       closeModal();
       renderRoute();
       toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
-    } catch (error) { toast(error.message, "danger"); }
+    } catch (error) {
+      if (String(error.message || "").includes("CONFLICT_RECORD")) {
+        toast("Questo elemento è stato modificato da un altro utente. I dati sono stati aggiornati: riaprilo e applica nuovamente la modifica.", "danger");
+        closeModal();
+        try { await loadAll(false); renderRoute(); } catch (refreshError) { /* conserva i dati già visibili */ }
+      } else toast(error.message, "danger");
+    }
     finally { setLoading(false); }
   }
 
@@ -1135,6 +1156,26 @@
       reader.onerror = () => reject(new Error("Impossibile leggere il file selezionato."));
       reader.readAsDataURL(file);
     });
+  }
+
+  async function prepareFileForUpload(file) {
+    const original = async () => ({ dataUrl: await readFileAsDataUrl(file), name: file.name, type: file.type || "application/octet-stream", size: file.size });
+    if (!file.type.startsWith("image/") || file.type === "image/gif" || file.size < 900 * 1024 || !window.createImageBitmap) return original();
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d", { alpha: false });
+      context.fillStyle = "#fff"; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+      if (!blob || blob.size >= file.size || blob.size > 8 * 1024 * 1024) return original();
+      const baseName = file.name.replace(/\.[^.]+$/, "");
+      return { dataUrl: await readFileAsDataUrl(blob), name: `${baseName}.jpg`, type: "image/jpeg", size: blob.size };
+    } catch (error) { return original(); }
   }
 
   async function mapWithConcurrency(items, concurrency, worker) {
@@ -1156,12 +1197,18 @@
     if (!confirm(`Eliminare definitivamente questo ${label}?`)) return;
     setLoading(true, "Eliminazione…");
     try {
-      await api.remove(entity, id);
+      const existing = (state.data[entity] || []).find((item) => String(item.id || item.username) === String(id));
+      await api.remove(entity, id, Number(existing && existing.record_version || 0));
       state.data[entity] = (state.data[entity] || []).filter((item) => String(item.id || item.username) !== String(id));
       if (entity === "documents") { const library = documentLibrary(); delete library.placements[id]; saveDocumentLibrary(library); }
       updateLocalDashboard(); scheduleBootstrapCache(); renderRoute(); toast(`${label} eliminato.`);
     }
-    catch (error) { toast(error.message, "danger"); }
+    catch (error) {
+      if (String(error.message || "").includes("CONFLICT_RECORD")) {
+        toast("L'elemento è cambiato prima dell'eliminazione. I dati sono stati aggiornati e nulla è stato cancellato.", "danger");
+        try { await loadAll(false); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
+      } else toast(error.message, "danger");
+    }
     finally { setLoading(false); }
   }
 
@@ -1293,6 +1340,7 @@
       "close-modal": closeModal,
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,
+      "preview-agent-month": () => openAgentMonthWelcome(true),
       "trophy-board": openTrophyBoard,
       "enable-fast-mode": openFastModeWarning,
       "confirm-fast-mode": enableFastMode,
@@ -1300,7 +1348,7 @@
       "sync-all": syncAll,
       "reload": async () => { await loadAll(); renderRoute(); },
       "reload-planner": () => { if (state.route === "planner") renderRoute(); },
-      "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.ping(); setConnectionState(); toast(response.ok ? "Collegamento funzionante." : "Collegamento non disponibile.", response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
+      "test-database": async () => { setLoading(true, "Verifica Google Fogli…"); try { const response = await api.health(); setConnectionState(); toast(response.ok ? `Database collegato: ${response.database_name || "Google Fogli"} · ${response.elapsed_ms || 0} ms.` : `Database incompleto: ${(response.missing_sheets || []).join(", ")}.`, response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
       "reset-demo": async () => { if (confirm("Ripristinare tutti i dati dimostrativi?")) { api.resetDemo(); await loadAll(); renderRoute(); toast("Dati demo ripristinati."); } }
     };
@@ -1432,15 +1480,22 @@
       event.preventDefault();
       try {
         const values = serializeForm(event.target);
-        await api.saveSettings(values);
-        state.data.settings = { ...(state.data.settings || {}), ...values };
+        values.expected_settings_revision = Number((state.data.settings || {}).settings_revision || 0);
+        const savedSettings = await api.saveSettings(values);
+        delete values.expected_settings_revision;
+        state.data.settings = { ...(state.data.settings || {}), ...values, ...(savedSettings || {}) };
         updateLocalDashboard();
         scheduleBootstrapCache();
         renderRoute();
         setConnectionState();
         toast(api.isFastMode() ? "Impostazioni salvate localmente. Usa SALVA TUTTO." : "Impostazioni salvate.");
       }
-      catch (error) { toast(error.message, "danger"); }
+      catch (error) {
+        if (String(error.message || "").includes("CONFLICT_RECORD")) {
+          toast("Le impostazioni sono state modificate da un altro amministratore. Dati aggiornati: verifica e salva nuovamente.", "danger");
+          try { await loadAll(false); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
+        } else toast(error.message, "danger");
+      }
     }
   });
 

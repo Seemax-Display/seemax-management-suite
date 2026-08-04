@@ -9,6 +9,7 @@
   const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_V1_";
   let session = demo.getSession();
   let online = !!config.demoMode;
+  let serverVersion = "";
 
   function readLocal(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -79,7 +80,7 @@
     return !config.demoMode && /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(config.appsScriptUrl || "");
   }
 
-  function jsonp(action, params = {}, timeout = 15000) {
+  function jsonp(action, params = {}, timeout = 45000) {
     return new Promise((resolve, reject) => {
       if (!isConfigured()) return reject(new Error("URL Apps Script non configurato."));
       const callback = "__SEEMAX_MGMT_CB_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
@@ -124,7 +125,8 @@
     let user;
     if (config.demoMode) user = demo.login(username, key);
     else {
-      const response = await jsonp("management_login", { agent_username: username, agent_key: key });
+      const response = await jsonp("management_login", { agent_username: username, agent_key: key }, 60000);
+      serverVersion = String(response.version || serverVersion || "");
       user = { ...response.user, username, key, authenticatedAt: new Date().toISOString() };
     }
     session = user;
@@ -139,7 +141,16 @@
 
   async function ping() {
     if (config.demoMode) return { ok: true, mode: "demo" };
-    const response = await jsonp("ping");
+    const response = await jsonp("ping", {}, 45000);
+    serverVersion = String(response.version || serverVersion || "");
+    online = !!response.ok;
+    return response;
+  }
+
+  async function health() {
+    if (config.demoMode) return { ok: true, mode: "demo", version: config.version, elapsed_ms: 0 };
+    const response = await jsonp("management_health", authParams(), 90000);
+    serverVersion = String(response.version || serverVersion || "");
     online = !!response.ok;
     return response;
   }
@@ -151,7 +162,8 @@
       if (local.length) data.activities = local; else setLocalActivities(data.activities || []);
       return applyPending(data);
     }
-    const response = await jsonp("management_bootstrap", authParams(), 45000);
+    const response = await jsonp("management_bootstrap", authParams(), 90000);
+    serverVersion = String(response.version || serverVersion || "");
     const data = response.data;
     const local = localActivities();
     data.activities = local.length ? local : [];
@@ -190,20 +202,20 @@
       value.file_id = confirmedUpload.file_id;
       delete value.file_base64;
     }
-    const response = await jsonp("management_upsert", { ...authParams(), entity, payload: JSON.stringify(value) }, 30000);
+    const response = await jsonp("management_upsert", { ...authParams(), entity, payload: JSON.stringify(value) }, 60000);
     const row = response.row || {};
     if (response.notifications) row.__notifications = response.notifications;
     return row;
   }
 
-  async function remove(entity, id) {
+  async function remove(entity, id, expectedRecordVersion = 0) {
     if (entity === "activities") return removeLocalActivity(id);
     if (isFastMode()) {
-      queueOperation({ type: "remove", entity, id });
+      queueOperation({ type: "remove", entity, id, expectedRecordVersion });
       return { ok: true, queued: true };
     }
     if (config.demoMode) return demo.remove(entity, id);
-    return jsonp("management_remove", { ...authParams(), entity, id }, 20000);
+    return jsonp("management_remove", { ...authParams(), entity, id, expected_record_version: expectedRecordVersion }, 60000);
   }
 
   async function getSettings() {
@@ -234,7 +246,7 @@
       return values;
     }
     if (config.demoMode) return demo.settings(values);
-    const response = await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(values) });
+    const response = await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(values) }, 60000);
     return response.settings;
   }
 
@@ -266,7 +278,7 @@
            il risultato tramite management_upload_status. */
         setTimeout(() => iframe.remove(), 120000);
         resolve({ ok: true, pending: true, requestId });
-      }, 4000);
+      }, 35000);
       function finish(error, result) {
         if (done) return;
         done = true;
@@ -291,9 +303,9 @@
   async function waitForUpload(requestId) {
     const started = Date.now();
     let lastError = null;
-    while (Date.now() - started < 90000) {
+    while (Date.now() - started < 180000) {
       try {
-        const response = await jsonp("management_upload_status", { ...authParams(), requestId }, 12000);
+        const response = await jsonp("management_upload_status", { ...authParams(), requestId }, 45000);
         if (response.completed) {
           if (response.upload && response.upload.ok !== false) return response.upload;
           throw new Error((response.upload && response.upload.error) || "Caricamento non riuscito.");
@@ -301,11 +313,11 @@
       } catch (error) {
         lastError = error;
       }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 2500));
     }
     throw new Error(lastError && lastError.message
       ? `Il file non è stato confermato dal database: ${lastError.message}`
-      : "Il file non è stato confermato dal database entro 90 secondi.");
+      : "Il file non è stato confermato dal database entro 180 secondi.");
   }
 
   async function syncAll(onProgress) {
@@ -316,8 +328,8 @@
       if (onProgress) onProgress({ index, total: queue.length, operation: op });
       let result;
       if (op.type === "upsert") result = await remoteUpsert(op.entity, op.record);
-      else if (op.type === "remove") result = config.demoMode ? demo.remove(op.entity, op.id) : await jsonp("management_remove", { ...authParams(), entity: op.entity, id: op.id }, 30000);
-      else if (op.type === "settings") result = config.demoMode ? demo.settings(op.values) : await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(op.values) }, 30000);
+      else if (op.type === "remove") result = config.demoMode ? demo.remove(op.entity, op.id) : await jsonp("management_remove", { ...authParams(), entity: op.entity, id: op.id, expected_record_version: op.expectedRecordVersion || 0 }, 60000);
+      else if (op.type === "settings") result = config.demoMode ? demo.settings(op.values) : await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(op.values) }, 60000);
       results.push(result);
       writeLocal(FAST_QUEUE_KEY, queue.slice(index + 1));
     }
@@ -339,7 +351,8 @@
   function exportDemo() { return demo.exportJson(); }
   function getSession() { return session; }
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
-  function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length }; }
+  function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length, serverVersion };
+  }
 
-  window.SeemaxApi = { login, logout, ping, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

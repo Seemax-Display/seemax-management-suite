@@ -32,6 +32,8 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - avvio accelerato con cache locale per utente e aggiornamento del database in background;
 - backend ottimizzato con letture per richiesta e salvataggi aggregati;
 - Planner alleggerito di oltre il 90% separando immagini e codice.
+- protezione multiutente con coda delle scritture, versioni record e prevenzione dei duplicati;
+- rilevamento dei conflitti senza sovrascritture silenziose.
 
 ## Prova immediata
 
@@ -51,7 +53,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.3.0 segui [docs/AGGIORNAMENTO_V2.3.md](docs/AGGIORNAMENTO_V2.3.md). L’analisi tecnica è disponibile in [docs/AUDIT_PRESTAZIONI_V2.3.md](docs/AUDIT_PRESTAZIONI_V2.3.md).
+Per aggiornare un'installazione già operativa alla versione 2.4.1 segui [docs/AGGIORNAMENTO_V2.4.1.md](docs/AGGIORNAMENTO_V2.4.1.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
 
 ## Placeholder
 

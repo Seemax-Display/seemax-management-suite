@@ -10,10 +10,11 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.3.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.4.1";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
+var RUNTIME_DEFERRED_EMAILS_ = [];
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -25,12 +26,12 @@ var ENTITY_SHEETS = {
 };
 
 var SHEET_SCHEMAS = {
-  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id"],
-  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl"],
-  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl"],
-  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl"],
-  ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl"],
+  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id", "record_version", "request_token", "aggiornato_da"],
+  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
+  DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
@@ -72,9 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.3.0 · Prestazioni ottimizzate");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.1 · Multiutente e upload resilienti");
   styleSheets_();
-  return "SEEMAX v2.3.0 configurato: cache, letture e salvataggi ottimizzati.";
+  return "SEEMAX v2.4.1 configurato: concorrenza, versioni e upload resilienti.";
+}
+
+function upgradeSeemaxV24() {
+  var ss = db_();
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.1 · Multiutente e upload resilienti");
+  styleSheets_();
+  return "SEEMAX v2.4.1 configurato: protezione multiutente, diagnostica database e upload resilienti.";
 }
 
 function doGet(e) {
@@ -110,6 +119,7 @@ function routeGet_(action, p) {
   switch (action) {
     case "ping": return { ok: true, version: SEEMAX_VERSION, serverTime: new Date().toISOString() };
     case "management_login": return managementLogin_(p);
+    case "management_health": return managementHealth_(p);
     case "management_bootstrap": return managementBootstrap_(p);
     case "management_list": return managementList_(p);
     case "management_upsert": return managementUpsert_(p);
@@ -137,9 +147,13 @@ function routeGet_(action, p) {
 /* ========================= MANAGEMENT APP ========================= */
 
 function managementLogin_(p) {
+  return withMutationLock_(function () { return managementLoginLocked_(p); });
+}
+
+function managementLoginLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   touchLogin_(user.username);
-  return { ok: true, user: publicUser_(user) };
+  return { ok: true, user: publicUser_(user), version: SEEMAX_VERSION };
 }
 
 function managementBootstrap_(p) {
@@ -167,6 +181,30 @@ function managementBootstrap_(p) {
   return { ok: true, data: data, user: publicUser_(user), version: SEEMAX_VERSION };
 }
 
+function managementHealth_(p) {
+  var started = new Date().getTime();
+  var user = authenticate_(p.agent_username, p.agent_key);
+  var ss = db_();
+  var required = ["AGENTI", "CLIENTI", "PRATICHE", "PRODOTTI_LED", "DOCUMENTI", "IMPOSTAZIONI"];
+  var sheets = {};
+  var missing = [];
+  required.forEach(function (name) {
+    var current = ss.getSheetByName(name);
+    if (!current) missing.push(name);
+    else sheets[name] = Math.max(0, current.getLastRow() - 1);
+  });
+  return {
+    ok: missing.length === 0,
+    version: SEEMAX_VERSION,
+    database_name: ss.getName(),
+    spreadsheet_suffix: String(ss.getId()).slice(-6),
+    sheets: sheets,
+    missing_sheets: missing,
+    user: user.username,
+    elapsed_ms: new Date().getTime() - started
+  };
+}
+
 function managementList_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var entity = String(p.entity || "");
@@ -176,6 +214,10 @@ function managementList_(p) {
 }
 
 function managementUpsert_(p) {
+  return withMutationLock_(function () { return managementUpsertLocked_(p); });
+}
+
+function managementUpsertLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var entity = String(p.entity || "");
   assertWritePermission_(entity, user);
@@ -231,17 +273,7 @@ function managementUpsert_(p) {
       if (existingUser) payload.chiave_id_agente = existingUser.chiave_id_agente;
     }
   }
-  var documentLock = null;
-  var row;
-  try {
-    if (entity === "documents") {
-      documentLock = LockService.getScriptLock();
-      documentLock.waitLock(20000);
-    }
-    row = upsertEntity_(entity, payload);
-  } finally {
-    if (documentLock) documentLock.releaseLock();
-  }
+  var row = upsertEntity_(entity, payload, user);
   log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
   return { ok: true, row: entity === "users" ? publicUser_(row) : row };
 }
@@ -394,19 +426,28 @@ function managementUploadStatus_(p) {
 }
 
 function managementUpdatePracticeDocuments_(p) {
+  return withMutationLock_(function () { return managementUpdatePracticeDocumentsLocked_(p); });
+}
+
+function managementUpdatePracticeDocumentsLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var practiceId = String(p.practice_id || "");
   var practice = findRowObject_("PRATICHE", "id", practiceId);
   if (!practice) throw new Error("Pratica non trovata.");
   if (!isAdmin_(user) && String(practice.agent_username || "") !== String(user.username)) throw new Error("Non sei autorizzato ad aggiornare questa pratica.");
   practice.documenti_caricati_json = String(p.documenti_caricati_json || "[]");
-  practice.aggiornatoIl = new Date().toISOString();
+  practice.expected_record_version = Number(practice.record_version || 0);
+  prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
   var saved = upsertObject_("PRATICHE", "id", practice.id, practice);
   log_(user, "UPDATE_DOCUMENTS", "practices", practice.id, "Riepilogo allegati pratica aggiornato");
   return { ok: true, row: saved };
 }
 
 function managementCreateFromQuote_(p) {
+  return withMutationLock_(function () { return managementCreateFromQuoteLocked_(p); });
+}
+
+function managementCreateFromQuoteLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var payload = parseJson_(p.payload, {});
   var type = String(payload.tipo_pratica || "").toUpperCase();
@@ -462,7 +503,9 @@ function managementCreateFromQuote_(p) {
     creatoIl: new Date().toISOString(),
     aggiornatoIl: new Date().toISOString()
   };
-  practice = upsertObject_("PRATICHE", "id", practice.id, practice);
+  var version = prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
+  if (version.duplicate) practice = version.duplicate;
+  else practice = upsertObject_("PRATICHE", "id", practice.id, practice);
   log_(user, "CREATE_FROM_QUOTE", "practices", practice.id, "Pratica " + type + " creata dal S.Q.P. preventivo " + practice.preventivo_id);
   return { ok: true, practice: practice, client: client };
 }
@@ -503,7 +546,8 @@ function findClientForQuote_(payload, user) {
   record.agent_username = record.agent_username || user.username;
   record.creato_da_username = record.creato_da_username || record.agent_username || user.username;
   record.creato_da_nome = record.creato_da_nome || userDisplayName_(user);
-  record.aggiornatoIl = new Date().toISOString();
+  record.expected_record_version = Number(record.record_version || 0);
+  prepareVersionedRecord_("CLIENTI", "id", record.id, record, user);
   return upsertObject_("CLIENTI", "id", record.id, record);
 }
 
@@ -534,18 +578,17 @@ function nextPracticeIdentifier_(user) {
 }
 
 function upsertPracticeWithInventory_(payload, user) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    if (String(payload.nuova_pratica || "NO").toUpperCase() === "SI") {
+  if (String(payload.nuova_pratica || "NO").toUpperCase() === "SI") {
       payload.numero = nextPracticeIdentifier_(user);
       payload.id = "PR-" + payload.numero;
       delete payload.nuova_pratica;
-    }
-    if (!payload.numero || String(payload.numero).toUpperCase() === "AUTO") payload.numero = nextPracticeIdentifier_(user);
-    payload.id = payload.id || "PR-" + payload.numero;
-    if (!payload.id) payload.id = uid_("pra");
-    var existing = findRowObject_("PRATICHE", "id", payload.id);
+  }
+  if (!payload.numero || String(payload.numero).toUpperCase() === "AUTO") payload.numero = nextPracticeIdentifier_(user);
+  payload.id = payload.id || "PR-" + payload.numero;
+  if (!payload.id) payload.id = uid_("pra");
+  var version = prepareVersionedRecord_("PRATICHE", "id", payload.id, payload, user);
+  if (version.duplicate) return version.duplicate;
+  var existing = version.existing;
     var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
     var nextStatus = normalizePracticeStatus_(payload.stato || existing && existing.stato || "Inserita");
     payload.stato = nextStatus;
@@ -580,8 +623,7 @@ function upsertPracticeWithInventory_(payload, user) {
       payload.magazzino_applicato_il = existing.magazzino_applicato_il || "";
       payload.magazzino_stornato_il = existing.magazzino_stornato_il || "";
     }
-    return upsertObject_("PRATICHE", "id", payload.id, payload);
-  } finally { lock.releaseLock(); }
+  return upsertObject_("PRATICHE", "id", payload.id, payload);
 }
 
 function normalizePracticeStatus_(status) {
@@ -614,6 +656,10 @@ function listNotificationsForUser_(user) {
 }
 
 function managementMarkNotificationsRead_(p) {
+  return withMutationLock_(function () { return managementMarkNotificationsReadLocked_(p); });
+}
+
+function managementMarkNotificationsReadLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var sheet = sheet_("NOTIFICHE");
   var table = tableData_(sheet);
@@ -667,13 +713,13 @@ function createPracticeStatusNotification_(before, after, actor) {
         emailText = "Gentile " + recipientName + ", ti informiamo che la pratica " + practiceId + " intestata a " + clientName + " è stata temporaneamente sospesa.\n\nRiceverai una nuova comunicazione quando lo stato della pratica verrà aggiornato.";
       }
       if (emailText) {
-        MailApp.sendEmail({
+        RUNTIME_DEFERRED_EMAILS_.push({ actor: actor, notificationId: id, message: {
           to: email,
           subject: subject,
           name: "Seemax Management Suite",
           body: emailText,
           htmlBody: "<p>" + escapeHtml_(emailText).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>") + "</p>"
-        });
+        } });
       }
     } catch (error) { log_(actor, "EMAIL_NOTIFICATION_ERROR", "notifications", id, String(error && error.message || error)); }
   }
@@ -700,7 +746,8 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
     var delta = direction * Number(line.quantita || 0);
     var after = before + delta;
     product.giacenza_attuale = after;
-    product.aggiornatoIl = new Date().toISOString();
+    product.expected_record_version = Number(product.record_version || 0);
+    prepareVersionedRecord_("PRODOTTI_LED", "id", product.id, product, user);
     upsertObject_("PRODOTTI_LED", "id", product.id, product);
     var movementId = uid_("mov");
     upsertObject_("MOVIMENTI_MAGAZZINO", "id", movementId, {
@@ -788,11 +835,21 @@ function canonicalProductId_(value, cabX, cabY) {
 function normalizeKey_(value) { return String(value || "").trim().toLowerCase().replace(/\s+/g, " "); }
 
 function managementRemove_(p) {
+  return withMutationLock_(function () { return managementRemoveLocked_(p); });
+}
+
+function managementRemoveLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var entity = String(p.entity || "");
   assertWritePermission_(entity, user);
   var id = String(p.id || "");
   if (!id) throw new Error("ID mancante.");
+  var sheetName = ENTITY_SHEETS[entity];
+  var idField = entity === "users" ? "username" : "id";
+  var currentRecord = sheetName ? findRowObject_(sheetName, idField, id) : null;
+  var currentVersion = Number(currentRecord && currentRecord.record_version || 0);
+  var expectedVersion = Number(p.expected_record_version || 0);
+  if (currentRecord && currentVersion > 0 && currentVersion !== expectedVersion) throw new Error("CONFLICT_RECORD: l'elemento è stato modificato prima dell'eliminazione.");
   if (entity === "users" && id === user.username) throw new Error("Non puoi eliminare l'account attualmente collegato.");
   if (entity === "practices") {
     var practice = findRowObject_("PRATICHE", "id", id);
@@ -816,9 +873,19 @@ function managementSettings_(p) {
 }
 
 function managementSaveSettings_(p) {
+  return withMutationLock_(function () { return managementSaveSettingsLocked_(p); });
+}
+
+function managementSaveSettingsLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
   var values = parseJson_(p.payload, {});
+  var currentSettings = getSettings_();
+  var currentRevision = Number(currentSettings.settings_revision || 0);
+  var expectedRevision = Number(values.expected_settings_revision || 0);
+  if (currentRevision > 0 && expectedRevision !== currentRevision) throw new Error("CONFLICT_RECORD: le impostazioni sono state aggiornate da un altro amministratore.");
+  delete values.expected_settings_revision;
+  values.settings_revision = currentRevision + 1;
   var settings = upsertSettingsBatch_(values, "Aggiornato da Management Suite");
   log_(user, "UPDATE", "settings", "IMPOSTAZIONI", "Impostazioni generali aggiornate");
   return { ok: true, settings: settings };
@@ -845,11 +912,13 @@ function listEntity_(entity, user) {
   return rows;
 }
 
-function upsertEntity_(entity, record) {
+function upsertEntity_(entity, record, user) {
   var sheetName = ENTITY_SHEETS[entity];
   var idField = entity === "users" ? "username" : "id";
   if (!sheetName) throw new Error("Entità non supportata.");
   if (!record[idField]) record[idField] = uid_(entity.substring(0, 3));
+  var version = prepareVersionedRecord_(sheetName, idField, String(record[idField]), record, user);
+  if (version.duplicate) return version.duplicate;
   return upsertObject_(sheetName, idField, String(record[idField]), record);
 }
 
@@ -1079,6 +1148,10 @@ function loadQuotePublic_(p) {
 }
 
 function deleteQuoteAgent_(p) {
+  return withMutationLock_(function () { return deleteQuoteAgentLocked_(p); });
+}
+
+function deleteQuoteAgentLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var row = findRowObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", p.id_preventivo);
   if (!row || row.deleted_at) throw new Error("Preventivo non trovato.");
@@ -1107,6 +1180,58 @@ function resetRuntimeCaches_() {
   RUNTIME_DB_CACHE_ = null;
   RUNTIME_SHEET_CACHE_ = {};
   RUNTIME_TABLE_CACHE_ = {};
+  RUNTIME_DEFERRED_EMAILS_ = [];
+}
+
+function withMutationLock_(callback) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(45000);
+  var result;
+  var failure = null;
+  try {
+    /* Una richiesta può avere letto dati prima di ottenere il lock: tutte le
+       tabelle vengono quindi rilette dentro la sezione critica. */
+    RUNTIME_TABLE_CACHE_ = {};
+    result = callback();
+  } catch (error) {
+    failure = error;
+  } finally {
+    lock.releaseLock();
+  }
+  if (failure) throw failure;
+  flushDeferredEmails_();
+  return result;
+}
+
+function flushDeferredEmails_() {
+  var queue = RUNTIME_DEFERRED_EMAILS_.splice(0);
+  queue.forEach(function (item) {
+    try { MailApp.sendEmail(item.message); }
+    catch (error) { log_(item.actor, "EMAIL_NOTIFICATION_ERROR", "notifications", item.notificationId, String(error && error.message || error)); }
+  });
+}
+
+function prepareVersionedRecord_(sheetName, keyField, keyValue, record, user) {
+  invalidateTable_(sheetName);
+  var existing = findRowObject_(sheetName, keyField, keyValue);
+  var requestToken = String(record.request_token || "");
+  if (!existing && requestToken) {
+    var duplicate = rowsToObjects_(sheet_(sheetName)).filter(function (row) { return String(row.request_token || "") === requestToken; })[0];
+    if (duplicate) return { duplicate: duplicate, existing: duplicate };
+  }
+  var currentVersion = Number(existing && existing.record_version || 0);
+  var expectedVersion = Number(record.expected_record_version || 0);
+  if (existing && requestToken && String(existing.request_token || "") === requestToken && expectedVersion < currentVersion) {
+    return { duplicate: existing, existing: existing };
+  }
+  if (existing && currentVersion > 0 && expectedVersion !== currentVersion) {
+    throw new Error("CONFLICT_RECORD: l'elemento è stato aggiornato da " + String(existing.aggiornato_da || "un altro utente") + ".");
+  }
+  delete record.expected_record_version;
+  record.record_version = currentVersion + 1;
+  record.aggiornato_da = String(user && (user.nome_visualizzato || user.username) || "Sistema");
+  record.aggiornatoIl = new Date().toISOString();
+  return { duplicate: null, existing: existing };
 }
 
 function sheet_(name) {
@@ -1236,7 +1361,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), note: user.note || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), note: user.note || "", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
