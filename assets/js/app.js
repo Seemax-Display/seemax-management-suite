@@ -403,13 +403,13 @@
     openAgentMonthWelcome();
   }
 
-  function openAgentMonthWelcome(preview = false) {
+  function openAgentMonthWelcome() {
     const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
-    const award = data && (data.award || (preview && (data.history || [])[0]));
+    const award = data && data.award;
     if (!award) { openAgentMonthDetails(); return; }
     const top = award.topPractice || {};
     const body = `<div class="agent-month-welcome"><div class="agent-month-trophy">🏆</div><span class="agent-month-label">AGENTE DEL MESE</span><h3>${esc(award.agent)}</h3><p class="agent-month-period">Risultato di ${esc(award.label)}</p><div class="agent-month-winning-practice"><small>PRATICA DI MAGGIOR VALORE</small><strong>${esc(top.id || "—")} · ${esc(top.client || "—")}</strong><span>${euros(top.value || 0)}</span></div><div class="agent-month-total"><span>Fatturato totale completato</span><strong>${euros(award.total)}</strong><small>${award.count} ${award.count === 1 ? "pratica completata" : "pratiche completate"}</small></div><div class="form-actions"><button class="btn ghost" data-action="close-modal">Continua</button><button class="btn primary" data-action="agent-month-details">Maggiori dettagli</button></div></div>`;
-    openModal(preview ? "Anteprima · Benvenuto nel nuovo mese!" : "Benvenuto nel nuovo mese!", body, { wide: true, kicker: preview ? "Test amministratore · nessun dato modificato" : "Seemax celebra i risultati" });
+    openModal("Benvenuto nel nuovo mese!", body, { wide: true, kicker: "Seemax celebra i risultati" });
   }
 
   function openAgentMonthDetails() {
@@ -421,9 +421,9 @@
       return `<article class="agent-leader-card ${type.toLowerCase()}"><span>${type === "ACQUISTO" ? "🛒" : type === "NOLEGGIO" ? "🔄" : type === "LEASING" ? "🏦" : "🏆"}</span><div><small>${leaderNames[type]}</small><strong>${row ? esc(row.agent) : "Nessun risultato"}</strong><em>${row ? euros(row.total) : "—"}</em>${row ? `<p>${row.count} pratiche completate${row.topPractice ? ` · Top ${esc(row.topPractice.id)} (${euros(row.topPractice.value)})` : ""}</p>` : ""}</div></article>`;
     }).join("");
     const history = (data.history || []).map((row) => `<tr><td><strong>${esc(row.label)}</strong></td><td>${esc(row.agent)}</td><td>${esc((row.topPractice || {}).id || "—")}<small>${esc((row.topPractice || {}).client || "")}</small></td><td>${row.count}</td><td><strong>${euros(row.total)}</strong></td></tr>`).join("");
-    const previewButton = api.isAdmin() ? `<button class="btn soft" data-action="preview-agent-month">👁️ Prova messaggio iniziale</button>` : "";
-    const body = `<div class="agent-month-details"><div class="agent-detail-actions"><button class="btn gold" data-action="trophy-board">🏅 Apri la mia bacheca trofei</button>${previewButton}</div><section><span class="section-kicker">Record complessivi</span><h3>Leader per tipologia</h3><div class="agent-leaders-grid">${leaders}</div></section><section><span class="section-kicker">Albo d’oro</span><h3>Agenti del mese</h3>${history ? `<div class="table-wrap"><table><thead><tr><th>Mese</th><th>Agente</th><th>Pratica principale</th><th>Pratiche</th><th>Fatturato</th></tr></thead><tbody>${history}</tbody></table></div>` : emptyState("Nessun mese disponibile", "Completa una pratica per iniziare la classifica.")}</section><p class="agent-month-note">Il calcolo considera esclusivamente il valore delle pratiche in stato COMPLETATA. Le provvigioni non vengono conteggiate.</p></div>`;
-    openModal("Agente del mese", body, { wide: true, kicker: "Classifiche Seemax", subtitle: "Risultati mensili e record complessivi" });
+    const referenceLabel = data.referenceLabel || (data.award && data.award.label) || "mese precedente";
+    const body = `<div class="agent-month-details"><div class="agent-detail-actions"><button class="btn gold" data-action="trophy-board">🏅 Apri la mia bacheca trofei</button></div><section><span class="section-kicker">Mese di riferimento</span><h3>Risultati di ${esc(referenceLabel)}</h3><div class="agent-leaders-grid">${leaders}</div></section><section><span class="section-kicker">Storico mensile</span><h3>Agenti del mese</h3>${history ? `<div class="table-wrap"><table><thead><tr><th>Mese</th><th>Agente</th><th>Pratica principale</th><th>Pratiche</th><th>Fatturato</th></tr></thead><tbody>${history}</tbody></table></div>` : emptyState("Nessun mese disponibile", "Completa una pratica per iniziare la classifica.")}</section><p class="agent-month-note">Ogni risultato considera esclusivamente le pratiche COMPLETATE nel mese indicato. Le pratiche di mesi diversi e le provvigioni non vengono conteggiate.</p></div>`;
+    openModal("Agente del mese", body, { wide: true, kicker: "Classifiche Seemax", subtitle: `Risultati di ${referenceLabel} e storico mensile` });
   }
 
   function openTrophyBoard() {
@@ -1424,7 +1424,6 @@
       "close-modal": closeModal,
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,
-      "preview-agent-month": () => openAgentMonthWelcome(true),
       "trophy-board": openTrophyBoard,
       "toggle-upload-center": () => { uploadState.expanded = !uploadState.expanded; renderUploadCenter(); },
       "dismiss-upload-center": () => {

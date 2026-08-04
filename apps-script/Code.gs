@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.4.2";
+var SEEMAX_VERSION = "seemax-management-suite-2.4.3";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.2 · Centro upload documenti");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.3 · Classifiche mensili isolate");
   styleSheets_();
-  return "SEEMAX v2.4.2 configurato: concorrenza e centro upload documenti.";
+  return "SEEMAX v2.4.3 configurato: concorrenza, upload e classifiche mensili isolate.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.2 · Centro upload documenti");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.4.3 · Classifiche mensili isolate");
   styleSheets_();
-  return "SEEMAX v2.4.2 configurato: protezione multiutente, diagnostica e centro upload.";
+  return "SEEMAX v2.4.3 configurato: protezione multiutente, diagnostica, upload e classifiche mensili isolate.";
 }
 
 function doGet(e) {
@@ -1018,11 +1018,12 @@ function agentOfMonth_(practices, clients, currentUser, userRows) {
   var now = new Date();
   var previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   var previousKey = monthKey_(previous);
+  var referenceCompleted = completed.filter(function (practice) { return monthKey_(practiceCompletionDate_(practice)) === previousKey; });
   var types = ["ACQUISTO", "NOLEGGIO", "LEASING"];
   var leaders = {};
   types.concat(["COMPLESSIVO"]).forEach(function (type) {
     var totals = {};
-    completed.filter(function (practice) { return type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type; }).forEach(function (practice) {
+    referenceCompleted.filter(function (practice) { return type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type; }).forEach(function (practice) {
       var username = String(practice.agent_username || practice.agente || "Non assegnato");
       if (!totals[username]) totals[username] = { agent: users[username] || practice.agente || username, total: 0, count: 0 };
       totals[username].total += Number(practice.valore || 0);
@@ -1030,7 +1031,7 @@ function agentOfMonth_(practices, clients, currentUser, userRows) {
     });
     leaders[type] = Object.keys(totals).map(function (username) { var value = totals[username]; value.agent_username = username; return value; }).sort(function (a, b) { return b.total - a.total || b.count - a.count; })[0] || null;
     if (leaders[type]) {
-      var leaderPractices = completed.filter(function (practice) { return String(practice.agent_username || practice.agente || "Non assegnato") === leaders[type].agent_username && (type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type); }).sort(function (a, b) { return Number(b.valore || 0) - Number(a.valore || 0); });
+      var leaderPractices = referenceCompleted.filter(function (practice) { return String(practice.agent_username || practice.agente || "Non assegnato") === leaders[type].agent_username && (type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type); }).sort(function (a, b) { return Number(b.valore || 0) - Number(a.valore || 0); });
       var leaderPractice = leaderPractices[0];
       leaders[type].topPractice = leaderPractice ? { id: leaderPractice.numero || leaderPractice.id || "—", client: leaderPractice.cliente || "—", value: Number(leaderPractice.valore || 0) } : null;
     }
@@ -1063,7 +1064,7 @@ function agentOfMonth_(practices, clients, currentUser, userRows) {
     { id: "completed_10", icon: "✅", title: "Closer", description: "Completa 10 pratiche.", current: ownCompleted.length, target: 10 },
     { id: "revenue_250k", icon: "🌟", title: "Quarto di milione", description: "Raggiungi 250.000 € di fatturato completato.", current: ownRevenue, target: 250000, currency: true }
   ].map(function (achievement) { achievement.unlocked = Number(achievement.current || 0) >= achievement.target; return achievement; });
-  return { currentPeriod: monthKey_(now), awardPeriod: previousKey, award: award, history: history, leaders: leaders, isCurrentUserWinner: !!award && String(award.agent_username || "") === username, achievements: achievements };
+  return { currentPeriod: monthKey_(now), awardPeriod: previousKey, referenceLabel: monthLabel_(previousKey), award: award, history: history, leaders: leaders, isCurrentUserWinner: !!award && String(award.agent_username || "") === username, achievements: achievements };
 }
 
 /* ========================= QUOTATION PLANNER ========================= */

@@ -130,17 +130,18 @@
       return { period, label: monthLabel(period), agent: winner.agent, agent_username: winner.agent_username, total: winner.total, count: winner.count, topPractice: winner.topPractice };
     });
     const now = new Date(); const previousKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    const referenceCompleted = completed.filter((practice) => monthKey(new Date(practice.completataIl || practice.aggiornatoIl || practice.creatoIl)) === previousKey);
     const leaders = {};
     ["ACQUISTO", "NOLEGGIO", "LEASING", "COMPLESSIVO"].forEach((type) => {
       const totals = {};
-      completed.filter((practice) => type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type).forEach((practice) => {
+      referenceCompleted.filter((practice) => type === "COMPLESSIVO" || String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type).forEach((practice) => {
         const username = String(practice.agent_username || practice.agente || "Non assegnato");
         totals[username] ||= { agent: names[username] || practice.agente || username, total: 0, count: 0 };
         totals[username].total += Number(practice.valore || 0); totals[username].count += 1;
       });
       leaders[type] = Object.entries(totals).map(([agent_username, value]) => ({ ...value, agent_username })).sort((a, b) => b.total - a.total || b.count - a.count)[0] || null;
       if (leaders[type]) {
-        const practice = completed.filter((item) => String(item.agent_username || item.agente || "Non assegnato") === leaders[type].agent_username && (type === "COMPLESSIVO" || String(item.tipo_pratica || "ACQUISTO").toUpperCase() === type)).sort((a, b) => Number(b.valore || 0) - Number(a.valore || 0))[0];
+        const practice = referenceCompleted.filter((item) => String(item.agent_username || item.agente || "Non assegnato") === leaders[type].agent_username && (type === "COMPLESSIVO" || String(item.tipo_pratica || "ACQUISTO").toUpperCase() === type)).sort((a, b) => Number(b.valore || 0) - Number(a.valore || 0))[0];
         leaders[type].topPractice = practice ? { id: practice.numero || practice.id || "—", client: practice.cliente || "—", value: Number(practice.valore || 0) } : null;
       }
     });
@@ -167,7 +168,7 @@
       ["completed_10","✅","Closer","Completa 10 pratiche.",ownCompleted.length,10],
       ["revenue_250k","🌟","Quarto di milione","Raggiungi 250.000 € di fatturato completato.",ownRevenue,250000,true]
     ].map(([id,icon,title,description,current,target,currency=false]) => ({ id,icon,title,description,current,target,currency,unlocked:Number(current || 0) >= target }));
-    return { currentPeriod: monthKey(now), awardPeriod: previousKey, award, history, leaders, isCurrentUserWinner: !!award && String(award.agent_username || "") === username, achievements };
+    return { currentPeriod: monthKey(now), awardPeriod: previousKey, referenceLabel: monthLabel(previousKey), award, history, leaders, isCurrentUserWinner: !!award && String(award.agent_username || "") === username, achievements };
   }
 
   function bootstrap() {
