@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.6.3";
+var SEEMAX_VERSION = "seemax-management-suite-2.7.0";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -28,8 +28,8 @@ var ENTITY_SHEETS = {
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "id", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
+  CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.3 · Esperienza Gold Agente del mese");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.0 · Anagrafiche e pratiche a tab");
   styleSheets_();
-  return "SEEMAX v2.6.3 configurato: esperienza Gold Agente del mese.";
+  return "SEEMAX v2.7.0 configurato: anagrafiche e pratiche a tab.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.6.3 · Esperienza Gold Agente del mese");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.0 · Anagrafiche e pratiche a tab");
   styleSheets_();
-  return "SEEMAX v2.6.3 configurato: protezione multiutente ed esperienza Gold Agente del mese.";
+  return "SEEMAX v2.7.0 configurato: protezione multiutente, anagrafiche e pratiche a tab.";
 }
 
 function doGet(e) {
@@ -250,6 +250,7 @@ function managementUpsertLocked_(p) {
       payload.intestatario_telefono = String(user.telefono || "");
       payload.valore_provvigione = 0;
     }
+    completeClientFromPractice_(payload, user);
     validatePracticeRequiredFields_(payload);
     var practiceRow = upsertPracticeWithInventory_(payload, user);
     if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) createPracticeStatusNotification_(previousPractice, practiceRow, user);
@@ -343,6 +344,16 @@ function managementVerifyVat_(p) {
 function validateClientFiscalData_(payload, user) {
   var vat = String(payload.piva || "").replace(/\D/g, "");
   var iban = String(payload.iban || "").replace(/\s+/g, "").toUpperCase();
+  var sdi = String(payload.sdi || "").replace(/\s+/g, "").toUpperCase();
+  var pec = String(payload.pec || "").trim().toLowerCase();
+  var email = String(payload.email || "").trim().toLowerCase();
+  var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!String(payload.ragioneSociale || "").trim()) throw new Error("Ragione sociale obbligatoria.");
+  if (!sdi && !pec) throw new Error("Inserisci almeno uno tra Codice SDI e PEC.");
+  if (sdi && !/^[A-Z0-9]{7}$/.test(sdi)) throw new Error("Il Codice SDI deve contenere esattamente 7 caratteri alfanumerici.");
+  if (pec && !emailPattern.test(pec)) throw new Error("Indirizzo PEC non valido.");
+  if (email && !emailPattern.test(email)) throw new Error("Indirizzo e-mail non valido.");
+  if (!String(payload.telefono || "").trim() || String(payload.telefono_valido || "NO").toUpperCase() !== "SI") throw new Error("Numero di cellulare obbligatorio e non valido.");
   if (vat && !validItalianVat_(vat)) throw new Error("Partita IVA formalmente non valida.");
   if (iban && !validIban_(iban)) throw new Error("IBAN formalmente non valido.");
   if (vat) {
@@ -352,11 +363,62 @@ function validateClientFiscalData_(payload, user) {
     if (duplicate) throw new Error("Partita IVA già associata al cliente " + (duplicate.ragioneSociale || duplicate.id) + ".");
   }
   payload.piva = vat;
+  payload.sdi = sdi;
+  payload.pec = pec;
+  payload.email = email;
   payload.codice_fiscale = String(payload.codice_fiscale || "").replace(/\s+/g, "").toUpperCase();
   payload.piva_formalmente_valida = vat ? "SI" : "NO";
   payload.iban = iban;
   payload.iban_valido = iban ? "SI" : "NO";
   payload.citta = payload.comune || payload.citta || "";
+}
+
+function completeClientFromPractice_(practice, user) {
+  var clientId = String(practice.clientId || "");
+  if (!clientId) return;
+  var client = findRowObject_("CLIENTI", "id", clientId);
+  if (!client) throw new Error("Cliente selezionato non trovato.");
+  var updates = {
+    codice_fiscale: practice.client_update_codice_fiscale,
+    piva: practice.client_update_piva,
+    email: practice.client_update_email,
+    iban: practice.client_update_iban
+  };
+  var requiredClientFields = ["codice_fiscale", "piva", "email"];
+  if (["NOLEGGIO", "LEASING"].indexOf(String(practice.tipo_pratica || "").toUpperCase()) >= 0) requiredClientFields.push("iban");
+  requiredClientFields.forEach(function (key) {
+    if (!String(client[key] || "").trim() && !String(updates[key] || "").trim()) throw new Error("Completa il dato cliente mancante: " + key.replace(/_/g, " ") + ".");
+  });
+  if (String(updates.piva || "").trim() && !validItalianVat_(String(updates.piva).replace(/\D/g, ""))) throw new Error("Partita IVA del cliente formalmente non valida.");
+  if (String(updates.iban || "").trim() && !validIban_(String(updates.iban).replace(/\s+/g, "").toUpperCase())) throw new Error("IBAN del cliente formalmente non valido.");
+  var changed = false;
+  Object.keys(updates).forEach(function (key) {
+    if (!String(client[key] || "").trim() && String(updates[key] || "").trim()) {
+      client[key] = String(updates[key]).trim();
+      changed = true;
+    }
+    delete practice["client_update_" + key];
+  });
+  var syncAddress = String(practice.sync_installation_to_client || "NO").toUpperCase() === "SI" || (String(practice.indirizzo_installazione_tipo || "").toUpperCase() === "COME INDIRIZZO CLIENTE" && !String(client.indirizzo || "").trim());
+  if (String(practice.indirizzo_installazione_tipo || "").toUpperCase() === "COME INDIRIZZO CLIENTE" && !String(client.indirizzo || "").trim()) {
+    ["regione", "provincia", "comune", "cap", "indirizzo", "civico"].forEach(function (key) {
+      if (!String(practice["installazione_" + key] || "").trim()) throw new Error("Indirizzo cliente assente: completa " + key + " dell’installazione.");
+    });
+  }
+  if (syncAddress && !String(client.indirizzo || "").trim()) {
+    ["regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico"].forEach(function (key) {
+      var value = practice["installazione_" + key];
+      if (!String(client[key] || "").trim() && String(value || "").trim()) { client[key] = value; changed = true; }
+    });
+    client.citta = client.comune || client.citta || "";
+  }
+  delete practice.sync_installation_to_client;
+  if (!changed) return;
+  client.expected_record_version = Number(client.record_version || 0);
+  client.request_token = "practice-client-" + String(practice.request_token || Utilities.getUuid());
+  client.aggiornatoIl = new Date().toISOString();
+  prepareVersionedRecord_("CLIENTI", "id", client.id, client, user);
+  upsertObject_("CLIENTI", "id", client.id, client);
 }
 
 function migrateClientFiscalV17_() {
@@ -1445,7 +1507,7 @@ function validatePracticeRequiredFields_(practice) {
     installazione_comune: "Comune di installazione", installazione_cap: "CAP di installazione",
     installazione_localita: "Località di installazione", installazione_indirizzo: "Indirizzo di installazione",
     installazione_civico: "Civico di installazione",
-    gestione_ledwall: "Gestione del Ledwall", cloud_username: "Username Cloud", cloud_password: "Password Cloud"
+    gestione_ledwall: "Gestione del Ledwall", sim_richiesta: "SIM per traffico rete", predisposizione_elettrica: "Predisposizione elettrica", cloud_username: "Username Cloud", cloud_password: "Password Cloud"
   };
   var fields = Object.keys(labels);
   fields.forEach(function (field) {
@@ -1503,6 +1565,8 @@ function seedSettings_() {
     req_acquisto_installazione_indirizzo: "SI",
     req_acquisto_installazione_civico: "SI",
     req_acquisto_gestione_ledwall: "SI",
+    req_acquisto_sim_richiesta: "NO",
+    req_acquisto_predisposizione_elettrica: "NO",
     req_acquisto_cloud_username: "NO",
     req_acquisto_cloud_password: "NO",
     req_acquisto_note: "NO",
@@ -1520,6 +1584,8 @@ function seedSettings_() {
     req_noleggio_installazione_indirizzo: "SI",
     req_noleggio_installazione_civico: "SI",
     req_noleggio_gestione_ledwall: "SI",
+    req_noleggio_sim_richiesta: "NO",
+    req_noleggio_predisposizione_elettrica: "NO",
     req_noleggio_cloud_username: "NO",
     req_noleggio_cloud_password: "NO",
     req_noleggio_documento_identita: "SI",
@@ -1540,6 +1606,8 @@ function seedSettings_() {
     req_leasing_installazione_indirizzo: "SI",
     req_leasing_installazione_civico: "SI",
     req_leasing_gestione_ledwall: "SI",
+    req_leasing_sim_richiesta: "NO",
+    req_leasing_predisposizione_elettrica: "NO",
     req_leasing_cloud_username: "NO",
     req_leasing_cloud_password: "NO",
     req_leasing_documento_identita: "SI",

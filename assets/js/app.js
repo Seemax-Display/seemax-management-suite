@@ -764,9 +764,9 @@
     const s = state.data ? state.data.settings : {};
     const status = api.status();
     const groups = {
-      ACQUISTO: [["destinatario_ordine", "Destinatario ordine"], ["clientid", "Cliente (se Per Cliente)"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["installazione_regione", "Regione installazione"], ["installazione_provincia", "Provincia installazione"], ["installazione_comune", "Comune installazione"], ["installazione_cap", "CAP installazione"], ["installazione_localita", "Località installazione"], ["installazione_indirizzo", "Indirizzo installazione"], ["installazione_civico", "Civico installazione"], ["gestione_ledwall", "Gestione Ledwall"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ["note", "Note installazione"]],
-      NOLEGGIO: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.NOLEGGIO],
-      LEASING: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.LEASING]
+      ACQUISTO: [["destinatario_ordine", "Destinatario ordine"], ["clientid", "Cliente (se Per Cliente)"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["installazione_regione", "Regione installazione"], ["installazione_provincia", "Provincia installazione"], ["installazione_comune", "Comune installazione"], ["installazione_cap", "CAP installazione"], ["installazione_localita", "Località installazione"], ["installazione_indirizzo", "Indirizzo installazione"], ["installazione_civico", "Civico installazione"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ["note", "Note installazione"]],
+      NOLEGGIO: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.NOLEGGIO],
+      LEASING: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.LEASING]
     };
     const requirements = Object.entries(groups).map(([type, fields]) => `<fieldset class="required-settings-group"><legend>${type}</legend><div class="required-settings-list">${fields.map(([key, label]) => {
       const settingKey = `req_${type.toLowerCase()}_${key}`;
@@ -810,6 +810,15 @@
 
   function formShell(entity, id, fields, submitLabel = "Salva", recordVersion = 0) {
     return `<form class="entity-form form-grid" data-entity="${entity}" data-id="${esc(id || "")}" data-record-version="${Number(recordVersion || 0)}" data-request-token="${newRequestToken()}">${fields}<div class="form-actions full"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">${esc(submitLabel)}</button></div></form>`;
+  }
+
+  function activateFormPanelFor(element) {
+    const panel = element && element.closest("[data-form-panel]");
+    if (!panel) return;
+    const form = panel.closest("form");
+    const name = panel.dataset.formPanel;
+    form.querySelectorAll("[data-form-panel]").forEach((node) => node.classList.toggle("active", node.dataset.formPanel === name));
+    form.querySelectorAll("[data-form-tab]").forEach((node) => node.classList.toggle("active", node.dataset.formTab === name));
   }
 
   function practiceRequired(type, field) {
@@ -885,6 +894,12 @@
       <p class="field-help full">La pratica e la fattura finale saranno intestate all’utente collegato.</p>
     </div></fieldset></div>`;
     const customerData = `<div class="conditional-section full" data-visible-when-destination="PER CLIENTE"><fieldset class="practice-section"><legend>Dati del cliente</legend><div class="form-grid">${clientField}</div></fieldset></div>`;
+    const clientCompletionFields = `<div class="client-practice-completion conditional-section full" data-visible-when-destination="PER CLIENTE"><div class="client-completion-alert" id="practiceClientCompletionAlert">Se l’anagrafica selezionata è incompleta, compila qui i dati mancanti: saranno registrati automaticamente nel cliente.</div><div class="form-grid">
+      <label data-client-fill-field="codice_fiscale">Codice fiscale<input name="client_update_codice_fiscale" maxlength="16" value="${esc(selectedClient && selectedClient.codice_fiscale || "")}"></label>
+      <label data-client-fill-field="piva">Partita IVA<input name="client_update_piva" inputmode="numeric" maxlength="11" value="${esc(selectedClient && selectedClient.piva || "")}"></label>
+      <label data-client-fill-field="email">E-mail<input name="client_update_email" type="email" value="${esc(selectedClient && selectedClient.email || "")}"></label>
+      ${practiceType === "ACQUISTO" ? "" : `<label data-client-fill-field="iban">IBAN<input name="client_update_iban" value="${esc(selectedClient && selectedClient.iban || "")}"></label>`}
+    </div></div>`;
     const valueFields = `<fieldset class="practice-section full"><legend>Valori pratica</legend><div class="form-grid">
       ${field("Valore pratica (IVA esclusa)", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01", required: req("valore") })}
       <label class="conditional-section" data-visible-when-commission="YES">Valore provvigione ${requiredMark(req("valore_provvigione"))}<input name="valore_provvigione" type="number" min="0" step="0.01" value="${esc(record.valore_provvigione || 0)}" ${req("valore_provvigione") ? "required" : ""}><small>Compilato automaticamente quando disponibile nel preventivo S.Q.P.</small></label>
@@ -894,7 +909,7 @@
     const rateOptions = currentRate && !standardRates.includes(currentRate) ? [currentRate, ...standardRates] : standardRates;
     const financeFields = practiceType === "ACQUISTO" ? "" : `<fieldset class="practice-section full"><legend>Condizioni ${practiceType === "NOLEGGIO" ? "Grenke" : "IFIS"}</legend><div class="form-grid">
       ${field("Numero di rate selezionate", "numero_rate", record.numero_rate || (practiceType === "NOLEGGIO" ? "36" : "60"), { options: rateOptions, required: req("numero_rate") })}
-      ${field("Mensilità", "periodicita_pagamento", record.periodicita_pagamento || "Mensile", { options: ["Mensile", "Bimestrale", "Trimestrale"], required: req("periodicita_pagamento") })}
+      ${field("Mensilità", "periodicita_pagamento", record.periodicita_pagamento || "Mensile", { options: practiceType === "NOLEGGIO" ? ["Mensile", "Trimestrale"] : ["Mensile", "Bimestrale", "Trimestrale"], required: req("periodicita_pagamento") })}
     </div></fieldset>`;
     const addressChoice = practiceType === "ACQUISTO" ? `<input type="hidden" name="indirizzo_installazione_tipo" value="PRESSO ALTRO INDIRIZZO">` : `<div class="address-choice full">
       <label class="choice-card compact"><input type="radio" name="indirizzo_installazione_tipo" value="COME INDIRIZZO CLIENTE" ${addressType === "COME INDIRIZZO CLIENTE" ? "checked" : ""} ${req("indirizzo_installazione_tipo") ? "required" : ""}><span><strong>Come indirizzo cliente</strong><small>Usa la sede registrata nell’anagrafica.</small></span></label>
@@ -902,17 +917,21 @@
     </div>`;
     const addressFields = `<fieldset class="practice-section full"><legend>Indirizzo di installazione</legend><div class="form-grid">${addressChoice}
       <div class="form-grid full conditional-section installation-address-fields" data-visible-when-address="PRESSO ALTRO INDIRIZZO">
-        ${field("Regione", "installazione_regione", record.installazione_regione || "", { required: req("installazione_regione") })}
-        ${field("Provincia", "installazione_provincia", record.installazione_provincia || "", { required: req("installazione_provincia") })}
-        ${field("Comune / Città", "installazione_comune", record.installazione_comune || "", { required: req("installazione_comune") })}
-        ${field("CAP", "installazione_cap", record.installazione_cap || "", { required: req("installazione_cap") })}
+        <label>Regione ${requiredMark(req("installazione_regione"))}<select name="installazione_regione" ${req("installazione_regione") ? "required" : ""}><option value="${esc(record.installazione_regione || "")}">${esc(record.installazione_regione || "Seleziona regione")}</option></select></label>
+        <label>Provincia ${requiredMark(req("installazione_provincia"))}<select name="installazione_provincia" ${req("installazione_provincia") ? "required" : ""}><option value="${esc(record.installazione_provincia || "")}">${esc(record.installazione_provincia || "Seleziona provincia")}</option></select></label>
+        <label>Comune / Città ${requiredMark(req("installazione_comune"))}<select name="installazione_comune" ${req("installazione_comune") ? "required" : ""}><option value="${esc(record.installazione_comune || "")}">${esc(record.installazione_comune || "Seleziona comune")}</option></select></label>
+        <label>CAP ${requiredMark(req("installazione_cap"))}<select name="installazione_cap" ${req("installazione_cap") ? "required" : ""}><option value="${esc(record.installazione_cap || "")}">${esc(record.installazione_cap || "Seleziona CAP")}</option></select></label>
         ${field("Località / Frazione", "installazione_localita", record.installazione_localita || "", { required: req("installazione_localita") })}
         ${field("Indirizzo", "installazione_indirizzo", record.installazione_indirizzo || "", { required: req("installazione_indirizzo") })}
         ${field("Civico", "installazione_civico", record.installazione_civico || "", { required: req("installazione_civico") })}
       </div>
+      <div class="installation-sync-question full ${practiceType === "ACQUISTO" ? "" : "is-hidden"}"><strong>L’indirizzo di installazione corrisponde alla sede legale del cliente?</strong><label><input type="radio" name="sync_installation_to_client" value="SI"> Sì, completa l’anagrafica se ancora vuota</label><label><input type="radio" name="sync_installation_to_client" value="NO" checked> No</label></div>
+      <div id="missingClientAddressNotice" class="client-completion-alert full is-hidden">Non esiste un indirizzo nell’anagrafica cliente. Inseriscilo adesso: verrà registrato automaticamente anche nel cliente.</div>
     </div></fieldset>`;
     const technicalManagement = `<fieldset class="practice-section full"><legend>Dettagli tecnici</legend><div class="form-grid">
       ${field("Gestione del Ledwall", "gestione_ledwall", management, { options: ["", "In locale con cavo di rete", "In locale con Wi-Fi", "Via Smartphone", "In Cloud"], required: req("gestione_ledwall") })}
+      ${field("SIM per traffico rete richiesta", "sim_richiesta", record.sim_richiesta || "NO", { options: ["NO", "SI"] })}
+      ${field("Predisposizione elettrica presente", "predisposizione_elettrica", record.predisposizione_elettrica || "NO", { options: ["NO", "SI"] })}
       <div class="cloud-fields form-grid full conditional-section" data-visible-when-management="IN CLOUD">
         ${field("Username Cloud", "cloud_username", record.cloud_username || "", { required: req("cloud_username") })}
         ${field("Password Cloud", "cloud_password", record.cloud_password || "", { type: "password", required: req("cloud_password") })}
@@ -935,17 +954,23 @@
       <div id="measureValidation" class="measure-validation full"></div>
     </div></fieldset>`;
     const identityFields = `<fieldset class="practice-section full"><legend>Identificazione</legend><div class="form-grid">${field("Identificativo pratica", "numero", number, { required: true, readonly: true })}${statusField}</div></fieldset>`;
-    const fields = typeSummary + (practiceType === "ACQUISTO" ? purchaseDestination + identityFields : identityFields) +
-      technicalFields + valueFields + financeFields +
-      (practiceType === "ACQUISTO" ? personalData + customerData : customerData) +
-      addressFields + technicalManagement + uploads +
+    const tabPanel = (name, content, active) => `<section class="form-tab-panel full ${active ? "active" : ""}" data-form-panel="${name}">${content}</section>`;
+    const practiceTabs = practiceType === "ACQUISTO"
+      ? [["recipient", "Destinatario Ordine"], ["product", "Prodotto della pratica"], ["value", "Valore della Pratica"], ["address", "Indirizzo di Installazione"], ["technical", "Dettagli Tecnici"]]
+      : [["client", "Cliente"], ["product", "Prodotto della pratica"], ["value", "Valore della Pratica"], ["finance", "Condizioni Finanziaria"], ["address", "Indirizzo di Installazione"], ["technical", "Dettagli Tecnici"], ["documents", "Sezione Documenti"]];
+    const tabNavigation = `<nav class="form-tabs practice-form-tabs full" aria-label="Sezioni pratica">${practiceTabs.map(([key, label], index) => `<button type="button" class="form-tab ${index === 0 ? "active" : ""}" data-form-tab="${key}"><i></i>${label}</button>`).join("")}</nav>`;
+    const tabContent = practiceType === "ACQUISTO"
+      ? tabPanel("recipient", purchaseDestination + identityFields + personalData + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") }))
+      : tabPanel("client", identityFields + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("finance", financeFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") })) + tabPanel("documents", uploads);
+    const fields = typeSummary + tabNavigation + tabContent +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
       `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}"><input type="hidden" name="p391_unificato" value="${esc(record.p391_unificato || "NO")}"><input type="hidden" name="p391_cabinet_50100" value="${esc(record.p391_cabinet_50100 || "0")}"><input type="hidden" name="p391_cabinet_5050" value="${esc(record.p391_cabinet_5050 || "0")}">` +
-      (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "") +
-      field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") });
+      (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "");
     openModal(record.id ? `Pratica ${record.numero}` : "Nuova pratica", formShell("practices", record.id, fields, record.id ? "Aggiorna pratica" : "Crea pratica", record.record_version), { wide: true, kicker: record.id ? "Gestione pratica" : "Nuova opportunità", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
     bindPracticeConditionalFields(practiceType);
     bindPracticeCalculator(logicalProducts, productOptions);
+    bindPracticeTabsAndClientCompletion(practiceType);
+    window.SeemaxClientTools.bindLocationFields(document.querySelector(".entity-form[data-entity='practices']"), record, "installazione_").catch((error) => toast(error.message, "danger"));
   }
 
   function bindPracticeConditionalFields(practiceType) {
@@ -955,15 +980,26 @@
       const destination = form.querySelector("[name='destinatario_ordine']:checked")?.value || "PER CLIENTE";
       const address = form.querySelector("[name='indirizzo_installazione_tipo']:checked")?.value || form.elements.indirizzo_installazione_tipo?.value || "PRESSO ALTRO INDIRIZZO";
       const management = String(form.elements.gestione_ledwall?.value || "").toUpperCase();
+      const selectedClient = state.data.clients.find((client) => String(client.id) === String(form.elements.clientId?.value || ""));
+      const clientHasAddress = !!(selectedClient && selectedClient.regione && selectedClient.provincia && (selectedClient.comune || selectedClient.citta) && selectedClient.cap && selectedClient.indirizzo && selectedClient.civico);
+      const needsClientAddress = address === "COME INDIRIZZO CLIENTE" && !clientHasAddress;
       form.querySelectorAll("[data-visible-when-destination]").forEach((node) => node.classList.toggle("is-hidden", practiceType === "ACQUISTO" && node.dataset.visibleWhenDestination !== destination));
       form.querySelectorAll("[data-visible-when-address]").forEach((node) => {
-        const hidden = node.dataset.visibleWhenAddress !== address;
+        const hidden = node.dataset.visibleWhenAddress !== address && !(node.classList.contains("installation-address-fields") && needsClientAddress);
         node.classList.toggle("is-hidden", hidden);
         node.querySelectorAll("input,select,textarea").forEach((input) => {
           if (hidden) { if (input.dataset.wasRequired === undefined) input.dataset.wasRequired = input.required ? "1" : "0"; input.required = false; }
           else if (input.dataset.wasRequired === "1") input.required = true;
         });
       });
+      const addressNotice = form.querySelector("#missingClientAddressNotice");
+      if (addressNotice) addressNotice.classList.toggle("is-hidden", !needsClientAddress);
+      const syncQuestion = form.querySelector(".installation-sync-question");
+      if (syncQuestion && practiceType === "ACQUISTO") syncQuestion.classList.toggle("is-hidden", !selectedClient || clientHasAddress || destination !== "PER CLIENTE");
+      if (needsClientAddress) {
+        const syncYes = form.querySelector("[name='sync_installation_to_client'][value='SI']");
+        if (syncYes) syncYes.checked = true;
+      }
       form.querySelectorAll("[data-visible-when-management]").forEach((node) => {
         const hidden = node.dataset.visibleWhenManagement !== management;
         node.classList.toggle("is-hidden", hidden);
@@ -981,9 +1017,52 @@
       }
     };
     form.addEventListener("change", (event) => {
-      if (["destinatario_ordine", "indirizzo_installazione_tipo", "gestione_ledwall"].includes(event.target.name)) refresh();
+      if (["destinatario_ordine", "indirizzo_installazione_tipo", "gestione_ledwall", "clientId"].includes(event.target.name)) refresh();
     });
     refresh();
+  }
+
+  function bindPracticeTabsAndClientCompletion(practiceType) {
+    const form = document.querySelector(".entity-form[data-entity='practices']");
+    if (!form) return;
+    const tabs = Array.from(form.querySelectorAll("[data-form-tab]"));
+    const panels = Array.from(form.querySelectorAll("[data-form-panel]"));
+    const activate = (name) => {
+      tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.formTab === name));
+      panels.forEach((panel) => panel.classList.toggle("active", panel.dataset.formPanel === name));
+    };
+    tabs.forEach((tab) => tab.addEventListener("click", () => activate(tab.dataset.formTab)));
+
+    const completionRows = Array.from(form.querySelectorAll("[data-client-fill-field]"));
+    function updateClientCompletion() {
+      const client = state.data.clients.find((item) => String(item.id) === String(form.elements.clientId?.value || ""));
+      completionRows.forEach((row) => {
+        const key = row.dataset.clientFillField;
+        const input = row.querySelector("input");
+        const existing = client ? String(client[key] || "").trim() : "";
+        if (existing) input.value = existing;
+        const missing = !!client && !existing;
+        row.classList.toggle("is-hidden", !missing);
+        input.required = missing;
+      });
+      const alert = form.querySelector("#practiceClientCompletionAlert");
+      if (alert) alert.classList.toggle("is-hidden", !client || !completionRows.some((row) => !row.classList.contains("is-hidden")));
+      updateTabs();
+    }
+    function updateTabs() {
+      tabs.forEach((tab) => {
+        const panel = panels.find((item) => item.dataset.formPanel === tab.dataset.formTab);
+        if (!panel) return;
+        const required = Array.from(panel.querySelectorAll("[required]")).filter((input) => !input.closest(".is-hidden"));
+        const complete = required.every((input) => String(input.value || "").trim());
+        tab.classList.toggle("complete", complete);
+        tab.classList.toggle("incomplete", !complete);
+      });
+    }
+    form.elements.clientId?.addEventListener("change", updateClientCompletion);
+    form.addEventListener("input", updateTabs);
+    form.addEventListener("change", () => setTimeout(updateTabs, 0));
+    updateClientCompletion();
   }
 
   function bindPracticeCalculator(products, inventoryProducts) {
@@ -1088,11 +1167,7 @@
     const session = api.getSession() || {};
     const owner = String(r.creato_da_username || r.agent_username || "");
     const canEdit = !r.id || api.isAdmin() || String(r.puo_modificare || "NO").toUpperCase() === "SI" || owner === String(session.username || "");
-    const fields = field("Ragione sociale", "ragioneSociale", r.ragioneSociale, { required: true, full: true }) +
-      field("Referente", "referente", r.referente) +
-      field("Email", "email", r.email, { type: "email" }) +
-      window.SeemaxClientTools.renderFields(r) +
-      field("Note commerciali", "note", r.note, { type: "textarea", full: true });
+    const fields = window.SeemaxClientTools.renderFields(r);
     openModal(r.id ? (canEdit ? "Modifica cliente" : "Anagrafica condivisa") : "Nuovo cliente", formShell("clients", r.id, fields, canEdit ? "Salva cliente" : "Consultazione", r.record_version), { wide: true, kicker: canEdit ? "Anagrafica cliente" : "Cliente condiviso", subtitle: !canEdit ? `Creato da ${r.creato_da_nome || "un altro utente"}. Puoi utilizzarlo nelle tue pratiche, ma non modificarlo.` : "" });
     const form = document.querySelector(".entity-form[data-entity='clients']");
     if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast, !canEdit);
@@ -1206,6 +1281,7 @@
     const missing = Array.from(form.querySelectorAll("[required]")).find((element) => !String(element.value || "").trim());
     if (missing) {
       toast("Compila tutti i campi obbligatori prima di proseguire.", "danger");
+      activateFormPanelFor(missing);
       missing.focus();
       return;
     }
@@ -1236,6 +1312,39 @@
       return;
     }
     if (entity === "clients") {
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const sdi = String(form.elements.sdi?.value || "").trim().toUpperCase();
+      const pec = String(form.elements.pec?.value || "").trim().toLowerCase();
+      if (!String(form.elements.sdi?.value || "").trim() && !String(form.elements.pec?.value || "").trim()) {
+        activateFormPanelFor(form.elements.sdi);
+        toast("Inserisci almeno uno tra Codice SDI e PEC.", "danger");
+        form.elements.sdi.focus();
+        return;
+      }
+      if (sdi && !/^[A-Z0-9]{7}$/.test(sdi)) {
+        activateFormPanelFor(form.elements.sdi);
+        toast("Il Codice SDI deve contenere esattamente 7 caratteri alfanumerici.", "danger");
+        form.elements.sdi.focus();
+        return;
+      }
+      if (pec && !emailPattern.test(pec)) {
+        activateFormPanelFor(form.elements.pec);
+        toast("Inserisci un indirizzo PEC valido.", "danger");
+        form.elements.pec.focus();
+        return;
+      }
+      if (form.elements.email?.value && !emailPattern.test(String(form.elements.email.value).trim())) {
+        activateFormPanelFor(form.elements.email);
+        toast("Inserisci un indirizzo e-mail valido.", "danger");
+        form.elements.email.focus();
+        return;
+      }
+      if (!form.elements.telefono_numero?.value || form.elements.telefono_valido?.value !== "SI") {
+        activateFormPanelFor(form.elements.telefono_numero);
+        toast("Il numero di cellulare è obbligatorio e deve essere valido.", "danger");
+        form.elements.telefono_numero.focus();
+        return;
+      }
       if (form.elements.piva?.value && (form.elements.piva_formalmente_valida?.value !== "SI" || form.elements.piva_duplicata?.value === "SI")) {
         toast("La Partita IVA non è formalmente valida oppure è già presente nel gestionale.", "danger");
         form.elements.piva.focus();
@@ -1270,6 +1379,8 @@
       delete record.piva_duplicata;
       record.piva = String(record.piva || "").replace(/\D/g, "");
       record.codice_fiscale = String(record.codice_fiscale || "").replace(/\s+/g, "").toUpperCase();
+      record.sdi = String(record.sdi || "").replace(/\s+/g, "").toUpperCase();
+      record.pec = String(record.pec || "").trim().toLowerCase();
       record.iban = String(record.iban || "").replace(/\s+/g, "").toUpperCase();
       record.citta = record.comune || record.citta || "";
     }

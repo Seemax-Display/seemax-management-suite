@@ -71,16 +71,23 @@
     const phoneCountry = record.telefono_paese || "IT";
     const adeOptions = ["NON VERIFICATA", "ATTIVA", "SOSPESA", "CESSATA", "NON PRESENTE"];
     return `
-      <fieldset class="client-section full">
-        <legend>Identificazione fiscale</legend>
+      <div class="client-completion full"><div><strong>ANAGRAFICA COMPLETA AL</strong><span id="clientCompletionPercent">0%</span></div><div class="client-completion-bar"><i id="clientCompletionBar"></i></div></div>
+      <nav class="form-tabs full" aria-label="Sezioni anagrafica cliente">
+        <button type="button" class="form-tab active" data-form-tab="identification"><i></i>Identificazione</button>
+        <button type="button" class="form-tab" data-form-tab="contacts"><i></i>Contatti</button>
+        <button type="button" class="form-tab" data-form-tab="banking"><i></i>Dati Bancari</button>
+        <button type="button" class="form-tab" data-form-tab="location"><i></i>Localizzazione</button>
+      </nav>
+      <section class="form-tab-panel full active" data-form-panel="identification">
         <div class="form-grid">
+          <label class="full">Ragione sociale <em class="required-mark">*</em><input name="ragioneSociale" value="${esc(record.ragioneSociale || "")}" required></label>
+          <label>Codice fiscale<input name="codice_fiscale" maxlength="16" value="${esc(record.codice_fiscale || "")}" placeholder="Codice fiscale"></label>
           <label>Partita IVA italiana
             <input name="piva" inputmode="numeric" maxlength="11" value="${esc(record.piva || "")}" placeholder="11 cifre">
             <small id="vatLocalStatus" class="field-validation neutral">Inserisci 11 cifre.</small>
           </label>
-          <label>Codice fiscale
-            <input name="codice_fiscale" maxlength="16" value="${esc(record.codice_fiscale || "")}" placeholder="Per persone fisiche o soggetti senza P.IVA">
-          </label>
+          <label>Codice SDI <small>Obbligatorio se manca la PEC</small><input name="sdi" maxlength="7" value="${esc(record.sdi || "")}" placeholder="7 caratteri"></label>
+          <label>PEC <small>Obbligatoria se manca il codice SDI</small><input name="pec" type="email" value="${esc(record.pec || "")}" placeholder="azienda@pec.it"></label>
           <label>Stato VIES
             <input name="piva_vies_nome" value="${esc(record.piva_vies_nome || "")}" readonly placeholder="Non verificato">
             <small id="vatViesStatus" class="field-validation neutral">${esc(record.piva_vies_esito || "Verifica facoltativa per operazioni UE.")}</small>
@@ -99,30 +106,34 @@
           <input type="hidden" name="piva_duplicata" value="NO">
           <input type="hidden" name="piva_vies_valida" value="${esc(record.piva_vies_valida || "NON VERIFICATA")}">
           <input type="hidden" name="piva_vies_esito" value="${esc(record.piva_vies_esito || "")}">
+          <input type="hidden" name="referente" value="${esc(record.referente || "")}">
         </div>
-      </fieldset>
-      <fieldset class="client-section full">
-        <legend>Dati bancari e contatti</legend>
+        <div class="client-sharing-section">
+          <div class="share-client-row"><input type="hidden" name="condiviso" value="NO"><label class="share-client-choice"><input type="checkbox" name="condiviso" value="SI" ${String(record.condiviso || "NO").toUpperCase() === "SI" ? "checked" : ""}><span>Condividi cliente</span></label><button class="info-mark" type="button" id="shareClientInfoButton" aria-expanded="false" aria-controls="shareClientInfoText" title="Informazioni sulla condivisione">i</button></div>
+          <p id="shareClientInfoText" class="share-client-info is-hidden">Se decidi di condividere questo cliente chiunque potrà accedere ai dati di quest'ultimo. Questo semplificherà l'inserimento delle pratiche per questo cliente nello specifico. Arricchirà inoltre il Database e apprezzeremmo enormemente il tuo contributo. Gli altri utenti vedranno che è stato creato da te ma nessuno potrà vedere le pratiche a cui è collegato fatta eccezione per quelle inserite personalmente.</p>
+          ${record.creato_da_nome ? `<small class="client-author">Creato da: <strong>${esc(record.creato_da_nome)}</strong></small>` : ""}
+        </div>
+      </section>
+      <section class="form-tab-panel full" data-form-panel="contacts">
         <div class="form-grid">
-          <label class="full">IBAN
-            <input name="iban" autocomplete="off" value="${esc(record.iban || "")}" placeholder="IT00 X000 0000 0000 0000 0000 000">
-            <small id="ibanStatus" class="field-validation neutral">Controllo matematico MOD-97.</small>
-          </label>
-          <input type="hidden" name="iban_valido" value="${esc(record.iban_valido || "NO")}">
           <label>Paese e prefisso
             <select name="telefono_paese">${countryOptions(phoneCountry)}</select>
           </label>
-          <label>Cellulare
-            <input name="telefono_numero" type="tel" value="${esc(record.telefono_numero || record.telefono || "")}" placeholder="Numero di cellulare">
+          <label>Numero di cellulare <em class="required-mark">*</em>
+            <input name="telefono_numero" type="tel" value="${esc(record.telefono_numero || record.telefono || "")}" placeholder="Numero di cellulare" required>
             <small id="phoneStatus" class="field-validation neutral">Il numero verrà salvato in formato internazionale.</small>
           </label>
+          <label class="full">E-mail<input name="email" type="email" value="${esc(record.email || "")}" placeholder="cliente@azienda.it"></label>
+          <label class="full">Note commerciali<textarea name="note">${esc(record.note || "")}</textarea></label>
           <input type="hidden" name="telefono" value="${esc(record.telefono || "")}">
           <input type="hidden" name="telefono_prefisso" value="${esc(record.telefono_prefisso || "+39")}">
           <input type="hidden" name="telefono_valido" value="${esc(record.telefono_valido || "NO")}">
         </div>
-      </fieldset>
-      <fieldset class="client-section full">
-        <legend>Sede e località</legend>
+      </section>
+      <section class="form-tab-panel full" data-form-panel="banking">
+        <div class="form-grid"><label class="full">IBAN<input name="iban" autocomplete="off" value="${esc(record.iban || "")}" placeholder="IT00 X000 0000 0000 0000 0000 000"><small id="ibanStatus" class="field-validation neutral">Controllo matematico MOD-97.</small></label><input type="hidden" name="iban_valido" value="${esc(record.iban_valido || "NO")}"></div>
+      </section>
+      <section class="form-tab-panel full" data-form-panel="location">
         <div class="form-grid">
           <label>Regione<select name="regione"><option value="">Caricamento regioni…</option></select></label>
           <label>Provincia<select name="provincia" disabled><option value="">Seleziona prima la regione</option></select></label>
@@ -133,26 +144,24 @@
           <label>Numero civico<input name="civico" value="${esc(record.civico || "")}"></label>
           <input type="hidden" name="citta" value="${esc(record.comune || record.citta || "")}">
         </div>
-      </fieldset>
-      <fieldset class="client-section client-sharing-section full">
-        <legend>Condivisione anagrafica</legend>
-        <div class="share-client-row">
-          <input type="hidden" name="condiviso" value="NO">
-          <label class="share-client-choice"><input type="checkbox" name="condiviso" value="SI" ${String(record.condiviso || "NO").toUpperCase() === "SI" ? "checked" : ""}><span>Condividi cliente</span></label>
-          <button class="info-mark" type="button" id="shareClientInfoButton" aria-expanded="false" aria-controls="shareClientInfoText" title="Informazioni sulla condivisione">i</button>
-        </div>
-        <p id="shareClientInfoText" class="share-client-info is-hidden">Se decidi di condividere questo cliente chiunque potrà accedere ai dati di quest'ultimo. Questo semplificherà l'inserimento delle pratiche per questo cliente nello specifico. Arricchirà inoltre il Database e apprezzeremmo enormemente il tuo contributo. Gli altri utenti vedranno che è stato creato da te ma nessuno potrà vedere le pratiche a cui è collegato fatta eccezione per quelle inserite personalmente.</p>
-        ${record.creato_da_nome ? `<small class="client-author">Creato da: <strong>${esc(record.creato_da_nome)}</strong></small>` : ""}
-      </fieldset>`;
+      </section>`;
   }
 
   function bind(form, record, clients, api, notify, readOnly) {
+    form.noValidate = true;
     const vat = form.elements.piva;
     const iban = form.elements.iban;
     const phoneCountry = form.elements.telefono_paese;
     const phoneNumber = form.elements.telefono_numero;
     const shareInfoButton = document.getElementById("shareClientInfoButton");
     const shareInfoText = document.getElementById("shareClientInfoText");
+    const tabButtons = Array.from(form.querySelectorAll("[data-form-tab]"));
+    const tabPanels = Array.from(form.querySelectorAll("[data-form-panel]"));
+    const activateTab = (name) => {
+      tabButtons.forEach((button) => button.classList.toggle("active", button.dataset.formTab === name));
+      tabPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.formPanel === name));
+    };
+    tabButtons.forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.formTab)));
     if (shareInfoButton && shareInfoText) {
       shareInfoButton.addEventListener("click", () => {
         const opening = shareInfoText.classList.contains("is-hidden");
@@ -190,7 +199,7 @@
       if (!phoneNumber.value.trim()) {
         form.elements.telefono.value = "";
         form.elements.telefono_valido.value = "NO";
-        status(document.getElementById("phoneStatus"), "neutral", "Campo facoltativo.");
+        status(document.getElementById("phoneStatus"), "invalid", "Il numero di cellulare è obbligatorio.");
         return;
       }
       try {
@@ -210,7 +219,34 @@
     iban.addEventListener("input", updateIban);
     phoneCountry.addEventListener("change", updatePhone);
     phoneNumber.addEventListener("input", updatePhone);
-    updateVat(); updateIban(); updatePhone();
+    function updateCompletion() {
+      const value = (name) => String(form.elements[name] && form.elements[name].value || "").trim();
+      const mandatoryByTab = {
+        identification: [!!value("ragioneSociale"), !!(value("sdi") || value("pec"))],
+        contacts: [!!value("telefono_numero"), value("telefono_valido") === "SI"],
+        banking: [], location: []
+      };
+      const completeByTab = {
+        identification: [value("ragioneSociale"), value("codice_fiscale"), value("piva"), value("sdi") || value("pec")].every(Boolean),
+        contacts: [value("telefono_numero"), value("email")].every(Boolean) && value("telefono_valido") === "SI",
+        banking: !!value("iban") && value("iban_valido") === "SI",
+        location: [value("regione"), value("provincia"), value("comune"), value("cap"), value("indirizzo"), value("civico")].every(Boolean)
+      };
+      tabButtons.forEach((button) => {
+        const mandatoryValid = (mandatoryByTab[button.dataset.formTab] || []).every(Boolean);
+        button.classList.toggle("complete", mandatoryValid && completeByTab[button.dataset.formTab]);
+        button.classList.toggle("incomplete", !mandatoryValid);
+      });
+      const checks = [value("ragioneSociale"), value("codice_fiscale"), value("piva"), value("sdi") || value("pec"), value("telefono_numero"), value("email"), value("iban"), value("regione"), value("provincia"), value("comune"), value("cap"), value("localita"), value("indirizzo"), value("civico")];
+      const percent = Math.round(checks.filter(Boolean).length / checks.length * 100);
+      const percentNode = document.getElementById("clientCompletionPercent");
+      const barNode = document.getElementById("clientCompletionBar");
+      if (percentNode) percentNode.textContent = `${percent}%`;
+      if (barNode) barNode.style.width = `${percent}%`;
+    }
+    updateVat(); updateIban(); updatePhone(); updateCompletion();
+    form.addEventListener("input", updateCompletion);
+    form.addEventListener("change", () => setTimeout(updateCompletion, 0));
 
     const verifyButton = document.getElementById("verifyViesButton");
     verifyButton.addEventListener("click", async () => {
@@ -249,6 +285,7 @@
 
     loadLocations().then((rows) => {
       bindLocations(form, record, rows);
+      updateCompletion();
       if (readOnly) lockClientForm(form);
     }).catch((error) => notify(error.message, "danger"));
     if (readOnly) lockClientForm(form);
@@ -261,23 +298,24 @@
     if (submit) submit.remove();
   }
 
-  function bindLocations(form, record, rows) {
-    const region = form.elements.regione;
-    const province = form.elements.provincia;
-    const comune = form.elements.comune;
-    const cap = form.elements.cap;
+  function bindLocations(form, record, rows, prefix) {
+    prefix = prefix || "";
+    const region = form.elements[prefix + "regione"];
+    const province = form.elements[prefix + "provincia"];
+    const comune = form.elements[prefix + "comune"];
+    const cap = form.elements[prefix + "cap"];
+    if (!region || !province || !comune || !cap) return;
     const unique = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "it"));
     const setOptions = (select, values, placeholder, selected) => {
       select.innerHTML = `<option value="">${placeholder}</option>${values.map((value) => `<option value="${esc(value)}" ${String(value) === String(selected || "") ? "selected" : ""}>${esc(value)}</option>`).join("")}`;
       select.disabled = !values.length;
     };
-    const currentComune = record.comune || record.citta || "";
-    const inferredRow = rows.find((row) => row.n === currentComune && (!record.regione || row.r === record.regione));
-    const currentRegion = record.regione || (inferredRow && inferredRow.r) || "";
-    const currentProvince = /\([A-Z]{2}\)$/.test(String(record.provincia || ""))
-      ? record.provincia
-      : inferredRow ? `${inferredRow.p} (${inferredRow.s})` : record.provincia || "";
-    const currentCap = record.cap || "";
+    const currentComune = record[prefix + "comune"] || (!prefix ? record.citta : "") || "";
+    const inferredRow = rows.find((row) => row.n === currentComune && (!record[prefix + "regione"] || row.r === record[prefix + "regione"]));
+    const currentRegion = record[prefix + "regione"] || (inferredRow && inferredRow.r) || "";
+    const rawProvince = record[prefix + "provincia"] || "";
+    const currentProvince = /\([A-Z]{2}\)$/.test(String(rawProvince)) ? rawProvince : inferredRow ? `${inferredRow.p} (${inferredRow.s})` : rawProvince;
+    const currentCap = record[prefix + "cap"] || "";
 
     function updateProvinces(selected) {
       setOptions(province, unique(rows.filter((row) => row.r === region.value).map((row) => `${row.p} (${row.s})`)), "Seleziona provincia", selected);
@@ -289,7 +327,7 @@
     function updateCaps(selected) {
       const sigla = (province.value.match(/\(([^)]+)\)$/) || [])[1] || "";
       setOptions(cap, unique(rows.filter((row) => row.s === sigla && row.n === comune.value).map((row) => row.c)), "Seleziona CAP", selected);
-      form.elements.citta.value = comune.value;
+      if (!prefix && form.elements.citta) form.elements.citta.value = comune.value;
     }
     setOptions(region, unique(rows.map((row) => row.r)), "Seleziona regione", currentRegion);
     updateProvinces(currentProvince);
@@ -300,5 +338,9 @@
     comune.addEventListener("change", () => updateCaps(""));
   }
 
-  window.SeemaxClientTools = { renderFields, bind, validItalianVat, validIban };
+  function bindLocationFields(form, record, prefix) {
+    return loadLocations().then((rows) => bindLocations(form, record || {}, rows, prefix || ""));
+  }
+
+  window.SeemaxClientTools = { renderFields, bind, bindLocationFields, validItalianVat, validIban };
 })();
