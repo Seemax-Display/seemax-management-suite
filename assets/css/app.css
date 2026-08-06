@@ -195,7 +195,7 @@ a { color: inherit; text-decoration: none; }
 .client-completion { border:1px solid #bfdbfe;border-radius:16px;padding:14px;background:linear-gradient(135deg,#eff6ff,#fff) }
 .client-completion > div:first-child { display:flex;align-items:center;justify-content:space-between;gap:12px;color:#174f9e;font-size:11px;letter-spacing:.08em }.client-completion span { font-size:16px;font-weight:950 }
 .client-completion-bar { height:9px;overflow:hidden;border-radius:999px;background:#dbeafe;margin-top:10px }.client-completion-bar i { display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#ef4444,#f59e0b 48%,#22c55e);transition:width .3s ease }
-.client-sharing-global { margin:2px 0 14px;padding:14px 2px 1px;border-top:1px solid rgba(148,163,184,.28) }
+.client-sharing-global { margin:16px 0 0;padding:15px 2px 1px;border-top:1px solid rgba(148,163,184,.28) }
 .client-practice-completion { border:1px solid #fde68a;border-radius:15px;padding:13px;background:#fffbeb }.client-completion-alert { margin-bottom:11px;border-left:4px solid #f59e0b;border-radius:10px;padding:10px 12px;color:#854d0e;background:#fff7ed;font-size:11px;line-height:1.45 }
 .installation-sync-question { display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid #bfdbfe;border-radius:14px;padding:12px;background:#eff6ff }.installation-sync-question strong { flex:0 0 100%;font-size:12px }.installation-sync-question label { flex-direction:row;align-items:center;font-size:11px }.installation-sync-question input { width:auto;min-height:auto }
 .practice-form-tabs { margin-top:2px }.practice-form-tabs .form-tab { padding-inline:29px 12px }

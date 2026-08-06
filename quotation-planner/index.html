@@ -4556,12 +4556,6 @@
     <div class="ifis-section-title">Riepilogo spese</div>
     <table class="ifis-summary">
       ${printRowIfis('Spese istruttoria', plainEuroIfis(r.istruttoria))}
-      ${printRowIfis('Spese gestione pagamenti', plainEuroIfis(INCASSO_SEPA_IFIS))}
-      ${printRowIfis('Costo di gestione del bene', plainEuroIfis(gestioneBenePeriodo))}
-      ${printRowIfis('Imposta di bollo', plainEuroIfis(BOLLO_IFIS))}
-      ${printRowIfis(`Costo opzione d'acquisto`, plainEuroIfis(CHIUSURA_CONTRATTO_IFIS))}
-      ${printRowIfis('Tasso Leasing (TAE)', p4(r.tae) + ' %')}
-      ${printRowIfis('TAN', p4(r.tan) + ' %')}
     </table>
 
     <div class="ifis-doc-code">20212 V01 ${codeDate}</div>
@@ -4812,15 +4806,11 @@
       frame.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
       document.body.appendChild(frame);
       const printDoc = frame.contentDocument;
-      const styles = Array.from(document.querySelectorAll('head style,head link[rel="stylesheet"]')).map(node => node.outerHTML).join('\n');
+      // Nel Management Suite il Planner vive in uno Shadow DOM: gli stili originali
+      // sono nel suo nodo <style>, non nell'head della pagina principale.
+      const styles = Array.from(document.querySelectorAll('style')).map(node => `<style>${String(node.textContent || '').replace(/:host/g, ':root')}</style>`).join('\n');
       printDoc.open();
-      printDoc.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><base href="${safe(document.baseURI)}"><title>${safe(suggestedPrintFileName())}</title>${styles}<style>
-        html,body{margin:0!important;padding:0!important;width:210mm!important;background:#fff!important;overflow:visible!important}
-        body>*:not(.quote-document){display:none!important}.quote-document{display:block!important;width:210mm!important;margin:0!important;padding:0!important}
-        .print-page{box-sizing:border-box!important;width:210mm!important;min-width:210mm!important;max-width:210mm!important;height:297mm!important;min-height:297mm!important;max-height:297mm!important;margin:0!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important}
-        .print-page:last-child{break-after:auto!important;page-break-after:auto!important}
-        .conformity-page-two,.ifis-page2{display:none!important}
-      </style></head><body>${source.outerHTML}</body></html>`);
+      printDoc.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><base href="${safe(document.baseURI)}"><title>${safe(suggestedPrintFileName())}</title>${styles}</head><body class="sqp-native-body integrated-suite management-native">${source.outerHTML}</body></html>`);
       printDoc.close();
       let printed = false;
       const printNow = () => {
