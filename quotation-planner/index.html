@@ -516,7 +516,7 @@
     .ifis-footer{position:absolute;left:15mm;right:15mm;bottom:8mm;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8mm;font-size:7px;line-height:1.14;color:#23334d}.ifis-page-number{position:absolute;right:15mm;bottom:15mm;font-size:8px}.ifis-doc-code{position:absolute;left:15mm;bottom:15mm;font-size:8px}.ifis-page2 .ifis-logo{margin-bottom:25mm}.ifis-page2 .ifis-summary td{padding:5.8px 6px}
     .missing-config{border:1px dashed var(--line-strong);background:#fff;border-radius:18px;padding:18px;color:var(--muted);line-height:1.55}
 
-    /* Dichiarazione di conformita - layout ricreato dal modello PDF originale */
+    /* Dichiarazione di conformita - pagine A4 derivate dai PDF ufficiali */
     .conformity-page{position:relative;width:210mm;min-height:297mm;max-width:none;margin-left:auto;margin-right:auto;background:#fff;color:#111827;font-family:Arial, Helvetica, sans-serif;overflow:hidden;padding:0!important;border-radius:0!important;box-sizing:border-box}
     .conformity-page *{box-sizing:border-box}
     .cdc-logo-ledlab{position:absolute;left:9.4mm;top:11.2mm;width:24.9mm;height:auto}
@@ -545,6 +545,7 @@
     .cdc-label-lines .u{text-decoration:underline;text-underline-offset:.6mm;text-decoration-thickness:.23mm}
     .cdc-label-ce{position:absolute;left:19.0mm;top:159.6mm;width:91mm;height:auto}
     .cdc-label-caption{position:absolute;left:0;right:0;top:196.0mm;text-align:center;font-size:4.22mm;line-height:1.1;color:#000;font-weight:800;text-transform:uppercase}
+    .cdc-template-image{position:absolute!important;inset:0!important;width:210mm!important;height:297mm!important;max-width:none!important;max-height:none!important;display:block!important;object-fit:fill!important;margin:0!important}
     @media print{
       .conformity-page{width:210mm!important;min-height:297mm!important;max-width:none!important;padding:0!important;page-break-after:always;break-after:page}
       .cdc-logo-ledlab,.cdc-logo-seemax,.cdc-ce-rohs,.cdc-label-ce,.cdc-footer-logos{display:block!important;visibility:visible!important;opacity:1!important;object-fit:contain!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1023,6 +1024,29 @@
       .conformity-page-one,.conformity-page-two{
         margin:0!important;
         transform:none!important;
+      }
+      .print-page.conformity-page{
+        box-sizing:border-box!important;
+        height:297mm!important;
+        max-height:297mm!important;
+        padding:0!important;
+        page-break-before:auto!important;
+        page-break-after:always!important;
+        break-before:auto!important;
+        break-after:page!important;
+      }
+      .print-page.conformity-page:last-child{
+        page-break-after:auto!important;
+        break-after:auto!important;
+      }
+      .cdc-template-image{
+        position:absolute!important;
+        inset:0!important;
+        width:210mm!important;
+        height:297mm!important;
+        max-width:none!important;
+        max-height:none!important;
+        object-fit:fill!important;
       }
     }
     body.integrated-suite .app{grid-template-columns:1fr}
@@ -4906,34 +4930,6 @@
       return productPitchLabel(item && item.nome ? item.nome : '').replace(/\s+/g,'').toUpperCase();
     }
 
-    function conformityTechValue(item, keyword){
-      const sheet = techSheetFor(item && item.nome ? item.nome : '');
-      const wanted = String(keyword || '').toLowerCase();
-      const row = sheet.rows.find(r => String(r[0] || '').toLowerCase().includes(wanted));
-      return row ? row[1] : '';
-    }
-
-    function conformityUsageLabel(item){
-      const usage = conformityTechValue(item, 'modalità') || conformityTechValue(item, 'utilizzo');
-      if(usage) return usage;
-      const pitch = productPitchLabel(item && item.nome ? item.nome : '');
-      if(pitch === 'P1.9') return 'Indoor';
-      if(pitch === 'P4') return 'Outdoor';
-      return 'Indoor / Outdoor';
-    }
-
-    function conformityOutdoorLabel(item){
-      const usage = conformityUsageLabel(item).toUpperCase();
-      if(usage.includes('INDOOR') && !usage.includes('OUTDOOR')) return 'INDOOR';
-      if(usage.includes('INDOOR') && usage.includes('OUTDOOR')) return 'INDOOR/OUTDOOR';
-      return 'OUTDOOR';
-    }
-
-    function conformityProductModel(item){
-      const pitch = productPitchLabel(item && item.nome ? item.nome : '');
-      return `${pitch} ${conformityOutdoorLabel(item)}`.trim();
-    }
-
     function buildConformityPages(selectedItems){
       const groups = [];
       const byPitch = new Map();
@@ -4947,73 +4943,22 @@
         byPitch.get(key).screens.push(item);
       });
 
-      const ledlabLogo = ASSET_ROOT + 'planner-media/ledlab-logo.png';
-      const seemaxLogo = ASSET_ROOT + 'planner-media/cdc-seemax-logo.png';
-      const ceRohs = ASSET_ROOT + 'planner-media/ce-rohs.png';
-      const ceRohsBig = ASSET_ROOT + 'planner-media/ce-rohs-big.png';
-      const footerLogos = ASSET_ROOT + 'planner-media/footer-logos.png';
-
-      function conformityHeaderHtml(){
-        return `<img class="cdc-logo-ledlab" src="${ledlabLogo}" alt="LED LAB COMPANY">
-          <div class="cdc-company-text">LED LAB COMPANY srl<br>Via Lineri, 16 - 95122 Catania<br>Tel. 095 463251 Mob. 340 0512361<br>Mail: info@ledlabcompany.it<br>P.Iva 05091870872</div>
-          <img class="cdc-logo-seemax" src="${seemaxLogo}" alt="SEEMAX">`;
-      }
-
       return groups.map(group => {
         const item = group.item;
-        const pitch = productPitchLabel(item && item.nome ? item.nome : '');
-        const model = conformityProductModel(item);
-        const code = `LLC ${pitch}`;
-        const labelModel = `LWP${pitch.replace(/^P/i,'')} ${conformityOutdoorLabel(item)}`;
-        const consumption = conformityTechValue(item, 'consumo massimo') || '1000W';
+        const pitch = productPitchLabel(item && item.nome ? item.nome : '').replace(/\s+/g,'').toUpperCase();
+        const templateByPitch = { 'P1.9':'p19', 'P2.5':'p25', 'P3':'p3', 'P3.91':'p391', 'P4':'p4' };
+        // I modelli non ancora provvisti di certificato ufficiale usano il modello
+        // P3 richiesto dal cliente. Non vengono ricostruite righe HTML: ogni foglio
+        // resta una singola immagine A4, quindi il browser non puo spezzarne il testo.
+        const template = templateByPitch[pitch] || 'p3';
+        const pageOneImage = ASSET_ROOT + `conformity/${template}-1.png`;
+        const pageTwoImage = ASSET_ROOT + `conformity/${template}-2.png`;
         const pageOne = `<section class="print-page conformity-page conformity-page-one">
-          ${conformityHeaderHtml()}
-          <h2 class="cdc-title">DICHIARAZIONE DI CONFORMITÀ</h2>
-          <div class="cdc-intro">La ditta LED LAB COMPANY SRL con Magazzino e Sede Operativa in Via Lineri N.16,<br>95122 , Catania (CT) , <span class="underline">dichiara sotto la propria responsabilità che il prodotto:</span></div>
-          <ul class="cdc-product">
-            <li><b>Descrizione:</b>&nbsp; DISPLAY LED</li>
-            <li><b>Modello:</b>&nbsp; ${safe(model)}</li>
-            <li><b>Codice:</b>&nbsp; ${safe(code)}</li>
-            <li><b>Costruito:</b>&nbsp; in China</li>
-          </ul>
-          <div class="cdc-body">se installato e mantenuto in conformità alla sua destinazione, alla legislazione, alle<br>norme in vigore, alle istruzioni del costruttore e alla regola d'arte, soddisfa le<br>disposizioni delle Direttive Comunitarie CEE:</div>
-          <ul class="cdc-directives">
-            <li>2014/35/UE del 26/02/2014 Direttiva Bassa Tensione.</li>
-            <li>2014/30/UE del 26/02/2014 Direttiva Compatibilità elettromagnetica (EMC).<br>2011/65/UE RoHS.</li>
-          </ul>
-          <div class="cdc-harmonized">ed è conforme alle seguenti Norme armonizzate:</div>
-          <ul class="cdc-standards">
-            <li>EN 55032: 2015</li>
-            <li>EN 61000-3-2; 2014 – EN 610000 -3-3; 2013</li>
-            <li>EN 55035; 2017</li>
-            <li>EN 61000 -4-2; 2009</li>
-            <li>IEC 62321:2013</li>
-            <li>IEC 62321-3-2: 2013</li>
-            <li>IEC 62321-5: 2013</li>
-          </ul>
-          <img class="cdc-ce-rohs" src="${ceRohs}" alt="CE RoHS">
-          <div class="cdc-date">Catania, 29/01/2025</div>
-          <div class="cdc-signature">Marco Cavallaro<strong>Legale Rappresentante</strong></div>
-          <img class="cdc-footer-logos" src="${footerLogos}" alt="ELPRO SEEMAX URBY">
+          <img class="cdc-template-image" src="${pageOneImage}" alt="Dichiarazione di conformità ${safe(pitch)} - pagina 1">
         </section>`;
 
         const pageTwo = `<section class="print-page conformity-page conformity-page-two">
-          ${conformityHeaderHtml()}
-          <div class="cdc-label-box"></div>
-          <div class="cdc-label-lines">
-            <div><span class="u">MODELLO:</span> ${safe(labelModel)}</div>
-            <div><span class="u">LOTTO:</span> 2752-1431</div>
-            <div><span class="u">VOLT/FREQ:</span> 220/240V</div>
-            <div><span class="u">POTENZA:</span> ${safe(consumption)}</div>
-            <div><span class="u">COLORE:</span></div>
-            <div><span class="u">LUCE:</span> RGB FULL COLOR</div>
-            <div><span class="u">MADE IN CHINA</span></div>
-            <div><span class="u">Importato da Led Lab Company srl</span></div>
-            <div><span class="u" style="color:#0875d1">www.seemaxdisplay.it</span></div>
-          </div>
-          <img class="cdc-label-ce" src="${ceRohsBig}" alt="CE RoHS">
-          <div class="cdc-label-caption">ETICHETTA MARCATURA CE</div>
-          <img class="cdc-footer-logos" src="${footerLogos}" alt="ELPRO SEEMAX URBY">
+          <img class="cdc-template-image" src="${pageTwoImage}" alt="Dichiarazione di conformità ${safe(pitch)} - pagina 2">
         </section>`;
         return pageOne + pageTwo;
       }).join('');

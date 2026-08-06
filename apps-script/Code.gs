@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.7.3";
+var SEEMAX_VERSION = "seemax-management-suite-2.7.4";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.3 · Ripristino stampa originale S.Q.P.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.4 · Certificati di conformità ufficiali A4.");
   styleSheets_();
-  return "SEEMAX v2.7.3 configurato: stampa originale S.Q.P. ripristinata.";
+  return "SEEMAX v2.7.4 configurato: certificati di conformità ufficiali A4.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.3 · Ripristino stampa originale S.Q.P.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.4 · Certificati di conformità ufficiali A4.");
   styleSheets_();
-  return "SEEMAX v2.7.3 configurato: stampa originale S.Q.P. e protezione multiutente.";
+  return "SEEMAX v2.7.4 configurato: certificati A4 e protezione multiutente.";
 }
 
 function doGet(e) {

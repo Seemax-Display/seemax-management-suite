@@ -1,9 +1,14 @@
-const CACHE = "seemax-management-v2-7-3";
+const CACHE = "seemax-management-v2-7-4";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
   "./assets/js/app.js", "./assets/js/planner-native.js",
-  "./assets/icons/icon.svg", "./manifest.webmanifest"
+  "./assets/icons/icon.svg", "./manifest.webmanifest",
+  "./assets/conformity/p19-1.png", "./assets/conformity/p19-2.png",
+  "./assets/conformity/p25-1.png", "./assets/conformity/p25-2.png",
+  "./assets/conformity/p3-1.png", "./assets/conformity/p3-2.png",
+  "./assets/conformity/p391-1.png", "./assets/conformity/p391-2.png",
+  "./assets/conformity/p4-1.png", "./assets/conformity/p4-2.png"
 ];
 
 self.addEventListener("install", (event) => {
