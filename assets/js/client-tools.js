@@ -77,7 +77,13 @@
         <button type="button" class="form-tab" data-form-tab="contacts"><i></i>Contatti</button>
         <button type="button" class="form-tab" data-form-tab="banking"><i></i>Dati Bancari</button>
         <button type="button" class="form-tab" data-form-tab="location"><i></i>Localizzazione</button>
+        <button type="button" class="form-tab" data-form-tab="other"><i></i>Altro</button>
       </nav>
+      <div class="client-sharing-global full">
+        <div class="share-client-row"><input type="hidden" name="condiviso" value="NO"><label class="share-client-choice"><input type="checkbox" name="condiviso" value="SI" ${String(record.condiviso || "NO").toUpperCase() === "SI" ? "checked" : ""}><span>Condividi cliente</span></label><button class="info-mark" type="button" id="shareClientInfoButton" aria-expanded="false" aria-controls="shareClientInfoText" title="Informazioni sulla condivisione">i</button></div>
+        <p id="shareClientInfoText" class="share-client-info is-hidden">Se decidi di condividere questo cliente chiunque potrà accedere ai dati di quest'ultimo. Questo semplificherà l'inserimento delle pratiche per questo cliente nello specifico. Arricchirà inoltre il Database e apprezzeremmo enormemente il tuo contributo. Gli altri utenti vedranno che è stato creato da te ma nessuno potrà vedere le pratiche a cui è collegato fatta eccezione per quelle inserite personalmente.</p>
+        ${record.creato_da_nome ? `<small class="client-author">Creato da: <strong>${esc(record.creato_da_nome)}</strong></small>` : ""}
+      </div>
       <section class="form-tab-panel full active" data-form-panel="identification">
         <div class="form-grid">
           <label class="full">Ragione sociale <em class="required-mark">*</em><input name="ragioneSociale" value="${esc(record.ragioneSociale || "")}" required></label>
@@ -86,8 +92,8 @@
             <input name="piva" inputmode="numeric" maxlength="11" value="${esc(record.piva || "")}" placeholder="11 cifre">
             <small id="vatLocalStatus" class="field-validation neutral">Inserisci 11 cifre.</small>
           </label>
-          <label>Codice SDI <small>Obbligatorio se manca la PEC</small><input name="sdi" maxlength="7" value="${esc(record.sdi || "")}" placeholder="7 caratteri"></label>
-          <label>PEC <small>Obbligatoria se manca il codice SDI</small><input name="pec" type="email" value="${esc(record.pec || "")}" placeholder="azienda@pec.it"></label>
+          <label>Codice SDI <em class="required-mark" id="sdiRequiredMark">* Obbligatorio</em><small id="sdiRequirementHelp">Obbligatorio se manca la PEC</small><input name="sdi" maxlength="7" value="${esc(record.sdi || "")}" placeholder="7 caratteri"></label>
+          <label>PEC <em class="required-mark" id="pecRequiredMark">* Obbligatoria</em><small id="pecRequirementHelp">Obbligatoria se manca il codice SDI</small><input name="pec" type="email" value="${esc(record.pec || "")}" placeholder="azienda@pec.it"></label>
           <label>Stato VIES
             <input name="piva_vies_nome" value="${esc(record.piva_vies_nome || "")}" readonly placeholder="Non verificato">
             <small id="vatViesStatus" class="field-validation neutral">${esc(record.piva_vies_esito || "Verifica facoltativa per operazioni UE.")}</small>
@@ -108,11 +114,6 @@
           <input type="hidden" name="piva_vies_esito" value="${esc(record.piva_vies_esito || "")}">
           <input type="hidden" name="referente" value="${esc(record.referente || "")}">
         </div>
-        <div class="client-sharing-section">
-          <div class="share-client-row"><input type="hidden" name="condiviso" value="NO"><label class="share-client-choice"><input type="checkbox" name="condiviso" value="SI" ${String(record.condiviso || "NO").toUpperCase() === "SI" ? "checked" : ""}><span>Condividi cliente</span></label><button class="info-mark" type="button" id="shareClientInfoButton" aria-expanded="false" aria-controls="shareClientInfoText" title="Informazioni sulla condivisione">i</button></div>
-          <p id="shareClientInfoText" class="share-client-info is-hidden">Se decidi di condividere questo cliente chiunque potrà accedere ai dati di quest'ultimo. Questo semplificherà l'inserimento delle pratiche per questo cliente nello specifico. Arricchirà inoltre il Database e apprezzeremmo enormemente il tuo contributo. Gli altri utenti vedranno che è stato creato da te ma nessuno potrà vedere le pratiche a cui è collegato fatta eccezione per quelle inserite personalmente.</p>
-          ${record.creato_da_nome ? `<small class="client-author">Creato da: <strong>${esc(record.creato_da_nome)}</strong></small>` : ""}
-        </div>
       </section>
       <section class="form-tab-panel full" data-form-panel="contacts">
         <div class="form-grid">
@@ -124,7 +125,6 @@
             <small id="phoneStatus" class="field-validation neutral">Il numero verrà salvato in formato internazionale.</small>
           </label>
           <label class="full">E-mail<input name="email" type="email" value="${esc(record.email || "")}" placeholder="cliente@azienda.it"></label>
-          <label class="full">Note commerciali<textarea name="note">${esc(record.note || "")}</textarea></label>
           <input type="hidden" name="telefono" value="${esc(record.telefono || "")}">
           <input type="hidden" name="telefono_prefisso" value="${esc(record.telefono_prefisso || "+39")}">
           <input type="hidden" name="telefono_valido" value="${esc(record.telefono_valido || "NO")}">
@@ -144,6 +144,9 @@
           <label>Numero civico<input name="civico" value="${esc(record.civico || "")}"></label>
           <input type="hidden" name="citta" value="${esc(record.comune || record.citta || "")}">
         </div>
+      </section>
+      <section class="form-tab-panel full" data-form-panel="other">
+        <div class="form-grid"><label class="full">Note commerciali<textarea name="note" placeholder="Annotazioni, preferenze e informazioni commerciali utili">${esc(record.note || "")}</textarea></label></div>
       </section>`;
   }
 
@@ -224,14 +227,25 @@
       const mandatoryByTab = {
         identification: [!!value("ragioneSociale"), !!(value("sdi") || value("pec"))],
         contacts: [!!value("telefono_numero"), value("telefono_valido") === "SI"],
-        banking: [], location: []
+        banking: [], location: [], other: []
       };
       const completeByTab = {
         identification: [value("ragioneSociale"), value("codice_fiscale"), value("piva"), value("sdi") || value("pec")].every(Boolean),
         contacts: [value("telefono_numero"), value("email")].every(Boolean) && value("telefono_valido") === "SI",
         banking: !!value("iban") && value("iban_valido") === "SI",
-        location: [value("regione"), value("provincia"), value("comune"), value("cap"), value("indirizzo"), value("civico")].every(Boolean)
+        location: [value("regione"), value("provincia"), value("comune"), value("cap"), value("indirizzo"), value("civico")].every(Boolean),
+        other: !!value("note")
       };
+      const hasSdi = !!value("sdi");
+      const hasPec = !!value("pec");
+      const sdiMark = document.getElementById("sdiRequiredMark");
+      const pecMark = document.getElementById("pecRequiredMark");
+      const sdiHelp = document.getElementById("sdiRequirementHelp");
+      const pecHelp = document.getElementById("pecRequirementHelp");
+      if (sdiMark) sdiMark.classList.toggle("is-hidden", hasPec);
+      if (pecMark) pecMark.classList.toggle("is-hidden", hasSdi);
+      if (sdiHelp) sdiHelp.textContent = hasPec ? "Facoltativo: PEC già presente" : "Obbligatorio se manca la PEC";
+      if (pecHelp) pecHelp.textContent = hasSdi ? "Facoltativa: Codice SDI già presente" : "Obbligatoria se manca il codice SDI";
       tabButtons.forEach((button) => {
         const mandatoryValid = (mandatoryByTab[button.dataset.formTab] || []).every(Boolean);
         button.classList.toggle("complete", mandatoryValid && completeByTab[button.dataset.formTab]);

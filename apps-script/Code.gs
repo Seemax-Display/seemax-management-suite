@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.7.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.7.1";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.0 · Anagrafiche e pratiche a tab");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.1 · Stampa S.Q.P. e anagrafica cliente");
   styleSheets_();
-  return "SEEMAX v2.7.0 configurato: anagrafiche e pratiche a tab.";
+  return "SEEMAX v2.7.1 configurato: stampa S.Q.P. e anagrafica cliente.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.0 · Anagrafiche e pratiche a tab");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.7.1 · Stampa S.Q.P. e anagrafica cliente");
   styleSheets_();
-  return "SEEMAX v2.7.0 configurato: protezione multiutente, anagrafiche e pratiche a tab.";
+  return "SEEMAX v2.7.1 configurato: stampa S.Q.P., anagrafica cliente e protezione multiutente.";
 }
 
 function doGet(e) {
