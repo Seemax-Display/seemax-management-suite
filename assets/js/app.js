@@ -15,6 +15,8 @@
   const uploadState = { batches: new Map(), expanded: false };
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
   let pendingFirstAccessTutorial = false;
+  let profileBoardDraft = [];
+  let profileDescriptionDraft = "";
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -37,7 +39,8 @@
     documents: ["Documenti", "Preventivi, contratti e allegati collegati"],
     activities: ["Attività", "Scadenze, telefonate e appuntamenti"],
     users: ["Agenti e accessi", "Profili, ruoli e stato degli account"],
-    settings: ["Impostazioni", "Configurazione generale del gestionale"]
+    settings: ["Impostazioni", "Configurazione generale del gestionale"],
+    profile: ["Il mio profilo", "Risultati, presentazione personale e bacheca trofei"]
   };
 
   const STATUSES = ["Inserita", "Accettata", "Sospesa", "Bocciata", "Completata"];
@@ -311,6 +314,9 @@
       { chapter: "Dashboard", selector: ".revenue-panel", title: "Obiettivi di fatturato", text: "Le barre confrontano il fatturato personale e aziendale con l'obiettivo impostato. Vengono considerate le pratiche in stato COMPLETATA." },
       { chapter: "Dashboard", selector: ".agent-month-dashboard", title: "Agente del mese e trofei", text: "Consulta il vincitore del mese di riferimento, le classifiche mensili e la tua bacheca degli obiettivi raggiunti." },
       { chapter: "Dashboard", selector: ".dashboard-grid", title: "Pipeline, agenda e aggiornamenti", text: "Questa zona riunisce lo stato delle pratiche, le prossime attività e le pratiche aggiornate più recentemente." },
+      { chapter: "Profilo", route: "profile", selector: ".profile-hero", title: "Il tuo spazio personale", text: "Qui trovi nome, ruolo, descrizione ed eventuale riconoscimento Agente del mese. Usa Personalizza profilo per aggiornare la tua presentazione." },
+      { chapter: "Profilo", selector: ".profile-stats-grid", title: "Le tue statistiche", text: "Questi indicatori considerano esclusivamente le pratiche COMPLETATE e mostrano schermo più utilizzato, pratica maggiore, tipologia preferita e provvigioni ottenute." },
+      { chapter: "Profilo", selector: ".profile-trophy-board", title: "Bacheca trofei personalizzabile", text: "Aggiungi fino a otto trofei sbloccati e disponili nell'ordine che preferisci. L'amministratore li vede tutti disponibili per le verifiche." },
       { chapter: "Pratiche", route: "practices", selector: ".view-toolbar", title: "Gestione delle pratiche", text: "Crea una nuova pratica e filtra immediatamente l'archivio per Inserita, Accettata, Sospesa, Bocciata o Completata." },
       { chapter: "Pratiche", selector: ".practice-controls", title: "Ricerca e ordinamento", text: "Cerca per ID o intestazione e ordina per esito, identificativo, cliente, tipologia, finanziaria, valore e, per gli amministratori, agente." },
       { chapter: "Pratiche", selector: ".practice-result-count", title: "Risultati e pagine", text: "Sono mostrati dieci elementi per pagina. Il contatore indica sempre quali risultati stai visualizzando." },
@@ -447,7 +453,7 @@
   }
 
   function go(route, updateHash = true) {
-    const allowed = visibleNav().some((item) => item.id === route);
+    const allowed = route === "profile" || visibleNav().some((item) => item.id === route);
     const nextRoute = allowed ? route : "dashboard";
     const changed = state.route !== nextRoute;
     const applyRoute = () => {
@@ -469,7 +475,7 @@
 
   function renderRoute(animate = false) {
     if (!state.data && state.route !== "settings") return;
-    const renders = { dashboard: renderDashboard, practices: renderPractices, clients: renderClients, catalog: renderCatalog, planner: renderPlanner, documents: renderDocuments, activities: renderActivities, users: renderUsers, settings: renderSettings };
+    const renders = { dashboard: renderDashboard, practices: renderPractices, clients: renderClients, catalog: renderCatalog, planner: renderPlanner, documents: renderDocuments, activities: renderActivities, users: renderUsers, settings: renderSettings, profile: renderProfile };
     $("viewContainer").innerHTML = renders[state.route]();
     if (state.route === "planner" && window.SeemaxNativePlanner) {
       window.SeemaxNativePlanner.mount($("nativePlannerRoot"), {
@@ -594,8 +600,7 @@
   }
 
   function openTrophyBoard() {
-    const data = state.data && state.data.dashboard && state.data.dashboard.agentOfMonth;
-    const achievements = (data && data.achievements) || [];
+    const achievements = profileAchievements();
     const unlocked = achievements.filter((item) => item.unlocked).length;
     const cards = achievements.map((item) => {
       const percent = Math.min(100, Math.round(Number(item.current || 0) / Number(item.target || 1) * 100));
@@ -604,6 +609,123 @@
     }).join("");
     const body = `<div class="trophy-board"><div class="trophy-board-head"><span>🏅</span><div><h3>${unlocked} trofei sbloccati su ${achievements.length}</h3><p>Ogni risultato viene aggiornato automaticamente dai dati delle tue pratiche e dei tuoi clienti.</p></div></div><div class="trophy-grid">${cards}</div></div>`;
     openModal("La mia bacheca trofei", body, { wide: true, kicker: "Obiettivi e riconoscimenti" });
+  }
+
+  function currentProfileUser() {
+    const session = api.getSession() || {};
+    return (state.data.users || []).find((user) => String(user.username || "") === String(session.username || "")) || session;
+  }
+
+  function profileAchievements() {
+    const source = (((state.data || {}).dashboard || {}).agentOfMonth || {}).achievements || [];
+    return source.map((item) => ({ ...item, unlocked: api.isAdmin() ? true : !!item.unlocked }));
+  }
+
+  function parseProfileBoard(user, achievements) {
+    let selected = [];
+    try { selected = JSON.parse(user.bacheca_trofei_json || "[]"); } catch (error) { selected = []; }
+    const available = new Set(achievements.filter((item) => item.unlocked).map((item) => item.id));
+    selected = selected.filter((id, index) => available.has(id) && selected.indexOf(id) === index).slice(0, 8);
+    if (!selected.length) selected = achievements.filter((item) => item.unlocked).slice(0, 4).map((item) => item.id);
+    return selected;
+  }
+
+  function profileStatistics() {
+    const session = api.getSession() || {};
+    const username = String(session.username || "");
+    const displayName = String(session.displayName || session.nome_visualizzato || "");
+    const completed = (state.data.practices || []).filter((practice) => practice.stato === "Completata" && (String(practice.agent_username || "") === username || (!practice.agent_username && String(practice.agente || "") === displayName)));
+    const displayTotals = {};
+    completed.forEach((practice) => {
+      let inventory = [];
+      try { inventory = JSON.parse(practice.righe_magazzino_json || "[]"); } catch (error) { inventory = []; }
+      if (inventory.length) inventory.forEach((line) => {
+        const raw = String(line.modello_display || line.descrizione || line.prodotto || line.product_id || "");
+        const match = raw.match(/P(?:1\.9|2\.5|3\.91|3|4)/i);
+        const model = match ? match[0].toUpperCase() : raw || "Non indicato";
+        displayTotals[model] = (displayTotals[model] || 0) + Math.max(1, Number(line.quantita || line.quantity || 1));
+      });
+      else {
+        const models = String(practice.modelli_display || "").match(/P(?:1\.9|2\.5|3\.91|3|4)/ig) || [];
+        models.forEach((model) => { const key = model.toUpperCase(); displayTotals[key] = (displayTotals[key] || 0) + 1; });
+      }
+    });
+    const favoriteDisplay = Object.entries(displayTotals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    const typeTotals = {};
+    completed.forEach((practice) => { const type = String(practice.tipo_pratica || "Non indicata").toUpperCase(); typeTotals[type] = (typeTotals[type] || 0) + 1; });
+    const favoriteType = Object.entries(typeTotals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    const highest = completed.slice().sort((a, b) => Number(b.valore || 0) - Number(a.valore || 0))[0] || null;
+    return {
+      completed: completed.length,
+      favoriteDisplay: favoriteDisplay ? favoriteDisplay[0] : "—",
+      favoriteDisplayCount: favoriteDisplay ? favoriteDisplay[1] : 0,
+      favoriteType: favoriteType ? favoriteType[0] : "—",
+      favoriteTypeCount: favoriteType ? favoriteType[1] : 0,
+      highest,
+      commissions: completed.reduce((sum, practice) => sum + Number(practice.valore_provvigione || 0), 0)
+    };
+  }
+
+  function renderProfile() {
+    const session = api.getSession() || {};
+    const user = currentProfileUser();
+    const achievements = profileAchievements();
+    const boardIds = parseProfileBoard(user, achievements);
+    const byId = Object.fromEntries(achievements.map((item) => [item.id, item]));
+    const stats = profileStatistics();
+    const board = boardIds.map((id, index) => {
+      const item = byId[id];
+      if (!item) return "";
+      return `<article class="profile-trophy" style="--trophy-delay:${index * 55}ms"><span>${item.icon}</span><div><small>RICONOSCIMENTO</small><strong>${esc(item.title)}</strong><p>${esc(item.description)}</p></div></article>`;
+    }).join("");
+    const highest = stats.highest;
+    return `<div class="profile-page">
+      <section class="profile-hero ${(((state.data.dashboard || {}).agentOfMonth || {}).isCurrentUserWinner) ? "gold" : ""}">
+        <div class="profile-avatar">${esc(initials(user.nome_visualizzato || user.displayName || session.displayName || session.username))}</div>
+        <div class="profile-identity"><span class="section-kicker">Profilo Seemax</span><h2>${esc(user.nome_visualizzato || user.displayName || session.displayName || session.username || "Utente")}</h2><p>${esc(user.descrizione_profilo || "Aggiungi una descrizione per raccontare il tuo ruolo, il tuo metodo di lavoro o i tuoi obiettivi professionali.")}</p><div><span>${badge(user.ruolo || user.role || "AGENTE")}</span>${((state.data.dashboard || {}).agentOfMonth || {}).isCurrentUserWinner ? `<em>🏆 AGENTE DEL MESE</em>` : ""}</div></div>
+        <button class="btn white profile-edit-button" data-action="edit-profile">✦ Personalizza profilo</button>
+      </section>
+      <section class="profile-stats-grid">
+        <article><span>🖥️</span><div><small>Schermo più utilizzato</small><strong>${esc(stats.favoriteDisplay)}</strong><p>${stats.favoriteDisplayCount ? `${stats.favoriteDisplayCount} cabinet in pratiche completate` : "Nessun dato disponibile"}</p></div></article>
+        <article><span>💼</span><div><small>Pratica dal valore più alto</small><strong>${highest ? euros(highest.valore) : "—"}</strong><p>${highest ? `${esc(highest.numero || highest.id)} · ${esc(highest.cliente || "Cliente")}` : "Nessuna pratica completata"}</p></div></article>
+        <article><span>📊</span><div><small>Tipologia preferita</small><strong>${esc(stats.favoriteType)}</strong><p>${stats.favoriteTypeCount ? `${stats.favoriteTypeCount} pratiche completate` : "Nessun dato disponibile"}</p></div></article>
+        <article><span>💰</span><div><small>Provvigioni ottenute finora</small><strong>${euros(stats.commissions)}</strong><p>Calcolate su ${stats.completed} pratiche completate</p></div></article>
+      </section>
+      <section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">La tua collezione</span><h3>Bacheca trofei</h3><p>Organizza e mostra fino a otto riconoscimenti tra quelli che hai sbloccato.</p></div><button class="btn gold" data-action="edit-profile-board">🏅 Modifica bacheca</button></div>
+        <div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>🔒</span><h3>La bacheca è ancora vuota</h3><p>Sblocca un trofeo oppure apri l’editor per aggiungere quelli disponibili.</p></div>`}</div>
+      </section>
+    </div>`;
+  }
+
+  function openProfileEditor(focusBoard = false, preserveDraft = false) {
+    const user = currentProfileUser();
+    const achievements = profileAchievements();
+    if (!preserveDraft) {
+      profileBoardDraft = parseProfileBoard(user, achievements);
+      profileDescriptionDraft = String(user.descrizione_profilo || "");
+    }
+    const available = achievements.filter((item) => item.unlocked);
+    const renderAvailable = available.map((item) => `<button type="button" class="profile-available-trophy ${profileBoardDraft.includes(item.id) ? "selected" : ""}" data-action="profile-board-toggle" data-id="${esc(item.id)}"><span>${item.icon}</span><div><strong>${esc(item.title)}</strong><small>${profileBoardDraft.includes(item.id) ? "Nella bacheca" : "Aggiungi"}</small></div></button>`).join("");
+    const ordered = profileBoardDraft.map((id, index) => { const item = available.find((entry) => entry.id === id); return item ? `<article class="profile-board-sort-item" draggable="true" data-profile-trophy-id="${esc(id)}"><span>${item.icon}</span><strong>${index + 1}. ${esc(item.title)}</strong><div><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="1" ${index === profileBoardDraft.length - 1 ? "disabled" : ""}>↓</button><button type="button" data-action="profile-board-toggle" data-id="${esc(id)}">×</button></div></article>` : ""; }).join("");
+    const body = `<form id="profileForm"><label class="profile-description-field">La tua descrizione<textarea name="descrizione_profilo" maxlength="420" placeholder="Racconta qualcosa di te…">${esc(profileDescriptionDraft)}</textarea><small>Massimo 420 caratteri.</small></label><div class="profile-editor-divider"></div><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti sbloccati</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine.</p><div class="profile-board-sort" id="profileBoardSort">${ordered || `<div class="profile-sort-empty">Seleziona un trofeo dalla colonna accanto.</div>`}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva profilo</button></div></form>`;
+    openModal("Personalizza il tuo profilo", body, { wide: true, kicker: "Spazio personale", subtitle: api.isAdmin() ? "Modalità test admin: tutti i trofei sono disponibili" : "Descrizione e bacheca trofei" });
+    if (focusBoard) requestAnimationFrame(() => document.querySelector(".profile-editor-divider")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function updateProfileBoardDraft(id, direction) {
+    const achievements = profileAchievements();
+    if (direction === "toggle") {
+      const index = profileBoardDraft.indexOf(id);
+      if (index >= 0) profileBoardDraft.splice(index, 1);
+      else if (profileBoardDraft.length < 8 && achievements.some((item) => item.id === id && item.unlocked)) profileBoardDraft.push(id);
+      else if (profileBoardDraft.length >= 8) { toast("La bacheca può contenere al massimo 8 trofei.", "danger"); return; }
+    } else {
+      const index = profileBoardDraft.indexOf(id);
+      const target = index + Number(direction || 0);
+      if (index >= 0 && target >= 0 && target < profileBoardDraft.length) [profileBoardDraft[index], profileBoardDraft[target]] = [profileBoardDraft[target], profileBoardDraft[index]];
+    }
+    profileDescriptionDraft = document.querySelector("#profileForm textarea[name='descrizione_profilo']")?.value || profileDescriptionDraft;
+    openProfileEditor(true, true);
   }
 
   function kpi(label, value, icon, tone, route) {
@@ -1713,6 +1835,10 @@
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,
       "trophy-board": openTrophyBoard,
+      "edit-profile": () => openProfileEditor(false),
+      "edit-profile-board": () => openProfileEditor(true),
+      "profile-board-toggle": () => updateProfileBoardDraft(id, "toggle"),
+      "profile-board-move": () => updateProfileBoardDraft(id, Number(data.direction || 0)),
       "start-tutorial": startTutorial,
       "disable-tutorial": () => { localStorage.setItem(tutorialStorageKey(), JSON.stringify({ status: "disabled" })); closeModal(); setTimeout(showMonthlyAwardIfNeeded, 250); toast("Tutorial automatico disattivato. Puoi riaprirlo quando vuoi."); },
       "stop-tutorial": () => stopTutorial(false),
@@ -1798,6 +1924,13 @@
   }));
 
   document.addEventListener("dragstart", (event) => {
+    const profileTrophy = event.target.closest("[data-profile-trophy-id]");
+    if (profileTrophy) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/seemax-profile-trophy", profileTrophy.dataset.profileTrophyId);
+      profileTrophy.classList.add("dragging");
+      return;
+    }
     const row = event.target.closest("[data-document-drag]");
     if (!row || event.target.closest("button,a,input,select,textarea")) { event.preventDefault(); return; }
     heldDocumentId = row.dataset.documentDrag;
@@ -1808,6 +1941,8 @@
   });
 
   document.addEventListener("dragend", (event) => {
+    const profileTrophy = event.target.closest("[data-profile-trophy-id]");
+    if (profileTrophy) { profileTrophy.classList.remove("dragging"); return; }
     const row = event.target.closest("[data-document-drag]");
     if (row) row.classList.remove("dragging");
     document.querySelectorAll("[data-document-folder]").forEach((folder) => folder.classList.remove("awaiting-drop", "drag-over"));
@@ -1815,17 +1950,32 @@
   });
 
   document.addEventListener("dragover", (event) => {
+    const profileTarget = event.target.closest("[data-profile-trophy-id]");
+    if (profileTarget && Array.from(event.dataTransfer.types || []).includes("text/seemax-profile-trophy")) { event.preventDefault(); profileTarget.classList.add("drag-over"); return; }
     const folder = event.target.closest("[data-document-folder]");
     if (!folder) return;
     event.preventDefault(); folder.classList.add("drag-over");
   });
 
   document.addEventListener("dragleave", (event) => {
+    const profileTarget = event.target.closest("[data-profile-trophy-id]");
+    if (profileTarget) profileTarget.classList.remove("drag-over");
     const folder = event.target.closest("[data-document-folder]");
     if (folder) folder.classList.remove("drag-over");
   });
 
   document.addEventListener("drop", (event) => {
+    const profileTarget = event.target.closest("[data-profile-trophy-id]");
+    const draggedProfileId = event.dataTransfer.getData("text/seemax-profile-trophy");
+    if (profileTarget && draggedProfileId) {
+      event.preventDefault();
+      const targetId = profileTarget.dataset.profileTrophyId;
+      const from = profileBoardDraft.indexOf(draggedProfileId);
+      const to = profileBoardDraft.indexOf(targetId);
+      if (from >= 0 && to >= 0 && from !== to) { profileBoardDraft.splice(from, 1); profileBoardDraft.splice(to, 0, draggedProfileId); }
+      updateProfileBoardDraft("", 0);
+      return;
+    }
     const folder = event.target.closest("[data-document-folder]");
     if (!folder) return;
     event.preventDefault();
@@ -1857,6 +2007,22 @@
       library.folders.push({ id: `folder-${Date.now().toString(36)}`, name, createdAt: new Date().toISOString() });
       saveDocumentLibrary(library);
       closeModal(); renderRoute(); toast("Cartella creata sul dispositivo.");
+      return;
+    }
+    if (event.target.id === "profileForm") {
+      event.preventDefault();
+      const description = String(event.target.elements.descrizione_profilo.value || "").trim();
+      setLoading(true, "Salvataggio profilo…");
+      try {
+        const saved = await api.saveProfile({ descrizione_profilo: description, bacheca_trofei_json: JSON.stringify(profileBoardDraft) });
+        const session = api.getSession() || {};
+        const index = (state.data.users || []).findIndex((user) => String(user.username || "") === String(session.username || ""));
+        if (index >= 0) state.data.users[index] = { ...state.data.users[index], ...saved };
+        Object.assign(session, saved);
+        closeModal(); scheduleBootstrapCache(); go("profile");
+        celebrateSuccess("🏅", "Profilo aggiornato", "La tua descrizione e la bacheca trofei sono state salvate.");
+      } catch (error) { toast(error.message, "danger"); }
+      finally { setLoading(false); }
       return;
     }
     if (event.target.matches(".entity-form")) { event.preventDefault(); await saveEntity(event.target); return; }

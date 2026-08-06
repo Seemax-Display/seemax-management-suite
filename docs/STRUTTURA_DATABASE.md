@@ -44,7 +44,7 @@ Conserva le variazioni di stato destinate all'agente responsabile e lo stato let
 
 ### AGENTI
 
-Utilizzato sia dal gestionale sia dal Planner per login e ruoli.
+Utilizzato sia dal gestionale sia dal Planner per login e ruoli. Dalla versione 2.8 comprende `descrizione_profilo` e `bacheca_trofei_json`: la prima contiene la presentazione personale, la seconda conserva l'ordine degli identificativi dei trofei esposti. Il salvataggio del profilo è limitato all'utente autenticato e il backend convalida i trofei realmente sbloccati; per gli amministratori sono consentiti tutti i trofei in modalità di test.
 
 ### PRODOTTI_LED
 

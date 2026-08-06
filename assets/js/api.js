@@ -250,6 +250,22 @@
     return response.settings;
   }
 
+  async function saveProfile(values) {
+    const payload = {
+      descrizione_profilo: String(values && values.descrizione_profilo || "").slice(0, 420),
+      bacheca_trofei_json: String(values && values.bacheca_trofei_json || "[]")
+    };
+    if (config.demoMode) {
+      const current = demo.list("users").find((user) => String(user.username || "") === String((session || {}).username || "")) || { username: session.username, id: session.username };
+      const saved = demo.upsert("users", { ...current, ...payload });
+      session = { ...session, ...saved }; demo.setSession(session);
+      return saved;
+    }
+    const response = await jsonp("management_save_profile", { ...authParams(), payload: JSON.stringify(payload) }, 60000);
+    session = { ...session, ...(response.user || {}) }; demo.setSession(session);
+    return response.user || payload;
+  }
+
   function postForm(action, values) {
     return new Promise((resolve, reject) => {
       const requestId = uid("post");
@@ -354,5 +370,5 @@
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length, serverVersion };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();
