@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.8.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.8.2";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.1 · Card profilo personalizzabile e bacheca anche vuota.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.2 · Primo accesso corretto, interazioni profilo fluide e stampa iPhone isolata.");
   styleSheets_();
-  return "SEEMAX v2.8.1 configurato: card profilo personalizzabile e bacheca anche vuota.";
+  return "SEEMAX v2.8.2 configurato: primo accesso corretto, profilo fluido e stampa iPhone isolata.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.1 · Card profilo personalizzabile e bacheca anche vuota.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.2 · Primo accesso corretto, interazioni profilo fluide e stampa iPhone isolata.");
   styleSheets_();
-  return "SEEMAX v2.8.1 configurato: profilo personalizzabile, trofei e protezione multiutente.";
+  return "SEEMAX v2.8.2 configurato: primo accesso corretto, profilo fluido e stampa iPhone isolata.";
 }
 
 function upgradeSeemaxV28() {
@@ -91,6 +91,10 @@ function upgradeSeemaxV28() {
 }
 
 function upgradeSeemaxV281() {
+  return upgradeSeemaxV24();
+}
+
+function upgradeSeemaxV282() {
   return upgradeSeemaxV24();
 }
 
@@ -160,9 +164,17 @@ function managementLogin_(p) {
 }
 
 function managementLoginLocked_(p) {
-  var user = authenticate_(p.agent_username, p.agent_key);
+  var authenticatedUser = authenticate_(p.agent_username, p.agent_key);
+  /* La riga viene riletta dal foglio: la cache di autenticazione non deve
+     falsare il controllo del primo accesso né lo stato corrente dell'account. */
+  var user = findRowObject_("AGENTI", "username", authenticatedUser.username);
+  if (!user || String(user.chiave_id_agente || "") !== String(p.agent_key || "") || String(user.stato || "ATTIVO").toUpperCase() !== "ATTIVO") throw new Error("Nome utente o Chiave ID non corretti.");
+  var lastAccess = String(user.ultimo_accesso || "").trim();
+  var firstAccess = !lastAccess;
+  var visibleUser = publicUser_(user);
+  visibleUser.primo_accesso = firstAccess;
   touchLogin_(user.username);
-  return { ok: true, user: publicUser_(user), version: SEEMAX_VERSION };
+  return { ok: true, user: visibleUser, first_access: firstAccess, version: SEEMAX_VERSION };
 }
 
 function managementBootstrap_(p) {
@@ -1484,7 +1496,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }

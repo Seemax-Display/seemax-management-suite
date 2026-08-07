@@ -379,12 +379,13 @@
   }
 
   function showTutorialWelcome() {
+    if (api.consumeFirstAccess) api.consumeFirstAccess();
     const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>IL TUO NUOVO CENTRO OPERATIVO</span><h3>BENVENUTO IN SEEMAX MANAGEMENT SUITE!</h3><p>Seemax Management Suite raccoglie tutto ciò che conoscevi di Seemax For You e lo porta a un livello completamente nuovo. Niente più reindirizzamenti esterni, navigazioni eccessive o perdite di tempo: ora hai tutto a portata di click o di tocco.</p><p>Crea preventivi, controlla le giacenze direttamente nel calcolatore, registra clienti e pratiche, gestisci i documenti e monitora il tuo lavoro da un unico ambiente.</p><div class="form-actions"><button class="btn ghost" data-action="disable-tutorial">Disattiva tutorial</button><button class="btn primary" data-action="start-tutorial">Spiegami tutto</button></div></div>`;
     openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
   }
 
   function scheduleFirstAccessExperience() {
-    const tutorialRequired = !localStorage.getItem(tutorialStorageKey());
+    const tutorialRequired = api.isFirstAccess ? api.isFirstAccess() : false;
     setTimeout(() => {
       if (showMonthlyAwardIfNeeded()) {
         pendingFirstAccessTutorial = tutorialRequired;
@@ -485,6 +486,14 @@
     $("app").classList.add("is-hidden");
     $("loginScreen").classList.remove("is-hidden");
     $("loginError").textContent = "";
+    const keyInput = $("loginKey");
+    const visibilityButton = document.querySelector("[data-action='toggle-login-password']");
+    if (keyInput) keyInput.type = "password";
+    if (visibilityButton) {
+      visibilityButton.classList.remove("is-visible");
+      visibilityButton.setAttribute("aria-pressed", "false");
+      visibilityButton.setAttribute("aria-label", "Mostra Chiave ID");
+    }
     if (config.demoMode) {
       $("demoCredentials").innerHTML = `<strong>Accessi dimostrativi</strong><button type="button" data-demo-login="admin">ADMIN · admin.demo / DEMO-ADMIN</button><button type="button" data-demo-login="agent">AGENTE · agente.demo / DEMO-AGENTE</button>`;
     } else $("demoCredentials").innerHTML = "";
@@ -783,15 +792,43 @@
     preview.querySelector("[data-profile-preview-description]").textContent = description;
   }
 
+  function profileBoardOrderedMarkup(available) {
+    const ordered = profileBoardDraft.map((id, index) => {
+      const item = available.find((entry) => entry.id === id);
+      return item ? `<article class="profile-board-sort-item" draggable="true" data-profile-trophy-id="${esc(id)}"><span>${item.icon}</span><strong>${index + 1}. ${esc(item.title)}</strong><div><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="1" ${index === profileBoardDraft.length - 1 ? "disabled" : ""}>↓</button><button type="button" data-action="profile-board-toggle" data-id="${esc(id)}">×</button></div></article>` : "";
+    }).join("");
+    return ordered || `<div class="profile-sort-empty">La bacheca è vuota. Aggiungi un trofeo oppure salvala così.</div>`;
+  }
+
   function openProfileBoardEditor(preserveDraft = false) {
     const user = currentProfileUser();
     const achievements = profileAchievements();
     if (!preserveDraft) profileBoardDraft = parseProfileBoard(user, achievements);
     const available = achievements.filter((item) => item.unlocked);
     const renderAvailable = available.map((item) => `<button type="button" class="profile-available-trophy ${profileBoardDraft.includes(item.id) ? "selected" : ""}" data-action="profile-board-toggle" data-id="${esc(item.id)}"><span>${item.icon}</span><div><strong>${esc(item.title)}</strong><small>${profileBoardDraft.includes(item.id) ? "Nella bacheca" : "Aggiungi"}</small></div></button>`).join("");
-    const ordered = profileBoardDraft.map((id, index) => { const item = available.find((entry) => entry.id === id); return item ? `<article class="profile-board-sort-item" draggable="true" data-profile-trophy-id="${esc(id)}"><span>${item.icon}</span><strong>${index + 1}. ${esc(item.title)}</strong><div><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="1" ${index === profileBoardDraft.length - 1 ? "disabled" : ""}>↓</button><button type="button" data-action="profile-board-toggle" data-id="${esc(id)}">×</button></div></article>` : ""; }).join("");
-    const body = `<form id="profileBoardForm"><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti sbloccati</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine. Puoi anche salvarla completamente vuota.</p><div class="profile-board-sort" id="profileBoardSort">${ordered || `<div class="profile-sort-empty">La bacheca è vuota. Aggiungi un trofeo oppure salvala così.</div>`}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva bacheca</button></div></form>`;
+    const body = `<form id="profileBoardForm"><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti sbloccati</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3 data-profile-board-count>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine. Puoi anche salvarla completamente vuota.</p><div class="profile-board-sort" id="profileBoardSort">${profileBoardOrderedMarkup(available)}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva bacheca</button></div></form>`;
     openModal("Modifica la bacheca", body, { wide: true, kicker: "Trofei in evidenza", subtitle: api.isAdmin() ? "Modalità test admin: tutti i trofei sono disponibili" : "Scegli e ordina fino a otto traguardi" });
+  }
+
+  function refreshProfileBoardEditor() {
+    const form = document.querySelector("#profileBoardForm");
+    if (!form) return;
+    const available = profileAchievements().filter((item) => item.unlocked);
+    const count = form.querySelector("[data-profile-board-count]");
+    if (count) count.textContent = `${profileBoardDraft.length} di 8 posizioni occupate`;
+    form.querySelectorAll(".profile-available-trophy[data-id]").forEach((button) => {
+      const selected = profileBoardDraft.includes(button.dataset.id);
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      const label = button.querySelector("small");
+      if (label) label.textContent = selected ? "Nella bacheca" : "Aggiungi";
+    });
+    const ordered = form.querySelector("#profileBoardSort");
+    if (!ordered) return;
+    ordered.innerHTML = profileBoardOrderedMarkup(available);
+    ordered.classList.remove("is-updating");
+    void ordered.offsetWidth;
+    ordered.classList.add("is-updating");
   }
 
   function updateProfileBoardDraft(id, direction) {
@@ -806,7 +843,7 @@
       const target = index + Number(direction || 0);
       if (index >= 0 && target >= 0 && target < profileBoardDraft.length) [profileBoardDraft[index], profileBoardDraft[target]] = [profileBoardDraft[target], profileBoardDraft[index]];
     }
-    openProfileBoardEditor(true);
+    refreshProfileBoardEditor();
   }
 
   function applySavedProfile(saved) {
@@ -995,11 +1032,13 @@
 
   function openModal(title, body, options = {}) {
     $("modalRoot").innerHTML = `<div class="modal-layer"><section class="modal-panel ${options.wide ? "wide" : ""}" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><header><div><span class="section-kicker">${esc(options.kicker || "Seemax Management")}</span><h2 id="modalTitle">${esc(title)}</h2>${options.subtitle ? `<p>${esc(options.subtitle)}</p>` : ""}</div><button class="icon-btn" data-action="close-modal" aria-label="Chiudi">×</button></header><div class="modal-body">${body}</div></section></div>`;
+    document.body.classList.add("modal-open");
     setTimeout(() => $("modalRoot").querySelector("input,select,textarea,button")?.focus(), 30);
   }
 
   function closeModal() {
     $("modalRoot").innerHTML = "";
+    document.body.classList.remove("modal-open");
     if (pendingFirstAccessTutorial) {
       pendingFirstAccessTutorial = false;
       setTimeout(showTutorialWelcome, 280);
@@ -1823,6 +1862,25 @@
       mobileButton.textContent = fast ? "Passa a Standard" : "Passa a Rapida";
       mobileButton.dataset.action = fast ? "disable-fast-mode" : "enable-fast-mode";
     }
+    const mobileSaveButton = $("mobileSaveAllButton");
+    const mobilePendingCount = $("mobilePendingCount");
+    if (mobileSaveButton) {
+      mobileSaveButton.classList.toggle("is-hidden", !fast);
+      mobileSaveButton.disabled = count === 0;
+    }
+    if (mobilePendingCount) mobilePendingCount.textContent = count;
+  }
+
+  function toggleLoginPassword() {
+    const input = $("loginKey");
+    const button = document.querySelector("[data-action='toggle-login-password']");
+    if (!input || !button) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.classList.toggle("is-visible", show);
+    button.setAttribute("aria-pressed", String(show));
+    button.setAttribute("aria-label", show ? "Nascondi Chiave ID" : "Mostra Chiave ID");
+    input.focus({ preventScroll: true });
   }
 
   function openFastModeWarning() {
@@ -1921,6 +1979,7 @@
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
       "close-modal": closeModal,
+      "toggle-login-password": toggleLoginPassword,
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,
       "trophy-board": openTrophyBoard,

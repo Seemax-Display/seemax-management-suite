@@ -7,6 +7,7 @@
   const FAST_QUEUE_KEY = "SEEMAX_MANAGEMENT_FAST_QUEUE_V1";
   const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
   const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_V1_";
+  const DEMO_FIRST_ACCESS_PREFIX = "SEEMAX_MANAGEMENT_DEMO_ACCESSED_V1_";
   let session = demo.getSession();
   let online = !!config.demoMode;
   let serverVersion = "";
@@ -123,11 +124,17 @@
 
   async function login(username, key) {
     let user;
-    if (config.demoMode) user = demo.login(username, key);
+    if (config.demoMode) {
+      user = demo.login(username, key);
+      const marker = DEMO_FIRST_ACCESS_PREFIX + String(user.username || username || "");
+      user = { ...user, firstAccess: localStorage.getItem(marker) !== "1", primo_accesso: localStorage.getItem(marker) !== "1" };
+      localStorage.setItem(marker, "1");
+    }
     else {
       const response = await jsonp("management_login", { agent_username: username, agent_key: key }, 60000);
       serverVersion = String(response.version || serverVersion || "");
-      user = { ...response.user, username, key, authenticatedAt: new Date().toISOString() };
+      const firstAccess = response.first_access === true || response.user && response.user.primo_accesso === true;
+      user = { ...response.user, username, key, firstAccess, primo_accesso: firstAccess, authenticatedAt: new Date().toISOString() };
     }
     session = user;
     demo.setSession(user);
@@ -371,9 +378,18 @@
   function resetDemo() { return demo.reset(); }
   function exportDemo() { return demo.exportJson(); }
   function getSession() { return session; }
+  function isFirstAccess() { return !!session && (session.firstAccess === true || session.primo_accesso === true); }
+  function consumeFirstAccess() {
+    const shouldShow = isFirstAccess();
+    if (session && shouldShow) {
+      session = { ...session, firstAccess: false, primo_accesso: false };
+      demo.setSession(session);
+    }
+    return shouldShow;
+  }
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length, serverVersion };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

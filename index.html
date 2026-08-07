@@ -27,7 +27,7 @@
       </div>
       <form id="loginForm" class="login-form">
         <label>Nome utente<input id="loginUsername" autocomplete="username" placeholder="nome.cognome" required></label>
-        <label>Chiave ID<input id="loginKey" type="password" autocomplete="current-password" placeholder="Chiave agente" required></label>
+        <label>Chiave ID<div class="password-input-wrap"><input id="loginKey" type="password" autocomplete="current-password" placeholder="Chiave agente" required><button type="button" class="password-visibility-button" data-action="toggle-login-password" aria-label="Mostra Chiave ID" aria-pressed="false"><svg class="eye-visible" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.7"></circle></svg><svg class="eye-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M10.6 6.1c.45-.07.92-.1 1.4-.1 6 0 9.5 6 9.5 6a15.7 15.7 0 0 1-2.7 3.35M6.1 6.15C3.75 7.8 2.5 12 2.5 12s3.5 6 9.5 6c1.25 0 2.38-.26 3.4-.68"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg></button></div></label>
         <button class="btn primary wide" type="submit">Accedi al gestionale</button>
       </form>
       <div id="demoCredentials" class="demo-credentials"></div>
@@ -60,6 +60,7 @@
         <div class="sidebar-mode-mobile mobile-only">
           <span id="mobileWorkModeLabel">Modalità Standard</span>
           <button id="mobileModeSwitchButton" class="btn ghost" data-action="enable-fast-mode">Passa a Rapida</button>
+          <button id="mobileSaveAllButton" class="btn sidebar-save-all is-hidden" data-action="sync-all">SALVA TUTTO <i id="mobilePendingCount">0</i></button>
         </div>
         <button id="logoutButton" class="btn sidebar-logout">Esci</button>
       </div>

@@ -4819,9 +4819,83 @@
       </div>`;
     }
 
+    function isIOSPrintDevice(){
+      const ua = String(navigator.userAgent || '');
+      return /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && Number(navigator.maxTouchPoints || 0) > 1);
+    }
+
+    function dedicatedPrintBase(){
+      try{ return new URL('.', String(location.href || document.baseURI || window.location.href)).href; }
+      catch(error){ return String(document.baseURI || ''); }
+    }
+
+    function dedicatedPrintStyles(){
+      return `
+        <style>
+          @page{size:A4 portrait;margin:0}
+          html,body{margin:0!important;padding:0!important;background:#fff!important}
+          body.sqp-ios-print{width:210mm!important;max-width:210mm!important;overflow:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+          body.sqp-ios-print #quotePrint,body.sqp-ios-print .quote-document{display:block!important;width:210mm!important;max-width:210mm!important;margin:0!important;padding:0!important;gap:0!important}
+          body.sqp-ios-print .print-page{box-sizing:border-box!important;width:210mm!important;min-width:210mm!important;max-width:210mm!important;height:296.5mm!important;min-height:296.5mm!important;max-height:296.5mm!important;margin:0!important;overflow:hidden!important;page-break-before:auto!important;break-before:auto!important;page-break-after:auto!important;break-after:auto!important;page-break-inside:avoid!important;break-inside:avoid-page!important}
+          body.sqp-ios-print .print-page:not(.conformity-page){padding:11mm 12mm 9mm!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+          body.sqp-ios-print .print-page + .print-page{page-break-before:always!important;break-before:page!important}
+          body.sqp-ios-print .print-page.conformity-page{height:296.5mm!important;min-height:296.5mm!important;max-height:296.5mm!important;padding:0!important}
+          body.sqp-ios-print .cdc-template-image{width:210mm!important;height:296.5mm!important;max-width:none!important;max-height:none!important;object-fit:fill!important}
+          body.sqp-ios-print .quote-band{display:grid!important;grid-template-columns:38mm 1fr 30mm!important;gap:16px!important;align-items:center!important;margin-bottom:9mm!important;text-align:initial!important;border-radius:0!important}
+          body.sqp-ios-print .quote-band .brand-center{text-align:center!important}
+          body.sqp-ios-print .quote-top-grid{display:grid!important;grid-template-columns:1.1fr .9fr!important;gap:18px!important;align-items:start!important;text-align:left!important}
+          body.sqp-ios-print .quote-title,body.sqp-ios-print .quote-date,body.sqp-ios-print .quote-client{text-align:left!important}
+          body.sqp-ios-print .product-hero{min-height:48mm!important}
+          body.sqp-ios-print .product-hero img{max-height:56mm!important;max-width:100%!important;margin:auto!important}
+          body.sqp-ios-print .quote-footer{position:absolute!important;left:12mm!important;right:12mm!important;bottom:6mm!important}
+          body.sqp-ios-print .tech-image-inner{min-height:48mm!important}
+          body.sqp-ios-print .tech-image-inner img{max-height:56mm!important;max-width:100%!important;margin:auto!important}
+          body.sqp-ios-print .ifis-internal-page{padding:18mm 15mm 14mm!important}
+          @media print{
+            html,body{width:210mm!important;max-width:210mm!important}
+            body.sqp-ios-print .print-page:last-child{page-break-after:auto!important;break-after:auto!important}
+          }
+        </style>`;
+    }
+
+    function waitForImagesInPrintDocument(printDoc, printNow){
+      const images = Array.from(printDoc.images || []);
+      let pending = images.filter(img => !img.complete).length;
+      if(!pending){ setTimeout(printNow, 140); return; }
+      const done = () => { pending--; if(pending <= 0) setTimeout(printNow, 100); };
+      images.forEach(img => { if(!img.complete){ img.addEventListener('load', done, {once:true}); img.addEventListener('error', done, {once:true}); } });
+      setTimeout(printNow, 3500);
+    }
+
     function waitForQuoteImagesThenPrint(){
       const source = document.getElementById('quotePrint');
       if(!source) return;
+      /* Safari iOS tende a ignorare la stampa dell'iframe e stampa la pagina
+         Management Suite che lo contiene. La finestra va aperta durante il
+         gesto dell'utente e con il solo documento del preventivo. */
+      const iosPrint = isIOSPrintDevice();
+      const iosWindow = iosPrint ? window.open('', '_blank') : null;
+      const styles = Array.from(document.querySelectorAll('style')).map(node => `<style>${String(node.textContent || '').replace(/:host/g, ':root')}</style>`).join('\n');
+      const viewport = iosPrint ? 'width=794, initial-scale=1' : 'width=device-width,initial-scale=1';
+      const printMarkup = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="${viewport}"><base href="${safe(dedicatedPrintBase())}"><title>${safe(suggestedPrintFileName())}</title>${styles}${iosPrint ? dedicatedPrintStyles() : ''}</head><body class="sqp-native-body integrated-suite management-native${iosPrint ? ' sqp-ios-print' : ''}">${source.outerHTML}</body></html>`;
+
+      if(iosWindow){
+        const printDoc = iosWindow.document;
+        printDoc.open();
+        printDoc.write(printMarkup);
+        printDoc.close();
+        let printed = false;
+        const printNow = () => {
+          if(printed || iosWindow.closed) return;
+          printed = true;
+          iosWindow.focus();
+          iosWindow.addEventListener('afterprint', () => setTimeout(() => { try{ iosWindow.close(); }catch(error){ /* chiusura facoltativa */ } }, 250), {once:true});
+          iosWindow.print();
+        };
+        waitForImagesInPrintDocument(printDoc, printNow);
+        return;
+      }
+
       const oldFrame = document.getElementById('sqpDedicatedPrintFrame');
       if(oldFrame) oldFrame.remove();
       const frame = document.createElement('iframe');
@@ -4832,9 +4906,8 @@
       const printDoc = frame.contentDocument;
       // Nel Management Suite il Planner vive in uno Shadow DOM: gli stili originali
       // sono nel suo nodo <style>, non nell'head della pagina principale.
-      const styles = Array.from(document.querySelectorAll('style')).map(node => `<style>${String(node.textContent || '').replace(/:host/g, ':root')}</style>`).join('\n');
       printDoc.open();
-      printDoc.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><base href="${safe(document.baseURI)}"><title>${safe(suggestedPrintFileName())}</title>${styles}</head><body class="sqp-native-body integrated-suite management-native">${source.outerHTML}</body></html>`);
+      printDoc.write(printMarkup);
       printDoc.close();
       let printed = false;
       const printNow = () => {
@@ -4844,12 +4917,7 @@
         frame.contentWindow.print();
         setTimeout(() => frame.remove(), 2500);
       };
-      const images = Array.from(printDoc.images || []);
-      let pending = images.filter(img => !img.complete).length;
-      if(!pending){ setTimeout(printNow, 120); return; }
-      const done = () => { pending--; if(pending <= 0) setTimeout(printNow, 80); };
-      images.forEach(img => { if(!img.complete){ img.addEventListener('load', done, {once:true}); img.addEventListener('error', done, {once:true}); } });
-      setTimeout(printNow, 2500);
+      waitForImagesInPrintDocument(printDoc, printNow);
     }
 
     function buildProductStrip(selectedItems){

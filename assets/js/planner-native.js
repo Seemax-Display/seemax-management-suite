@@ -137,9 +137,20 @@
       ["btnDatabaseRefresh", "btnAgentLogin", "btnAgentLogout"].forEach((id) => {
         const control = shadow.getElementById(id); if (control) control.remove();
       });
+      const plannerLayers = ["draftModalLayer", "onlineArchiveModalLayer", "practiceTypeModalLayer", "calcLoadingLayer", "sqpDialogLayer", "patchNotesLayer", "tutorialLayer"]
+        .map((id) => shadow.getElementById(id)).filter(Boolean);
+      const syncPlannerLayerState = () => {
+        const active = plannerLayers.some((layer) => !layer.classList.contains("hidden"));
+        document.body.classList.toggle("planner-modal-open", active);
+      };
+      const plannerLayerObserver = new MutationObserver(syncPlannerLayerState);
+      plannerLayers.forEach((layer) => plannerLayerObserver.observe(layer, { attributes: true, attributeFilter: ["class"] }));
+      syncPlannerLayerState();
       const lifecycle = new MutationObserver(() => {
         if (container.isConnected) return;
         listeners.forEach(([type, listener, options]) => window.removeEventListener(type, listener, options));
+        document.body.classList.remove("planner-modal-open");
+        plannerLayerObserver.disconnect();
         lifecycle.disconnect();
       });
       lifecycle.observe(document.body, { childList: true, subtree: true });

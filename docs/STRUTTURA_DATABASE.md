@@ -44,7 +44,7 @@ Conserva le variazioni di stato destinate all'agente responsabile e lo stato let
 
 ### AGENTI
 
-Utilizzato sia dal gestionale sia dal Planner per login e ruoli. Dalla versione 2.8.1 comprende `nome_profilo`, `descrizione_profilo`, `tema_profilo`, `colore_profilo`, `icona_profilo` e `bacheca_trofei_json`. Il nome del profilo è un alias puramente visivo e non sostituisce l'identità ufficiale dell'agente. La bacheca conserva l'ordine degli identificativi dei trofei esposti e può contenere anche un array vuoto. Il salvataggio è limitato all'utente autenticato e il backend convalida temi, colori, icone e trofei realmente sbloccati; per gli amministratori sono consentiti tutti i trofei in modalità di test.
+Utilizzato sia dal gestionale sia dal Planner per login e ruoli. `ultimo_accesso` determina il primo benvenuto: il backend legge il valore prima di aggiornarlo e mostra la guida automatica soltanto se il campo era vuoto. Dalla versione 2.8.1 comprende inoltre `nome_profilo`, `descrizione_profilo`, `tema_profilo`, `colore_profilo`, `icona_profilo` e `bacheca_trofei_json`. Il nome del profilo è un alias puramente visivo e non sostituisce l'identità ufficiale dell'agente. La bacheca conserva l'ordine degli identificativi dei trofei esposti e può contenere anche un array vuoto. Il salvataggio è limitato all'utente autenticato e il backend convalida temi, colori, icone e trofei realmente sbloccati; per gli amministratori sono consentiti tutti i trofei in modalità di test.
 
 ### PRODOTTI_LED
 
