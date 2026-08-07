@@ -16,7 +16,6 @@
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
   let pendingFirstAccessTutorial = false;
   let profileBoardDraft = [];
-  let profileDescriptionDraft = "";
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -45,6 +44,31 @@
 
   const STATUSES = ["Inserita", "Accettata", "Sospesa", "Bocciata", "Completata"];
   const FINANCE = ["Da definire", "Grenke", "IFIS", "Acquisto diretto", "Altro"];
+  const PROFILE_THEMES = [
+    { id: "gradient", label: "Gradiente", description: "Dinamico e professionale" },
+    { id: "classic", label: "Classico", description: "Pulito e istituzionale" },
+    { id: "spotlight", label: "Spotlight", description: "Luminoso e moderno" },
+    { id: "minimal", label: "Minimal", description: "Chiaro ed essenziale" }
+  ];
+  const PROFILE_COLORS = [
+    { value: "#0B5EC4", label: "Blu Seemax" },
+    { value: "#6D28D9", label: "Viola" },
+    { value: "#047857", label: "Smeraldo" },
+    { value: "#B42318", label: "Rubino" },
+    { value: "#A66F00", label: "Oro" },
+    { value: "#334155", label: "Ardesia" }
+  ];
+  const PROFILE_ICONS = [
+    { value: "", label: "Iniziali" },
+    { value: "👤", label: "Profilo" },
+    { value: "💼", label: "Business" },
+    { value: "🚀", label: "Crescita" },
+    { value: "🏆", label: "Traguardi" },
+    { value: "🧠", label: "Strategia" },
+    { value: "🎯", label: "Obiettivi" },
+    { value: "⚡", label: "Energia" },
+    { value: "🖥️", label: "Ledwall" }
+  ];
   const ENTITY_LABELS = { practices: "pratica", clients: "cliente", products: "prodotto", documents: "documento", activities: "attività", users: "agente" };
   const PRACTICE_DOCUMENTS = {
     NOLEGGIO: [
@@ -85,6 +109,20 @@
 
   function initials(name) {
     return String(name || "S").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  }
+
+  function profileAppearance(user) {
+    const theme = PROFILE_THEMES.some((item) => item.id === String((user || {}).tema_profilo || "")) ? String(user.tema_profilo) : "gradient";
+    const requestedColor = String((user || {}).colore_profilo || "").toUpperCase();
+    const color = PROFILE_COLORS.some((item) => item.value === requestedColor) ? requestedColor : PROFILE_COLORS[0].value;
+    const requestedIcon = String((user || {}).icona_profilo || "");
+    const icon = PROFILE_ICONS.some((item) => item.value === requestedIcon) ? requestedIcon : "";
+    const rgb = color.slice(1).match(/.{2}/g).map((part) => parseInt(part, 16)).join(",");
+    return { theme, color, icon, rgb };
+  }
+
+  function profileDisplayName(user, session) {
+    return String((user || {}).nome_profilo || (user || {}).nome_visualizzato || (user || {}).displayName || (session || {}).displayName || (session || {}).username || "Utente");
   }
 
   function slug(value) {
@@ -626,7 +664,6 @@
     try { selected = JSON.parse(user.bacheca_trofei_json || "[]"); } catch (error) { selected = []; }
     const available = new Set(achievements.filter((item) => item.unlocked).map((item) => item.id));
     selected = selected.filter((id, index) => available.has(id) && selected.indexOf(id) === index).slice(0, 8);
-    if (!selected.length) selected = achievements.filter((item) => item.unlocked).slice(0, 4).map((item) => item.id);
     return selected;
   }
 
@@ -669,6 +706,8 @@
   function renderProfile() {
     const session = api.getSession() || {};
     const user = currentProfileUser();
+    const appearance = profileAppearance(user);
+    const displayName = profileDisplayName(user, session);
     const achievements = profileAchievements();
     const boardIds = parseProfileBoard(user, achievements);
     const byId = Object.fromEntries(achievements.map((item) => [item.id, item]));
@@ -680,9 +719,9 @@
     }).join("");
     const highest = stats.highest;
     return `<div class="profile-page">
-      <section class="profile-hero ${(((state.data.dashboard || {}).agentOfMonth || {}).isCurrentUserWinner) ? "gold" : ""}">
-        <div class="profile-avatar">${esc(initials(user.nome_visualizzato || user.displayName || session.displayName || session.username))}</div>
-        <div class="profile-identity"><span class="section-kicker">Profilo Seemax</span><h2>${esc(user.nome_visualizzato || user.displayName || session.displayName || session.username || "Utente")}</h2><p>${esc(user.descrizione_profilo || "Aggiungi una descrizione per raccontare il tuo ruolo, il tuo metodo di lavoro o i tuoi obiettivi professionali.")}</p><div><span>${badge(user.ruolo || user.role || "AGENTE")}</span>${((state.data.dashboard || {}).agentOfMonth || {}).isCurrentUserWinner ? `<em>🏆 AGENTE DEL MESE</em>` : ""}</div></div>
+      <section class="profile-hero profile-theme-${appearance.theme} ${(((state.data.dashboard || {}).agentOfMonth || {}).isCurrentUserWinner) ? "gold" : ""}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}">
+        <div class="profile-avatar ${appearance.icon ? "uses-icon" : ""}">${esc(appearance.icon || initials(displayName))}</div>
+        <div class="profile-identity"><span class="section-kicker">Profilo Seemax</span><h2>${esc(displayName)}</h2><p>${esc(user.descrizione_profilo || "Aggiungi una descrizione per raccontare il tuo ruolo, il tuo metodo di lavoro o i tuoi obiettivi professionali.")}</p><div><span>${badge(user.ruolo || user.role || "AGENTE")}</span>${((state.data.dashboard || {}).agentOfMonth || {}).isCurrentUserWinner ? `<em>🏆 AGENTE DEL MESE</em>` : ""}</div></div>
         <button class="btn white profile-edit-button" data-action="edit-profile">✦ Personalizza profilo</button>
       </section>
       <section class="profile-stats-grid">
@@ -692,24 +731,67 @@
         <article><span>💰</span><div><small>Provvigioni ottenute finora</small><strong>${euros(stats.commissions)}</strong><p>Calcolate su ${stats.completed} pratiche completate</p></div></article>
       </section>
       <section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">La tua collezione</span><h3>Bacheca trofei</h3><p>Organizza e mostra fino a otto riconoscimenti tra quelli che hai sbloccato.</p></div><button class="btn gold" data-action="edit-profile-board">🏅 Modifica bacheca</button></div>
-        <div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>🔒</span><h3>La bacheca è ancora vuota</h3><p>Sblocca un trofeo oppure apri l’editor per aggiungere quelli disponibili.</p></div>`}</div>
+        <div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>✨</span><h3>Sembra un po’ vuoto qui.</h3><p>Perché non lo abbellisci con i tuoi traguardi?</p></div>`}</div>
       </section>
     </div>`;
   }
 
-  function openProfileEditor(focusBoard = false, preserveDraft = false) {
+  function openProfileEditor() {
+    const user = currentProfileUser();
+    const session = api.getSession() || {};
+    const appearance = profileAppearance(user);
+    const officialName = String(user.nome_visualizzato || user.displayName || session.displayName || session.username || "Utente");
+    const displayName = profileDisplayName(user, session);
+    const themeOptions = PROFILE_THEMES.map((item) => `<label class="profile-theme-choice"><input type="radio" name="tema_profilo" value="${item.id}" ${appearance.theme === item.id ? "checked" : ""}><span class="profile-theme-swatch profile-theme-${item.id}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}"><i></i></span><strong>${esc(item.label)}</strong><small>${esc(item.description)}</small></label>`).join("");
+    const colorOptions = PROFILE_COLORS.map((item) => `<label class="profile-color-choice" title="${esc(item.label)}"><input type="radio" name="colore_profilo" value="${item.value}" ${appearance.color === item.value ? "checked" : ""}><span style="--choice-color:${item.value}"></span><small>${esc(item.label)}</small></label>`).join("");
+    const iconOptions = PROFILE_ICONS.map((item) => `<label class="profile-icon-choice" title="${esc(item.label)}"><input type="radio" name="icona_profilo" value="${esc(item.value)}" ${appearance.icon === item.value ? "checked" : ""}><span>${item.value ? esc(item.value) : esc(initials(displayName))}</span><small>${esc(item.label)}</small></label>`).join("");
+    const body = `<form id="profileForm">
+      <div id="profileCustomizerPreview" class="profile-customizer-preview profile-theme-${appearance.theme}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}"><div class="profile-avatar ${appearance.icon ? "uses-icon" : ""}" data-profile-preview-avatar>${esc(appearance.icon || initials(displayName))}</div><div><span>ANTEPRIMA PROFILO</span><h3 data-profile-preview-name>${esc(displayName)}</h3><p data-profile-preview-description>${esc(user.descrizione_profilo || "Aggiungi una descrizione personale.")}</p></div></div>
+      <div class="profile-personal-fields">
+        <label>Nome mostrato nel profilo<input name="nome_profilo" maxlength="80" value="${esc(user.nome_profilo || "")}" placeholder="${esc(officialName)}"><small>Lascia vuoto per utilizzare il nome ufficiale: ${esc(officialName)}.</small></label>
+        <label>La tua descrizione<textarea name="descrizione_profilo" maxlength="420" placeholder="Racconta qualcosa di te…">${esc(user.descrizione_profilo || "")}</textarea><small>Massimo 420 caratteri.</small></label>
+      </div>
+      <fieldset class="profile-customizer-section"><legend>Tema della card</legend><div class="profile-theme-grid">${themeOptions}</div></fieldset>
+      <fieldset class="profile-customizer-section"><legend>Colore principale</legend><div class="profile-color-grid">${colorOptions}</div></fieldset>
+      <fieldset class="profile-customizer-section"><legend>Icona profilo</legend><div class="profile-icon-grid">${iconOptions}</div></fieldset>
+      <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva profilo</button></div>
+    </form>`;
+    openModal("Personalizza il tuo profilo", body, { wide: true, kicker: "Spazio personale", subtitle: "Nome pubblico, descrizione e stile della card" });
+  }
+
+  function updateProfileCustomizerPreview() {
+    const form = document.querySelector("#profileForm");
+    const preview = document.querySelector("#profileCustomizerPreview");
+    if (!form || !preview) return;
+    const user = currentProfileUser();
+    const session = api.getSession() || {};
+    const officialName = String(user.nome_visualizzato || user.displayName || session.displayName || session.username || "Utente");
+    const selected = profileAppearance({
+      tema_profilo: form.elements.tema_profilo.value,
+      colore_profilo: form.elements.colore_profilo.value,
+      icona_profilo: form.elements.icona_profilo.value
+    });
+    const name = String(form.elements.nome_profilo.value || "").trim() || officialName;
+    const description = String(form.elements.descrizione_profilo.value || "").trim() || "Aggiungi una descrizione personale.";
+    preview.className = `profile-customizer-preview profile-theme-${selected.theme}`;
+    preview.style.setProperty("--profile-accent", selected.color);
+    preview.style.setProperty("--profile-accent-rgb", selected.rgb);
+    const avatar = preview.querySelector("[data-profile-preview-avatar]");
+    avatar.textContent = selected.icon || initials(name);
+    avatar.classList.toggle("uses-icon", !!selected.icon);
+    preview.querySelector("[data-profile-preview-name]").textContent = name;
+    preview.querySelector("[data-profile-preview-description]").textContent = description;
+  }
+
+  function openProfileBoardEditor(preserveDraft = false) {
     const user = currentProfileUser();
     const achievements = profileAchievements();
-    if (!preserveDraft) {
-      profileBoardDraft = parseProfileBoard(user, achievements);
-      profileDescriptionDraft = String(user.descrizione_profilo || "");
-    }
+    if (!preserveDraft) profileBoardDraft = parseProfileBoard(user, achievements);
     const available = achievements.filter((item) => item.unlocked);
     const renderAvailable = available.map((item) => `<button type="button" class="profile-available-trophy ${profileBoardDraft.includes(item.id) ? "selected" : ""}" data-action="profile-board-toggle" data-id="${esc(item.id)}"><span>${item.icon}</span><div><strong>${esc(item.title)}</strong><small>${profileBoardDraft.includes(item.id) ? "Nella bacheca" : "Aggiungi"}</small></div></button>`).join("");
     const ordered = profileBoardDraft.map((id, index) => { const item = available.find((entry) => entry.id === id); return item ? `<article class="profile-board-sort-item" draggable="true" data-profile-trophy-id="${esc(id)}"><span>${item.icon}</span><strong>${index + 1}. ${esc(item.title)}</strong><div><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="profile-board-move" data-id="${esc(id)}" data-direction="1" ${index === profileBoardDraft.length - 1 ? "disabled" : ""}>↓</button><button type="button" data-action="profile-board-toggle" data-id="${esc(id)}">×</button></div></article>` : ""; }).join("");
-    const body = `<form id="profileForm"><label class="profile-description-field">La tua descrizione<textarea name="descrizione_profilo" maxlength="420" placeholder="Racconta qualcosa di te…">${esc(profileDescriptionDraft)}</textarea><small>Massimo 420 caratteri.</small></label><div class="profile-editor-divider"></div><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti sbloccati</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine.</p><div class="profile-board-sort" id="profileBoardSort">${ordered || `<div class="profile-sort-empty">Seleziona un trofeo dalla colonna accanto.</div>`}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva profilo</button></div></form>`;
-    openModal("Personalizza il tuo profilo", body, { wide: true, kicker: "Spazio personale", subtitle: api.isAdmin() ? "Modalità test admin: tutti i trofei sono disponibili" : "Descrizione e bacheca trofei" });
-    if (focusBoard) requestAnimationFrame(() => document.querySelector(".profile-editor-divider")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    const body = `<form id="profileBoardForm"><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti sbloccati</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine. Puoi anche salvarla completamente vuota.</p><div class="profile-board-sort" id="profileBoardSort">${ordered || `<div class="profile-sort-empty">La bacheca è vuota. Aggiungi un trofeo oppure salvala così.</div>`}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva bacheca</button></div></form>`;
+    openModal("Modifica la bacheca", body, { wide: true, kicker: "Trofei in evidenza", subtitle: api.isAdmin() ? "Modalità test admin: tutti i trofei sono disponibili" : "Scegli e ordina fino a otto traguardi" });
   }
 
   function updateProfileBoardDraft(id, direction) {
@@ -724,8 +806,15 @@
       const target = index + Number(direction || 0);
       if (index >= 0 && target >= 0 && target < profileBoardDraft.length) [profileBoardDraft[index], profileBoardDraft[target]] = [profileBoardDraft[target], profileBoardDraft[index]];
     }
-    profileDescriptionDraft = document.querySelector("#profileForm textarea[name='descrizione_profilo']")?.value || profileDescriptionDraft;
-    openProfileEditor(true, true);
+    openProfileBoardEditor(true);
+  }
+
+  function applySavedProfile(saved) {
+    const session = api.getSession() || {};
+    const index = (state.data.users || []).findIndex((user) => String(user.username || "") === String(session.username || ""));
+    if (index >= 0) state.data.users[index] = { ...state.data.users[index], ...(saved || {}) };
+    Object.assign(session, saved || {});
+    scheduleBootstrapCache();
   }
 
   function kpi(label, value, icon, tone, route) {
@@ -1835,8 +1924,8 @@
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,
       "trophy-board": openTrophyBoard,
-      "edit-profile": () => openProfileEditor(false),
-      "edit-profile-board": () => openProfileEditor(true),
+      "edit-profile": openProfileEditor,
+      "edit-profile-board": () => openProfileBoardEditor(false),
       "profile-board-toggle": () => updateProfileBoardDraft(id, "toggle"),
       "profile-board-move": () => updateProfileBoardDraft(id, Number(data.direction || 0)),
       "start-tutorial": startTutorial,
@@ -1881,6 +1970,7 @@
   });
 
   document.addEventListener("input", (event) => {
+    if (event.target.closest("#profileForm")) { updateProfileCustomizerPreview(); return; }
     if (event.target.id !== "practiceSearch") return;
     state.practiceQuery = event.target.value;
     state.practicePage = 1;
@@ -1893,6 +1983,7 @@
 
   document.addEventListener("change", (event) => {
     if (event.target.matches("select,input[type='file']") || (event.target.matches("input[type='checkbox'],input[type='radio']") && !event.target.closest(".choice-card"))) haptic("select");
+    if (event.target.closest("#profileForm")) { updateProfileCustomizerPreview(); return; }
     if (event.target.id === "practiceSort") { state.practiceSort = event.target.value; state.practicePage = 1; renderRoute(); }
     if (event.target.id === "practiceDirection") { state.practiceDirection = event.target.value; state.practicePage = 1; renderRoute(); }
   });
@@ -2014,13 +2105,28 @@
       const description = String(event.target.elements.descrizione_profilo.value || "").trim();
       setLoading(true, "Salvataggio profilo…");
       try {
-        const saved = await api.saveProfile({ descrizione_profilo: description, bacheca_trofei_json: JSON.stringify(profileBoardDraft) });
-        const session = api.getSession() || {};
-        const index = (state.data.users || []).findIndex((user) => String(user.username || "") === String(session.username || ""));
-        if (index >= 0) state.data.users[index] = { ...state.data.users[index], ...saved };
-        Object.assign(session, saved);
-        closeModal(); scheduleBootstrapCache(); go("profile");
-        celebrateSuccess("🏅", "Profilo aggiornato", "La tua descrizione e la bacheca trofei sono state salvate.");
+        const saved = await api.saveProfile({
+          nome_profilo: String(event.target.elements.nome_profilo.value || "").trim(),
+          descrizione_profilo: description,
+          tema_profilo: event.target.elements.tema_profilo.value,
+          colore_profilo: event.target.elements.colore_profilo.value,
+          icona_profilo: event.target.elements.icona_profilo.value
+        });
+        applySavedProfile(saved);
+        closeModal(); go("profile");
+        celebrateSuccess("✨", "Profilo personalizzato", "Nome pubblico, descrizione e stile della card sono stati salvati.");
+      } catch (error) { toast(error.message, "danger"); }
+      finally { setLoading(false); }
+      return;
+    }
+    if (event.target.id === "profileBoardForm") {
+      event.preventDefault();
+      setLoading(true, "Salvataggio bacheca…");
+      try {
+        const saved = await api.saveProfile({ bacheca_trofei_json: JSON.stringify(profileBoardDraft) });
+        applySavedProfile(saved);
+        closeModal(); go("profile");
+        celebrateSuccess("🏅", "Bacheca aggiornata", profileBoardDraft.length ? "I trofei scelti sono stati salvati nel nuovo ordine." : "La bacheca è stata salvata completamente vuota.");
       } catch (error) { toast(error.message, "danger"); }
       finally { setLoading(false); }
       return;

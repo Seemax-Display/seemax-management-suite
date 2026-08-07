@@ -251,10 +251,15 @@
   }
 
   async function saveProfile(values) {
-    const payload = {
-      descrizione_profilo: String(values && values.descrizione_profilo || "").slice(0, 420),
-      bacheca_trofei_json: String(values && values.bacheca_trofei_json || "[]")
-    };
+    const source = values || {};
+    const payload = {};
+    const owns = (field) => Object.prototype.hasOwnProperty.call(source, field);
+    if (owns("nome_profilo")) payload.nome_profilo = String(source.nome_profilo || "").slice(0, 80);
+    if (owns("descrizione_profilo")) payload.descrizione_profilo = String(source.descrizione_profilo || "").slice(0, 420);
+    if (owns("tema_profilo")) payload.tema_profilo = String(source.tema_profilo || "");
+    if (owns("colore_profilo")) payload.colore_profilo = String(source.colore_profilo || "");
+    if (owns("icona_profilo")) payload.icona_profilo = String(source.icona_profilo || "");
+    if (owns("bacheca_trofei_json")) payload.bacheca_trofei_json = String(source.bacheca_trofei_json || "[]");
     if (config.demoMode) {
       const current = demo.list("users").find((user) => String(user.username || "") === String((session || {}).username || "")) || { username: session.username, id: session.username };
       const saved = demo.upsert("users", { ...current, ...payload });

@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.8.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.8.1";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -26,7 +26,7 @@ var ENTITY_SHEETS = {
 };
 
 var SHEET_SCHEMAS = {
-  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "descrizione_profilo", "bacheca_trofei_json", "id", "record_version", "request_token", "aggiornato_da"],
+  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -73,20 +73,24 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.0 · Profilo personale e bacheca trofei.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.1 · Card profilo personalizzabile e bacheca anche vuota.");
   styleSheets_();
-  return "SEEMAX v2.8.0 configurato: profilo personale e bacheca trofei.";
+  return "SEEMAX v2.8.1 configurato: card profilo personalizzabile e bacheca anche vuota.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.0 · Profilo personale e bacheca trofei.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.1 · Card profilo personalizzabile e bacheca anche vuota.");
   styleSheets_();
-  return "SEEMAX v2.8.0 configurato: profilo personale, trofei e protezione multiutente.";
+  return "SEEMAX v2.8.1 configurato: profilo personalizzabile, trofei e protezione multiutente.";
 }
 
 function upgradeSeemaxV28() {
+  return upgradeSeemaxV24();
+}
+
+function upgradeSeemaxV281() {
   return upgradeSeemaxV24();
 }
 
@@ -290,22 +294,47 @@ function managementSaveProfile_(p) {
     var payload = parseJson_(p.payload, {});
     var current = findRowObject_("AGENTI", "username", user.username);
     if (!current) throw new Error("Profilo utente non trovato.");
-    var allowedAchievements = ["month_1", "month_streak_3", "practice_50k", "practice_100k", "clients_10", "purchase_5", "rental_5", "leasing_5", "completed_10", "revenue_250k"];
-    if (!isAdmin_(user)) {
-      var achievementData = agentOfMonth_(rowsToObjects_(sheet_("PRATICHE")), rowsToObjects_(sheet_("CLIENTI")), user, rowsToObjects_(sheet_("AGENTI")));
-      allowedAchievements = (achievementData.achievements || []).filter(function (achievement) { return achievement.unlocked; }).map(function (achievement) { return achievement.id; });
+    var owns = function (field) { return Object.prototype.hasOwnProperty.call(payload, field); };
+    var updated = [];
+    if (owns("bacheca_trofei_json")) {
+      var allowedAchievements = ["month_1", "month_streak_3", "practice_50k", "practice_100k", "clients_10", "purchase_5", "rental_5", "leasing_5", "completed_10", "revenue_250k"];
+      if (!isAdmin_(user)) {
+        var achievementData = agentOfMonth_(rowsToObjects_(sheet_("PRATICHE")), rowsToObjects_(sheet_("CLIENTI")), user, rowsToObjects_(sheet_("AGENTI")));
+        allowedAchievements = (achievementData.achievements || []).filter(function (achievement) { return achievement.unlocked; }).map(function (achievement) { return achievement.id; });
+      }
+      var board = parseJson_(String(payload.bacheca_trofei_json || "[]"), []);
+      if (!Array.isArray(board)) board = [];
+      board = board.map(function (id) { return String(id); });
+      board = board.filter(function (id, index) { return allowedAchievements.indexOf(id) >= 0 && board.indexOf(id) === index; }).slice(0, 8);
+      current.bacheca_trofei_json = JSON.stringify(board);
+      updated.push("bacheca");
     }
-    var board = parseJson_(String(payload.bacheca_trofei_json || "[]"), []);
-    if (!Array.isArray(board)) board = [];
-    board = board.filter(function (id, index) { return allowedAchievements.indexOf(String(id)) >= 0 && board.indexOf(id) === index; }).slice(0, 8);
-    current.descrizione_profilo = String(payload.descrizione_profilo || "").trim().slice(0, 420);
-    current.bacheca_trofei_json = JSON.stringify(board);
+    if (owns("nome_profilo")) { current.nome_profilo = String(payload.nome_profilo || "").trim().slice(0, 80); updated.push("nome pubblico"); }
+    if (owns("descrizione_profilo")) { current.descrizione_profilo = String(payload.descrizione_profilo || "").trim().slice(0, 420); updated.push("descrizione"); }
+    if (owns("tema_profilo")) {
+      var allowedThemes = ["gradient", "classic", "spotlight", "minimal"];
+      var theme = String(payload.tema_profilo || "gradient").toLowerCase();
+      current.tema_profilo = allowedThemes.indexOf(theme) >= 0 ? theme : "gradient";
+      updated.push("tema");
+    }
+    if (owns("colore_profilo")) {
+      var allowedColors = ["#0B5EC4", "#6D28D9", "#047857", "#B42318", "#A66F00", "#334155"];
+      var color = String(payload.colore_profilo || "#0B5EC4").toUpperCase();
+      current.colore_profilo = allowedColors.indexOf(color) >= 0 ? color : "#0B5EC4";
+      updated.push("colore");
+    }
+    if (owns("icona_profilo")) {
+      var allowedIcons = ["", "👤", "💼", "🚀", "🏆", "🧠", "🎯", "⚡", "🖥️"];
+      var icon = String(payload.icona_profilo || "");
+      current.icona_profilo = allowedIcons.indexOf(icon) >= 0 ? icon : "";
+      updated.push("icona");
+    }
     current.aggiornatoIl = new Date().toISOString();
     current.aggiornato_da = user.username;
     current.expected_record_version = Number(current.record_version || 0);
     current.request_token = "profile-" + user.username + "-" + new Date().getTime();
     var row = upsertEntity_("users", current, user);
-    log_(user, "UPDATE_PROFILE", "users", user.username, "Profilo e bacheca trofei aggiornati");
+    log_(user, "UPDATE_PROFILE", "users", user.username, "Aggiornati: " + (updated.join(", ") || "nessun campo"));
     return { ok: true, user: publicUser_(row) };
   });
 }
@@ -1455,7 +1484,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), note: user.note || "", descrizione_profilo: user.descrizione_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
