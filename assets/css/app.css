@@ -505,3 +505,29 @@ button:not(:disabled):active,.choice-card:active,.kpi-card:active{transform:scal
 @media(max-width:800px){.profile-theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.profile-icon-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.profile-personal-fields{grid-template-columns:1fr}}
 @media(max-width:520px){.profile-customizer-preview{grid-template-columns:1fr;text-align:center}.profile-customizer-preview .profile-avatar{margin:auto}.profile-theme-grid{grid-template-columns:1fr 1fr}.profile-icon-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.profile-color-choice{min-width:62px}}
 @media(prefers-reduced-motion:reduce){.profile-hero.gold::before{animation:none}}
+
+/* Fase beta temporanea 2.8.3 */
+.modal-panel.beta-welcome-modal{width:min(900px,100%);border-color:rgba(92,150,235,.36);background:linear-gradient(180deg,#f8fbff 0%,#fff 46%);box-shadow:0 34px 100px rgba(4,30,67,.36)}
+.beta-welcome-modal>header{border-bottom-color:#d9e8fb;background:rgba(248,251,255,.96)}
+.beta-welcome-modal .modal-body{padding:0}
+.beta-welcome{padding:22px}
+.beta-welcome-hero{position:relative;overflow:hidden;border-radius:22px;padding:27px 28px;color:#fff;background:radial-gradient(circle at 88% 12%,rgba(71,183,255,.52),transparent 30%),linear-gradient(128deg,#061b39 0%,#0a3974 50%,#0876d8 100%);box-shadow:0 18px 42px rgba(8,67,137,.2)}
+.beta-welcome-hero::after{content:"BETA";position:absolute;right:-10px;bottom:-37px;color:rgba(255,255,255,.07);font-size:112px;font-weight:950;letter-spacing:-.08em;pointer-events:none}
+.beta-welcome-icon{display:grid;place-items:center;width:54px;height:54px;margin-bottom:14px;border:1px solid rgba(255,255,255,.28);border-radius:17px;background:rgba(255,255,255,.13);box-shadow:inset 0 1px rgba(255,255,255,.25),0 12px 28px rgba(0,0,0,.14);font-size:29px;animation:betaWelcomeFloat 3.8s ease-in-out infinite}
+.beta-welcome-pill{display:inline-flex;align-items:center;border:1px solid rgba(164,220,255,.36);border-radius:999px;padding:6px 10px;color:#ccecff;background:rgba(0,23,52,.24);font-size:9px;font-weight:950;letter-spacing:.12em}
+.beta-welcome-hero h3{position:relative;z-index:1;max-width:650px;margin:10px 0 8px;font-size:clamp(29px,4.5vw,42px);line-height:1;letter-spacing:-.045em}
+.beta-welcome-hero p{position:relative;z-index:1;max-width:710px;margin:0;color:rgba(255,255,255,.8);font-size:13px;line-height:1.65}
+.beta-welcome-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.beta-welcome-grid article{display:grid;grid-template-columns:auto 1fr;gap:13px;align-items:start;border:1px solid #dbe8f7;border-radius:18px;padding:16px;background:#fff;box-shadow:0 9px 24px rgba(16,55,97,.06)}
+.beta-welcome-grid article>span{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:linear-gradient(145deg,#e8f3ff,#f7fbff);font-size:23px}
+.beta-welcome-grid h4{margin:1px 0 5px;color:#0d2a50;font-size:14px}
+.beta-welcome-grid p{margin:0;color:#5b6f88;font-size:11px;line-height:1.55}
+.beta-welcome-warning,.beta-welcome-feedback{display:grid;grid-template-columns:auto 1fr;gap:13px;align-items:start;margin-top:12px;border-radius:18px;padding:15px 16px}
+.beta-welcome-warning{border:1px solid #f4ca66;color:#603f00;background:linear-gradient(135deg,#fff8dd,#fffdf5)}
+.beta-welcome-feedback{border:1px solid #bee1ff;color:#164b77;background:linear-gradient(135deg,#eef8ff,#f8fcff)}
+.beta-welcome-warning>span,.beta-welcome-feedback>span{font-size:24px}
+.beta-welcome-warning strong{display:block;margin-bottom:4px;color:#7a4d00;font-size:12px}.beta-welcome-warning p,.beta-welcome-feedback p{margin:0;font-size:11px;line-height:1.58}
+.beta-welcome .form-actions{padding-top:15px}.beta-welcome-start{min-width:210px;justify-content:center}
+@keyframes betaWelcomeFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
+@media(max-width:700px){.beta-welcome{padding:14px}.beta-welcome-hero{border-radius:18px;padding:21px 18px}.beta-welcome-hero::after{right:-4px;bottom:-22px;font-size:76px}.beta-welcome-hero p{font-size:12px}.beta-welcome-grid{grid-template-columns:1fr}.beta-welcome-grid article{padding:14px}.beta-welcome-warning,.beta-welcome-feedback{padding:13px}.beta-welcome .form-actions{display:block}.beta-welcome-start{width:100%}}
+@media(prefers-reduced-motion:reduce){.beta-welcome-icon{animation:none}}

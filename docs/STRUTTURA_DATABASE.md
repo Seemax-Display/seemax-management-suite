@@ -56,7 +56,7 @@ Archivio tecnico dei preventivi S.Q.P. Il backend aggiunge automaticamente event
 
 ### IMPOSTAZIONI
 
-Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni, versione della configurazione e `obiettivo_fatturato`. Le chiavi che iniziano con `req_acquisto_`, `req_noleggio_` o `req_leasing_` controllano l'obbligatorietà dei campi: usare esclusivamente `SI` o `NO`.
+Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni, versione della configurazione e `obiettivo_fatturato`. Le chiavi che iniziano con `req_acquisto_`, `req_noleggio_` o `req_leasing_` controllano l'obbligatorietà dei campi: usare esclusivamente `SI` o `NO`. Durante il collaudo, `beta_test_attiva` controlla l'avviso mostrato a ogni apertura e `beta_sblocca_trofei` rende temporaneamente disponibili tutti i riconoscimenti; entrambe possono essere riportate a `NO` al termine della fase Beta.
 
 ## Relazioni principali
 

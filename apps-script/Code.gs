@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.8.2";
+var SEEMAX_VERSION = "seemax-management-suite-2.8.3";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -73,17 +73,17 @@ function upgradeSeemaxV11() {
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
   managementDocumentsFolder_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.2 · Primo accesso corretto, interazioni profilo fluide e stampa iPhone isolata.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.3 · Avviso beta temporaneo e trofei disponibili per tutti durante il test.");
   styleSheets_();
-  return "SEEMAX v2.8.2 configurato: primo accesso corretto, profilo fluido e stampa iPhone isolata.";
+  return "SEEMAX v2.8.3 configurato: fase beta attiva e trofei temporaneamente disponibili per tutti.";
 }
 
 function upgradeSeemaxV24() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.2 · Primo accesso corretto, interazioni profilo fluide e stampa iPhone isolata.");
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.3 · Avviso beta temporaneo e trofei disponibili per tutti durante il test.");
   styleSheets_();
-  return "SEEMAX v2.8.2 configurato: primo accesso corretto, profilo fluido e stampa iPhone isolata.";
+  return "SEEMAX v2.8.3 configurato: fase beta attiva e trofei temporaneamente disponibili per tutti.";
 }
 
 function upgradeSeemaxV28() {
@@ -96,6 +96,15 @@ function upgradeSeemaxV281() {
 
 function upgradeSeemaxV282() {
   return upgradeSeemaxV24();
+}
+
+function upgradeSeemaxV283() {
+  var ss = db_();
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  seedSettings_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.8.3 · Avviso beta temporaneo e trofei disponibili per tutti durante il test.");
+  styleSheets_();
+  return "SEEMAX v2.8.3 configurato: fase beta attiva e trofei temporaneamente disponibili per tutti.";
 }
 
 function doGet(e) {
@@ -310,7 +319,8 @@ function managementSaveProfile_(p) {
     var updated = [];
     if (owns("bacheca_trofei_json")) {
       var allowedAchievements = ["month_1", "month_streak_3", "practice_50k", "practice_100k", "clients_10", "purchase_5", "rental_5", "leasing_5", "completed_10", "revenue_250k"];
-      if (!isAdmin_(user)) {
+      var betaUnlocksAllTrophies = String(getSettings_().beta_sblocca_trofei || "NO").toUpperCase() === "SI";
+      if (!isAdmin_(user) && !betaUnlocksAllTrophies) {
         var achievementData = agentOfMonth_(rowsToObjects_(sheet_("PRATICHE")), rowsToObjects_(sheet_("CLIENTI")), user, rowsToObjects_(sheet_("AGENTI")));
         allowedAchievements = (achievementData.achievements || []).filter(function (achievement) { return achievement.unlocked; }).map(function (achievement) { return achievement.id; });
       }
@@ -1625,6 +1635,8 @@ function seedSettings_() {
     numero_preventivo_admin_iniziale: 1,
     numero_preventivo_agenti_iniziale: 1,
     obiettivo_fatturato: 500000,
+    beta_test_attiva: "SI",
+    beta_sblocca_trofei: "SI",
     req_acquisto_destinatario_ordine: "SI",
     req_acquisto_clientid: "SI",
     req_acquisto_valore: "SI",

@@ -6,9 +6,20 @@
  */
 window.SEEMAX_APP_CONFIG = {
   appName: "Seemax Management Suite",
-  version: "2.8.2",
+  version: "2.8.3",
   demoMode: false,
   appsScriptUrl: "https://script.google.com/macros/s/AKfycbxNBdyg27CBYRu9M1FRFCw3Sm701hUZ5UQTyHPI3cE3AuoW8LaBRx_E6TLOoAxzHQCf/exec",
+  /*
+   * CAMPAGNA BETA TEMPORANEA
+   * Le impostazioni omonime del foglio IMPOSTAZIONI hanno la precedenza.
+   * Per terminare il test senza modificare il codice imposta:
+   * - beta_test_attiva = NO
+   * - beta_sblocca_trofei = NO
+   */
+  betaTest: {
+    enabled: true,
+    unlockAllTrophies: true
+  },
   company: {
     legalName: "LED LAB COMPANY",
     brand: "SEEMAX DISPLAY",

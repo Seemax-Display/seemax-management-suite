@@ -45,6 +45,8 @@
       numero_preventivo_admin_iniziale: 1,
       numero_preventivo_agenti_iniziale: 1,
       obiettivo_fatturato: 500000,
+      beta_test_attiva: "SI",
+      beta_sblocca_trofei: "SI",
       req_acquisto_destinatario_ordine: "SI", req_acquisto_clientid: "SI", req_acquisto_valore: "SI", req_acquisto_valore_provvigione: "NO",
       req_acquisto_installazione_regione: "NO", req_acquisto_installazione_provincia: "NO", req_acquisto_installazione_comune: "SI", req_acquisto_installazione_cap: "SI", req_acquisto_installazione_localita: "NO", req_acquisto_installazione_indirizzo: "SI", req_acquisto_installazione_civico: "SI", req_acquisto_gestione_ledwall: "SI", req_acquisto_cloud_username: "NO", req_acquisto_cloud_password: "NO", req_acquisto_note: "NO",
       req_noleggio_clientid: "SI", req_noleggio_valore: "SI", req_noleggio_valore_provvigione: "SI", req_noleggio_numero_rate: "SI", req_noleggio_periodicita_pagamento: "SI",

@@ -15,6 +15,7 @@
   const uploadState = { batches: new Map(), expanded: false };
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
   let pendingFirstAccessTutorial = false;
+  let pendingBetaWelcome = false;
   let profileBoardDraft = [];
 
   const NAV = [
@@ -338,6 +339,20 @@
     return `SEEMAX_SUPER_TUTORIAL_${user.username || "utente"}`;
   }
 
+  function settingEnabled(key, fallback = false) {
+    const settings = (state.data && state.data.settings) || {};
+    if (settings[key] !== undefined && settings[key] !== "") return String(settings[key]).trim().toUpperCase() === "SI";
+    return !!fallback;
+  }
+
+  function betaTestActive() {
+    return settingEnabled("beta_test_attiva", !!(config.betaTest && config.betaTest.enabled));
+  }
+
+  function betaTrophiesUnlocked() {
+    return settingEnabled("beta_sblocca_trofei", !!(config.betaTest && config.betaTest.unlockAllTrophies));
+  }
+
   function tutorialSteps() {
     const steps = [
       { chapter: "Per iniziare", route: "dashboard", selector: ".topbar", title: "La barra principale", text: "Da qui puoi cercare informazioni, cambiare modalità di lavoro, creare una pratica, consultare le notifiche e aprire il tuo profilo." },
@@ -354,7 +369,7 @@
       { chapter: "Dashboard", selector: ".dashboard-grid", title: "Pipeline, agenda e aggiornamenti", text: "Questa zona riunisce lo stato delle pratiche, le prossime attività e le pratiche aggiornate più recentemente." },
       { chapter: "Profilo", route: "profile", selector: ".profile-hero", title: "Il tuo spazio personale", text: "Qui trovi nome, ruolo, descrizione ed eventuale riconoscimento Agente del mese. Usa Personalizza profilo per aggiornare la tua presentazione." },
       { chapter: "Profilo", selector: ".profile-stats-grid", title: "Le tue statistiche", text: "Questi indicatori considerano esclusivamente le pratiche COMPLETATE e mostrano schermo più utilizzato, pratica maggiore, tipologia preferita e provvigioni ottenute." },
-      { chapter: "Profilo", selector: ".profile-trophy-board", title: "Bacheca trofei personalizzabile", text: "Aggiungi fino a otto trofei sbloccati e disponili nell'ordine che preferisci. L'amministratore li vede tutti disponibili per le verifiche." },
+      { chapter: "Profilo", selector: ".profile-trophy-board", title: "Bacheca trofei personalizzabile", text: "Aggiungi fino a otto trofei e disponili nell'ordine che preferisci. Durante la fase beta tutti i riconoscimenti sono temporaneamente disponibili per le prove." },
       { chapter: "Pratiche", route: "practices", selector: ".view-toolbar", title: "Gestione delle pratiche", text: "Crea una nuova pratica e filtra immediatamente l'archivio per Inserita, Accettata, Sospesa, Bocciata o Completata." },
       { chapter: "Pratiche", selector: ".practice-controls", title: "Ricerca e ordinamento", text: "Cerca per ID o intestazione e ordina per esito, identificativo, cliente, tipologia, finanziaria, valore e, per gli amministratori, agente." },
       { chapter: "Pratiche", selector: ".practice-result-count", title: "Risultati e pagine", text: "Sono mostrati dieci elementi per pagina. Il contatore indica sempre quali risultati stai visualizzando." },
@@ -384,14 +399,52 @@
     openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
   }
 
+  function showBetaWelcome() {
+    const body = `<div class="beta-welcome">
+      <section class="beta-welcome-hero">
+        <div class="beta-welcome-icon" aria-hidden="true">🧪</div>
+        <span class="beta-welcome-pill">SEEMAX MANAGEMENT SUITE · VERSIONE BETA</span>
+        <h3>BENVENUTO NELLA FASE DI TEST</h3>
+        <p>Stai utilizzando Seemax Management Suite in modalità di prova. Il sistema entra ora nella sua fase di test operativo e resterà accessibile nei prossimi giorni per permetterti di conoscerlo e metterlo alla prova.</p>
+      </section>
+      <div class="beta-welcome-grid">
+        <article><span>🚀</span><div><h4>Esplora il tuo nuovo spazio di lavoro</h4><p>Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.</p></div></article>
+        <article><span>🏆</span><div><h4>Personalizza profilo e bacheca</h4><p>Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.</p></div></article>
+      </div>
+      <section class="beta-welcome-warning">
+        <span aria-hidden="true">⚠️</span>
+        <div><strong>Ambiente di prova</strong><p>I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in <strong>Seemax For You</strong> verranno invece importati in Seemax Management Suite.</p></div>
+      </section>
+      <section class="beta-welcome-feedback">
+        <span aria-hidden="true">💬</span>
+        <p>Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da <strong>PC</strong> sia da <strong>smartphone</strong>. Il tuo feedback ci aiuterà a plasmare la versione finale.</p>
+      </section>
+      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="close-modal">🚀 Inizia a esplorare</button></div>
+    </div>`;
+    openModal("Benvenuto nella Beta", body, { wide: true, kicker: "Seemax Management Suite", subtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova", panelClass: "beta-welcome-modal" });
+  }
+
+  function showNextWelcomeMessage() {
+    if (tutorialState.active || $("modalRoot").children.length) return false;
+    if (pendingBetaWelcome) {
+      pendingBetaWelcome = false;
+      showBetaWelcome();
+      return true;
+    }
+    if (pendingFirstAccessTutorial) {
+      pendingFirstAccessTutorial = false;
+      showTutorialWelcome();
+      return true;
+    }
+    return false;
+  }
+
   function scheduleFirstAccessExperience() {
-    const tutorialRequired = api.isFirstAccess ? api.isFirstAccess() : false;
+    pendingFirstAccessTutorial = api.isFirstAccess ? api.isFirstAccess() : false;
+    pendingBetaWelcome = betaTestActive();
     setTimeout(() => {
-      if (showMonthlyAwardIfNeeded()) {
-        pendingFirstAccessTutorial = tutorialRequired;
-        return;
-      }
-      if (tutorialRequired) showTutorialWelcome();
+      if (showMonthlyAwardIfNeeded()) return;
+      showNextWelcomeMessage();
     }, 350);
   }
 
@@ -652,9 +705,9 @@
     const cards = achievements.map((item) => {
       const percent = Math.min(100, Math.round(Number(item.current || 0) / Number(item.target || 1) * 100));
       const progress = item.currency ? `${euros(item.current)} / ${euros(item.target)}` : `${item.current} / ${item.target}`;
-      return `<article class="trophy-slot ${item.unlocked ? "unlocked" : "locked"}"><div class="trophy-icon">${item.unlocked ? item.icon : "🔒"}</div><div><small>${item.unlocked ? "TROFEO SBLOCCATO" : "OBIETTIVO IN CORSO"}</small><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><div class="trophy-progress"><i style="width:${percent}%"></i></div><strong>${progress}</strong></div></article>`;
+      return `<article class="trophy-slot ${item.unlocked ? "unlocked" : "locked"}"><div class="trophy-icon">${item.unlocked ? item.icon : "🔒"}</div><div><small>${item.betaUnlocked ? "DISPONIBILE NEL TEST BETA" : item.unlocked ? "TROFEO SBLOCCATO" : "OBIETTIVO IN CORSO"}</small><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><div class="trophy-progress"><i style="width:${percent}%"></i></div><strong>${progress}</strong></div></article>`;
     }).join("");
-    const body = `<div class="trophy-board"><div class="trophy-board-head"><span>🏅</span><div><h3>${unlocked} trofei sbloccati su ${achievements.length}</h3><p>Ogni risultato viene aggiornato automaticamente dai dati delle tue pratiche e dei tuoi clienti.</p></div></div><div class="trophy-grid">${cards}</div></div>`;
+    const body = `<div class="trophy-board"><div class="trophy-board-head"><span>🏅</span><div><h3>${unlocked} trofei disponibili su ${achievements.length}</h3><p>${betaTrophiesUnlocked() ? "Durante la fase beta tutti i riconoscimenti sono temporaneamente utilizzabili nella tua bacheca." : "Ogni risultato viene aggiornato automaticamente dai dati delle tue pratiche e dei tuoi clienti."}</p></div></div><div class="trophy-grid">${cards}</div></div>`;
     openModal("La mia bacheca trofei", body, { wide: true, kicker: "Obiettivi e riconoscimenti" });
   }
 
@@ -665,7 +718,8 @@
 
   function profileAchievements() {
     const source = (((state.data || {}).dashboard || {}).agentOfMonth || {}).achievements || [];
-    return source.map((item) => ({ ...item, unlocked: api.isAdmin() ? true : !!item.unlocked }));
+    const betaUnlock = betaTrophiesUnlocked();
+    return source.map((item) => ({ ...item, betaUnlocked: betaUnlock && !item.unlocked, unlocked: api.isAdmin() || betaUnlock ? true : !!item.unlocked }));
   }
 
   function parseProfileBoard(user, achievements) {
@@ -739,7 +793,7 @@
         <article><span>📊</span><div><small>Tipologia preferita</small><strong>${esc(stats.favoriteType)}</strong><p>${stats.favoriteTypeCount ? `${stats.favoriteTypeCount} pratiche completate` : "Nessun dato disponibile"}</p></div></article>
         <article><span>💰</span><div><small>Provvigioni ottenute finora</small><strong>${euros(stats.commissions)}</strong><p>Calcolate su ${stats.completed} pratiche completate</p></div></article>
       </section>
-      <section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">La tua collezione</span><h3>Bacheca trofei</h3><p>Organizza e mostra fino a otto riconoscimenti tra quelli che hai sbloccato.</p></div><button class="btn gold" data-action="edit-profile-board">🏅 Modifica bacheca</button></div>
+      <section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">La tua collezione</span><h3>Bacheca trofei</h3><p>${betaTrophiesUnlocked() ? "Durante la fase beta puoi organizzare e mostrare fino a otto riconoscimenti tra quelli temporaneamente disponibili." : "Organizza e mostra fino a otto riconoscimenti tra quelli che hai sbloccato."}</p></div><button class="btn gold" data-action="edit-profile-board">🏅 Modifica bacheca</button></div>
         <div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>✨</span><h3>Sembra un po’ vuoto qui.</h3><p>Perché non lo abbellisci con i tuoi traguardi?</p></div>`}</div>
       </section>
     </div>`;
@@ -806,8 +860,8 @@
     if (!preserveDraft) profileBoardDraft = parseProfileBoard(user, achievements);
     const available = achievements.filter((item) => item.unlocked);
     const renderAvailable = available.map((item) => `<button type="button" class="profile-available-trophy ${profileBoardDraft.includes(item.id) ? "selected" : ""}" data-action="profile-board-toggle" data-id="${esc(item.id)}"><span>${item.icon}</span><div><strong>${esc(item.title)}</strong><small>${profileBoardDraft.includes(item.id) ? "Nella bacheca" : "Aggiungi"}</small></div></button>`).join("");
-    const body = `<form id="profileBoardForm"><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti sbloccati</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3 data-profile-board-count>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine. Puoi anche salvarla completamente vuota.</p><div class="profile-board-sort" id="profileBoardSort">${profileBoardOrderedMarkup(available)}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva bacheca</button></div></form>`;
-    openModal("Modifica la bacheca", body, { wide: true, kicker: "Trofei in evidenza", subtitle: api.isAdmin() ? "Modalità test admin: tutti i trofei sono disponibili" : "Scegli e ordina fino a otto traguardi" });
+    const body = `<form id="profileBoardForm"><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti ${betaTrophiesUnlocked() ? "disponibili" : "sbloccati"}</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3 data-profile-board-count>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine. Puoi anche salvarla completamente vuota.</p><div class="profile-board-sort" id="profileBoardSort">${profileBoardOrderedMarkup(available)}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva bacheca</button></div></form>`;
+    openModal("Modifica la bacheca", body, { wide: true, kicker: "Trofei in evidenza", subtitle: betaTrophiesUnlocked() ? "Fase beta: tutti i trofei sono temporaneamente disponibili" : api.isAdmin() ? "Modalità test admin: tutti i trofei sono disponibili" : "Scegli e ordina fino a otto traguardi" });
   }
 
   function refreshProfileBoardEditor() {
@@ -1031,7 +1085,8 @@
   }
 
   function openModal(title, body, options = {}) {
-    $("modalRoot").innerHTML = `<div class="modal-layer"><section class="modal-panel ${options.wide ? "wide" : ""}" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><header><div><span class="section-kicker">${esc(options.kicker || "Seemax Management")}</span><h2 id="modalTitle">${esc(title)}</h2>${options.subtitle ? `<p>${esc(options.subtitle)}</p>` : ""}</div><button class="icon-btn" data-action="close-modal" aria-label="Chiudi">×</button></header><div class="modal-body">${body}</div></section></div>`;
+    const panelClasses = ["modal-panel", options.wide ? "wide" : "", options.panelClass || ""].filter(Boolean).join(" ");
+    $("modalRoot").innerHTML = `<div class="modal-layer"><section class="${esc(panelClasses)}" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><header><div><span class="section-kicker">${esc(options.kicker || "Seemax Management")}</span><h2 id="modalTitle">${esc(title)}</h2>${options.subtitle ? `<p>${esc(options.subtitle)}</p>` : ""}</div><button class="icon-btn" data-action="close-modal" aria-label="Chiudi">×</button></header><div class="modal-body">${body}</div></section></div>`;
     document.body.classList.add("modal-open");
     setTimeout(() => $("modalRoot").querySelector("input,select,textarea,button")?.focus(), 30);
   }
@@ -1039,10 +1094,7 @@
   function closeModal() {
     $("modalRoot").innerHTML = "";
     document.body.classList.remove("modal-open");
-    if (pendingFirstAccessTutorial) {
-      pendingFirstAccessTutorial = false;
-      setTimeout(showTutorialWelcome, 280);
-    }
+    if (pendingBetaWelcome || pendingFirstAccessTutorial) setTimeout(showNextWelcomeMessage, 280);
   }
 
   function field(label, name, value = "", options = {}) {
