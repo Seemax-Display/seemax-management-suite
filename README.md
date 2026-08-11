@@ -13,7 +13,8 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - destinatario ordine “Per Me” o “Per Cliente”, indirizzo installazione e gestione tecnica Ledwall;
 - documentazione finanziaria caricabile direttamente nella pratica;
 - obbligatorietà dei campi configurabile dagli admin o dal foglio `IMPOSTAZIONI`;
-- ricerca, ordinamento e paginazione delle pratiche (10 risultati per pagina);
+- ricerca, ordinamento e paginazione di clienti e pratiche (6 risultati per pagina);
+- ordinamento amministrativo iniziale dal record più recente e assegnazione dei nuovi clienti agli agenti;
 - catalogo Ledwall con immagini, schede tecniche, listini, promozioni e giacenze;
 - inserimento diretto di pratiche Acquisto/Noleggio/Leasing dal riepilogo S.Q.P.;
 - scarico automatico e tracciato del magazzino allo stato Accettata;
@@ -57,7 +58,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.10.0 segui [docs/AGGIORNAMENTO_V2.10.0.md](docs/AGGIORNAMENTO_V2.10.0.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
+Per aggiornare un'installazione già operativa alla versione 2.11.0 segui [docs/AGGIORNAMENTO_V2.11.0.md](docs/AGGIORNAMENTO_V2.11.0.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
 
 ## Placeholder
 

@@ -364,6 +364,7 @@ body { font-size: 16px; }
 .read-only-client input:disabled, .read-only-client select:disabled, .read-only-client textarea:disabled { opacity: 1; color: #334155; -webkit-text-fill-color: #334155; background: #f1f5f9; }
 
 .practice-controls { display: grid; grid-template-columns: minmax(280px, 1fr) 220px 170px; gap: 12px; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 17px; padding: 14px; background: #fff; box-shadow: var(--shadow-soft); }
+.practice-controls.client-controls { grid-template-columns: minmax(220px, 1fr) 220px; }
 .practice-controls label { display: grid; gap: 6px; color: #475569; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
 .practice-controls input, .practice-controls select { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; color: var(--ink); background: #f8fafc; font: inherit; font-size: 13px; font-weight: 750; text-transform: none; letter-spacing: 0; }
 .practice-search { position: relative; }
@@ -415,6 +416,7 @@ body { font-size: 16px; }
   .revenue-card strong { font-size: 21px; }
   .mode-controls .btn { display: inline-flex; }
   .practice-controls { grid-template-columns: 1fr; }
+  .practice-controls.client-controls { grid-template-columns: 1fr; }
   .practice-search { grid-column: auto; }
   .practice-pagination { align-items: stretch; flex-direction: column; }
 }
@@ -561,6 +563,7 @@ button:not(:disabled):active,.choice-card:active,.kpi-card:active{transform:scal
 
 /* Magazzino e organizzazione pratiche 2.10 */
 .admin-unknown-notice{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;border:1px solid #c9dcf6;border-radius:16px;padding:13px 15px;color:#184b82;background:linear-gradient(120deg,#eef6ff,#f8fbff)}.admin-unknown-notice>span{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#dcecff;font-size:20px}.admin-unknown-notice strong{display:block;font-size:12px}.admin-unknown-notice p{margin:3px 0 0;color:#55718e;font-size:10px;line-height:1.45}.admin-unknown-notice b{color:#0a57b3;letter-spacing:.08em}
+.client-owner-assignment{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;border:1px solid #a9cffb;border-radius:16px;padding:14px 15px;background:linear-gradient(120deg,#edf6ff,#fbfdff)}.client-owner-assignment>span{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:#dbeafe;font-size:20px}.client-owner-assignment label{display:grid;gap:7px;color:#17365d;font-size:12px;font-weight:900}.client-owner-assignment select{min-height:44px;border:1px solid #b9d5f5;border-radius:12px;padding:0 12px;color:var(--ink);background:#fff;font:inherit}.client-owner-assignment small{color:#5a7290;font-size:10px;font-weight:650}
 .catalog-toolbar-info{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.inventory-button{border:1px solid #bad7f5;color:#124f91;background:#edf6ff}.inventory-button:hover{border-color:#75b2ed;background:#e1f0ff}
 .practice-row.practice-stock-shortage{box-shadow:inset 4px 0 #dc2626}.stock-practice-flag{display:inline-flex!important;width:max-content;margin-top:5px;border:1px solid #fecaca;border-radius:999px;padding:4px 7px;color:#b91c1c;background:#fff1f2;font-size:8px!important;font-weight:950;letter-spacing:.045em;line-height:1.1}
 .practice-layout-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 12px;border:1px solid var(--line);border-radius:17px;padding:12px 14px;background:#fff;box-shadow:var(--shadow-soft)}.practice-layout-toolbar strong,.practice-layout-toolbar span{display:block}.practice-layout-toolbar strong{color:#17365d;font-size:12px}.practice-layout-toolbar span{margin-top:2px;color:var(--muted);font-size:9px}.practice-layout-switch{display:flex;gap:5px;border-radius:13px;padding:4px;background:#edf2f8}.practice-layout-switch button{border:0;border-radius:10px;padding:9px 12px;color:#52677f;background:transparent;font-size:10px;font-weight:900}.practice-layout-switch button.active{color:#0b59b4;background:#fff;box-shadow:0 4px 12px rgba(24,72,126,.12)}

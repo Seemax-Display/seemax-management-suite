@@ -4,7 +4,7 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "numero", practiceDirection: "desc", practicePage: 1, practiceLayout: "", documentFolderId: "" };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "" };
   let installPrompt = null;
   let heldDocumentId = "";
   let documentHoldTimer = null;
@@ -106,6 +106,22 @@
     if (!value) return "—";
     const date = new Date(String(value).length === 10 ? value + "T12:00:00" : value);
     return Number.isNaN(date.getTime()) ? esc(value) : date.toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  function createdTimestamp(record) {
+    const raw = String((record || {}).creatoIl || (record || {}).aggiornatoIl || "").trim();
+    const parsed = Date.parse(raw.length === 10 ? `${raw}T12:00:00` : raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function resetListingStateForSession() {
+    const admin = api.isAdmin();
+    state.practiceSort = admin ? "created" : "numero";
+    state.practiceDirection = "desc";
+    state.practicePage = 1;
+    state.clientSort = admin ? "created" : "name";
+    state.clientDirection = admin ? "desc" : "asc";
+    state.clientPage = 1;
   }
 
   function initials(name) {
@@ -507,6 +523,7 @@
 
   async function showApp() {
     state.practiceLayout = "";
+    resetListingStateForSession();
     $("loginScreen").classList.add("is-hidden");
     $("app").classList.remove("is-hidden");
     setUser();
@@ -981,16 +998,21 @@
     const searchableFields = api.isAdmin() ? ["numero", "id", "cliente", "titolo", "agente", "agent_username"] : ["numero", "id", "cliente", "titolo"];
     if (query) rows = rows.filter((row) => searchableFields.some((key) => String(row[key] || "").toLowerCase().includes(query)));
     if (state.filterStatus) rows = rows.filter((p) => p.stato === state.filterStatus);
-    const sortKey = state.practiceSort || "numero";
+    const sortKey = state.practiceSort || (api.isAdmin() ? "created" : "numero");
     const direction = state.practiceDirection === "asc" ? 1 : -1;
     const statusOrder = Object.fromEntries(STATUSES.map((status, index) => [status, index]));
     rows.sort((left, right) => {
       if (sortKey === "valore") return (Number(left.valore || 0) - Number(right.valore || 0)) * direction;
       if (sortKey === "stato") return ((statusOrder[left.stato] ?? 99) - (statusOrder[right.stato] ?? 99)) * direction;
+      if (sortKey === "created") {
+        const difference = createdTimestamp(left) - createdTimestamp(right);
+        if (difference) return difference * direction;
+        return String(left.numero || left.id || "").localeCompare(String(right.numero || right.id || ""), "it", { numeric: true, sensitivity: "base" }) * direction;
+      }
       const value = (record) => sortKey === "numero" ? record.numero : sortKey === "cliente" ? record.cliente : sortKey === "tipo" ? record.tipo_pratica : sortKey === "finanziaria" ? record.finanziaria : record.agente || record.agent_username;
       return String(value(left) || "").localeCompare(String(value(right) || ""), "it", { numeric: true, sensitivity: "base" }) * direction;
     });
-    const pageSize = 10;
+    const pageSize = 6;
     const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
     state.practicePage = Math.min(Math.max(1, Number(state.practicePage || 1)), pageCount);
     const start = (state.practicePage - 1) * pageSize;
@@ -998,7 +1020,7 @@
     const layout = currentPracticeLayout();
     const chips = STATUSES.map((s) => `<button class="filter-chip ${state.filterStatus === s ? "active" : ""}" data-filter-status="${esc(s)}">${esc(s)} <strong>${state.data.practices.filter((p) => p.stato === s).length}</strong></button>`).join("");
     const sortOptions = [
-      ["stato", "Esito / stato"], ["numero", "ID pratica"], ["cliente", "Nome cliente"],
+      ["created", "Data creazione"], ["stato", "Esito / stato"], ["numero", "ID pratica"], ["cliente", "Nome cliente"],
       ["tipo", "Tipologia"], ["finanziaria", "Finanziaria"], ["valore", "Valore"]
     ].concat(api.isAdmin() ? [["agente", "Agente"]] : []);
     const controls = `<div class="practice-controls">
@@ -1026,14 +1048,48 @@
   }
 
   function renderClients() {
-    const rows = filterRows(state.data.clients, ["ragioneSociale", "referente", "piva", "email", "telefono", "citta"]);
-    return `${viewToolbar("Nuovo cliente", "new-client", `<p class="toolbar-note">${rows.length} clienti visualizzati</p>`)}<div class="card-grid">${rows.length ? rows.map((c) => {
+    const rows = filterRows(state.data.clients, ["ragioneSociale", "referente", "piva", "email", "telefono", "citta", "creato_da_nome", "creato_da_username"]).slice();
+    const sortKey = state.clientSort || (api.isAdmin() ? "created" : "name");
+    const direction = state.clientDirection === "desc" ? -1 : 1;
+    rows.sort((left, right) => {
+      if (sortKey === "created") {
+        const difference = createdTimestamp(left) - createdTimestamp(right);
+        if (difference) return difference * direction;
+        return String(left.id || "").localeCompare(String(right.id || ""), "it", { numeric: true, sensitivity: "base" }) * direction;
+      }
+      const value = (record) => sortKey === "location"
+        ? record.comune || record.citta || record.provincia
+        : sortKey === "sharing"
+          ? record.condiviso
+          : sortKey === "agent"
+            ? record.creato_da_nome || record.creato_da_username || record.agent_username
+            : record.ragioneSociale;
+      return String(value(left) || "").localeCompare(String(value(right) || ""), "it", { numeric: true, sensitivity: "base" }) * direction;
+    });
+    const pageSize = 6;
+    const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+    state.clientPage = Math.min(Math.max(1, Number(state.clientPage || 1)), pageCount);
+    const start = (state.clientPage - 1) * pageSize;
+    const visibleRows = rows.slice(start, start + pageSize);
+    const sortOptions = [["created", "Data creazione"], ["name", "Ragione sociale"], ["location", "Località"], ["sharing", "Condivisione"]].concat(api.isAdmin() ? [["agent", "Agente associato"]] : []);
+    const controls = `<div class="practice-controls client-controls">
+      <label>Ordina per<select id="clientSort">${sortOptions.map(([value, label]) => `<option value="${value}" ${sortKey === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+      <label>Ordine<select id="clientDirection"><option value="asc" ${state.clientDirection === "asc" ? "selected" : ""}>Crescente</option><option value="desc" ${state.clientDirection === "desc" ? "selected" : ""}>Decrescente</option></select></label>
+    </div>`;
+    const pagination = rows.length > pageSize ? `<nav class="practice-pagination" aria-label="Pagine clienti">
+      <button class="btn ghost" data-client-page="${state.clientPage - 1}" ${state.clientPage === 1 ? "disabled" : ""}>← Precedente</button>
+      <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => `<button class="${page === state.clientPage ? "active" : ""}" data-client-page="${page}" aria-label="Pagina ${page}">${page}</button>`).join("")}</div>
+      <button class="btn ghost" data-client-page="${state.clientPage + 1}" ${state.clientPage === pageCount ? "disabled" : ""}>Successiva →</button>
+    </nav>` : "";
+    const range = rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} di ${rows.length} clienti` : "0 clienti";
+    return `${viewToolbar("Nuovo cliente", "new-client", `<p class="toolbar-note">${range}</p>`)}${controls}<div class="card-grid">${visibleRows.length ? visibleRows.map((c) => {
       const count = state.data.practices.filter((p) => p.clientId === c.id).length;
       const locked = String(c.ha_pratiche_collegate || "NO").toUpperCase() === "SI" || state.data.practices.some((p) => p.clientId === c.id);
       const canEdit = api.isAdmin() || String(c.puo_modificare || "NO").toUpperCase() === "SI";
       const shared = String(c.condiviso || "NO").toUpperCase() === "SI";
-      return `<article class="client-card ${shared ? "shared-client" : ""}"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)} ${shared ? `<span class="shared-client-badge">CONDIVISO</span>` : ""}</h3><p>${esc(c.referente || "Referente non indicato")}</p>${shared ? `<small>Creato da: ${esc(c.creato_da_nome || "Utente Seemax")}</small>` : ""}</div>${locked ? `<span class="locked-record" title="Cliente collegato a una pratica: eliminazione disabilitata">🔒</span>` : canEdit ? `<button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button>` : `<span class="locked-record" title="Cliente consultabile ma modificabile soltanto dal creatore">◉</span>`}</div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche personali</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}">${canEdit ? "Apri anagrafica" : "Consulta anagrafica"}</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}">＋ Pratica</button></div></article>`;
-    }).join("") : emptyState("Nessun cliente", "Aggiungi la prima anagrafica.", "Nuovo cliente", "new-client")}</div>`;
+      const ownerLabel = c.creato_da_nome || c.creato_da_username || c.agent_username || "Utente Seemax";
+      return `<article class="client-card ${shared ? "shared-client" : ""}"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)} ${shared ? `<span class="shared-client-badge">CONDIVISO</span>` : ""}</h3><p>${esc(c.referente || "Referente non indicato")}</p>${api.isAdmin() ? `<small>Associato a: ${esc(ownerLabel)}</small>` : shared ? `<small>Creato da: ${esc(ownerLabel)}</small>` : ""}</div>${locked ? `<span class="locked-record" title="Cliente collegato a una pratica: eliminazione disabilitata">🔒</span>` : canEdit ? `<button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button>` : `<span class="locked-record" title="Cliente consultabile ma modificabile soltanto dal creatore">◉</span>`}</div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche personali</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}">${canEdit ? "Apri anagrafica" : "Consulta anagrafica"}</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}">＋ Pratica</button></div></article>`;
+    }).join("") : emptyState("Nessun cliente", "Aggiungi la prima anagrafica.", "Nuovo cliente", "new-client")}</div>${pagination}`;
   }
 
   function renderCatalog() {
@@ -1658,8 +1714,16 @@
     const session = api.getSession() || {};
     const owner = String(r.creato_da_username || r.agent_username || "");
     const canEdit = !r.id || api.isAdmin() || String(r.puo_modificare || "NO").toUpperCase() === "SI" || owner === String(session.username || "");
+    const ownerAssignment = api.isAdmin() && !r.id ? (() => {
+      const assignees = practiceAssignees();
+      return `<div class="client-owner-assignment full"><span>👤</span><label>Associa il cliente a ${requiredMark(true)}<select name="client_owner_username" required>${assignees.map((user) => {
+        const name = user.nome_visualizzato || user.displayName || user.username;
+        const mine = String(user.username || "") === String(session.username || "");
+        return `<option value="${esc(user.username)}" ${mine ? "selected" : ""}>${esc(name)}${mine ? " (Tu)" : ""}</option>`;
+      }).join("")}</select><small>Il cliente risulterà creato e gestito dall’utente selezionato.</small></label></div>`;
+    })() : "";
     const adminUnknownNotice = api.isAdmin() && canEdit ? `<div class="admin-unknown-notice full"><span>🔐</span><div><strong>Deroga amministratore</strong><p>Se un dato non è ancora disponibile, inserisci <b>0000</b>. Il cliente potrà essere salvato e il valore resterà riconoscibile come dato da completare.</p></div></div>` : "";
-    const fields = adminUnknownNotice + window.SeemaxClientTools.renderFields(r);
+    const fields = ownerAssignment + adminUnknownNotice + window.SeemaxClientTools.renderFields(r);
     openModal(r.id ? (canEdit ? "Modifica cliente" : "Anagrafica condivisa") : "Nuovo cliente", formShell("clients", r.id, fields, canEdit ? "Salva cliente" : "Consultazione", r.record_version), { wide: true, kicker: canEdit ? "Anagrafica cliente" : "Cliente condiviso", subtitle: !canEdit ? `Creato da ${r.creato_da_nome || "un altro utente"}. Puoi utilizzarlo nelle tue pratiche, ma non modificarlo.` : "" });
     const form = document.querySelector(".entity-form[data-entity='clients']");
     if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast, !canEdit);
@@ -1904,9 +1968,16 @@
     delete record.product_id;
     delete record.stato_display;
     if (form.dataset.id) record.id = form.dataset.id;
-    const now = new Date().toISOString().slice(0, 10);
-    if (entity === "clients") record.creatoIl = record.creatoIl || now;
+    const nowIso = new Date().toISOString();
+    const now = nowIso.slice(0, 10);
+    if (entity === "clients") record.creatoIl = record.creatoIl || nowIso;
     if (entity === "clients") {
+      if (!current.id && api.isAdmin()) {
+        const assignedOwner = practiceAssignees().find((user) => String(user.username || "") === String(record.client_owner_username || "")) || api.getSession() || {};
+        record.creato_da_username = assignedOwner.username || "";
+        record.creato_da_nome = assignedOwner.nome_visualizzato || assignedOwner.displayName || assignedOwner.username || "";
+        record.agent_username = assignedOwner.username || "";
+      }
       delete record.telefono_numero;
       delete record.piva_duplicata;
       record.piva = String(record.piva || "").replace(/\D/g, "");
@@ -1934,6 +2005,7 @@
       record.agente = current.agente || selectedAssigneeName;
       record.finanziaria = record.tipo_pratica === "NOLEGGIO" ? "Grenke" : record.tipo_pratica === "LEASING" ? "IFIS" : (record.finanziaria || "Da definire");
       if (!api.isAdmin() && !current.id) record.stato = "Inserita";
+      if (!current.id) record.creatoIl = record.creatoIl || nowIso;
       record.aggiornatoIl = now;
       record.id = record.id || "PR-" + record.numero;
       if (!current.id) record.nuova_pratica = "SI";
@@ -2316,6 +2388,8 @@
     if (filterTarget) { state.filterStatus = filterTarget.dataset.filterStatus || ""; state.practicePage = 1; renderRoute(); return; }
     const practicePageTarget = event.target.closest("[data-practice-page]");
     if (practicePageTarget && !practicePageTarget.disabled) { state.practicePage = Number(practicePageTarget.dataset.practicePage || 1); renderRoute(); return; }
+    const clientPageTarget = event.target.closest("[data-client-page]");
+    if (clientPageTarget && !clientPageTarget.disabled) { state.clientPage = Number(clientPageTarget.dataset.clientPage || 1); renderRoute(); return; }
     const routeTarget = event.target.closest("[data-route]");
     if (routeTarget) { go(routeTarget.dataset.route); return; }
     const actionTarget = event.target.closest("[data-action]");
@@ -2344,6 +2418,8 @@
     if (event.target.closest("#profileForm")) { updateProfileCustomizerPreview(); return; }
     if (event.target.id === "practiceSort") { state.practiceSort = event.target.value; state.practicePage = 1; renderRoute(); }
     if (event.target.id === "practiceDirection") { state.practiceDirection = event.target.value; state.practicePage = 1; renderRoute(); }
+    if (event.target.id === "clientSort") { state.clientSort = event.target.value; state.clientPage = 1; renderRoute(); }
+    if (event.target.id === "clientDirection") { state.clientDirection = event.target.value; state.clientPage = 1; renderRoute(); }
   });
 
   document.addEventListener("pointerdown", (event) => {
@@ -2544,7 +2620,12 @@
   $("closeSidebar").addEventListener("click", () => $("sidebar").classList.remove("open"));
   $("globalSearch").addEventListener("keydown", (event) => { if (event.key === "Enter") searchEverywhere(event.currentTarget.value); });
   $("globalSearch").addEventListener("input", (event) => {
-    if (["practices", "clients", "catalog", "documents", "activities", "users"].includes(state.route)) { state.search = event.target.value; renderRoute(); }
+    if (["practices", "clients", "catalog", "documents", "activities", "users"].includes(state.route)) {
+      state.search = event.target.value;
+      if (state.route === "practices") state.practicePage = 1;
+      if (state.route === "clients") state.clientPage = 1;
+      renderRoute();
+    }
   });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { if (tutorialState.active) stopTutorial(false); else closeModal(); $("sidebar").classList.remove("open"); } if (tutorialState.active && event.key === "ArrowRight") moveTutorial(1); if (tutorialState.active && event.key === "ArrowLeft") moveTutorial(-1); });
   window.addEventListener("resize", () => { if (tutorialState.active) positionTutorialSpotlight(tutorialState.steps[tutorialState.index].selector); });

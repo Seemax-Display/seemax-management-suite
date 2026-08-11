@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.10.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.11.0";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -121,6 +121,16 @@ function upgradeSeemaxV2100() {
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.10.0 · Deroga ADMIN 0000, avvisi giacenza, movimenti manuali e organizzazione pratiche.");
   styleSheets_();
   return "SEEMAX v2.10.0 configurato: deroga ADMIN, avvisi giacenza e carico/scarico magazzino attivi.";
+}
+
+function upgradeSeemaxV2110() {
+  var ss = db_();
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  seedSettings_();
+  updatePatchNotesV2110_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.11.0 · Paginazione a 6 elementi, ordinamento cronologico e assegnazione clienti agli agenti.");
+  styleSheets_();
+  return "SEEMAX v2.11.0 configurato: elenchi paginati e assegnazione clienti ADMIN attivi.";
 }
 
 function doGet(e) {
@@ -313,9 +323,27 @@ function managementUpsertLocked_(p) {
   if (entity === "clients") {
     var existingClient = payload.id ? findRowObject_("CLIENTI", "id", payload.id) : null;
     if (existingClient && !canEditClient_(existingClient, user)) throw new Error("Questo cliente può essere modificato soltanto dal creatore o da un amministratore.");
-    payload.creato_da_username = existingClient && existingClient.creato_da_username || existingClient && existingClient.agent_username || user.username;
-    payload.creato_da_nome = existingClient && existingClient.creato_da_nome || userDisplayName_(findRowObject_("AGENTI", "username", payload.creato_da_username) || user);
-    payload.agent_username = payload.creato_da_username;
+    var clientOwner = user;
+    if (existingClient) {
+      var existingOwnerUsername = String(existingClient.creato_da_username || existingClient.agent_username || user.username);
+      clientOwner = findRowObject_("AGENTI", "username", existingOwnerUsername) || {
+        username: existingOwnerUsername,
+        nome_visualizzato: existingClient.creato_da_nome || existingOwnerUsername,
+        ruolo: "AGENTE",
+        stato: "ATTIVO"
+      };
+    } else if (isAdmin_(user)) {
+      var requestedOwnerUsername = String(payload.client_owner_username || payload.creato_da_username || user.username).trim();
+      var requestedOwner = findRowObject_("AGENTI", "username", requestedOwnerUsername);
+      if (!requestedOwner || String(requestedOwner.stato || "ATTIVO").toUpperCase() !== "ATTIVO") throw new Error("L’utente scelto per il cliente non è disponibile o non è attivo.");
+      if (isAdmin_(requestedOwner) && String(requestedOwner.username) !== String(user.username)) throw new Error("Il cliente può essere associato a un agente oppure al tuo profilo amministratore.");
+      clientOwner = requestedOwner;
+    }
+    delete payload.client_owner_username;
+    payload.creato_da_username = clientOwner.username;
+    payload.creato_da_nome = userDisplayName_(clientOwner);
+    payload.agent_username = clientOwner.username;
+    payload.creatoIl = existingClient && existingClient.creatoIl || new Date().toISOString();
     payload.condiviso = String(payload.condiviso || existingClient && existingClient.condiviso || "NO").toUpperCase() === "SI" ? "SI" : "NO";
     payload.condiviso_il = payload.condiviso === "SI" ? (existingClient && existingClient.condiviso_il || new Date().toISOString()) : "";
     validateClientFiscalData_(payload, user);
@@ -809,6 +837,7 @@ function upsertPracticeWithInventory_(payload, user, identifierUser) {
   var version = prepareVersionedRecord_("PRATICHE", "id", payload.id, payload, user);
   if (version.duplicate) return version.duplicate;
   var existing = version.existing;
+    payload.creatoIl = existing && existing.creatoIl || new Date().toISOString();
     var wasApplied = String(existing && existing.magazzino_applicato || "NO").toUpperCase() === "SI";
     var nextStatus = normalizePracticeStatus_(payload.stato || existing && existing.stato || "Inserita");
     payload.stato = nextStatus;
@@ -1924,9 +1953,9 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.10"], ["title", "Magazzino amministrativo e pratiche più flessibili"],
-    ["intro", "Gli ADMIN possono registrare dati temporaneamente sconosciuti con 0000 e gestire carichi o scarichi di magazzino con uno storico completo."],
-    ["footer", "Le pratiche restano inseribili anche senza giacenza e possono essere organizzate per tipologia sul singolo dispositivo."]
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.11"], ["title", "Elenchi più ordinati e assegnazione clienti"],
+    ["intro", "Clienti e pratiche mostrano sei elementi per pagina. Gli amministratori vedono per primi i record più recenti."],
+    ["footer", "Durante la creazione di un cliente, un ADMIN può associarlo direttamente all’agente responsabile."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
 }
@@ -1951,6 +1980,19 @@ function updatePatchNotesV2100_() {
     title: "Magazzino amministrativo e pratiche più flessibili",
     intro: "Gli ADMIN possono registrare dati temporaneamente sconosciuti con 0000 e gestire carichi o scarichi di magazzino con uno storico completo.",
     footer: "Le pratiche restano inseribili anche senza giacenza e possono essere organizzate per tipologia sul singolo dispositivo."
+  };
+  Object.keys(notes).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
+  });
+}
+
+function updatePatchNotesV2110_() {
+  var notes = {
+    version: SEEMAX_VERSION,
+    label: "SEEMAX MANAGEMENT SUITE 2.11",
+    title: "Elenchi più ordinati e assegnazione clienti",
+    intro: "Clienti e pratiche mostrano sei elementi per pagina. Gli amministratori vedono per primi i record più recenti.",
+    footer: "Durante la creazione di un cliente, un ADMIN può associarlo direttamente all’agente responsabile."
   };
   Object.keys(notes).forEach(function (key) {
     upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });

@@ -1,4 +1,9 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.10.0
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.11.0
+
+NOVITÀ VERSIONE 2.11
+- PAGINAZIONE: CLIENTI e PRATICHE mostrano 6 elementi per pagina; oltre il sesto elemento compaiono le pagine successive.
+- ORDINE ADMIN: clienti e pratiche sono inizialmente ordinati dal più recente al più vecchio. I menu di ordinamento restano disponibili.
+- ASSEGNAZIONE CLIENTE: durante la creazione, un ADMIN può scegliere l'agente proprietario dell'anagrafica.
 
 NOVITÀ VERSIONE 2.10
 - DEROGA ADMIN: scrivere esattamente 0000 nei dati cliente o pratica non ancora conosciuti. Gli agenti non possono usare questa deroga.
@@ -16,7 +21,7 @@ NOVITÀ VERSIONE 1.5
 - OBIETTIVO FATTURATO: valore iniziale 500.000 euro, modificabile da Impostazioni.
 - CLIENTI: privati per impostazione iniziale; attivare Condividi cliente per renderli consultabili agli altri utenti.
 - PROTEZIONE CLIENTI: un cliente collegato anche a una sola pratica non può essere eliminato dal gestionale.
-- PRATICHE: ricerca e ordinamento disponibili; massimo 10 risultati per pagina.
+- CLIENTI E PRATICHE: ricerca e ordinamento disponibili; massimo 6 risultati per pagina.
 - AGENTI: non vedono né modificano lo Stato. Gli esiti vengono comunicati tramite campanella ed email.
 - NUOVA PRATICA: scegliere prima Acquisto, Noleggio o Leasing tramite le tre card.
 - ACQUISTO: scegliere obbligatoriamente Per Me oppure Per Cliente.
