@@ -1,4 +1,11 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.11.0
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.12.0
+
+NOVITÀ VERSIONE 2.12
+- MULTI-LEDWALL: nella tab Prodotto della pratica usare “Aggiungi un altro Ledwall” per inserire più schermi nella stessa pratica.
+- INDIRIZZI: il Ledwall principale usa l'indirizzo della pratica; per ogni Ledwall aggiuntivo scegliere INDIRIZZO UNICO oppure PRESSO ALTRO INDIRIZZ.
+- CABINET: il gestionale calcola le quantità per singolo Ledwall e aggrega automaticamente le righe di magazzino, compreso il P3.91 unificato.
+- GIACENZA INSUFFICIENTE: non blocca più neppure il passaggio di stato. La pratica viene salvata, la riga resta evidenziata e lo scarico rimane in attesa senza portare il magazzino sotto zero.
+- INDIRIZZO CLIENTE: i dati già presenti vengono importati campo per campo; un singolo dato mancante non azzera più regione, provincia o comune già compilati.
 
 NOVITÀ VERSIONE 2.11
 - PAGINAZIONE: CLIENTI e PRATICHE mostrano 6 elementi per pagina; oltre il sesto elemento compaiono le pagine successive.

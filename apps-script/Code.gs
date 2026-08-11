@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.11.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.12.0";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -29,7 +29,7 @@ var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
@@ -53,6 +53,7 @@ function setupSeemaxDatabase() {
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
   backfillPracticeStockWarningsV2100_();
+  backfillLedwallConfigurationsV2120_();
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
@@ -131,6 +132,17 @@ function upgradeSeemaxV2110() {
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.11.0 · Paginazione a 6 elementi, ordinamento cronologico e assegnazione clienti agli agenti.");
   styleSheets_();
   return "SEEMAX v2.11.0 configurato: elenchi paginati e assegnazione clienti ADMIN attivi.";
+}
+
+function upgradeSeemaxV2120() {
+  var ss = db_();
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  seedSettings_();
+  backfillLedwallConfigurationsV2120_();
+  updatePatchNotesV2120_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.12.0 · Pratiche multi-Ledwall e gestione non bloccante delle giacenze insufficienti.");
+  styleSheets_();
+  return "SEEMAX v2.12.0 configurato: pratiche multi-Ledwall e impegni magazzino in attesa attivi.";
 }
 
 function doGet(e) {
@@ -313,6 +325,7 @@ function managementUpsertLocked_(p) {
       payload.intestatario_telefono = String(assignedUser.telefono || "");
       payload.valore_provvigione = 0;
     }
+    normalizePracticeLedwallConfigurations_(payload);
     completeClientFromPractice_(payload, user);
     validatePracticeRequiredFields_(payload);
     var practiceRow = upsertPracticeWithInventory_(payload, user, assignedUser);
@@ -578,16 +591,18 @@ function completeClientFromPractice_(practice, user) {
   var installationUsesClient = String(practice.indirizzo_installazione_tipo || "").toUpperCase() === "COME INDIRIZZO CLIENTE";
   var requiredAddressKeys = ["regione", "provincia", "comune", "cap", "indirizzo", "civico"];
   var clientAddressComplete = requiredAddressKeys.every(function (key) { return !!String(client[key] || (key === "comune" ? client.citta : "") || "").trim(); });
-  if (installationUsesClient && clientAddressComplete) {
+  /* Importa ogni dato disponibile singolarmente. Prima veniva eseguita la
+     copia soltanto se l'intera anagrafica era completa: bastava un civico
+     mancante perché anche regione/provincia già presenti risultassero vuote. */
+  if (installationUsesClient) {
     ["regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico"].forEach(function (key) {
       if (!String(practice["installazione_" + key] || "").trim()) practice["installazione_" + key] = client[key] || (key === "comune" ? client.citta : "") || "";
     });
   }
   var syncAddress = String(practice.sync_installation_to_client || "NO").toUpperCase() === "SI" || (installationUsesClient && !clientAddressComplete);
   if (installationUsesClient && !clientAddressComplete) {
-    requiredAddressKeys.forEach(function (key) {
-      if (!String(practice["installazione_" + key] || "").trim()) throw new Error("Indirizzo cliente assente: completa " + key + " dell’installazione.");
-    });
+    var missingAddressKeys = requiredAddressKeys.filter(function (key) { return !String(practice["installazione_" + key] || "").trim(); });
+    if (missingAddressKeys.length) throw new Error("Indirizzo cliente assente: completa " + missingAddressKeys.join(", ") + " dell’installazione.");
   }
   if (syncAddress && !clientAddressComplete) {
     ["regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico"].forEach(function (key) {
@@ -603,6 +618,70 @@ function completeClientFromPractice_(practice, user) {
   client.aggiornatoIl = new Date().toISOString();
   prepareVersionedRecord_("CLIENTI", "id", client.id, client, user);
   upsertObject_("CLIENTI", "id", client.id, client);
+}
+
+function normalizePracticeLedwallConfigurations_(practice) {
+  var configurations = parseJson_(practice.ledwall_configurazioni_json, []);
+  if (!Array.isArray(configurations) || !configurations.length) return;
+  var grouped = {};
+  var models = [];
+  var measures = [];
+  var anyBifacial = false;
+  var p391Rectangular = 0;
+  var p391Square = 0;
+  var normalized = configurations.map(function (raw, index) {
+    var item = raw && typeof raw === "object" ? raw : {};
+    var width = item.larghezza;
+    var height = item.altezza;
+    if (!isAdminUnknownValue_(width) && (!Number(width) || Number(width) <= 0)) throw new Error("Ledwall " + (index + 1) + ": larghezza non valida.");
+    if (!isAdminUnknownValue_(height) && (!Number(height) || Number(height) <= 0)) throw new Error("Ledwall " + (index + 1) + ": altezza non valida.");
+    var addressType = index === 0 ? "INDIRIZZO UNICO" : String(item.indirizzo_tipo || "INDIRIZZO UNICO").toUpperCase();
+    if (["INDIRIZZO UNICO", "PRESSO ALTRO INDIRIZZO"].indexOf(addressType) < 0) addressType = "INDIRIZZO UNICO";
+    if (addressType === "PRESSO ALTRO INDIRIZZO") {
+      var missing = ["regione", "provincia", "comune", "cap", "indirizzo", "civico"].filter(function (key) {
+        return !String(item["installazione_" + key] || "").trim();
+      });
+      if (missing.length) throw new Error("Ledwall " + (index + 1) + ": completa " + missing.join(", ") + " dell'indirizzo alternativo.");
+    }
+    var stockLines = Array.isArray(item.stock_lines) ? item.stock_lines : [];
+    var normalizedLines = [];
+    stockLines.forEach(function (line) {
+      var productId = canonicalProductId_(line.product_id || line.modello_display, line.cabX, line.cabY) || String(line.product_id || "").trim();
+      var quantity = Number(line.quantita || 0);
+      if (!productId || !Number.isFinite(quantity) || quantity <= 0) return;
+      var description = String(line.descrizione || line.modello_display || productId);
+      normalizedLines.push({ product_id: productId, quantita: quantity, descrizione: description });
+      if (!grouped[productId]) grouped[productId] = { product_id: productId, quantita: 0, descrizione: description };
+      grouped[productId].quantita += quantity;
+      if (productId === "p391-50100") p391Rectangular += quantity;
+      if (productId === "p391-5050") p391Square += quantity;
+    });
+    var model = String(item.modello_display || item.prodotto || "Ledwall").trim();
+    var bifacial = String(item.bifacciale || "NO").toUpperCase() === "SI" ? "SI" : "NO";
+    models.push(model);
+    measures.push("Ledwall " + (index + 1) + ": " + String(width) + "x" + String(height));
+    if (bifacial === "SI") anyBifacial = true;
+    return {
+      id: String(item.id || "ledwall-" + (index + 1)), product_id: String(item.product_id || ""), modello_display: model,
+      larghezza: width, altezza: height, bifacciale: bifacial,
+      cabinet_necessari: isAdminUnknownValue_(item.cabinet_necessari) ? "0000" : normalizedLines.reduce(function (sum, line) { return sum + Number(line.quantita || 0); }, 0),
+      stock_lines: normalizedLines, indirizzo_tipo: addressType,
+      installazione_regione: String(item.installazione_regione || ""), installazione_provincia: String(item.installazione_provincia || ""),
+      installazione_comune: String(item.installazione_comune || ""), installazione_cap: String(item.installazione_cap || ""),
+      installazione_localita: String(item.installazione_localita || ""), installazione_indirizzo: String(item.installazione_indirizzo || ""),
+      installazione_civico: String(item.installazione_civico || "")
+    };
+  });
+  var inventoryRows = Object.keys(grouped).map(function (key) { return grouped[key]; });
+  practice.ledwall_configurazioni_json = JSON.stringify(normalized);
+  practice.righe_magazzino_json = JSON.stringify(inventoryRows);
+  practice.modelli_display = models.join(" | ");
+  practice.misure_display = measures.join(" | ");
+  practice.bifacciale = anyBifacial ? "SI" : "NO";
+  practice.cabinet_da_sottrarre = inventoryRows.length ? inventoryRows.map(function (line) { return line.descrizione + ": " + line.quantita; }).join(" | ") : "0000";
+  practice.p391_unificato = p391Rectangular || p391Square ? "SI" : "NO";
+  practice.p391_cabinet_50100 = p391Rectangular;
+  practice.p391_cabinet_5050 = p391Square;
 }
 
 function migrateClientFiscalV17_() {
@@ -745,8 +824,10 @@ function managementCreateFromQuoteLocked_(p) {
     bifacciale: items.some(function (item) { return String(item.bifacciale || "NO").toUpperCase() === "SI"; }) ? "SI" : "NO",
     cabinet_da_sottrarre: items.map(function (item) { return String(item.cabinet_da_sottrarre || item.cabinet || ""); }).filter(Boolean).join(" | "),
     righe_magazzino_json: JSON.stringify(buildInventoryRowsFromItems_(items)),
+    ledwall_configurazioni_json: JSON.stringify(buildLedwallConfigurationsFromItems_(items)),
     righe_json: JSON.stringify(items),
     magazzino_applicato: "NO",
+    magazzino_in_attesa: "NO",
     creatoIl: new Date().toISOString(),
     aggiornatoIl: new Date().toISOString()
   };
@@ -856,7 +937,6 @@ function upsertPracticeWithInventory_(payload, user, identifierUser) {
     var hasInventoryRows = inventoryLinesFromPractice_(inventorySource).length > 0;
     var requiresStock = ["Accettata", "Completata"].indexOf(nextStatus) >= 0;
     var releasesStock = ["Inserita", "Sospesa", "Bocciata"].indexOf(nextStatus) >= 0;
-    var shouldApply = requiresStock && !wasApplied && hasInventoryRows;
     var shouldReverse = releasesStock && wasApplied;
     payload.avviso_giacenza = existing && String(existing.avviso_giacenza || "").trim()
       ? String(existing.avviso_giacenza).toUpperCase()
@@ -864,22 +944,32 @@ function upsertPracticeWithInventory_(payload, user, identifierUser) {
     var inventoryAssessment = practiceInventoryAssessment_(inventorySource, wasApplied);
     payload.giacenza_insufficiente = inventoryAssessment.insufficient ? "SI" : "NO";
     payload.dettaglio_giacenza = inventoryAssessment.detail;
-    if (wasApplied && existing && payload.righe_json && String(payload.righe_json) !== String(existing.righe_json || "") && !shouldReverse) {
+    var shouldApply = requiresStock && !wasApplied && hasInventoryRows && !inventoryAssessment.insufficient;
+    payload.magazzino_in_attesa = requiresStock && !wasApplied && (!hasInventoryRows || inventoryAssessment.insufficient) ? "SI" : "NO";
+    /* Dopo uno scarico confronta soltanto l'impegno reale di magazzino.
+       Il JSON può cambiare ordine/formattazione oppure contenere un nuovo
+       indirizzo senza che cabinet e quantità siano stati modificati. */
+    var compositionChanged = existing && inventorySignature_(inventorySource) !== inventorySignature_(existing);
+    if (wasApplied && compositionChanged && !shouldReverse) {
       throw new Error("La composizione Ledwall non può essere modificata dopo l'impegno di magazzino. Annulla prima la pratica.");
     }
     if (shouldApply) {
       applyInventoryForPractice_(payload, user, -1, "SCARICO_PRATICA_" + nextStatus.toUpperCase());
       payload.magazzino_applicato = "SI";
+      payload.magazzino_in_attesa = "NO";
       payload.magazzino_applicato_il = new Date().toISOString();
       payload.magazzino_stornato_il = "";
     } else if (shouldReverse) {
       applyInventoryForPractice_(existing || payload, user, 1, "STORNO_PRATICA");
       payload.magazzino_applicato = "NO";
+      payload.magazzino_in_attesa = "NO";
       payload.magazzino_stornato_il = new Date().toISOString();
     } else if (existing) {
       payload.magazzino_applicato = existing.magazzino_applicato || "NO";
       payload.magazzino_applicato_il = existing.magazzino_applicato_il || "";
       payload.magazzino_stornato_il = existing.magazzino_stornato_il || "";
+    } else {
+      payload.magazzino_applicato = "NO";
     }
   return upsertObject_("PRATICHE", "id", payload.id, payload);
 }
@@ -1022,6 +1112,13 @@ function practiceInventoryAssessment_(practice, alreadyApplied) {
   if (alreadyApplied || String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") {
     return { insufficient: false, detail: "", shortages: [] };
   }
+  var configurations = parseJson_(practice.ledwall_configurazioni_json, []);
+  var undefinedConfiguration = Array.isArray(configurations) && configurations.some(function (item) {
+    return isAdminUnknownValue_(item && item.cabinet_necessari) || !Array.isArray(item && item.stock_lines) || !item.stock_lines.length;
+  });
+  if (undefinedConfiguration) {
+    return { insufficient: true, detail: "Composizione cabinet di uno o più Ledwall ancora da completare.", shortages: [] };
+  }
   var shortages = [];
   var lines = inventoryLinesFromPractice_(practice);
   if (!lines.length && isAdminUnknownValue_(practice.cabinet_da_sottrarre)) {
@@ -1134,6 +1231,12 @@ function inventoryLinesFromPractice_(practice) {
   return Object.keys(grouped).map(function (id) { return { product_id: id, quantita: grouped[id] }; });
 }
 
+function inventorySignature_(practice) {
+  return inventoryLinesFromPractice_(practice || {}).map(function (line) {
+    return String(line.product_id) + ":" + String(Number(line.quantita || 0));
+  }).sort().join("|");
+}
+
 function findInventoryProduct_(productId) {
   var direct = findRowObject_("PRODOTTI_LED", "id", productId);
   if (direct) return direct;
@@ -1154,6 +1257,66 @@ function buildInventoryRowsFromItems_(items) {
     if (id && qty > 0) out.push({ product_id: id, modello_display: item.modello_display || item.prodotto || "", quantita: qty });
   });
   return out;
+}
+
+function measurePartsFromItem_(item) {
+  var source = String(item.misura_display || item.misura_m || item.misura_cm || item.misura || "").replace(/,/g, ".");
+  var match = source.match(/([\d.]+)\s*[x×]\s*([\d.]+)/i);
+  if (!match) return { width: "", height: "" };
+  var width = Number(match[1]);
+  var height = Number(match[2]);
+  if (/cm/i.test(source) || width > 20 || height > 20) { width = width / 100; height = height / 100; }
+  return { width: width, height: height };
+}
+
+function buildLedwallConfigurationsFromItems_(items) {
+  return (items || []).map(function (item, index) {
+    var stock = Array.isArray(item.stock_lines) && item.stock_lines.length ? item.stock_lines : buildInventoryRowsFromItems_([item]);
+    var canonicalIds = stock.map(function (line) { return canonicalProductId_(line.product_id || line.modello_display || item.modello_display || item.prodotto, line.cabX, line.cabY); }).filter(Boolean);
+    var unifiedP391 = canonicalIds.some(function (id) { return id === "p391-50100" || id === "p391-5050"; });
+    var measure = measurePartsFromItem_(item);
+    var model = String(item.modello_display || item.prodotto || "").replace(/^Ledwall\s+Display\s+/i, "").trim();
+    return {
+      id: String(item.id || "ledwall-" + (index + 1)),
+      product_id: unifiedP391 ? "P391_UNIFIED" : String(canonicalIds[0] || item.product_id || ""),
+      modello_display: unifiedP391 ? "P3.91" : model,
+      larghezza: measure.width,
+      altezza: measure.height,
+      bifacciale: String(item.bifacciale || "NO").toUpperCase() === "SI" ? "SI" : "NO",
+      cabinet_necessari: stock.reduce(function (sum, line) { return sum + Number(line.quantita || 0); }, 0),
+      stock_lines: stock,
+      indirizzo_tipo: "INDIRIZZO UNICO",
+      installazione_regione: "", installazione_provincia: "", installazione_comune: "", installazione_cap: "",
+      installazione_localita: "", installazione_indirizzo: "", installazione_civico: ""
+    };
+  });
+}
+
+function backfillLedwallConfigurationsV2120_() {
+  rowsToObjects_(sheet_("PRATICHE")).forEach(function (practice) {
+    var configurations = parseJson_(practice.ledwall_configurazioni_json, []);
+    var changed = false;
+    if (!Array.isArray(configurations) || !configurations.length) {
+      var items = parseJson_(practice.righe_json, []);
+      configurations = buildLedwallConfigurationsFromItems_(items);
+      if (!configurations.length && String(practice.modelli_display || practice.misure_display || practice.righe_magazzino_json || "").trim()) {
+        var stock = parseJson_(practice.righe_magazzino_json, []);
+        configurations = buildLedwallConfigurationsFromItems_([{
+          id: "ledwall-1", prodotto: practice.modelli_display, modello_display: practice.modelli_display,
+          misura_display: practice.misure_display, bifacciale: practice.bifacciale, stock_lines: stock,
+          cabinet_da_sottrarre: stock.reduce(function (sum, line) { return sum + Number(line.quantita || 0); }, 0)
+        }]);
+      }
+      practice.ledwall_configurazioni_json = JSON.stringify(configurations);
+      changed = true;
+    }
+    var applied = String(practice.magazzino_applicato || "NO").toUpperCase() === "SI";
+    var requiresStock = ["Accettata", "Completata"].indexOf(String(practice.stato || "")) >= 0;
+    var assessment = practiceInventoryAssessment_(practice, applied);
+    var pending = requiresStock && !applied && (assessment.insufficient || !inventoryLinesFromPractice_(practice).length) ? "SI" : "NO";
+    if (String(practice.magazzino_in_attesa || "") !== pending) { practice.magazzino_in_attesa = pending; changed = true; }
+    if (changed) upsertObject_("PRATICHE", "id", practice.id, practice);
+  });
 }
 
 function backfillPracticeInventoryV12_() {
@@ -1953,9 +2116,9 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.11"], ["title", "Elenchi più ordinati e assegnazione clienti"],
-    ["intro", "Clienti e pratiche mostrano sei elementi per pagina. Gli amministratori vedono per primi i record più recenti."],
-    ["footer", "Durante la creazione di un cliente, un ADMIN può associarlo direttamente all’agente responsabile."]
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.12"], ["title", "Una pratica, più Ledwall"],
+    ["intro", "Ogni pratica può comprendere più Ledwall, anche installati presso indirizzi differenti."],
+    ["footer", "Una giacenza insufficiente viene segnalata senza bloccare il salvataggio: lo scarico resta in attesa e il magazzino non scende mai sotto zero."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
 }
@@ -1993,6 +2156,19 @@ function updatePatchNotesV2110_() {
     title: "Elenchi più ordinati e assegnazione clienti",
     intro: "Clienti e pratiche mostrano sei elementi per pagina. Gli amministratori vedono per primi i record più recenti.",
     footer: "Durante la creazione di un cliente, un ADMIN può associarlo direttamente all’agente responsabile."
+  };
+  Object.keys(notes).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
+  });
+}
+
+function updatePatchNotesV2120_() {
+  var notes = {
+    version: SEEMAX_VERSION,
+    label: "SEEMAX MANAGEMENT SUITE 2.12",
+    title: "Una pratica, più Ledwall",
+    intro: "Ogni pratica può comprendere più Ledwall, anche installati presso indirizzi differenti.",
+    footer: "Una giacenza insufficiente viene segnalata senza bloccare il salvataggio: lo scarico resta in attesa e il magazzino non scende mai sotto zero."
   };
   Object.keys(notes).forEach(function (key) {
     upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });

@@ -20,13 +20,13 @@ Ogni riga rappresenta un’opportunità o lavoro. Gli stati previsti sono:
 4. Bocciata, solo per noleggio e leasing
 5. Completata
 
-Le colonne `modelli_display`, `misure_display`, `bifacciale`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito la configurazione e l'impegno di magazzino. Per il P3.91 unificato sono disponibili anche `p391_unificato`, `p391_cabinet_50100` e `p391_cabinet_5050`; lo scarico continua a usare le righe JSON separate, quindi resta atomico e idempotente.
+Le colonne `modelli_display`, `misure_display`, `bifacciale`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito la configurazione e l'impegno di magazzino. `ledwall_configurazioni_json` conserva invece l'elenco dei singoli Ledwall della pratica: modello, misura, bifacciale, cabinet, righe di stock e l'eventuale indirizzo alternativo. `righe_magazzino_json` resta la vista aggregata usata dal magazzino. Per il P3.91 unificato sono disponibili anche `p391_unificato`, `p391_cabinet_50100` e `p391_cabinet_5050`; lo scarico continua a usare le righe JSON separate, quindi resta atomico e idempotente.
 
 Le colonne `archiviata` e `archiviata_il` vengono valorizzate quando una pratica passa a `Bocciata`. `agent_username` determina il proprietario e impedisce agli agenti di leggere o modificare pratiche altrui; lo stato è modificabile esclusivamente dagli amministratori.
 
 `creatoIl` conserva l’istante di creazione della pratica. Per le righe storiche che non lo possiedono ancora, l’interfaccia usa `aggiornatoIl` come riferimento compatibile, senza richiedere una riscrittura massiva del foglio.
 
-Le colonne `avviso_giacenza`, `giacenza_insufficiente` e `dettaglio_giacenza` gestiscono il nuovo avviso non bloccante. Una pratica può sempre essere inserita anche se i cabinet non sono disponibili. Impostando manualmente `avviso_giacenza` su `NO` nella riga della pratica, il contrassegno rosso viene nascosto; riportandolo a `SI` torna visibile se la disponibilità è ancora insufficiente. L'impegno effettivo del magazzino resta protetto: Accettata/Completata non possono produrre una giacenza negativa.
+Le colonne `avviso_giacenza`, `giacenza_insufficiente` e `dettaglio_giacenza` gestiscono l'avviso non bloccante. Una pratica può sempre essere salvata anche se i cabinet non sono disponibili, compreso il passaggio ad Accettata o Completata. In questo caso `magazzino_in_attesa=SI`, `magazzino_applicato=NO` e nessuna quantità viene portata sotto zero. Impostando manualmente `avviso_giacenza` su `NO` nella riga della pratica, il contrassegno rosso viene nascosto; riportandolo a `SI` torna visibile se la disponibilità è ancora insufficiente.
 
 Dalla versione 1.9 la riga contiene inoltre destinatario dell'ordine, intestatario, provvigione, rate, periodicità, indirizzo di installazione, modalità di gestione del Ledwall, credenziali Cloud e riepilogo dei documenti richiesti/caricati. I campi restano nella stessa tabella per consentire filtri e controlli diretti da Google Fogli.
 
