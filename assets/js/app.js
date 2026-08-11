@@ -917,9 +917,22 @@
     return `<button class="activity-item" data-action="edit-activity" data-id="${esc(item.id)}"><i class="${overdue ? "overdue" : ""}"></i><div><strong>${esc(item.titolo)}</strong><span>${esc(item.tipo)} · ${dateIt(item.scadenza)}</span></div>${badge(item.stato)}</button>`;
   }
 
+  function isCompletedPractice(practice) {
+    return String(practice && practice.stato || "").trim().toLowerCase() === "completata";
+  }
+
+  function isPlannerPracticePending(practice) {
+    const origin = String(practice && practice.origine || "").toUpperCase();
+    return !isCompletedPractice(practice) && (origin.includes("QUOTATION PLANNER") || origin.includes("S.Q.P"));
+  }
+
   function practiceTable(rows, compact = false, showAgent = false) {
     if (!rows.length) return emptyState("Nessuna pratica", "Crea la prima pratica per iniziare.", "Nuova pratica", "new-practice");
-    return `<div class="table-wrap"><table class="practice-table"><thead><tr><th>Pratica</th><th>Cliente</th><th>Tipologia</th><th>Stato</th><th>Finanziaria</th><th>Valore</th>${showAgent ? "<th>Agente</th>" : ""}<th></th></tr></thead><tbody>${rows.map((p) => `<tr class="practice-row practice-${slug(p.stato)}"><td><strong>${esc(p.numero)}</strong><small>${dateIt(p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td>${showAgent ? `<td>${esc(p.agente || p.agent_username || "—")}</td>` : ""}<td><button class="table-action" data-action="edit-practice" data-id="${esc(p.id)}">Apri</button>${compact || p.stato === "Completata" ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="practice-table"><thead><tr><th>Pratica</th><th>Cliente</th><th>Tipologia</th><th>Stato</th><th>Finanziaria</th><th>Valore</th>${showAgent ? "<th>Agente</th>" : ""}<th></th></tr></thead><tbody>${rows.map((p) => {
+      const plannerPending = isPlannerPracticePending(p);
+      const completed = isCompletedPractice(p);
+      return `<tr class="practice-row practice-${slug(p.stato)} ${plannerPending ? "practice-planner-pending" : ""}"><td><strong>${esc(p.numero)}</strong>${plannerPending ? `<span class="planner-practice-flag">✦ IMPORTATA · DA COMPLETARE</span>` : completed ? `<span class="completed-practice-flag">🔒 ARCHIVIO CONCLUSO</span>` : ""}<small>${dateIt(completed ? p.completataIl || p.aggiornatoIl : p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td>${showAgent ? `<td>${esc(p.agente || p.agent_username || "—")}</td>` : ""}<td><button class="table-action ${completed ? "completed" : ""}" data-action="edit-practice" data-id="${esc(p.id)}">${completed ? "Consulta" : "Apri"}</button>${compact || completed ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`;
+    }).join("")}</tbody></table></div>`;
   }
 
   function renderPractices() {
@@ -1141,13 +1154,70 @@
     openModal("Nuova pratica", body, { wide: true, kicker: "Scegli la tipologia", subtitle: "Acquisto, Noleggio operativo o Leasing" });
   }
 
+  function practiceAssignees() {
+    const session = api.getSession() || {};
+    const users = (state.data.users || []).filter((user) => {
+      const active = String(user.stato || "ATTIVO").toUpperCase() === "ATTIVO";
+      const role = String(user.ruolo || user.role || "AGENTE").toUpperCase();
+      return active && (String(user.username || "") === String(session.username || "") || role === "AGENTE");
+    });
+    if (session.username && !users.some((user) => String(user.username) === String(session.username))) users.unshift(session);
+    return users.filter((user, index, rows) => user.username && rows.findIndex((candidate) => String(candidate.username) === String(user.username)) === index).sort((left, right) => {
+      if (String(left.username) === String(session.username)) return -1;
+      if (String(right.username) === String(session.username)) return 1;
+      return String(left.nome_visualizzato || left.displayName || left.username).localeCompare(String(right.nome_visualizzato || right.displayName || right.username), "it", { sensitivity: "base" });
+    });
+  }
+
+  function nextPracticeIdentifierPreview(user) {
+    const source = user && (user.nome_visualizzato || user.displayName || user.username) || "SM";
+    const prefix = initials(source).replace(/[^A-Z0-9]/g, "").slice(0, 2) || "SM";
+    const existingNumbers = (state.data.practices || []).filter((practice) => !practice.agent_username || String(practice.agent_username) === String(user && user.username || "")).map((practice) => String(practice.numero || "")).filter((number) => number.startsWith(prefix)).map((number) => Number(number.slice(prefix.length))).filter(Number.isFinite);
+    return prefix + String((existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1).padStart(4, "0");
+  }
+
+  function openCompletedPractice(record) {
+    const client = (state.data.clients || []).find((item) => String(item.id) === String(record.clientId || "")) || {};
+    const documents = (state.data.documents || []).filter((document) => String(document.practiceId || "") === String(record.id || ""));
+    let inventoryRows = [];
+    try { inventoryRows = JSON.parse(record.righe_magazzino_json || "[]"); } catch (error) { inventoryRows = []; }
+    const value = (content, fallback = "—") => String(content === undefined || content === null ? "" : content).trim() ? esc(content) : fallback;
+    const item = (label, content, options = {}) => `<div class="completed-detail ${options.wide ? "wide" : ""}"><small>${esc(label)}</small><strong>${options.html ? content : value(content)}</strong></div>`;
+    const addressSource = String(record.indirizzo_installazione_tipo || "").toUpperCase() === "COME INDIRIZZO CLIENTE" ? client : {
+      regione: record.installazione_regione, provincia: record.installazione_provincia, comune: record.installazione_comune,
+      cap: record.installazione_cap, localita: record.installazione_localita, indirizzo: record.installazione_indirizzo, civico: record.installazione_civico
+    };
+    const address = [addressSource.indirizzo, addressSource.civico, addressSource.cap, addressSource.localita || addressSource.comune || addressSource.citta, addressSource.provincia, addressSource.regione].filter((entry) => String(entry || "").trim()).join(", ");
+    const inventory = inventoryRows.length ? inventoryRows.map((row) => `<li><span>${value(row.descrizione || row.product_id)}</span><strong>${Number(row.quantita || 0)} cabinet</strong></li>`).join("") : `<li><span>${value(record.cabinet_da_sottrarre, "Composizione non indicata")}</span></li>`;
+    const documentList = documents.length ? documents.map((document) => `<li><span class="completed-document-icon">📄</span><div><strong>${value(document.nome || document.file_name)}</strong><small>${value(document.tipo || "Documento")} · ${dateIt(document.data || document.aggiornatoIl)}</small></div>${document.url ? `<a class="btn soft" href="${esc(document.url)}" target="_blank" rel="noopener">Apri ↗</a>` : `<span class="placeholder-pill">Non disponibile</span>`}</li>`).join("") : `<li class="empty"><span>🗂️</span><div><strong>Nessun allegato registrato</strong><small>La pratica resta consultabile come archivio definitivo.</small></div></li>`;
+    const origin = String(record.origine || "").toUpperCase().includes("QUOTATION PLANNER") ? "Importata dal Seemax Quotation Planner" : record.origine || "Creata nel Management Suite";
+    const body = `<article class="completed-practice-view">
+      <header class="completed-practice-hero"><span class="completed-seal">✓</span><div><small>PRATICA CONCLUSA</small><h3>${value(record.numero)}</h3><p>${value(record.cliente)} · ${value(record.tipo_pratica || record.finanziaria)}</p></div><div class="completed-lock"><span>🔒</span><strong>Sola lettura</strong><small>Archivio non modificabile</small></div></header>
+      <div class="completed-practice-message"><span>✓</span><div><strong>Iter commerciale completato</strong><p>La pratica è stata conclusa e consolidata. Dati, assegnazione e composizione di magazzino sono ora protetti da modifiche accidentali.</p></div></div>
+      <section class="completed-summary-grid">${item("Stato", badge("Completata"), { html: true })}${item("Completata il", dateIt(record.completataIl || record.aggiornatoIl))}${item("Agente responsabile", record.agente || record.agent_username)}${item("Valore pratica", euros(record.valore || 0))}${item("Provvigione", euros(record.valore_provvigione || 0))}${item("Origine", origin)}</section>
+      <div class="completed-sections">
+        <section><div class="completed-section-heading"><span>👤</span><div><small>INTESTAZIONE</small><h4>Cliente e destinatario</h4></div></div><div class="completed-detail-grid">${item("Cliente / intestatario", record.cliente || record.intestatario_nome)}${item("Destinatario ordine", record.destinatario_ordine || "Cliente")}${item("E-mail intestatario", record.intestatario_email || client.email)}${item("Telefono", record.intestatario_telefono || client.telefono)}</div></section>
+        <section><div class="completed-section-heading"><span>🖥️</span><div><small>FORNITURA</small><h4>Prodotto e configurazione</h4></div></div><div class="completed-detail-grid">${item("Modello display", record.modelli_display)}${item("Misura preventivata", record.misure_display)}${item("Bifacciale", record.bifacciale || "NO")}${item("Gestione Ledwall", record.gestione_ledwall)}</div><ul class="completed-inventory-list">${inventory}</ul></section>
+        <section><div class="completed-section-heading"><span>📍</span><div><small>INSTALLAZIONE</small><h4>Sede e requisiti tecnici</h4></div></div><div class="completed-detail-grid">${item("Tipo indirizzo", record.indirizzo_installazione_tipo)}${item("Indirizzo completo", address, { wide: true })}${item("SIM traffico rete", record.sim_richiesta || "NO")}${item("Predisposizione elettrica", record.predisposizione_elettrica || "NO")}${record.cloud_username ? item("Account Cloud", record.cloud_username) : ""}</div></section>
+        ${String(record.tipo_pratica || "").toUpperCase() === "ACQUISTO" ? "" : `<section><div class="completed-section-heading"><span>🏦</span><div><small>CONDIZIONI</small><h4>${value(record.finanziaria)} e pagamenti</h4></div></div><div class="completed-detail-grid">${item("Finanziaria", record.finanziaria)}${item("Numero rate", record.numero_rate)}${item("Periodicità", record.periodicita_pagamento)}${item("Preventivo S.Q.P.", record.preventivo_id)}</div></section>`}
+        <section class="completed-documents-section"><div class="completed-section-heading"><span>🗂️</span><div><small>DOCUMENTI</small><h4>Allegati archiviati</h4></div></div><ul class="completed-document-list">${documentList}</ul></section>
+        ${record.note ? `<section><div class="completed-section-heading"><span>💬</span><div><small>ANNOTAZIONI</small><h4>Note finali</h4></div></div><p class="completed-notes">${esc(record.note)}</p></section>` : ""}
+      </div>
+      <footer class="completed-practice-footer"><div><span>✓</span><p><strong>Magazzino consolidato</strong><small>${String(record.magazzino_applicato || "NO").toUpperCase() === "SI" ? "I cabinet previsti risultano già contabilizzati." : "Nessun movimento di magazzino risulta applicato."}</small></p></div><button type="button" class="btn primary" data-action="close-modal">Chiudi archivio</button></footer>
+    </article>`;
+    openModal(`Pratica ${record.numero}`, body, { wide: true, panelClass: "completed-practice-modal", kicker: "Archivio pratiche concluse", subtitle: "Consultazione definitiva · sola lettura" });
+  }
+
   function openPractice(id, clientId, selectedType) {
     const record = state.data.practices.find((p) => p.id === id) || {};
+    if (record.id && isCompletedPractice(record)) { openCompletedPractice(record); return; }
     const client = state.data.clients.find((c) => c.id === (clientId || record.clientId));
     const session = api.getSession() || {};
-    const prefix = initials(session.displayName || session.nome_visualizzato || session.username).replace(/[^A-Z0-9]/g, "").slice(0, 2) || "SM";
-    const existingNumbers = state.data.practices.map((p) => String(p.numero || "")).filter((number) => number.startsWith(prefix)).map((number) => Number(number.slice(prefix.length))).filter(Number.isFinite);
-    const number = record.numero || prefix + String((existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1).padStart(4, "0");
+    const assignees = practiceAssignees();
+    const assigneeUsername = record.agent_username || session.username || (assignees[0] && assignees[0].username) || "";
+    const assignee = assignees.find((user) => String(user.username) === String(assigneeUsername)) || (state.data.users || []).find((user) => String(user.username) === String(assigneeUsername)) || session;
+    const assigneeName = assignee.nome_visualizzato || assignee.displayName || record.agente || assignee.username || "Utente Seemax";
+    const number = record.numero || nextPracticeIdentifierPreview(assignee);
     const inferredType = record.finanziaria === "Grenke" ? "NOLEGGIO" : record.finanziaria === "IFIS" ? "LEASING" : "ACQUISTO";
     const practiceType = String(record.tipo_pratica || selectedType || inferredType).toUpperCase();
     const allowedStatuses = practiceType === "ACQUISTO" ? STATUSES.filter((status) => status !== "Bocciata") : STATUSES;
@@ -1176,6 +1246,15 @@
     const statusField = !api.isAdmin()
       ? `<input type="hidden" name="stato" value="${esc(record.stato || "Inserita")}">`
       : field("Stato", "stato", record.stato || "Inserita", { options: allowedStatuses });
+    const assigneeField = api.isAdmin()
+      ? record.id
+        ? `${field("Agente responsabile", "agente_display", record.agente || assigneeName, { readonly: true })}<input type="hidden" name="agent_username" value="${esc(assigneeUsername)}">`
+        : `<label>Agente responsabile ${requiredMark(true)}<select name="agent_username" required>${assignees.map((user) => {
+          const displayName = user.nome_visualizzato || user.displayName || user.username;
+          const self = String(user.username) === String(session.username);
+          return `<option value="${esc(user.username)}" ${String(user.username) === String(assigneeUsername) ? "selected" : ""}>${esc(displayName)}${self ? " · Il mio profilo" : ""}</option>`;
+        }).join("")}</select><small>La pratica, le notifiche e il fatturato saranno associati all’agente selezionato.</small></label>`
+      : `<input type="hidden" name="agent_username" value="${esc(assigneeUsername)}">`;
     const destination = String(record.destinatario_ordine || "PER CLIENTE").toUpperCase();
     const finance = practiceType === "NOLEGGIO" ? "Grenke" : practiceType === "LEASING" ? "IFIS" : "Acquisto diretto";
     const addressType = String(record.indirizzo_installazione_tipo || (practiceType === "ACQUISTO" ? "PRESSO ALTRO INDIRIZZO" : "COME INDIRIZZO CLIENTE")).toUpperCase();
@@ -1185,22 +1264,22 @@
       <input type="hidden" name="tipo_pratica" value="${esc(practiceType)}"><input type="hidden" name="finanziaria" value="${esc(finance)}">`;
     const purchaseDestination = practiceType !== "ACQUISTO" ? "" : `<fieldset class="practice-section full"><legend>Destinatario ordine ${requiredMark(req("destinatario_ordine"))}</legend>
       <div class="destination-grid">
-        <label class="choice-card"><input type="radio" name="destinatario_ordine" value="PER ME" ${destination === "PER ME" ? "checked" : ""} ${req("destinatario_ordine") ? "required" : ""}><span><strong>Per Me</strong><small>La fattura finale sarà intestata all’agente connesso.</small></span></label>
+        <label class="choice-card"><input type="radio" name="destinatario_ordine" value="PER ME" ${destination === "PER ME" ? "checked" : ""} ${req("destinatario_ordine") ? "required" : ""}><span><strong>Per Me</strong><small>La fattura finale sarà intestata all’agente assegnato alla pratica.</small></span></label>
         <label class="choice-card"><input type="radio" name="destinatario_ordine" value="PER CLIENTE" ${destination !== "PER ME" ? "checked" : ""}><span><strong>Per Cliente</strong><small>L’ordine e la fattura saranno intestati al cliente selezionato.</small></span></label>
       </div>
     </fieldset>`;
     const personalData = `<div class="conditional-section full" data-visible-when-destination="PER ME"><fieldset class="practice-section"><legend>Dati personali</legend><div class="form-grid">
-      ${field("Intestatario ordine", "intestatario_nome", record.intestatario_nome || session.displayName || session.nome_visualizzato || session.username, { readonly: true })}
-      ${field("Email", "intestatario_email", record.intestatario_email || session.email || "", { readonly: true, type: "email" })}
-      ${field("Telefono", "intestatario_telefono", record.intestatario_telefono || session.telefono || session.phone || "", { readonly: true })}
-      <p class="field-help full">La pratica e la fattura finale saranno intestate all’utente collegato.</p>
+      ${field("Intestatario ordine", "intestatario_nome", record.intestatario_nome || assigneeName, { readonly: true })}
+      ${field("Email", "intestatario_email", record.intestatario_email || assignee.email || "", { readonly: true, type: "email" })}
+      ${field("Telefono", "intestatario_telefono", record.intestatario_telefono || assignee.telefono || assignee.phone || "", { readonly: true })}
+      <p class="field-help full">La pratica e la fattura finale saranno intestate all’agente responsabile selezionato.</p>
     </div></fieldset></div>`;
     const customerData = `<div class="conditional-section full" data-visible-when-destination="PER CLIENTE"><fieldset class="practice-section"><legend>Dati del cliente</legend><div class="form-grid">${clientField}</div></fieldset></div>`;
     const clientCompletionFields = `<div class="client-practice-completion conditional-section full" data-visible-when-destination="PER CLIENTE"><div class="client-completion-alert" id="practiceClientCompletionAlert">Se l’anagrafica selezionata è incompleta, compila qui i dati mancanti: saranno registrati automaticamente nel cliente.</div><div class="form-grid">
-      <label data-client-fill-field="codice_fiscale">Codice fiscale<input name="client_update_codice_fiscale" maxlength="16" value="${esc(selectedClient && selectedClient.codice_fiscale || "")}"></label>
-      <label data-client-fill-field="piva">Partita IVA<input name="client_update_piva" inputmode="numeric" maxlength="11" value="${esc(selectedClient && selectedClient.piva || "")}"></label>
-      <label data-client-fill-field="email">E-mail<input name="client_update_email" type="email" value="${esc(selectedClient && selectedClient.email || "")}"></label>
-      ${practiceType === "ACQUISTO" ? "" : `<label data-client-fill-field="iban">IBAN<input name="client_update_iban" value="${esc(selectedClient && selectedClient.iban || "")}"></label>`}
+      <label data-client-fill-field="codice_fiscale" data-client-fill-required="${practiceType === "ACQUISTO" ? "NO" : "SI"}">Codice fiscale ${requiredMark(practiceType !== "ACQUISTO")}<input name="client_update_codice_fiscale" maxlength="16" value="${esc(selectedClient && selectedClient.codice_fiscale || "")}">${practiceType === "ACQUISTO" ? `<small>Facoltativo per le pratiche di acquisto.</small>` : ""}</label>
+      <label data-client-fill-field="piva" data-client-fill-required="SI">Partita IVA ${requiredMark(true)}<input name="client_update_piva" inputmode="numeric" maxlength="11" value="${esc(selectedClient && selectedClient.piva || "")}"></label>
+      <label data-client-fill-field="email" data-client-fill-required="SI">E-mail ${requiredMark(true)}<input name="client_update_email" type="email" value="${esc(selectedClient && selectedClient.email || "")}"></label>
+      ${practiceType === "ACQUISTO" ? "" : `<label data-client-fill-field="iban" data-client-fill-required="SI">IBAN ${requiredMark(true)}<input name="client_update_iban" value="${esc(selectedClient && selectedClient.iban || "")}"></label>`}
     </div></div>`;
     const valueFields = `<fieldset class="practice-section full"><legend>Valori pratica</legend><div class="form-grid">
       ${field("Valore pratica (IVA esclusa)", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01", required: req("valore") })}
@@ -1213,10 +1292,10 @@
       ${field("Numero di rate selezionate", "numero_rate", record.numero_rate || (practiceType === "NOLEGGIO" ? "36" : "60"), { options: rateOptions, required: req("numero_rate") })}
       ${field("Mensilità", "periodicita_pagamento", record.periodicita_pagamento || "Mensile", { options: practiceType === "NOLEGGIO" ? ["Mensile", "Trimestrale"] : ["Mensile", "Bimestrale", "Trimestrale"], required: req("periodicita_pagamento") })}
     </div></fieldset>`;
-    const addressChoice = practiceType === "ACQUISTO" ? `<input type="hidden" name="indirizzo_installazione_tipo" value="PRESSO ALTRO INDIRIZZO">` : `<div class="address-choice full">
-      <label class="choice-card compact"><input type="radio" name="indirizzo_installazione_tipo" value="COME INDIRIZZO CLIENTE" ${addressType === "COME INDIRIZZO CLIENTE" ? "checked" : ""} ${req("indirizzo_installazione_tipo") ? "required" : ""}><span><strong>Come indirizzo cliente</strong><small>Usa la sede registrata nell’anagrafica.</small></span></label>
+    const addressChoice = `<div class="address-choice full">
+      <label class="choice-card compact" ${practiceType === "ACQUISTO" ? `data-visible-when-destination="PER CLIENTE"` : ""}><input type="radio" name="indirizzo_installazione_tipo" value="COME INDIRIZZO CLIENTE" ${addressType === "COME INDIRIZZO CLIENTE" ? "checked" : ""} ${req("indirizzo_installazione_tipo") ? "required" : ""}><span><strong>Importa dall’anagrafica cliente</strong><small>Usa direttamente la sede registrata nel cliente selezionato.</small></span></label>
       <label class="choice-card compact"><input type="radio" name="indirizzo_installazione_tipo" value="PRESSO ALTRO INDIRIZZO" ${addressType !== "COME INDIRIZZO CLIENTE" ? "checked" : ""}><span><strong>Presso altro indirizzo</strong><small>Inserisci una sede di installazione differente.</small></span></label>
-    </div>`;
+    </div><div id="selectedClientAddressPreview" class="selected-client-address full is-hidden"></div>`;
     const addressFields = `<fieldset class="practice-section full"><legend>Indirizzo di installazione</legend><div class="form-grid">${addressChoice}
       <div class="form-grid full conditional-section installation-address-fields" data-visible-when-address="PRESSO ALTRO INDIRIZZO">
         <label>Regione ${requiredMark(req("installazione_regione"))}<select name="installazione_regione" ${req("installazione_regione") ? "required" : ""}><option value="${esc(record.installazione_regione || "")}">${esc(record.installazione_regione || "Seleziona regione")}</option></select></label>
@@ -1255,7 +1334,7 @@
       <label>Cabinet necessari<input name="cabinet_calculated" value="0" readonly><small id="cabinetAvailability" class="cabinet-availability"></small></label>
       <div id="measureValidation" class="measure-validation full"></div>
     </div></fieldset>`;
-    const identityFields = `<fieldset class="practice-section full"><legend>Identificazione</legend><div class="form-grid">${field("Identificativo pratica", "numero", number, { required: true, readonly: true })}${statusField}</div></fieldset>`;
+    const identityFields = `<fieldset class="practice-section full"><legend>Identificazione</legend><div class="form-grid">${field("Identificativo pratica", "numero", number, { required: true, readonly: true })}${statusField}${assigneeField}</div></fieldset>`;
     const tabPanel = (name, content, active) => `<section class="form-tab-panel full ${active ? "active" : ""}" data-form-panel="${name}">${content}</section>`;
     const practiceTabs = practiceType === "ACQUISTO"
       ? [["recipient", "Destinatario Ordine"], ["product", "Prodotto della pratica"], ["value", "Valore della Pratica"], ["address", "Indirizzo di Installazione"], ["technical", "Dettagli Tecnici"]]
@@ -1264,7 +1343,8 @@
     const tabContent = practiceType === "ACQUISTO"
       ? tabPanel("recipient", purchaseDestination + identityFields + personalData + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") }))
       : tabPanel("client", identityFields + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("finance", financeFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") })) + tabPanel("documents", uploads);
-    const fields = typeSummary + tabNavigation + tabContent +
+    const plannerImportNotice = isPlannerPracticePending(record) ? `<div class="planner-practice-notice full"><span>✦</span><div><strong>Pratica importata dal Quotation Planner</strong><p>Completa e verifica i dati mancanti prima di proseguire con l’iter commerciale.</p></div></div>` : "";
+    const fields = plannerImportNotice + typeSummary + tabNavigation + tabContent +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
       `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}"><input type="hidden" name="p391_unificato" value="${esc(record.p391_unificato || "NO")}"><input type="hidden" name="p391_cabinet_50100" value="${esc(record.p391_cabinet_50100 || "0")}"><input type="hidden" name="p391_cabinet_5050" value="${esc(record.p391_cabinet_5050 || "0")}">` +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "");
@@ -1280,12 +1360,26 @@
     if (!form) return;
     const refresh = () => {
       const destination = form.querySelector("[name='destinatario_ordine']:checked")?.value || "PER CLIENTE";
-      const address = form.querySelector("[name='indirizzo_installazione_tipo']:checked")?.value || form.elements.indirizzo_installazione_tipo?.value || "PRESSO ALTRO INDIRIZZO";
+      let address = form.querySelector("[name='indirizzo_installazione_tipo']:checked")?.value || form.elements.indirizzo_installazione_tipo?.value || "PRESSO ALTRO INDIRIZZO";
+      if (practiceType === "ACQUISTO" && destination === "PER ME" && address === "COME INDIRIZZO CLIENTE") {
+        const alternateAddress = form.querySelector("[name='indirizzo_installazione_tipo'][value='PRESSO ALTRO INDIRIZZO']");
+        if (alternateAddress) alternateAddress.checked = true;
+        address = "PRESSO ALTRO INDIRIZZO";
+      }
       const management = String(form.elements.gestione_ledwall?.value || "").toUpperCase();
       const selectedClient = state.data.clients.find((client) => String(client.id) === String(form.elements.clientId?.value || ""));
       const clientHasAddress = !!(selectedClient && selectedClient.regione && selectedClient.provincia && (selectedClient.comune || selectedClient.citta) && selectedClient.cap && selectedClient.indirizzo && selectedClient.civico);
       const needsClientAddress = address === "COME INDIRIZZO CLIENTE" && !clientHasAddress;
-      form.querySelectorAll("[data-visible-when-destination]").forEach((node) => node.classList.toggle("is-hidden", practiceType === "ACQUISTO" && node.dataset.visibleWhenDestination !== destination));
+      form.querySelectorAll("[data-visible-when-destination]").forEach((node) => {
+        const hidden = practiceType === "ACQUISTO" && node.dataset.visibleWhenDestination !== destination;
+        node.classList.toggle("is-hidden", hidden);
+        node.querySelectorAll("input,select,textarea").forEach((input) => {
+          if (hidden) {
+            if (input.dataset.wasRequired === undefined) input.dataset.wasRequired = input.required ? "1" : "0";
+            input.required = false;
+          } else if (input.dataset.wasRequired === "1") input.required = true;
+        });
+      });
       form.querySelectorAll("[data-visible-when-address]").forEach((node) => {
         const hidden = node.dataset.visibleWhenAddress !== address && !(node.classList.contains("installation-address-fields") && needsClientAddress);
         node.classList.toggle("is-hidden", hidden);
@@ -1296,6 +1390,12 @@
       });
       const addressNotice = form.querySelector("#missingClientAddressNotice");
       if (addressNotice) addressNotice.classList.toggle("is-hidden", !needsClientAddress);
+      const addressPreview = form.querySelector("#selectedClientAddressPreview");
+      if (addressPreview) {
+        const parts = selectedClient ? [selectedClient.indirizzo, selectedClient.civico, selectedClient.cap, selectedClient.localita || selectedClient.comune || selectedClient.citta, selectedClient.provincia, selectedClient.regione].filter((part) => String(part || "").trim()) : [];
+        addressPreview.innerHTML = clientHasAddress && address === "COME INDIRIZZO CLIENTE" ? `<span>📍</span><div><strong>Indirizzo importato dall’anagrafica</strong><p>${parts.map(esc).join(", ")}</p></div>` : "";
+        addressPreview.classList.toggle("is-hidden", !(clientHasAddress && address === "COME INDIRIZZO CLIENTE"));
+      }
       const syncQuestion = form.querySelector(".installation-sync-question");
       if (syncQuestion && practiceType === "ACQUISTO") syncQuestion.classList.toggle("is-hidden", !selectedClient || clientHasAddress || destination !== "PER CLIENTE");
       if (needsClientAddress) {
@@ -1310,16 +1410,33 @@
           else if (input.dataset.wasRequired === "1") input.required = true;
         });
       });
-      form.querySelectorAll("[data-visible-when-commission]").forEach((node) => node.classList.toggle("is-hidden", practiceType === "ACQUISTO" && destination === "PER ME"));
+      form.querySelectorAll("[data-visible-when-commission]").forEach((node) => {
+        const hidden = practiceType === "ACQUISTO" && destination === "PER ME";
+        node.classList.toggle("is-hidden", hidden);
+        node.querySelectorAll("input,select,textarea").forEach((input) => {
+          if (hidden) {
+            if (input.dataset.wasRequired === undefined) input.dataset.wasRequired = input.required ? "1" : "0";
+            input.required = false;
+            if (input.name === "valore_provvigione") input.value = "0";
+          } else if (input.dataset.wasRequired === "1") input.required = true;
+        });
+      });
       const clientSelect = form.elements.clientId;
       if (clientSelect && practiceType === "ACQUISTO") {
         const personal = destination === "PER ME";
         if (personal) { if (clientSelect.dataset.wasRequired === undefined) clientSelect.dataset.wasRequired = clientSelect.required ? "1" : "0"; clientSelect.required = false; }
         else if (clientSelect.dataset.wasRequired === "1") clientSelect.required = true;
       }
+      const selectedAssignee = (state.data.users || []).find((user) => String(user.username || "") === String(form.elements.agent_username?.value || "")) || api.getSession() || {};
+      if (!form.dataset.id && form.elements.agent_username) {
+        form.elements.numero.value = nextPracticeIdentifierPreview(selectedAssignee);
+        if (form.elements.intestatario_nome) form.elements.intestatario_nome.value = selectedAssignee.nome_visualizzato || selectedAssignee.displayName || selectedAssignee.username || "";
+        if (form.elements.intestatario_email) form.elements.intestatario_email.value = selectedAssignee.email || "";
+        if (form.elements.intestatario_telefono) form.elements.intestatario_telefono.value = selectedAssignee.telefono || selectedAssignee.phone || "";
+      }
     };
     form.addEventListener("change", (event) => {
-      if (["destinatario_ordine", "indirizzo_installazione_tipo", "gestione_ledwall", "clientId"].includes(event.target.name)) refresh();
+      if (["destinatario_ordine", "indirizzo_installazione_tipo", "gestione_ledwall", "clientId", "agent_username"].includes(event.target.name)) refresh();
     });
     refresh();
   }
@@ -1345,7 +1462,7 @@
         if (existing) input.value = existing;
         const missing = !!client && !existing;
         row.classList.toggle("is-hidden", !missing);
-        input.required = missing;
+        input.required = missing && String(row.dataset.clientFillRequired || "SI").toUpperCase() === "SI";
       });
       const alert = form.querySelector("#practiceClientCompletionAlert");
       if (alert) alert.classList.toggle("is-hidden", !client || !completionRows.some((row) => !row.classList.contains("is-hidden")));
@@ -1580,6 +1697,13 @@
 
   async function saveEntity(form) {
     const entity = form.dataset.entity;
+    const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
+    if (entity === "practices" && isCompletedPractice(current)) {
+      toast("La pratica è completata e può essere soltanto consultata nell’archivio.", "danger");
+      closeModal();
+      openCompletedPractice(current);
+      return;
+    }
     const missing = Array.from(form.querySelectorAll("[required]")).find((element) => !String(element.value || "").trim());
     if (missing) {
       toast("Compila tutti i campi obbligatori prima di proseguire.", "danger");
@@ -1663,7 +1787,6 @@
         return;
       }
     }
-    const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const record = { ...current, ...serializeForm(form) };
     record.expected_record_version = Number(form.dataset.recordVersion || 0);
     record.request_token = form.dataset.requestToken || newRequestToken();
@@ -1687,12 +1810,21 @@
       record.citta = record.comune || record.citta || "";
     }
     if (entity === "practices") {
+      const session = api.getSession() || {};
+      const selectedAssignee = (state.data.users || []).find((user) => String(user.username || "") === String(record.agent_username || "")) || (String(record.agent_username || "") === String(session.username || "") ? session : null) || session;
+      const selectedAssigneeName = selectedAssignee.nome_visualizzato || selectedAssignee.displayName || selectedAssignee.username || session.displayName || "";
       const client = state.data.clients.find((c) => c.id === record.clientId);
       const personalPurchase = record.tipo_pratica === "ACQUISTO" && record.destinatario_ordine === "PER ME";
-      record.cliente = personalPurchase ? (record.intestatario_nome || (api.getSession() || {}).displayName || "") : (client ? client.ragioneSociale : record.cliente);
-      if (personalPurchase) { record.clientId = ""; record.valore_provvigione = 0; }
-      record.agente = record.agente || ((api.getSession() || {}).displayName || "");
-      record.agent_username = record.agent_username || ((api.getSession() || {}).username || "");
+      record.cliente = personalPurchase ? (record.intestatario_nome || selectedAssigneeName) : (client ? client.ragioneSociale : record.cliente);
+      if (personalPurchase) {
+        record.clientId = "";
+        record.valore_provvigione = 0;
+        record.intestatario_nome = selectedAssigneeName;
+        record.intestatario_email = selectedAssignee.email || "";
+        record.intestatario_telefono = selectedAssignee.telefono || selectedAssignee.phone || "";
+      }
+      record.agent_username = current.agent_username || record.agent_username || session.username || "";
+      record.agente = current.agente || selectedAssigneeName;
       record.finanziaria = record.tipo_pratica === "NOLEGGIO" ? "Grenke" : record.tipo_pratica === "LEASING" ? "IFIS" : (record.finanziaria || "Da definire");
       if (!api.isAdmin() && !current.id) record.stato = "Inserita";
       record.aggiornatoIl = now;

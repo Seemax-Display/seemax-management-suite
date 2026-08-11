@@ -18,7 +18,7 @@ Ogni riga rappresenta un’opportunità o lavoro. Gli stati previsti sono:
 4. Bocciata, solo per noleggio e leasing
 5. Completata
 
-Le colonne `modelli_display`, `misure_display`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito l'impegno di magazzino. Per il P3.91 unificato sono disponibili anche `p391_unificato`, `p391_cabinet_50100` e `p391_cabinet_5050`; lo scarico continua a usare le righe JSON separate, quindi resta atomico e idempotente.
+Le colonne `modelli_display`, `misure_display`, `bifacciale`, `cabinet_da_sottrarre` e `righe_magazzino_json` descrivono in modo esplicito la configurazione e l'impegno di magazzino. Per il P3.91 unificato sono disponibili anche `p391_unificato`, `p391_cabinet_50100` e `p391_cabinet_5050`; lo scarico continua a usare le righe JSON separate, quindi resta atomico e idempotente.
 
 Le colonne `archiviata` e `archiviata_il` vengono valorizzate quando una pratica passa a `Bocciata`. `agent_username` determina il proprietario e impedisce agli agenti di leggere o modificare pratiche altrui; lo stato è modificabile esclusivamente dagli amministratori.
 
@@ -56,7 +56,7 @@ Archivio tecnico dei preventivi S.Q.P. Il backend aggiunge automaticamente event
 
 ### IMPOSTAZIONI
 
-Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni, versione della configurazione e `obiettivo_fatturato`. Le chiavi che iniziano con `req_acquisto_`, `req_noleggio_` o `req_leasing_` controllano l'obbligatorietà dei campi: usare esclusivamente `SI` o `NO`. Durante il collaudo, `beta_test_attiva` controlla l'avviso mostrato a ogni apertura e `beta_sblocca_trofei` rende temporaneamente disponibili tutti i riconoscimenti; entrambe possono essere riportate a `NO` al termine della fase Beta.
+Tabella chiave/valore per IVA, acconto, validità dei preventivi, numerazioni, versione della configurazione e `obiettivo_fatturato`. Le chiavi che iniziano con `req_acquisto_`, `req_noleggio_` o `req_leasing_` controllano l'obbligatorietà dei campi: usare esclusivamente `SI` o `NO`. Durante il collaudo, `beta_test_attiva` controlla l'avviso mostrato a ogni apertura e `beta_sblocca_trofei` rende temporaneamente disponibili tutti i riconoscimenti; entrambe possono essere riportate a `NO` al termine della fase Beta. Per le pratiche di acquisto **Per Me** il valore provvigionale viene sempre ignorato; il codice fiscale del cliente non è richiesto nelle pratiche di acquisto. Una pratica in stato `Completata` è bloccata dal backend e può essere corretta soltanto intervenendo direttamente sul Foglio Google.
 
 ## Relazioni principali
 
