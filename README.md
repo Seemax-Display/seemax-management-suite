@@ -22,7 +22,7 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - pratiche inseribili anche con giacenza insufficiente, evidenziate da un avviso disattivabile sulla singola riga del Foglio Google;
 - più Ledwall nella stessa pratica, con calcolo aggregato dei cabinet e indirizzo unico o alternativo per ogni installazione aggiuntiva;
 - scarico magazzino non bloccante: se la disponibilità non basta la pratica viene salvata, resta segnalata e l'impegno viene mantenuto in attesa senza creare giacenze negative;
-- deroga ADMIN `0000` per registrare temporaneamente dati non disponibili;
+- deroga ADMIN `0000` per registrare temporaneamente dati non disponibili, preservata come testo anche negli indirizzi importati nelle pratiche;
 - organizzazione delle pratiche in visione corrente oppure per Acquisto, Noleggio e Leasing, memorizzata localmente;
 - workflow pratiche semplificato: Inserita, Accettata, Sospesa, Bocciata e Completata;
 - notifiche interne con campanella ed email gratuita all'agente responsabile;
@@ -60,7 +60,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.12.0 segui [docs/AGGIORNAMENTO_V2.12.0.md](docs/AGGIORNAMENTO_V2.12.0.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
+Per aggiornare un'installazione già operativa alla versione 2.12.1 segui [docs/AGGIORNAMENTO_V2.12.1.md](docs/AGGIORNAMENTO_V2.12.1.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
 
 ## Placeholder
 

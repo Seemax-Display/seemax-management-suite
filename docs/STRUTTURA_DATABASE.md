@@ -10,6 +10,8 @@ La privacy è regolata da `condiviso`, `creato_da_username`, `creato_da_nome` e 
 
 Dalla versione 2.11 un amministratore può creare un cliente per conto di un agente attivo. In quel caso `creato_da_username`, `creato_da_nome` e `agent_username` vengono assegnati dal backend all’utente selezionato; una richiesta equivalente inviata da un agente viene ignorata, evitando appropriazioni o spostamenti non autorizzati. `creatoIl` conserva l’istante di creazione e viene usato per l’ordinamento cronologico iniziale degli account ADMIN.
 
+Dalla versione 2.12.1 le colonne testuali che ammettono la deroga amministrativa `0000`, comprese Regione, Provincia, Comune, CAP, località, indirizzo e civico, vengono forzate nel formato testo. L’upgrade converte inoltre gli eventuali zeri numerici creati in precedenza da Google Fogli nel valore letterale `0000`. Durante l’importazione in una pratica questi valori sono considerati dati provvisori presenti e non campi vuoti.
+
 ### PRATICHE
 
 Ogni riga rappresenta un’opportunità o lavoro. Gli stati previsti sono:

@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.12.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.12.1";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -41,6 +41,13 @@ var SHEET_SCHEMAS = {
   LOG: ["data", "username", "ruolo", "azione", "entita", "record_id", "dettaglio"]
 };
 
+/* Queste colonne possono contenere il placeholder amministrativo 0000.
+   Il formato testo impedisce a Google Fogli di convertirlo nel numero 0. */
+var ADMIN_UNKNOWN_TEXT_COLUMNS = {
+  CLIENTI: ["ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "email", "iban", "telefono", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta"],
+  PRATICHE: ["installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "cloud_username", "cloud_password"]
+};
+
 function setupSeemaxDatabase() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error("Apri questo script dal Foglio Google da utilizzare come database.");
@@ -60,6 +67,7 @@ function setupSeemaxDatabase() {
   managementDocumentsFolder_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
+  normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   return "DATABASE SEEMAX configurato correttamente.";
 }
@@ -143,6 +151,18 @@ function upgradeSeemaxV2120() {
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.12.0 · Pratiche multi-Ledwall e gestione non bloccante delle giacenze insufficienti.");
   styleSheets_();
   return "SEEMAX v2.12.0 configurato: pratiche multi-Ledwall e impegni magazzino in attesa attivi.";
+}
+
+function upgradeSeemaxV2121() {
+  var ss = db_();
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  seedSettings_();
+  backfillExistingIds_();
+  normalizeAdminUnknownPlaceholdersV2121_();
+  updatePatchNotesV2121_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.12.1 · Placeholder ADMIN 0000 preservati negli indirizzi e durante l'inserimento delle pratiche.");
+  styleSheets_();
+  return "SEEMAX v2.12.1 configurato: placeholder 0000 normalizzati e indirizzi con dati sconosciuti compatibili con le pratiche.";
 }
 
 function doGet(e) {
@@ -491,6 +511,24 @@ function isAdminUnknownValue_(value) {
   return typeof value === "string" && String(value).trim() === "0000";
 }
 
+function isLegacySheetUnknownValue_(value) {
+  return value === 0 || (typeof value === "string" && String(value).trim() === "0");
+}
+
+function normalizeAdminUnknownTextValue_(value) {
+  return isAdminUnknownValue_(value) || isLegacySheetUnknownValue_(value) ? "0000" : value;
+}
+
+function hasStoredTextValue_(value) {
+  return value !== null && value !== undefined && String(value).trim() !== "";
+}
+
+function clientStoredTextValue_(client, key) {
+  var value = client && client[key];
+  if (!hasStoredTextValue_(value) && key === "comune") value = client && client.citta;
+  return normalizeAdminUnknownTextValue_(value);
+}
+
 function assertAdminUnknownUsage_(payload, user) {
   var containsPlaceholder = (function containsUnknown(value, depth) {
     if (depth > 8) return false;
@@ -573,14 +611,14 @@ function completeClientFromPractice_(practice, user) {
   var practiceType = String(practice.tipo_pratica || "").toUpperCase();
   var requiredClientFields = practiceType === "ACQUISTO" ? ["piva", "email"] : ["codice_fiscale", "piva", "email", "iban"];
   requiredClientFields.forEach(function (key) {
-    if (!String(client[key] || "").trim() && !String(updates[key] || "").trim()) throw new Error("Completa il dato cliente mancante: " + key.replace(/_/g, " ") + ".");
+    if (!hasStoredTextValue_(clientStoredTextValue_(client, key)) && !hasStoredTextValue_(updates[key])) throw new Error("Completa il dato cliente mancante: " + key.replace(/_/g, " ") + ".");
   });
   if (String(updates.email || "").trim() && !isAdminUnknownValue_(updates.email) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(updates.email).trim())) throw new Error("Indirizzo e-mail del cliente non valido.");
   if (String(updates.piva || "").trim() && !isAdminUnknownValue_(updates.piva) && !validItalianVat_(String(updates.piva).replace(/\D/g, ""))) throw new Error("Partita IVA del cliente formalmente non valida.");
   if (String(updates.iban || "").trim() && !isAdminUnknownValue_(updates.iban) && !validIban_(String(updates.iban).replace(/\s+/g, "").toUpperCase())) throw new Error("IBAN del cliente formalmente non valido.");
   var changed = false;
   Object.keys(updates).forEach(function (key) {
-    if (!String(client[key] || "").trim() && String(updates[key] || "").trim()) {
+    if (!hasStoredTextValue_(clientStoredTextValue_(client, key)) && hasStoredTextValue_(updates[key])) {
       client[key] = String(updates[key]).trim();
       if (key === "piva" && isAdminUnknownValue_(updates[key])) client.piva_formalmente_valida = "DEROGA ADMIN";
       if (key === "iban" && isAdminUnknownValue_(updates[key])) client.iban_valido = "DEROGA ADMIN";
@@ -590,24 +628,30 @@ function completeClientFromPractice_(practice, user) {
   });
   var installationUsesClient = String(practice.indirizzo_installazione_tipo || "").toUpperCase() === "COME INDIRIZZO CLIENTE";
   var requiredAddressKeys = ["regione", "provincia", "comune", "cap", "indirizzo", "civico"];
-  var clientAddressComplete = requiredAddressKeys.every(function (key) { return !!String(client[key] || (key === "comune" ? client.citta : "") || "").trim(); });
+  var allAddressKeys = ["regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico"];
+  allAddressKeys.forEach(function (key) {
+    var practiceKey = "installazione_" + key;
+    if (isLegacySheetUnknownValue_(practice[practiceKey])) practice[practiceKey] = "0000";
+  });
+  var clientAddressComplete = requiredAddressKeys.every(function (key) { return hasStoredTextValue_(clientStoredTextValue_(client, key)); });
   /* Importa ogni dato disponibile singolarmente. Prima veniva eseguita la
      copia soltanto se l'intera anagrafica era completa: bastava un civico
      mancante perché anche regione/provincia già presenti risultassero vuote. */
   if (installationUsesClient) {
-    ["regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico"].forEach(function (key) {
-      if (!String(practice["installazione_" + key] || "").trim()) practice["installazione_" + key] = client[key] || (key === "comune" ? client.citta : "") || "";
+    allAddressKeys.forEach(function (key) {
+      var practiceKey = "installazione_" + key;
+      if (!hasStoredTextValue_(practice[practiceKey])) practice[practiceKey] = clientStoredTextValue_(client, key) || "";
     });
   }
   var syncAddress = String(practice.sync_installation_to_client || "NO").toUpperCase() === "SI" || (installationUsesClient && !clientAddressComplete);
   if (installationUsesClient && !clientAddressComplete) {
-    var missingAddressKeys = requiredAddressKeys.filter(function (key) { return !String(practice["installazione_" + key] || "").trim(); });
+    var missingAddressKeys = requiredAddressKeys.filter(function (key) { return !hasStoredTextValue_(normalizeAdminUnknownTextValue_(practice["installazione_" + key])); });
     if (missingAddressKeys.length) throw new Error("Indirizzo cliente assente: completa " + missingAddressKeys.join(", ") + " dell’installazione.");
   }
   if (syncAddress && !clientAddressComplete) {
-    ["regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico"].forEach(function (key) {
-      var value = practice["installazione_" + key];
-      if (!String(client[key] || "").trim() && String(value || "").trim()) { client[key] = value; changed = true; }
+    allAddressKeys.forEach(function (key) {
+      var value = normalizeAdminUnknownTextValue_(practice["installazione_" + key]);
+      if (!hasStoredTextValue_(clientStoredTextValue_(client, key)) && hasStoredTextValue_(value)) { client[key] = value; changed = true; }
     });
     client.citta = client.comune || client.citta || "";
   }
@@ -682,6 +726,36 @@ function normalizePracticeLedwallConfigurations_(practice) {
   practice.p391_unificato = p391Rectangular || p391Square ? "SI" : "NO";
   practice.p391_cabinet_50100 = p391Rectangular;
   practice.p391_cabinet_5050 = p391Square;
+}
+
+function normalizeAdminUnknownPlaceholdersV2121_() {
+  Object.keys(ADMIN_UNKNOWN_TEXT_COLUMNS).forEach(function (sheetName) {
+    rowsToObjects_(sheet_(sheetName)).forEach(function (record) {
+      var changed = false;
+      ADMIN_UNKNOWN_TEXT_COLUMNS[sheetName].forEach(function (field) {
+        if (!isLegacySheetUnknownValue_(record[field])) return;
+        record[field] = "0000";
+        changed = true;
+      });
+      if (sheetName === "CLIENTI") {
+        if (record.piva === "0000" && record.piva_formalmente_valida !== "DEROGA ADMIN") { record.piva_formalmente_valida = "DEROGA ADMIN"; changed = true; }
+        if (record.iban === "0000" && record.iban_valido !== "DEROGA ADMIN") { record.iban_valido = "DEROGA ADMIN"; changed = true; }
+        if (record.telefono === "0000" && record.telefono_valido !== "DEROGA ADMIN") { record.telefono_valido = "DEROGA ADMIN"; changed = true; }
+      }
+      if (sheetName === "PRATICHE") {
+        var configurations = parseJson_(record.ledwall_configurazioni_json, []);
+        if (Array.isArray(configurations) && configurations.length) {
+          configurations.forEach(function (configuration) {
+            ["installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico"].forEach(function (field) {
+              if (isLegacySheetUnknownValue_(configuration[field])) { configuration[field] = "0000"; changed = true; }
+            });
+          });
+          if (changed) record.ledwall_configurazioni_json = JSON.stringify(configurations);
+        }
+      }
+      if (changed && record.id) upsertObject_(sheetName, "id", record.id, record);
+    });
+  });
 }
 
 function migrateClientFiscalV17_() {
@@ -1790,8 +1864,18 @@ function ensureSheet_(ss, name, schema) {
   if (headers.length) {
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, headers.length).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold").setWrap(true);
+    enforceAdminUnknownTextColumns_(sheet, name, headers);
   }
   return sheet;
+}
+
+function enforceAdminUnknownTextColumns_(sheet, name, headers) {
+  var fields = ADMIN_UNKNOWN_TEXT_COLUMNS[name] || [];
+  var rowCount = Math.max(1, sheet.getMaxRows() - 1);
+  fields.forEach(function (field) {
+    var index = headers.indexOf(field);
+    if (index >= 0) sheet.getRange(2, index + 1, rowCount, 1).setNumberFormat("@");
+  });
 }
 
 function tableData_(sheet) {
@@ -2116,9 +2200,9 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.12"], ["title", "Una pratica, più Ledwall"],
-    ["intro", "Ogni pratica può comprendere più Ledwall, anche installati presso indirizzi differenti."],
-    ["footer", "Una giacenza insufficiente viene segnalata senza bloccare il salvataggio: lo scarico resta in attesa e il magazzino non scende mai sotto zero."]
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.12.1"], ["title", "Dati sconosciuti, pratiche sempre operative"],
+    ["intro", "Il placeholder amministrativo 0000 resta riconoscibile anche negli indirizzi memorizzati su Google Fogli."],
+    ["footer", "I clienti con informazioni parziali possono essere importati nelle pratiche senza che il valore 0000 venga confuso con un campo vuoto."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
 }
@@ -2169,6 +2253,19 @@ function updatePatchNotesV2120_() {
     title: "Una pratica, più Ledwall",
     intro: "Ogni pratica può comprendere più Ledwall, anche installati presso indirizzi differenti.",
     footer: "Una giacenza insufficiente viene segnalata senza bloccare il salvataggio: lo scarico resta in attesa e il magazzino non scende mai sotto zero."
+  };
+  Object.keys(notes).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
+  });
+}
+
+function updatePatchNotesV2121_() {
+  var notes = {
+    version: SEEMAX_VERSION,
+    label: "SEEMAX MANAGEMENT SUITE 2.12.1",
+    title: "Dati sconosciuti, pratiche sempre operative",
+    intro: "Il placeholder amministrativo 0000 resta riconoscibile anche negli indirizzi memorizzati su Google Fogli.",
+    footer: "I clienti con informazioni parziali possono essere importati nelle pratiche senza che il valore 0000 venga confuso con un campo vuoto."
   };
   Object.keys(notes).forEach(function (key) {
     upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });

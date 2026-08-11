@@ -943,6 +943,14 @@
     return api.isAdmin() && String(value == null ? "" : value).trim() === "0000";
   }
 
+  function storedUnknownText(value) {
+    return value === 0 || (typeof value === "string" && value.trim() === "0") ? "0000" : (value == null ? "" : value);
+  }
+
+  function hasStoredText(value) {
+    return String(storedUnknownText(value)).trim() !== "";
+  }
+
   function isPlannerPracticePending(practice) {
     const origin = String(practice && practice.origine || "").toUpperCase();
     return !isCompletedPractice(practice) && (origin.includes("QUOTATION PLANNER") || origin.includes("S.Q.P"));
@@ -1434,10 +1442,10 @@
     </div></fieldset></div>`;
     const customerData = `<div class="conditional-section full" data-visible-when-destination="PER CLIENTE"><fieldset class="practice-section"><legend>Dati del cliente</legend><div class="form-grid">${clientField}</div></fieldset></div>`;
     const clientCompletionFields = `<div class="client-practice-completion conditional-section full" data-visible-when-destination="PER CLIENTE"><div class="client-completion-alert" id="practiceClientCompletionAlert">Se l’anagrafica selezionata è incompleta, compila qui i dati mancanti: saranno registrati automaticamente nel cliente.</div><div class="form-grid">
-      <label data-client-fill-field="codice_fiscale" data-client-fill-required="${practiceType === "ACQUISTO" ? "NO" : "SI"}">Codice fiscale ${requiredMark(practiceType !== "ACQUISTO")}<input name="client_update_codice_fiscale" maxlength="16" value="${esc(selectedClient && selectedClient.codice_fiscale || "")}">${practiceType === "ACQUISTO" ? `<small>Facoltativo per le pratiche di acquisto.</small>` : ""}</label>
-      <label data-client-fill-field="piva" data-client-fill-required="SI">Partita IVA ${requiredMark(true)}<input name="client_update_piva" inputmode="numeric" maxlength="11" value="${esc(selectedClient && selectedClient.piva || "")}"></label>
-      <label data-client-fill-field="email" data-client-fill-required="SI">E-mail ${requiredMark(true)}<input name="client_update_email" type="email" value="${esc(selectedClient && selectedClient.email || "")}"></label>
-      ${practiceType === "ACQUISTO" ? "" : `<label data-client-fill-field="iban" data-client-fill-required="SI">IBAN ${requiredMark(true)}<input name="client_update_iban" value="${esc(selectedClient && selectedClient.iban || "")}"></label>`}
+      <label data-client-fill-field="codice_fiscale" data-client-fill-required="${practiceType === "ACQUISTO" ? "NO" : "SI"}">Codice fiscale ${requiredMark(practiceType !== "ACQUISTO")}<input name="client_update_codice_fiscale" maxlength="16" value="${esc(storedUnknownText(selectedClient && selectedClient.codice_fiscale))}">${practiceType === "ACQUISTO" ? `<small>Facoltativo per le pratiche di acquisto.</small>` : ""}</label>
+      <label data-client-fill-field="piva" data-client-fill-required="SI">Partita IVA ${requiredMark(true)}<input name="client_update_piva" inputmode="numeric" maxlength="11" value="${esc(storedUnknownText(selectedClient && selectedClient.piva))}"></label>
+      <label data-client-fill-field="email" data-client-fill-required="SI">E-mail ${requiredMark(true)}<input name="client_update_email" type="email" value="${esc(storedUnknownText(selectedClient && selectedClient.email))}"></label>
+      ${practiceType === "ACQUISTO" ? "" : `<label data-client-fill-field="iban" data-client-fill-required="SI">IBAN ${requiredMark(true)}<input name="client_update_iban" value="${esc(storedUnknownText(selectedClient && selectedClient.iban))}"></label>`}
     </div></div>`;
     const valueFields = `<fieldset class="practice-section full"><legend>Valori pratica</legend><div class="form-grid">
       ${field("Valore pratica (IVA esclusa)", "valore", record.valore || 0, { type: "number", min: 0, step: "0.01", required: req("valore") })}
@@ -1529,7 +1537,7 @@
       }
       const management = String(form.elements.gestione_ledwall?.value || "").toUpperCase();
       const selectedClient = state.data.clients.find((client) => String(client.id) === String(form.elements.clientId?.value || ""));
-      const clientHasAddress = !!(selectedClient && selectedClient.regione && selectedClient.provincia && (selectedClient.comune || selectedClient.citta) && selectedClient.cap && selectedClient.indirizzo && selectedClient.civico);
+      const clientHasAddress = !!(selectedClient && [selectedClient.regione, selectedClient.provincia, hasStoredText(selectedClient.comune) ? selectedClient.comune : selectedClient.citta, selectedClient.cap, selectedClient.indirizzo, selectedClient.civico].every(hasStoredText));
       const needsClientAddress = address === "COME INDIRIZZO CLIENTE" && !clientHasAddress;
       form.querySelectorAll("[data-visible-when-destination]").forEach((node) => {
         const hidden = practiceType === "ACQUISTO" && node.dataset.visibleWhenDestination !== destination;
@@ -1553,7 +1561,7 @@
       if (addressNotice) addressNotice.classList.toggle("is-hidden", !needsClientAddress);
       const addressPreview = form.querySelector("#selectedClientAddressPreview");
       if (addressPreview) {
-        const parts = selectedClient ? [selectedClient.indirizzo, selectedClient.civico, selectedClient.cap, selectedClient.localita || selectedClient.comune || selectedClient.citta, selectedClient.provincia, selectedClient.regione].filter((part) => String(part || "").trim()) : [];
+        const parts = selectedClient ? [selectedClient.indirizzo, selectedClient.civico, selectedClient.cap, hasStoredText(selectedClient.localita) ? selectedClient.localita : (hasStoredText(selectedClient.comune) ? selectedClient.comune : selectedClient.citta), selectedClient.provincia, selectedClient.regione].map(storedUnknownText).filter(hasStoredText) : [];
         addressPreview.innerHTML = clientHasAddress && address === "COME INDIRIZZO CLIENTE" ? `<span>📍</span><div><strong>Indirizzo importato dall’anagrafica</strong><p>${parts.map(esc).join(", ")}</p></div>` : "";
         addressPreview.classList.toggle("is-hidden", !(clientHasAddress && address === "COME INDIRIZZO CLIENTE"));
       }
@@ -1619,10 +1627,11 @@
       completionRows.forEach((row) => {
         const key = row.dataset.clientFillField;
         const input = row.querySelector("input");
-        const existing = client ? String(client[key] || "").trim() : "";
+        const existing = client ? String(storedUnknownText(client[key])).trim() : "";
         if (existing) input.value = existing;
         const missing = !!client && !existing;
         row.classList.toggle("is-hidden", !missing);
+        input.disabled = !missing;
         input.required = missing && String(row.dataset.clientFillRequired || "SI").toUpperCase() === "SI";
       });
       const alert = form.querySelector("#practiceClientCompletionAlert");

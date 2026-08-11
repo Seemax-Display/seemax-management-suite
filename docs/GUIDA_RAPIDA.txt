@@ -1,4 +1,9 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.12.0
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.12.1
+
+CORREZIONE VERSIONE 2.12.1
+- PLACEHOLDER 0000: Google Fogli non può più trasformarlo in uno zero numerico nelle colonne anagrafiche e negli indirizzi.
+- CLIENTI INCOMPLETI: un indirizzo composto da valori 0000 viene riconosciuto come indirizzo amministrativo provvisorio e può essere importato nella pratica.
+- MIGRAZIONE: upgradeSeemaxV2121 converte automaticamente in 0000 gli zeri già presenti nelle colonne interessate.
 
 NOVITÀ VERSIONE 2.12
 - MULTI-LEDWALL: nella tab Prodotto della pratica usare “Aggiungi un altro Ledwall” per inserire più schermi nella stessa pratica.

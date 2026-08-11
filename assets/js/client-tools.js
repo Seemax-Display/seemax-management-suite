@@ -8,6 +8,7 @@
   const esc = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
   const digits = (value) => String(value || "").replace(/\D/g, "");
   const flag = (code) => String(code || "").toUpperCase().replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
+  const storedText = (value) => value === 0 || (typeof value === "string" && value.trim() === "0") ? "0000" : (value == null ? "" : value);
 
   function loadLocations() {
     if (!locationsPromise) {
@@ -81,14 +82,14 @@
       </nav>
       <section class="form-tab-panel full active" data-form-panel="identification">
         <div class="form-grid">
-          <label class="full">Ragione sociale <em class="required-mark">Obbligatorio</em><input name="ragioneSociale" value="${esc(record.ragioneSociale || "")}" required></label>
-          <label>Codice fiscale<input name="codice_fiscale" maxlength="16" value="${esc(record.codice_fiscale || "")}" placeholder="Codice fiscale"></label>
+          <label class="full">Ragione sociale <em class="required-mark">Obbligatorio</em><input name="ragioneSociale" value="${esc(storedText(record.ragioneSociale))}" required></label>
+          <label>Codice fiscale<input name="codice_fiscale" maxlength="16" value="${esc(storedText(record.codice_fiscale))}" placeholder="Codice fiscale"></label>
           <label>Partita IVA italiana
-            <input name="piva" inputmode="numeric" maxlength="11" value="${esc(record.piva || "")}" placeholder="11 cifre">
+            <input name="piva" inputmode="numeric" maxlength="11" value="${esc(storedText(record.piva))}" placeholder="11 cifre">
             <small id="vatLocalStatus" class="field-validation neutral">Inserisci 11 cifre.</small>
           </label>
-          <label>Codice SDI <em class="required-mark" id="sdiRequiredMark">Obbligatorio</em><small id="sdiRequirementHelp">Obbligatorio se manca la PEC</small><input name="sdi" maxlength="7" value="${esc(record.sdi || "")}" placeholder="7 caratteri"></label>
-          <label>PEC <em class="required-mark" id="pecRequiredMark">Obbligatorio</em><small id="pecRequirementHelp">Obbligatoria se manca il codice SDI</small><input name="pec" type="email" value="${esc(record.pec || "")}" placeholder="azienda@pec.it"></label>
+          <label>Codice SDI <em class="required-mark" id="sdiRequiredMark">Obbligatorio</em><small id="sdiRequirementHelp">Obbligatorio se manca la PEC</small><input name="sdi" maxlength="7" value="${esc(storedText(record.sdi))}" placeholder="7 caratteri"></label>
+          <label>PEC <em class="required-mark" id="pecRequiredMark">Obbligatorio</em><small id="pecRequirementHelp">Obbligatoria se manca il codice SDI</small><input name="pec" type="email" value="${esc(storedText(record.pec))}" placeholder="azienda@pec.it"></label>
           <label>Stato VIES
             <input name="piva_vies_nome" value="${esc(record.piva_vies_nome || "")}" readonly placeholder="Non verificato">
             <small id="vatViesStatus" class="field-validation neutral">${esc(record.piva_vies_esito || "Verifica facoltativa per operazioni UE.")}</small>
@@ -116,17 +117,17 @@
             <select name="telefono_paese">${countryOptions(phoneCountry)}</select>
           </label>
           <label>Numero di cellulare <em class="required-mark">Obbligatorio</em>
-            <input name="telefono_numero" type="tel" value="${esc(record.telefono_numero || record.telefono || "")}" placeholder="Numero di cellulare" required>
+            <input name="telefono_numero" type="tel" value="${esc(storedText(record.telefono_numero != null && record.telefono_numero !== "" ? record.telefono_numero : record.telefono))}" placeholder="Numero di cellulare" required>
             <small id="phoneStatus" class="field-validation neutral">Il numero verrà salvato in formato internazionale.</small>
           </label>
-          <label class="full">E-mail<input name="email" type="email" value="${esc(record.email || "")}" placeholder="cliente@azienda.it"></label>
-          <input type="hidden" name="telefono" value="${esc(record.telefono || "")}">
+          <label class="full">E-mail<input name="email" type="email" value="${esc(storedText(record.email))}" placeholder="cliente@azienda.it"></label>
+          <input type="hidden" name="telefono" value="${esc(storedText(record.telefono))}">
           <input type="hidden" name="telefono_prefisso" value="${esc(record.telefono_prefisso || "+39")}">
           <input type="hidden" name="telefono_valido" value="${esc(record.telefono_valido || "NO")}">
         </div>
       </section>
       <section class="form-tab-panel full" data-form-panel="banking">
-        <div class="form-grid"><label class="full">IBAN<input name="iban" autocomplete="off" value="${esc(record.iban || "")}" placeholder="IT00 X000 0000 0000 0000 0000 000"><small id="ibanStatus" class="field-validation neutral">Controllo matematico MOD-97.</small></label><input type="hidden" name="iban_valido" value="${esc(record.iban_valido || "NO")}"></div>
+        <div class="form-grid"><label class="full">IBAN<input name="iban" autocomplete="off" value="${esc(storedText(record.iban))}" placeholder="IT00 X000 0000 0000 0000 0000 000"><small id="ibanStatus" class="field-validation neutral">Controllo matematico MOD-97.</small></label><input type="hidden" name="iban_valido" value="${esc(record.iban_valido || "NO")}"></div>
       </section>
       <section class="form-tab-panel full" data-form-panel="location">
         <div class="form-grid">
@@ -134,10 +135,10 @@
           <label>Provincia<select name="provincia" disabled><option value="">Seleziona prima la regione</option></select></label>
           <label>Comune / Città<select name="comune" disabled><option value="">Seleziona prima la provincia</option></select></label>
           <label>CAP<select name="cap" disabled><option value="">Seleziona prima il comune</option></select></label>
-          <label>Località / frazione<input name="localita" value="${esc(record.localita || "")}" placeholder="Facoltativa"></label>
-          <label>Indirizzo<input name="indirizzo" value="${esc(record.indirizzo || "")}" placeholder="Via, viale, piazza…"></label>
-          <label>Numero civico<input name="civico" value="${esc(record.civico || "")}"></label>
-          <input type="hidden" name="citta" value="${esc(record.comune || record.citta || "")}">
+          <label>Località / frazione<input name="localita" value="${esc(storedText(record.localita))}" placeholder="Facoltativa"></label>
+          <label>Indirizzo<input name="indirizzo" value="${esc(storedText(record.indirizzo))}" placeholder="Via, viale, piazza…"></label>
+          <label>Numero civico<input name="civico" value="${esc(storedText(record.civico))}"></label>
+          <input type="hidden" name="citta" value="${esc(storedText(record.comune != null && record.comune !== "" ? record.comune : record.citta))}">
         </div>
       </section>
       <section class="form-tab-panel full" data-form-panel="other">
@@ -152,7 +153,7 @@
 
   function bind(form, record, clients, api, notify, readOnly) {
     form.noValidate = true;
-    const adminUnknown = (value) => !!api.isAdmin && api.isAdmin() && String(value || "").trim() === "0000";
+    const adminUnknown = (value) => !!api.isAdmin && api.isAdmin() && String(value == null ? "" : value).trim() === "0000";
     const vat = form.elements.piva;
     const iban = form.elements.iban;
     const phoneCountry = form.elements.telefono_paese;
@@ -349,12 +350,13 @@
       select.innerHTML = `<option value="">${placeholder}</option>${available.map((value) => `<option value="${esc(value)}" ${String(value) === String(selected || "") ? "selected" : ""}>${String(value) === "0000" ? "0000 · Dato non disponibile" : esc(value)}</option>`).join("")}`;
       select.disabled = !values.length;
     };
-    const currentComune = record[prefix + "comune"] || (!prefix ? record.citta : "") || "";
-    const inferredRow = rows.find((row) => row.n === currentComune && (!record[prefix + "regione"] || row.r === record[prefix + "regione"]));
-    const currentRegion = record[prefix + "regione"] || (inferredRow && inferredRow.r) || "";
-    const rawProvince = record[prefix + "provincia"] || "";
+    const currentComune = storedText(record[prefix + "comune"] != null && record[prefix + "comune"] !== "" ? record[prefix + "comune"] : (!prefix ? record.citta : ""));
+    const recordRegion = storedText(record[prefix + "regione"]);
+    const inferredRow = rows.find((row) => row.n === currentComune && (!recordRegion || row.r === recordRegion));
+    const currentRegion = recordRegion || (inferredRow && inferredRow.r) || "";
+    const rawProvince = storedText(record[prefix + "provincia"]);
     const currentProvince = /\([A-Z]{2}\)$/.test(String(rawProvince)) ? rawProvince : inferredRow ? `${inferredRow.p} (${inferredRow.s})` : rawProvince;
-    const currentCap = record[prefix + "cap"] || "";
+    const currentCap = storedText(record[prefix + "cap"]);
 
     function updateProvinces(selected) {
       if (region.value === "0000") { setOptions(province, [], "Seleziona provincia", "0000"); province.disabled = false; province.value = "0000"; return; }
