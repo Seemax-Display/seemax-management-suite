@@ -365,6 +365,41 @@
     return results;
   }
 
+  async function adjustInventory(values) {
+    if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
+    if (isFastMode()) throw new Error("Il magazzino condiviso richiede la Modalità Standard per evitare conflitti tra utenti.");
+    const payload = { ...(values || {}), request_token: (values && values.request_token) || uid("stock-req") };
+    if (config.demoMode) {
+      const previousMovement = demo.list("movements").find((row) => String(row.request_token || "") === String(payload.request_token));
+      if (previousMovement) {
+        return {
+          product: demo.list("products").find((row) => String(row.id) === String(previousMovement.product_id)) || {},
+          movement: previousMovement,
+          duplicate: true
+        };
+      }
+      const product = demo.list("products").find((row) => String(row.id) === String(payload.product_id));
+      if (!product) throw new Error("Prodotto magazzino non trovato.");
+      const operation = String(payload.operazione || "").toUpperCase();
+      const quantity = Number(payload.quantita || 0);
+      const before = Number(product.giacenza_attuale || 0);
+      const after = before + (operation === "CARICO" ? quantity : -quantity);
+      if (!["CARICO", "SCARICO"].includes(operation) || !Number.isInteger(quantity) || quantity <= 0) throw new Error("Movimento non valido.");
+      if (after < 0) throw new Error(`Lo scarico supera la giacenza disponibile: ${before} cabinet.`);
+      const savedProduct = demo.upsert("products", { ...product, giacenza_attuale: after, aggiornatoIl: new Date().toISOString() });
+      const movement = demo.upsert("movements", {
+        id: uid("mov"), data: new Date().toISOString(), product_id: product.id, sku: product.sku || product.id,
+        prodotto: `${product.nome || product.id} ${product.cabX || ""}x${product.cabY || ""}`,
+        quantita: operation === "CARICO" ? quantity : -quantity, tipo_movimento: `${operation}_MANUALE`,
+        giacenza_prima: before, giacenza_dopo: after, username: (session || {}).username || "demo", note: payload.descrizione || "",
+        request_token: payload.request_token
+      });
+      return { product: savedProduct, movement };
+    }
+    const response = await jsonp("management_inventory_adjust", { ...authParams(), payload: JSON.stringify(payload) }, 60000);
+    return { product: response.product, movement: response.movement, duplicate: response.duplicate === true };
+  }
+
   async function markNotificationsRead() {
     if (config.demoMode) return [];
     const response = await jsonp("management_mark_notifications_read", authParams());
@@ -391,5 +426,5 @@
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length, serverVersion };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

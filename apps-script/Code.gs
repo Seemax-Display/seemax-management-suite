@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.9.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.10.0";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -29,14 +29,14 @@ var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
+  PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
   ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
-  MOVIMENTI_MAGAZZINO: ["id", "data", "practiceId", "numero_pratica", "cliente", "product_id", "sku", "prodotto", "quantita", "tipo_movimento", "giacenza_prima", "giacenza_dopo", "username", "note"],
+  MOVIMENTI_MAGAZZINO: ["id", "data", "practiceId", "numero_pratica", "cliente", "product_id", "sku", "prodotto", "quantita", "tipo_movimento", "giacenza_prima", "giacenza_dopo", "username", "note", "request_token"],
   NOTIFICHE: ["id", "data", "recipient_username", "recipient_name", "practiceId", "numero_pratica", "stato_precedente", "nuovo_stato", "titolo", "messaggio", "letta", "letta_il", "actor_username"],
   LOG: ["data", "username", "ruolo", "azione", "entita", "record_id", "dettaglio"]
 };
@@ -52,6 +52,7 @@ function setupSeemaxDatabase() {
   seedProducts_();
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
+  backfillPracticeStockWarningsV2100_();
   migratePracticeStatusesV13_();
   migrateClientFiscalV17_();
   migrateClientSharingV18_();
@@ -108,13 +109,18 @@ function upgradeSeemaxV283() {
 }
 
 function upgradeSeemaxV290() {
+  return upgradeSeemaxV2100();
+}
+
+function upgradeSeemaxV2100() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
-  updatePatchNotesV290_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.9.0 · Archivio pratiche concluse, import Planner evidenziato e assegnazione agente ADMIN.");
+  backfillPracticeStockWarningsV2100_();
+  updatePatchNotesV2100_();
+  setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.10.0 · Deroga ADMIN 0000, avvisi giacenza, movimenti manuali e organizzazione pratiche.");
   styleSheets_();
-  return "SEEMAX v2.9.0 configurato: archivio pratiche concluse, import Planner evidenziato e assegnazione agente attivi.";
+  return "SEEMAX v2.10.0 configurato: deroga ADMIN, avvisi giacenza e carico/scarico magazzino attivi.";
 }
 
 function doGet(e) {
@@ -164,6 +170,7 @@ function routeGet_(action, p) {
     case "management_upload_status": return managementUploadStatus_(p);
     case "management_update_practice_documents": return managementUpdatePracticeDocuments_(p);
     case "management_verify_vat": return managementVerifyVat_(p);
+    case "management_inventory_adjust": return managementInventoryAdjust_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -216,7 +223,8 @@ function managementBootstrap_(p) {
   var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(user)];
   var settings = getSettings_();
   var notifications = listNotificationsForUser_(user);
-  var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, settings: settings, notifications: notifications };
+  var movements = isAdmin_(user) ? rowsToObjects_(sheet_("MOVIMENTI_MAGAZZINO")).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 100) : [];
+  var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, movements: movements, settings: settings, notifications: notifications };
   data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
   return { ok: true, data: data, user: publicUser_(user), version: SEEMAX_VERSION };
 }
@@ -263,6 +271,7 @@ function managementUpsertLocked_(p) {
   assertWritePermission_(entity, user);
   var payload = parseJson_(p.payload, {});
   if (!payload || typeof payload !== "object") throw new Error("Dati non validi.");
+  if (["clients", "practices"].indexOf(entity) >= 0) assertAdminUnknownUsage_(payload, user);
   if (["clients", "practices", "documents", "activities"].indexOf(entity) >= 0) {
     var ownedRecord = entity === "practices" && payload.id ? findRowObject_("PRATICHE", "id", payload.id) : null;
     payload.agent_username = payload.agent_username || (ownedRecord && ownedRecord.agent_username) || user.username;
@@ -437,22 +446,58 @@ function managementVerifyVat_(p) {
   };
 }
 
+function isAdminUnknownValue_(value) {
+  return typeof value === "string" && String(value).trim() === "0000";
+}
+
+function assertAdminUnknownUsage_(payload, user) {
+  var containsPlaceholder = (function containsUnknown(value, depth) {
+    if (depth > 8) return false;
+    if (isAdminUnknownValue_(value)) return true;
+    if (Array.isArray(value)) return value.some(function (item) { return containsUnknown(item, depth + 1); });
+    if (value && typeof value === "object") {
+      return Object.keys(value).some(function (key) { return containsUnknown(value[key], depth + 1); });
+    }
+    /* Alcuni campi complessi arrivano come JSON serializzato. Anche in quel
+       caso la deroga 0000 deve restare esclusivamente amministrativa. */
+    if (typeof value === "string" && /^[\[{]/.test(value.trim())) {
+      var parsed = parseJson_(value, null);
+      return parsed !== null && containsUnknown(parsed, depth + 1);
+    }
+    return false;
+  })(payload || {}, 0);
+  if (containsPlaceholder && !isAdmin_(user)) {
+    throw new Error("Il valore 0000 come dato non disponibile è riservato agli amministratori.");
+  }
+}
+
 function validateClientFiscalData_(payload, user) {
-  var vat = String(payload.piva || "").replace(/\D/g, "");
-  var iban = String(payload.iban || "").replace(/\s+/g, "").toUpperCase();
-  var sdi = String(payload.sdi || "").replace(/\s+/g, "").toUpperCase();
-  var pec = String(payload.pec || "").trim().toLowerCase();
-  var email = String(payload.email || "").trim().toLowerCase();
+  var vatRaw = String(payload.piva || "").trim();
+  var ibanRaw = String(payload.iban || "").trim();
+  var sdiRaw = String(payload.sdi || "").trim();
+  var pecRaw = String(payload.pec || "").trim();
+  var emailRaw = String(payload.email || "").trim();
+  var vatUnknown = isAdmin_(user) && isAdminUnknownValue_(vatRaw);
+  var ibanUnknown = isAdmin_(user) && isAdminUnknownValue_(ibanRaw);
+  var sdiUnknown = isAdmin_(user) && isAdminUnknownValue_(sdiRaw);
+  var pecUnknown = isAdmin_(user) && isAdminUnknownValue_(pecRaw);
+  var emailUnknown = isAdmin_(user) && isAdminUnknownValue_(emailRaw);
+  var phoneUnknown = isAdmin_(user) && isAdminUnknownValue_(payload.telefono);
+  var vat = vatUnknown ? "0000" : vatRaw.replace(/\D/g, "");
+  var iban = ibanUnknown ? "0000" : ibanRaw.replace(/\s+/g, "").toUpperCase();
+  var sdi = sdiUnknown ? "0000" : sdiRaw.replace(/\s+/g, "").toUpperCase();
+  var pec = pecUnknown ? "0000" : pecRaw.toLowerCase();
+  var email = emailUnknown ? "0000" : emailRaw.toLowerCase();
   var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!String(payload.ragioneSociale || "").trim()) throw new Error("Ragione sociale obbligatoria.");
   if (!sdi && !pec) throw new Error("Inserisci almeno uno tra Codice SDI e PEC.");
-  if (sdi && !/^[A-Z0-9]{7}$/.test(sdi)) throw new Error("Il Codice SDI deve contenere esattamente 7 caratteri alfanumerici.");
-  if (pec && !emailPattern.test(pec)) throw new Error("Indirizzo PEC non valido.");
-  if (email && !emailPattern.test(email)) throw new Error("Indirizzo e-mail non valido.");
-  if (!String(payload.telefono || "").trim() || String(payload.telefono_valido || "NO").toUpperCase() !== "SI") throw new Error("Numero di cellulare obbligatorio e non valido.");
-  if (vat && !validItalianVat_(vat)) throw new Error("Partita IVA formalmente non valida.");
-  if (iban && !validIban_(iban)) throw new Error("IBAN formalmente non valido.");
-  if (vat) {
+  if (sdi && !sdiUnknown && !/^[A-Z0-9]{7}$/.test(sdi)) throw new Error("Il Codice SDI deve contenere esattamente 7 caratteri alfanumerici.");
+  if (pec && !pecUnknown && !emailPattern.test(pec)) throw new Error("Indirizzo PEC non valido.");
+  if (email && !emailUnknown && !emailPattern.test(email)) throw new Error("Indirizzo e-mail non valido.");
+  if (!String(payload.telefono || "").trim() || (!phoneUnknown && String(payload.telefono_valido || "NO").toUpperCase() !== "SI")) throw new Error("Numero di cellulare obbligatorio e non valido.");
+  if (vat && !vatUnknown && !validItalianVat_(vat)) throw new Error("Partita IVA formalmente non valida.");
+  if (iban && !ibanUnknown && !validIban_(iban)) throw new Error("IBAN formalmente non valido.");
+  if (vat && !vatUnknown) {
     var duplicate = rowsToObjects_(sheet_("CLIENTI")).filter(function (row) {
       return canAccessClient_(row, user) && String(row.id || "") !== String(payload.id || "") && String(row.piva || "").replace(/\D/g, "") === vat;
     })[0];
@@ -463,9 +508,13 @@ function validateClientFiscalData_(payload, user) {
   payload.pec = pec;
   payload.email = email;
   payload.codice_fiscale = String(payload.codice_fiscale || "").replace(/\s+/g, "").toUpperCase();
-  payload.piva_formalmente_valida = vat ? "SI" : "NO";
+  payload.piva_formalmente_valida = vatUnknown ? "DEROGA ADMIN" : (vat ? "SI" : "NO");
   payload.iban = iban;
-  payload.iban_valido = iban ? "SI" : "NO";
+  payload.iban_valido = ibanUnknown ? "DEROGA ADMIN" : (iban ? "SI" : "NO");
+  if (phoneUnknown) {
+    payload.telefono = "0000";
+    payload.telefono_valido = "DEROGA ADMIN";
+  }
   payload.citta = payload.comune || payload.citta || "";
 }
 
@@ -485,12 +534,15 @@ function completeClientFromPractice_(practice, user) {
   requiredClientFields.forEach(function (key) {
     if (!String(client[key] || "").trim() && !String(updates[key] || "").trim()) throw new Error("Completa il dato cliente mancante: " + key.replace(/_/g, " ") + ".");
   });
-  if (String(updates.piva || "").trim() && !validItalianVat_(String(updates.piva).replace(/\D/g, ""))) throw new Error("Partita IVA del cliente formalmente non valida.");
-  if (String(updates.iban || "").trim() && !validIban_(String(updates.iban).replace(/\s+/g, "").toUpperCase())) throw new Error("IBAN del cliente formalmente non valido.");
+  if (String(updates.email || "").trim() && !isAdminUnknownValue_(updates.email) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(updates.email).trim())) throw new Error("Indirizzo e-mail del cliente non valido.");
+  if (String(updates.piva || "").trim() && !isAdminUnknownValue_(updates.piva) && !validItalianVat_(String(updates.piva).replace(/\D/g, ""))) throw new Error("Partita IVA del cliente formalmente non valida.");
+  if (String(updates.iban || "").trim() && !isAdminUnknownValue_(updates.iban) && !validIban_(String(updates.iban).replace(/\s+/g, "").toUpperCase())) throw new Error("IBAN del cliente formalmente non valido.");
   var changed = false;
   Object.keys(updates).forEach(function (key) {
     if (!String(client[key] || "").trim() && String(updates[key] || "").trim()) {
       client[key] = String(updates[key]).trim();
+      if (key === "piva" && isAdminUnknownValue_(updates[key])) client.piva_formalmente_valida = "DEROGA ADMIN";
+      if (key === "iban" && isAdminUnknownValue_(updates[key])) client.iban_valido = "DEROGA ADMIN";
       changed = true;
     }
     delete practice["client_update_" + key];
@@ -769,11 +821,20 @@ function upsertPracticeWithInventory_(payload, user, identifierUser) {
     var practiceType = String(payload.tipo_pratica || existing && existing.tipo_pratica || inferredType).toUpperCase();
     payload.tipo_pratica = practiceType;
     if (nextStatus === "Bocciata" && practiceType === "ACQUISTO") throw new Error("Lo stato Bocciata è disponibile solo per pratiche di noleggio o leasing.");
-    var hasInventoryRows = !!String(payload.righe_magazzino_json || existing && existing.righe_magazzino_json || payload.righe_json || existing && existing.righe_json || "").trim();
+    var inventorySource = {};
+    Object.keys(existing || {}).forEach(function (key) { inventorySource[key] = existing[key]; });
+    Object.keys(payload || {}).forEach(function (key) { inventorySource[key] = payload[key]; });
+    var hasInventoryRows = inventoryLinesFromPractice_(inventorySource).length > 0;
     var requiresStock = ["Accettata", "Completata"].indexOf(nextStatus) >= 0;
     var releasesStock = ["Inserita", "Sospesa", "Bocciata"].indexOf(nextStatus) >= 0;
     var shouldApply = requiresStock && !wasApplied && hasInventoryRows;
     var shouldReverse = releasesStock && wasApplied;
+    payload.avviso_giacenza = existing && String(existing.avviso_giacenza || "").trim()
+      ? String(existing.avviso_giacenza).toUpperCase()
+      : String(payload.avviso_giacenza || "SI").toUpperCase();
+    var inventoryAssessment = practiceInventoryAssessment_(inventorySource, wasApplied);
+    payload.giacenza_insufficiente = inventoryAssessment.insufficient ? "SI" : "NO";
+    payload.dettaglio_giacenza = inventoryAssessment.detail;
     if (wasApplied && existing && payload.righe_json && String(payload.righe_json) !== String(existing.righe_json || "") && !shouldReverse) {
       throw new Error("La composizione Ledwall non può essere modificata dopo l'impegno di magazzino. Annulla prima la pratica.");
     }
@@ -928,6 +989,101 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
   });
 }
 
+function practiceInventoryAssessment_(practice, alreadyApplied) {
+  if (alreadyApplied || String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") {
+    return { insufficient: false, detail: "", shortages: [] };
+  }
+  var shortages = [];
+  var lines = inventoryLinesFromPractice_(practice);
+  if (!lines.length && isAdminUnknownValue_(practice.cabinet_da_sottrarre)) {
+    return { insufficient: true, detail: "Composizione cabinet da completare: dato registrato con deroga amministratore.", shortages: [] };
+  }
+  lines.forEach(function (line) {
+    var product = findInventoryProduct_(line.product_id);
+    var available = product ? Number(product.giacenza_attuale || 0) : 0;
+    var requested = Number(line.quantita || 0);
+    if (!product || available < requested) {
+      shortages.push({
+        product_id: line.product_id,
+        product: product ? String(product.nome || line.product_id) : String(line.product_id),
+        available: available,
+        requested: requested,
+        missing: Math.max(0, requested - available)
+      });
+    }
+  });
+  return {
+    insufficient: shortages.length > 0,
+    shortages: shortages,
+    detail: shortages.map(function (row) {
+      return row.product + ": disponibili " + row.available + ", necessari " + row.requested;
+    }).join(" | ")
+  };
+}
+
+function managementInventoryAdjust_(p) {
+  return withMutationLock_(function () { return managementInventoryAdjustLocked_(p); });
+}
+
+function managementInventoryAdjustLocked_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
+  var payload = parseJson_(p.payload, {});
+  var requestToken = String(payload.request_token || "").trim() || uid_("stock-req");
+  var previousMovement = rowsToObjects_(sheet_("MOVIMENTI_MAGAZZINO")).filter(function (row) {
+    return String(row.request_token || "") === requestToken;
+  })[0];
+  if (previousMovement) {
+    return {
+      ok: true,
+      product: findInventoryProduct_(previousMovement.product_id) || {},
+      movement: previousMovement,
+      duplicate: true
+    };
+  }
+  var productId = canonicalProductId_(payload.product_id || "") || String(payload.product_id || "");
+  var operation = String(payload.operazione || payload.operation || "").trim().toUpperCase();
+  var quantity = Number(payload.quantita || payload.quantity || 0);
+  var note = String(payload.descrizione || payload.note || "").trim();
+  if (["CARICO", "SCARICO"].indexOf(operation) < 0) throw new Error("Seleziona CARICO oppure SCARICO.");
+  if (!Number.isInteger(quantity) || quantity <= 0) throw new Error("La quantità deve essere un numero intero maggiore di zero.");
+  if (!note) throw new Error("Inserisci una descrizione del movimento.");
+  var product = findInventoryProduct_(productId);
+  if (!product) throw new Error("Prodotto magazzino non trovato: " + productId);
+  var before = Number(product.giacenza_attuale || 0);
+  var delta = operation === "CARICO" ? quantity : -quantity;
+  var after = before + delta;
+  if (after < 0) throw new Error("Lo scarico supera la giacenza disponibile: " + before + " cabinet.");
+  product.giacenza_attuale = after;
+  if (after <= 0 && String(product.stato_giacenza || "").toUpperCase() === "DISPONIBILE") product.stato_giacenza = "NON DISPONIBILE";
+  if (after > 0 && String(product.stato_giacenza || "").toUpperCase() === "NON DISPONIBILE") product.stato_giacenza = "DISPONIBILE";
+  product.expected_record_version = Number(product.record_version || 0);
+  product.request_token = requestToken;
+  var version = prepareVersionedRecord_("PRODOTTI_LED", "id", product.id, product, user);
+  if (version.duplicate) return { ok: true, product: version.duplicate, duplicate: true };
+  var savedProduct = upsertObject_("PRODOTTI_LED", "id", product.id, product);
+  var movementId = uid_("mov");
+  var movement = upsertObject_("MOVIMENTI_MAGAZZINO", "id", movementId, {
+    id: movementId,
+    data: new Date().toISOString(),
+    practiceId: "",
+    numero_pratica: "",
+    cliente: "",
+    product_id: savedProduct.id,
+    sku: savedProduct.sku || savedProduct.id,
+    prodotto: String(savedProduct.nome || savedProduct.id) + " " + String(savedProduct.cabX || "") + "x" + String(savedProduct.cabY || ""),
+    quantita: delta,
+    tipo_movimento: operation + "_MANUALE",
+    giacenza_prima: before,
+    giacenza_dopo: after,
+    username: user.username,
+    note: note,
+    request_token: requestToken
+  });
+  log_(user, operation, "movements", movementId, note + " · " + savedProduct.id + " · " + delta);
+  return { ok: true, product: savedProduct, movement: movement };
+}
+
 function inventoryLinesFromPractice_(practice) {
   var explicit = parseJson_(practice.righe_magazzino_json, []);
   var items = parseJson_(practice.righe_json, []);
@@ -983,6 +1139,18 @@ function backfillPracticeInventoryV12_() {
       practice.cabinet_da_sottrarre = buildInventoryRowsFromItems_(items).map(function (line) { return (line.descrizione || line.modello_display || line.product_id) + ": " + Number(line.quantita || 0); }).join(" | ");
       changed = true;
     }
+    if (changed) upsertObject_("PRATICHE", "id", practice.id, practice);
+  });
+}
+
+function backfillPracticeStockWarningsV2100_() {
+  rowsToObjects_(sheet_("PRATICHE")).forEach(function (practice) {
+    var assessment = practiceInventoryAssessment_(practice, String(practice.magazzino_applicato || "NO").toUpperCase() === "SI");
+    var changed = false;
+    if (!String(practice.avviso_giacenza || "").trim()) { practice.avviso_giacenza = "SI"; changed = true; }
+    var insufficient = assessment.insufficient ? "SI" : "NO";
+    if (String(practice.giacenza_insufficiente || "") !== insufficient) { practice.giacenza_insufficiente = insufficient; changed = true; }
+    if (String(practice.dettaglio_giacenza || "") !== assessment.detail) { practice.dettaglio_giacenza = assessment.detail; changed = true; }
     if (changed) upsertObject_("PRATICHE", "id", practice.id, practice);
   });
 }
@@ -1756,9 +1924,9 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.9"], ["title", "Pratiche protette e assegnazione commerciale"],
-    ["intro", "Le pratiche concluse diventano archivi in sola lettura; gli ADMIN possono assegnare ogni nuova pratica all’agente responsabile."],
-    ["footer", "Le pratiche importate dal Quotation Planner sono ora evidenziate fino alla conclusione dell’iter."]
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.10"], ["title", "Magazzino amministrativo e pratiche più flessibili"],
+    ["intro", "Gli ADMIN possono registrare dati temporaneamente sconosciuti con 0000 e gestire carichi o scarichi di magazzino con uno storico completo."],
+    ["footer", "Le pratiche restano inseribili anche senza giacenza e possono essere organizzate per tipologia sul singolo dispositivo."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
 }
@@ -1770,6 +1938,19 @@ function updatePatchNotesV290_() {
     title: "Pratiche protette e assegnazione commerciale",
     intro: "Le pratiche concluse diventano archivi professionali in sola lettura e gli ADMIN possono scegliere l’agente responsabile durante la creazione.",
     footer: "Le importazioni dal Quotation Planner sono evidenziate come pratiche da completare."
+  };
+  Object.keys(notes).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
+  });
+}
+
+function updatePatchNotesV2100_() {
+  var notes = {
+    version: SEEMAX_VERSION,
+    label: "SEEMAX MANAGEMENT SUITE 2.10",
+    title: "Magazzino amministrativo e pratiche più flessibili",
+    intro: "Gli ADMIN possono registrare dati temporaneamente sconosciuti con 0000 e gestire carichi o scarichi di magazzino con uno storico completo.",
+    footer: "Le pratiche restano inseribili anche senza giacenza e possono essere organizzate per tipologia sul singolo dispositivo."
   };
   Object.keys(notes).forEach(function (key) {
     upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });

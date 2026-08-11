@@ -17,6 +17,10 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - catalogo Ledwall con immagini, schede tecniche, listini, promozioni e giacenze;
 - inserimento diretto di pratiche Acquisto/Noleggio/Leasing dal riepilogo S.Q.P.;
 - scarico automatico e tracciato del magazzino allo stato Accettata;
+- carico/scarico manuale delle giacenze riservato agli ADMIN, con causale e storico;
+- pratiche inseribili anche con giacenza insufficiente, evidenziate da un avviso disattivabile sulla singola riga del Foglio Google;
+- deroga ADMIN `0000` per registrare temporaneamente dati non disponibili;
+- organizzazione delle pratiche in visione corrente oppure per Acquisto, Noleggio e Leasing, memorizzata localmente;
 - workflow pratiche semplificato: Inserita, Accettata, Sospesa, Bocciata e Completata;
 - notifiche interne con campanella ed email gratuita all'agente responsabile;
 - documenti e media caricati direttamente e archiviati su Google Drive;
@@ -53,7 +57,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.9.0 segui [docs/AGGIORNAMENTO_V2.9.0.md](docs/AGGIORNAMENTO_V2.9.0.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
+Per aggiornare un'installazione già operativa alla versione 2.10.0 segui [docs/AGGIORNAMENTO_V2.10.0.md](docs/AGGIORNAMENTO_V2.10.0.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
 
 ## Placeholder
 

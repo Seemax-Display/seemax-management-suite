@@ -1,4 +1,10 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 1.9.1
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.10.0
+
+NOVITÀ VERSIONE 2.10
+- DEROGA ADMIN: scrivere esattamente 0000 nei dati cliente o pratica non ancora conosciuti. Gli agenti non possono usare questa deroga.
+- GIACENZA INSUFFICIENTE: non blocca la creazione della pratica; compare un avviso rosso. Nella relativa riga di PRATICHE impostare avviso_giacenza su NO per nasconderlo.
+- CARICO / SCARICO: dal Catalogo, gli ADMIN possono variare le giacenze indicando sempre una causale. Ogni operazione resta nello storico MOVIMENTI_MAGAZZINO.
+- ORGANIZZAZIONE PRATICHE: scegliere Visione attuale o Per tipologia. La preferenza resta soltanto sul dispositivo.
 
 NOVITÀ VERSIONE 1.5
 - MODALITÀ STANDARD: ogni modifica viene salvata subito nel database.

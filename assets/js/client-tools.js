@@ -152,6 +152,7 @@
 
   function bind(form, record, clients, api, notify, readOnly) {
     form.noValidate = true;
+    const adminUnknown = (value) => !!api.isAdmin && api.isAdmin() && String(value || "").trim() === "0000";
     const vat = form.elements.piva;
     const iban = form.elements.iban;
     const phoneCountry = form.elements.telefono_paese;
@@ -175,6 +176,12 @@
 
     function updateVat() {
       vat.value = digits(vat.value).slice(0, 11);
+      if (adminUnknown(vat.value)) {
+        form.elements.piva_formalmente_valida.value = "DEROGA ADMIN";
+        form.elements.piva_duplicata.value = "NO";
+        status(document.getElementById("vatLocalStatus"), "warning", "Dato non disponibile · deroga amministratore.");
+        return;
+      }
       const valid = validItalianVat(vat.value);
       form.elements.piva_formalmente_valida.value = valid ? "SI" : "NO";
       if (!vat.value) status(document.getElementById("vatLocalStatus"), "neutral", "Inserisci 11 cifre.");
@@ -189,6 +196,11 @@
 
     function updateIban() {
       iban.value = String(iban.value || "").replace(/\s+/g, "").toUpperCase().replace(/(.{4})/g, "$1 ").trim();
+      if (adminUnknown(iban.value)) {
+        form.elements.iban_valido.value = "DEROGA ADMIN";
+        status(document.getElementById("ibanStatus"), "warning", "Dato non disponibile · deroga amministratore.");
+        return;
+      }
       const valid = validIban(iban.value);
       form.elements.iban_valido.value = valid ? "SI" : "NO";
       status(document.getElementById("ibanStatus"), !iban.value ? "neutral" : valid ? "valid" : "invalid", !iban.value ? "Campo facoltativo." : valid ? "IBAN formalmente valido." : "IBAN non valido: controlla Paese, lunghezza e cifre di controllo.");
@@ -199,6 +211,12 @@
       const country = phoneCountry.value || "IT";
       const prefix = library ? `+${library.getCountryCallingCode(country)}` : "+39";
       form.elements.telefono_prefisso.value = prefix;
+      if (adminUnknown(phoneNumber.value)) {
+        form.elements.telefono.value = "0000";
+        form.elements.telefono_valido.value = "DEROGA ADMIN";
+        status(document.getElementById("phoneStatus"), "warning", "Dato non disponibile · deroga amministratore.");
+        return;
+      }
       if (!phoneNumber.value.trim()) {
         form.elements.telefono.value = "";
         form.elements.telefono_valido.value = "NO";
@@ -226,13 +244,13 @@
       const value = (name) => String(form.elements[name] && form.elements[name].value || "").trim();
       const mandatoryByTab = {
         identification: [!!value("ragioneSociale"), !!(value("sdi") || value("pec"))],
-        contacts: [!!value("telefono_numero"), value("telefono_valido") === "SI"],
+        contacts: [!!value("telefono_numero"), ["SI", "DEROGA ADMIN"].includes(value("telefono_valido"))],
         banking: [], location: [], other: []
       };
       const completeByTab = {
         identification: [value("ragioneSociale"), value("codice_fiscale"), value("piva"), value("sdi") || value("pec")].every(Boolean),
-        contacts: [value("telefono_numero"), value("email")].every(Boolean) && value("telefono_valido") === "SI",
-        banking: !!value("iban") && value("iban_valido") === "SI",
+        contacts: [value("telefono_numero"), value("email")].every(Boolean) && ["SI", "DEROGA ADMIN"].includes(value("telefono_valido")),
+        banking: !!value("iban") && ["SI", "DEROGA ADMIN"].includes(value("iban_valido")),
         location: [value("regione"), value("provincia"), value("comune"), value("cap"), value("indirizzo"), value("civico")].every(Boolean),
         other: !!value("note")
       };
@@ -265,6 +283,10 @@
     const verifyButton = document.getElementById("verifyViesButton");
     verifyButton.addEventListener("click", async () => {
       updateVat();
+      if (adminUnknown(vat.value)) {
+        notify("Il valore 0000 indica un dato non disponibile e non può essere verificato su VIES.", "danger");
+        return;
+      }
       if (form.elements.piva_formalmente_valida.value !== "SI") {
         notify("Inserisci prima una Partita IVA formalmente valida.", "danger");
         vat.focus();
@@ -320,8 +342,11 @@
     const cap = form.elements[prefix + "cap"];
     if (!region || !province || !comune || !cap) return;
     const unique = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "it"));
+    const admin = !!window.SeemaxApi && window.SeemaxApi.isAdmin();
+    const withAdminUnknown = (values) => admin ? ["0000", ...values.filter((value) => String(value) !== "0000")] : values;
     const setOptions = (select, values, placeholder, selected) => {
-      select.innerHTML = `<option value="">${placeholder}</option>${values.map((value) => `<option value="${esc(value)}" ${String(value) === String(selected || "") ? "selected" : ""}>${esc(value)}</option>`).join("")}`;
+      const available = withAdminUnknown(values);
+      select.innerHTML = `<option value="">${placeholder}</option>${available.map((value) => `<option value="${esc(value)}" ${String(value) === String(selected || "") ? "selected" : ""}>${String(value) === "0000" ? "0000 · Dato non disponibile" : esc(value)}</option>`).join("")}`;
       select.disabled = !values.length;
     };
     const currentComune = record[prefix + "comune"] || (!prefix ? record.citta : "") || "";
@@ -332,13 +357,16 @@
     const currentCap = record[prefix + "cap"] || "";
 
     function updateProvinces(selected) {
+      if (region.value === "0000") { setOptions(province, [], "Seleziona provincia", "0000"); province.disabled = false; province.value = "0000"; return; }
       setOptions(province, unique(rows.filter((row) => row.r === region.value).map((row) => `${row.p} (${row.s})`)), "Seleziona provincia", selected);
     }
     function updateComuni(selected) {
+      if (province.value === "0000") { setOptions(comune, [], "Seleziona comune", "0000"); comune.disabled = false; comune.value = "0000"; return; }
       const sigla = (province.value.match(/\(([^)]+)\)$/) || [])[1] || "";
       setOptions(comune, unique(rows.filter((row) => row.r === region.value && row.s === sigla).map((row) => row.n)), "Seleziona comune", selected);
     }
     function updateCaps(selected) {
+      if (comune.value === "0000") { setOptions(cap, [], "Seleziona CAP", "0000"); cap.disabled = false; cap.value = "0000"; if (!prefix && form.elements.citta) form.elements.citta.value = "0000"; return; }
       const sigla = (province.value.match(/\(([^)]+)\)$/) || [])[1] || "";
       setOptions(cap, unique(rows.filter((row) => row.s === sigla && row.n === comune.value).map((row) => row.c)), "Seleziona CAP", selected);
       if (!prefix && form.elements.citta) form.elements.citta.value = comune.value;

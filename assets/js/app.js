@@ -4,7 +4,7 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "numero", practiceDirection: "desc", practicePage: 1, documentFolderId: "" };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "numero", practiceDirection: "desc", practicePage: 1, practiceLayout: "", documentFolderId: "" };
   let installPrompt = null;
   let heldDocumentId = "";
   let documentHoldTimer = null;
@@ -506,6 +506,7 @@
   }
 
   async function showApp() {
+    state.practiceLayout = "";
     $("loginScreen").classList.add("is-hidden");
     $("app").classList.remove("is-hidden");
     setUser();
@@ -921,9 +922,47 @@
     return String(practice && practice.stato || "").trim().toLowerCase() === "completata";
   }
 
+  function isAdminUnknown(value) {
+    return api.isAdmin() && String(value == null ? "" : value).trim() === "0000";
+  }
+
   function isPlannerPracticePending(practice) {
     const origin = String(practice && practice.origine || "").toUpperCase();
     return !isCompletedPractice(practice) && (origin.includes("QUOTATION PLANNER") || origin.includes("S.Q.P"));
+  }
+
+  function practiceStockWarning(practice) {
+    if (String(practice.avviso_giacenza || "SI").toUpperCase() === "NO") return null;
+    if (String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") return null;
+    let lines = [];
+    try { lines = JSON.parse(practice.righe_magazzino_json || "[]"); } catch (error) { lines = []; }
+    const grouped = {};
+    lines.forEach((line) => {
+      const id = String(line.product_id || "").toLowerCase();
+      const quantity = Number(line.quantita || line.cabinet_da_sottrarre || 0);
+      if (id && quantity > 0) grouped[id] = (grouped[id] || 0) + quantity;
+    });
+    const shortages = Object.entries(grouped).map(([id, requested]) => {
+      const product = (state.data.products || []).find((item) => String(item.id || "").toLowerCase() === id);
+      const available = Number(product && product.giacenza_attuale || 0);
+      return !product || available < requested ? { id, name: product && product.nome || id, available, requested } : null;
+    }).filter(Boolean);
+    if (!shortages.length) {
+      if (!Object.keys(grouped).length && String(practice.giacenza_insufficiente || "NO").toUpperCase() === "SI") {
+        return { detail: practice.dettaglio_giacenza || "Giacenza non disponibile per la configurazione indicata." };
+      }
+      return null;
+    }
+    return { detail: shortages.map((row) => `${row.name}: ${row.available} disponibili, ${row.requested} necessari`).join(" · ") };
+  }
+
+  function practiceLayoutKey() {
+    return `SEEMAX_PRACTICE_LAYOUT_V1_${String((api.getSession() || {}).username || "local")}`;
+  }
+
+  function currentPracticeLayout() {
+    if (!state.practiceLayout) state.practiceLayout = localStorage.getItem(practiceLayoutKey()) === "type" ? "type" : "table";
+    return state.practiceLayout;
   }
 
   function practiceTable(rows, compact = false, showAgent = false) {
@@ -931,7 +970,8 @@
     return `<div class="table-wrap"><table class="practice-table"><thead><tr><th>Pratica</th><th>Cliente</th><th>Tipologia</th><th>Stato</th><th>Finanziaria</th><th>Valore</th>${showAgent ? "<th>Agente</th>" : ""}<th></th></tr></thead><tbody>${rows.map((p) => {
       const plannerPending = isPlannerPracticePending(p);
       const completed = isCompletedPractice(p);
-      return `<tr class="practice-row practice-${slug(p.stato)} ${plannerPending ? "practice-planner-pending" : ""}"><td><strong>${esc(p.numero)}</strong>${plannerPending ? `<span class="planner-practice-flag">✦ IMPORTATA · DA COMPLETARE</span>` : completed ? `<span class="completed-practice-flag">🔒 ARCHIVIO CONCLUSO</span>` : ""}<small>${dateIt(completed ? p.completataIl || p.aggiornatoIl : p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td>${showAgent ? `<td>${esc(p.agente || p.agent_username || "—")}</td>` : ""}<td><button class="table-action ${completed ? "completed" : ""}" data-action="edit-practice" data-id="${esc(p.id)}">${completed ? "Consulta" : "Apri"}</button>${compact || completed ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`;
+      const stockWarning = practiceStockWarning(p);
+      return `<tr class="practice-row practice-${slug(p.stato)} ${plannerPending ? "practice-planner-pending" : ""} ${stockWarning ? "practice-stock-shortage" : ""}"><td><strong>${esc(p.numero)}</strong>${plannerPending ? `<span class="planner-practice-flag">✦ IMPORTATA · DA COMPLETARE</span>` : completed ? `<span class="completed-practice-flag">🔒 ARCHIVIO CONCLUSO</span>` : ""}${stockWarning ? `<span class="stock-practice-flag" title="${esc(stockWarning.detail)}">⚠ GIACENZA INSUFFICIENTE</span>` : ""}<small>${dateIt(completed ? p.completataIl || p.aggiornatoIl : p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td>${showAgent ? `<td>${esc(p.agente || p.agent_username || "—")}</td>` : ""}<td><button class="table-action ${completed ? "completed" : ""}" data-action="edit-practice" data-id="${esc(p.id)}">${completed ? "Consulta" : "Apri"}</button>${compact || completed ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`;
     }).join("")}</tbody></table></div>`;
   }
 
@@ -955,6 +995,7 @@
     state.practicePage = Math.min(Math.max(1, Number(state.practicePage || 1)), pageCount);
     const start = (state.practicePage - 1) * pageSize;
     const visibleRows = rows.slice(start, start + pageSize);
+    const layout = currentPracticeLayout();
     const chips = STATUSES.map((s) => `<button class="filter-chip ${state.filterStatus === s ? "active" : ""}" data-filter-status="${esc(s)}">${esc(s)} <strong>${state.data.practices.filter((p) => p.stato === s).length}</strong></button>`).join("");
     const sortOptions = [
       ["stato", "Esito / stato"], ["numero", "ID pratica"], ["cliente", "Nome cliente"],
@@ -965,13 +1006,23 @@
       <label>Ordina per<select id="practiceSort">${sortOptions.map(([value, label]) => `<option value="${value}" ${state.practiceSort === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
       <label>Ordine<select id="practiceDirection"><option value="asc" ${state.practiceDirection === "asc" ? "selected" : ""}>Crescente</option><option value="desc" ${state.practiceDirection === "desc" ? "selected" : ""}>Decrescente</option></select></label>
     </div>`;
+    const layoutControls = `<div class="practice-layout-toolbar"><div><strong>Organizzazione pratiche</strong><span>Preferenza salvata soltanto su questo dispositivo</span></div><div class="practice-layout-switch"><button class="${layout === "table" ? "active" : ""}" data-action="set-practice-layout" data-layout="table">☷ Visione attuale</button><button class="${layout === "type" ? "active" : ""}" data-action="set-practice-layout" data-layout="type">▦ Per tipologia</button></div></div>`;
     const pagination = rows.length > pageSize ? `<nav class="practice-pagination" aria-label="Pagine pratiche">
       <button class="btn ghost" data-practice-page="${state.practicePage - 1}" ${state.practicePage === 1 ? "disabled" : ""}>← Precedente</button>
       <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => `<button class="${page === state.practicePage ? "active" : ""}" data-practice-page="${page}" aria-label="Pagina ${page}">${page}</button>`).join("")}</div>
       <button class="btn ghost" data-practice-page="${state.practicePage + 1}" ${state.practicePage === pageCount ? "disabled" : ""}>Successiva →</button>
     </nav>` : "";
     const range = rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} di ${rows.length} pratiche` : "0 pratiche";
-    return `${viewToolbar("Nuova pratica", "new-practice", `<div class="filter-strip"><button class="filter-chip ${state.filterStatus ? "" : "active"}" data-filter-status="">Tutte <strong>${state.data.practices.length}</strong></button>${chips}</div>`)}${controls}<section class="panel"><div class="practice-result-count">${range}</div>${visibleRows.length ? practiceTable(visibleRows, false, api.isAdmin()) : emptyState("Nessuna pratica trovata", "Modifica ricerca, filtro o ordinamento.", "", "")}${pagination}</section>`;
+    const resultBody = layout === "type" && visibleRows.length
+      ? ["ACQUISTO", "NOLEGGIO", "LEASING"].map((type) => {
+        const group = visibleRows.filter((practice) => String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type);
+        if (!group.length) return "";
+        const totalCount = rows.filter((practice) => String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type).length;
+        const icon = type === "ACQUISTO" ? "🛒" : type === "NOLEGGIO" ? "🔄" : "🏦";
+        return `<section class="practice-type-group type-${type.toLowerCase()}"><header><span>${icon}</span><div><strong>${type}</strong><small>${totalCount} ${totalCount === 1 ? "pratica" : "pratiche"} nei risultati</small></div></header>${practiceTable(group, false, api.isAdmin())}</section>`;
+      }).join("")
+      : (visibleRows.length ? practiceTable(visibleRows, false, api.isAdmin()) : emptyState("Nessuna pratica trovata", "Modifica ricerca, filtro o ordinamento.", "", ""));
+    return `${viewToolbar("Nuova pratica", "new-practice", `<div class="filter-strip"><button class="filter-chip ${state.filterStatus ? "" : "active"}" data-filter-status="">Tutte <strong>${state.data.practices.length}</strong></button>${chips}</div>`)}${layoutControls}${controls}<section class="panel"><div class="practice-result-count">${range}</div>${resultBody}${pagination}</section>`;
   }
 
   function renderClients() {
@@ -987,7 +1038,8 @@
 
   function renderCatalog() {
     const rows = filterRows(state.data.products, ["nome", "categoria", "descrizione"]);
-    return `${viewToolbar("Nuovo prodotto", api.isAdmin() ? "new-product" : "", `<p class="toolbar-note">Listino ${api.isAdmin() ? "amministrativo" : "agente"} · ${rows.length} configurazioni</p>`)}<div class="product-grid">${rows.map((p) => {
+    const inventoryAction = api.isAdmin() ? `<button class="btn inventory-button" data-action="inventory-adjust">📦 Carico / Scarico</button>` : "";
+    return `${viewToolbar("Nuovo prodotto", api.isAdmin() ? "new-product" : "", `<div class="catalog-toolbar-info"><p class="toolbar-note">Listino ${api.isAdmin() ? "amministrativo" : "agente"} · ${rows.length} configurazioni</p>${inventoryAction}</div>`)}<div class="product-grid">${rows.map((p) => {
       const promo = Number(p.prezzoPromoAgenti || 0);
       const price = promo || Number(p.prezzoAgente || 0);
       const promoActive = promo || String(p.promo_attiva || "NO").toUpperCase() === "SI";
@@ -1260,7 +1312,7 @@
     const addressType = String(record.indirizzo_installazione_tipo || (practiceType === "ACQUISTO" ? "PRESSO ALTRO INDIRIZZO" : "COME INDIRIZZO CLIENTE")).toUpperCase();
     const management = record.gestione_ledwall || "";
     const req = (name) => practiceRequired(practiceType, name);
-    const typeSummary = `<div class="practice-kind-banner ${practiceType.toLowerCase()} full"><span>${practiceType === "ACQUISTO" ? "🛒" : practiceType === "NOLEGGIO" ? "🔄" : "🏦"}</span><div><small>TIPOLOGIA PRATICA</small><strong>${esc(practiceType)}</strong></div>${record.id ? "" : `<button type="button" class="btn ghost" data-action="back-practice-types">Cambia tipologia</button>`}</div>
+    const typeSummary = `${api.isAdmin() ? `<div class="admin-unknown-notice full"><span>🔐</span><div><strong>Deroga amministratore</strong><p>Puoi usare <b>0000</b> nei dati temporaneamente sconosciuti. La pratica verrà salvata e potrà essere completata in seguito.</p></div></div>` : ""}<div class="practice-kind-banner ${practiceType.toLowerCase()} full"><span>${practiceType === "ACQUISTO" ? "🛒" : practiceType === "NOLEGGIO" ? "🔄" : "🏦"}</span><div><small>TIPOLOGIA PRATICA</small><strong>${esc(practiceType)}</strong></div>${record.id ? "" : `<button type="button" class="btn ghost" data-action="back-practice-types">Cambia tipologia</button>`}</div>
       <input type="hidden" name="tipo_pratica" value="${esc(practiceType)}"><input type="hidden" name="finanziaria" value="${esc(finance)}">`;
     const purchaseDestination = practiceType !== "ACQUISTO" ? "" : `<fieldset class="practice-section full"><legend>Destinatario ordine ${requiredMark(req("destinatario_ordine"))}</legend>
       <div class="destination-grid">
@@ -1358,6 +1410,11 @@
   function bindPracticeConditionalFields(practiceType) {
     const form = document.querySelector(".entity-form[data-entity='practices']");
     if (!form) return;
+    /* Consente all'ADMIN di usare il valore letterale 0000 anche nei campi
+       con validazione HTML (per esempio e-mail). La validazione completa
+       resta sia qui sia sul backend, quindi gli altri valori errati non
+       vengono accettati. */
+    form.noValidate = true;
     const refresh = () => {
       const destination = form.querySelector("[name='destinatario_ordine']:checked")?.value || "PER CLIENTE";
       let address = form.querySelector("[name='indirizzo_installazione_tipo']:checked")?.value || form.elements.indirizzo_installazione_tipo?.value || "PRESSO ALTRO INDIRIZZO";
@@ -1497,6 +1554,21 @@
     const availability = $("cabinetAvailability");
     function calculate() {
       const p = products.find((item) => item.id === product.value) || {};
+      if (isAdminUnknown(width.value) || isAdminUnknown(height.value)) {
+        cabinets.value = "0000";
+        availability.textContent = "Quantità cabinet da definire";
+        availability.className = "cabinet-availability insufficient";
+        validation.innerHTML = `<strong>Dato non disponibile:</strong> la misura è stata registrata con deroga amministratore. Completa la configurazione prima di impegnare il magazzino.`;
+        form.elements.modelli_display.value = String(p.nome || "0000").split(" - ")[0];
+        form.elements.misure_display.value = `${String(width.value || "0000")}x${String(height.value || "0000")}`;
+        form.elements.cabinet_da_sottrarre.value = "0000";
+        form.elements.righe_magazzino_json.value = "[]";
+        if (form.elements.righe_json) form.elements.righe_json.value = "[]";
+        form.elements.p391_unificato.value = p.id === "P391_UNIFIED" ? "SI" : "NO";
+        form.elements.p391_cabinet_50100.value = "0";
+        form.elements.p391_cabinet_5050.value = "0";
+        return;
+      }
       const isUnifiedP391 = p.id === "P391_UNIFIED";
       const stepX = Number(p.cabX || 50) / 100;
       const stepY = Number(p.cabY || 50) / 100;
@@ -1586,7 +1658,8 @@
     const session = api.getSession() || {};
     const owner = String(r.creato_da_username || r.agent_username || "");
     const canEdit = !r.id || api.isAdmin() || String(r.puo_modificare || "NO").toUpperCase() === "SI" || owner === String(session.username || "");
-    const fields = window.SeemaxClientTools.renderFields(r);
+    const adminUnknownNotice = api.isAdmin() && canEdit ? `<div class="admin-unknown-notice full"><span>🔐</span><div><strong>Deroga amministratore</strong><p>Se un dato non è ancora disponibile, inserisci <b>0000</b>. Il cliente potrà essere salvato e il valore resterà riconoscibile come dato da completare.</p></div></div>` : "";
+    const fields = adminUnknownNotice + window.SeemaxClientTools.renderFields(r);
     openModal(r.id ? (canEdit ? "Modifica cliente" : "Anagrafica condivisa") : "Nuovo cliente", formShell("clients", r.id, fields, canEdit ? "Salva cliente" : "Consultazione", r.record_version), { wide: true, kicker: canEdit ? "Anagrafica cliente" : "Cliente condiviso", subtitle: !canEdit ? `Creato da ${r.creato_da_nome || "un altro utente"}. Puoi utilizzarlo nelle tue pratiche, ma non modificarlo.` : "" });
     const form = document.querySelector(".entity-form[data-entity='clients']");
     if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast, !canEdit);
@@ -1605,6 +1678,38 @@
       section("Scheda tecnica", field("Pixel pitch", "tech_pixel_pitch", spec("tech_pixel_pitch", "Pixel pitch")) + field("Certificazione", "tech_certificazione", spec("tech_certificazione", "Certificazione")) + field("Modalità di utilizzo", "tech_utilizzo", spec("tech_utilizzo", "Modalità")) + field("Densità pixel", "tech_densita_pixel", spec("tech_densita_pixel", "Densità pixel")) + field("LED standard", "tech_led_standard", spec("tech_led_standard", "LED")) + field("Materiale cabinet", "tech_materiale_cabinet", spec("tech_materiale_cabinet", "Cabinet")) + field("Peso cabinet", "tech_peso_cabinet", spec("tech_peso_cabinet", "Peso cabinet")) + field("Scala di grigi", "tech_scala_grigi", spec("tech_scala_grigi", "Scala di grigi")) + field("Temperatura operativa", "tech_temperatura", spec("tech_temperatura", "Temperatura")) + field("Valore IP", "tech_ip", spec("tech_ip", "Protezione")) + field("Consumo medio", "tech_consumo_medio", spec("tech_consumo_medio", "Consumo medio")) + field("Consumo massimo", "tech_consumo_massimo", spec("tech_consumo_massimo", "Consumo massimo")) + field("Vita media", "tech_vita_media", spec("tech_vita_media", "Vita media")) + field("Visibilità", "tech_visibilita", spec("tech_visibilita", "Visibilità")) + field("Luminosità", "tech_luminosita", spec("tech_luminosita", "Luminosità")) + field("Frequenza aggiornamento", "tech_refresh", spec("tech_refresh", "Refresh"))) +
       section("Altro", field("Immagine prodotto", "immagine_url", r.immagine_url, { full: true }) + field("Link scheda tecnica", "scheda_url", r.scheda_url, { full: true }) + field("Informazioni agenti", "infoAgenti", r.infoAgenti, { type: "textarea", full: true }) + field("Informazioni amministrative", "infoAdmin", r.infoAdmin, { type: "textarea", full: true }) + field("Prodotto attivo", "attivo", r.attivo || "SI", { options: ["SI", "NO"] }));
     openModal(r.id ? "Modifica prodotto" : "Nuovo prodotto", formShell("products", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Catalogo Ledwall" });
+  }
+
+  function openInventoryAdjustment() {
+    if (!api.isAdmin()) return;
+    if (api.isFastMode()) {
+      toast("Passa alla Modalità Standard per registrare movimenti condivisi di magazzino.", "danger");
+      return;
+    }
+    const products = (state.data.products || []).filter((product) => String(product.attivo || "SI").toUpperCase() !== "NO");
+    if (!products.length) { toast("Nessun prodotto disponibile in catalogo.", "danger"); return; }
+    const recent = (state.data.movements || []).slice(0, 12);
+    const body = `<form id="inventoryAdjustmentForm" class="inventory-adjustment-form" data-request-token="${newRequestToken()}">
+      <div class="inventory-current-card"><span>📦</span><div><small>GIACENZA ATTUALE</small><strong id="inventoryCurrentStock">${Number(products[0].giacenza_attuale || 0)} cabinet</strong><p id="inventoryCurrentProduct">${esc(products[0].nome)} · ${esc(products[0].cabX)}×${esc(products[0].cabY)} cm</p></div></div>
+      <div class="form-grid">
+        <label class="full">Prodotto ${requiredMark(true)}<select name="product_id" required>${products.map((product) => `<option value="${esc(product.id)}">${esc(product.nome)} · ${esc(product.cabX)}×${esc(product.cabY)} cm · ${Number(product.giacenza_attuale || 0)} pz</option>`).join("")}</select></label>
+        <fieldset class="inventory-operation full"><legend>Tipo di movimento ${requiredMark(true)}</legend><div class="destination-grid"><label class="choice-card load"><input type="radio" name="operazione" value="CARICO" checked><span><strong>＋ Carico</strong><small>Aumenta la giacenza disponibile.</small></span></label><label class="choice-card unload"><input type="radio" name="operazione" value="SCARICO"><span><strong>− Scarico</strong><small>Riduce la giacenza disponibile.</small></span></label></div></fieldset>
+        <label>Quantità cabinet ${requiredMark(true)}<input name="quantita" type="number" min="1" step="1" value="1" required></label>
+        <label class="full">Descrizione del movimento ${requiredMark(true)}<textarea name="descrizione" required maxlength="500" placeholder="Es. Arrivo merce ordine 125, rettifica inventario, cabinet destinati a demo…"></textarea></label>
+      </div>
+      <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Registra movimento</button></div>
+    </form>
+    <section class="inventory-history"><div class="panel-head"><div><span class="section-kicker">Registro condiviso</span><h3>Ultimi movimenti</h3></div></div>${recent.length ? `<div class="inventory-history-list">${recent.map((movement) => `<article><span class="movement-delta ${Number(movement.quantita || 0) >= 0 ? "positive" : "negative"}">${Number(movement.quantita || 0) >= 0 ? "+" : ""}${Number(movement.quantita || 0)}</span><div><strong>${esc(movement.prodotto || movement.product_id)}</strong><p>${esc(movement.note || movement.tipo_movimento || "Movimento magazzino")}</p><small>${dateIt(movement.data)} · ${esc(movement.username || "Sistema")} · ${Number(movement.giacenza_prima || 0)} → ${Number(movement.giacenza_dopo || 0)}</small></div></article>`).join("")}</div>` : `<p class="field-help">Nessun movimento ancora registrato.</p>`}</section>`;
+    openModal("Carico / Scarico magazzino", body, { wide: true, kicker: "Amministrazione giacenze", subtitle: "Ogni variazione viene registrata con autore, data e descrizione." });
+    const form = document.getElementById("inventoryAdjustmentForm");
+    const refreshCurrent = () => {
+      const product = products.find((item) => String(item.id) === String(form.elements.product_id.value)) || products[0];
+      const stock = document.getElementById("inventoryCurrentStock");
+      const label = document.getElementById("inventoryCurrentProduct");
+      if (stock) stock.textContent = `${Number(product.giacenza_attuale || 0)} cabinet`;
+      if (label) label.textContent = `${product.nome} · ${product.cabX}×${product.cabY} cm`;
+    };
+    form.elements.product_id.addEventListener("change", refreshCurrent);
   }
 
   function openProductTech(id) {
@@ -1654,7 +1759,9 @@
   function serializeForm(form) {
     const record = {};
     new FormData(form).forEach((value, key) => { record[key] = value; });
-    form.querySelectorAll('input[type="number"]').forEach((input) => { record[input.name] = input.value === "" ? "" : Number(input.value); });
+    form.querySelectorAll('input[type="number"]').forEach((input) => {
+      record[input.name] = input.value === "" ? "" : (isAdminUnknown(input.value) ? "0000" : Number(input.value));
+    });
     return record;
   }
 
@@ -1711,7 +1818,7 @@
       missing.focus();
       return;
     }
-    if (entity === "practices" && (Number(form.elements.display_width?.value || 0) <= 0 || Number(form.elements.display_height?.value || 0) <= 0)) {
+    if (entity === "practices" && !isAdminUnknown(form.elements.display_width?.value) && !isAdminUnknown(form.elements.display_height?.value) && (Number(form.elements.display_width?.value || 0) <= 0 || Number(form.elements.display_height?.value || 0) <= 0)) {
       toast("Inserisci larghezza e altezza maggiori di zero.", "danger");
       return;
     }
@@ -1747,41 +1854,41 @@
         form.elements.sdi.focus();
         return;
       }
-      if (sdi && !/^[A-Z0-9]{7}$/.test(sdi)) {
+      if (sdi && !isAdminUnknown(sdi) && !/^[A-Z0-9]{7}$/.test(sdi)) {
         activateFormPanelFor(form.elements.sdi);
         toast("Il Codice SDI deve contenere esattamente 7 caratteri alfanumerici.", "danger");
         form.elements.sdi.focus();
         return;
       }
-      if (pec && !emailPattern.test(pec)) {
+      if (pec && !isAdminUnknown(pec) && !emailPattern.test(pec)) {
         activateFormPanelFor(form.elements.pec);
         toast("Inserisci un indirizzo PEC valido.", "danger");
         form.elements.pec.focus();
         return;
       }
-      if (form.elements.email?.value && !emailPattern.test(String(form.elements.email.value).trim())) {
+      if (form.elements.email?.value && !isAdminUnknown(form.elements.email.value) && !emailPattern.test(String(form.elements.email.value).trim())) {
         activateFormPanelFor(form.elements.email);
         toast("Inserisci un indirizzo e-mail valido.", "danger");
         form.elements.email.focus();
         return;
       }
-      if (!form.elements.telefono_numero?.value || form.elements.telefono_valido?.value !== "SI") {
+      if (!form.elements.telefono_numero?.value || (!["SI", "DEROGA ADMIN"].includes(form.elements.telefono_valido?.value) && !isAdminUnknown(form.elements.telefono_numero?.value))) {
         activateFormPanelFor(form.elements.telefono_numero);
         toast("Il numero di cellulare è obbligatorio e deve essere valido.", "danger");
         form.elements.telefono_numero.focus();
         return;
       }
-      if (form.elements.piva?.value && (form.elements.piva_formalmente_valida?.value !== "SI" || form.elements.piva_duplicata?.value === "SI")) {
+      if (form.elements.piva?.value && !isAdminUnknown(form.elements.piva.value) && (form.elements.piva_formalmente_valida?.value !== "SI" || form.elements.piva_duplicata?.value === "SI")) {
         toast("La Partita IVA non è formalmente valida oppure è già presente nel gestionale.", "danger");
         form.elements.piva.focus();
         return;
       }
-      if (form.elements.iban?.value && form.elements.iban_valido?.value !== "SI") {
+      if (form.elements.iban?.value && !isAdminUnknown(form.elements.iban.value) && form.elements.iban_valido?.value !== "SI") {
         toast("Controlla l’IBAN: il codice inserito non supera la verifica MOD-97.", "danger");
         form.elements.iban.focus();
         return;
       }
-      if (form.elements.telefono_numero?.value && form.elements.telefono_valido?.value !== "SI") {
+      if (form.elements.telefono_numero?.value && !isAdminUnknown(form.elements.telefono_numero.value) && form.elements.telefono_valido?.value !== "SI") {
         toast("Controlla il numero di cellulare e il prefisso internazionale.", "danger");
         form.elements.telefono_numero.focus();
         return;
@@ -2141,6 +2248,14 @@
       "choose-practice-type": () => openPractice(null, data.clientId || "", data.type),
       "back-practice-types": () => openPracticeTypeChooser(),
       "new-product": () => openProduct(), "edit-product": () => openProduct(id), "product-tech": () => openProductTech(id), "delete-product": () => removeEntity("products", id),
+      "inventory-adjust": openInventoryAdjustment,
+      "set-practice-layout": () => {
+        const layout = data.layout === "type" ? "type" : "table";
+        state.practiceLayout = layout;
+        state.practicePage = 1;
+        localStorage.setItem(practiceLayoutKey(), layout);
+        renderRoute();
+      },
       "new-document": () => openDocument(null, data.folderId || state.documentFolderId), "edit-document": () => openDocument(id), "delete-document": () => removeEntity("documents", id),
       "new-document-folder": openDocumentFolderModal,
       "open-document-folder": () => {
@@ -2343,6 +2458,28 @@
       closeModal(); renderRoute(); toast("Cartella creata sul dispositivo.");
       return;
     }
+    if (event.target.id === "inventoryAdjustmentForm") {
+      event.preventDefault();
+      const form = event.target;
+      const payload = serializeForm(form);
+      payload.request_token = form.dataset.requestToken || newRequestToken();
+      if (!String(payload.descrizione || "").trim()) { toast("Inserisci una descrizione del movimento.", "danger"); return; }
+      setLoading(true, "Registrazione movimento magazzino…");
+      try {
+        const result = await api.adjustInventory(payload);
+        if (result.product) replaceLocalEntity("products", result.product);
+        if (result.movement) {
+          state.data.movements ||= [];
+          state.data.movements.unshift(result.movement);
+          state.data.movements = state.data.movements.slice(0, 100);
+        }
+        closeModal();
+        renderRoute();
+        celebrateSuccess(payload.operazione === "CARICO" ? "📥" : "📤", payload.operazione === "CARICO" ? "Carico registrato" : "Scarico registrato", `${Number(payload.quantita || 0)} cabinet · ${String(payload.descrizione || "").trim()}`);
+      } catch (error) { toast(error.message, "danger"); }
+      finally { setLoading(false); }
+      return;
+    }
     if (event.target.id === "profileForm") {
       event.preventDefault();
       const description = String(event.target.elements.descrizione_profilo.value || "").trim();
@@ -2400,7 +2537,7 @@
 
   $("logoutButton").addEventListener("click", () => {
     if (hasActiveUploads()) { toast("Attendi il completamento dei documenti prima di uscire.", "danger"); uploadState.expanded = true; renderUploadCenter(); return; }
-    api.logout(); state.data = null; showLogin();
+    api.logout(); state.data = null; state.practiceLayout = ""; showLogin();
   });
   $("quickAddButton").addEventListener("click", () => openPracticeTypeChooser());
   $("openSidebar").addEventListener("click", () => $("sidebar").classList.add("open"));

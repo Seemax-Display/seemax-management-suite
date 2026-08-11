@@ -22,6 +22,8 @@ Le colonne `modelli_display`, `misure_display`, `bifacciale`, `cabinet_da_sottra
 
 Le colonne `archiviata` e `archiviata_il` vengono valorizzate quando una pratica passa a `Bocciata`. `agent_username` determina il proprietario e impedisce agli agenti di leggere o modificare pratiche altrui; lo stato è modificabile esclusivamente dagli amministratori.
 
+Le colonne `avviso_giacenza`, `giacenza_insufficiente` e `dettaglio_giacenza` gestiscono il nuovo avviso non bloccante. Una pratica può sempre essere inserita anche se i cabinet non sono disponibili. Impostando manualmente `avviso_giacenza` su `NO` nella riga della pratica, il contrassegno rosso viene nascosto; riportandolo a `SI` torna visibile se la disponibilità è ancora insufficiente. L'impegno effettivo del magazzino resta protetto: Accettata/Completata non possono produrre una giacenza negativa.
+
 Dalla versione 1.9 la riga contiene inoltre destinatario dell'ordine, intestatario, provvigione, rate, periodicità, indirizzo di installazione, modalità di gestione del Ledwall, credenziali Cloud e riepilogo dei documenti richiesti/caricati. I campi restano nella stessa tabella per consentire filtri e controlli diretti da Google Fogli.
 
 ### DOCUMENTI
@@ -49,6 +51,12 @@ Utilizzato sia dal gestionale sia dal Planner per login e ruoli. `ultimo_accesso
 ### PRODOTTI_LED
 
 Listino comune a catalogo e calcolatore. Comprende ID prodotto, costi, giacenze, promozioni e singoli campi della scheda tecnica modificabili dal gestionale.
+
+### MOVIMENTI_MAGAZZINO
+
+Registro immutabile dei carichi, scarichi e storni. I movimenti manuali riportano `tipo_movimento` (`CARICO_MANUALE` o `SCARICO_MANUALE`), quantità firmata, giacenza precedente e successiva, autore e causale. Le operazioni passano dal blocco globale Apps Script, così due amministratori non possono sovrascrivere contemporaneamente la stessa giacenza. La colonna `request_token` rende inoltre idempotente ogni movimento manuale: un doppio invio della medesima richiesta viene riconosciuto e non modifica nuovamente la quantità.
+
+Il valore letterale `0000` è una deroga riservata agli ADMIN per i dati temporaneamente sconosciuti di clienti e pratiche. Non equivale a un dato verificato e deve essere sostituito appena disponibile; il backend rifiuta questa deroga se inviata da un agente.
 
 ### ARCHIVIO_PREVENTIVI
 

@@ -36,6 +36,7 @@
       { id: "act-demo-2", practiceId: "PR-002-26", titolo: "Controllare documentazione IFIS", tipo: "Verifica", scadenza: iso(2), stato: "Aperta", assegnatoA: "David Failla" },
       { id: "act-demo-3", practiceId: "PR-003-26", titolo: "Confermare data sopralluogo", tipo: "Appuntamento", scadenza: iso(4), stato: "Aperta", assegnatoA: "Agente Dimostrativo" }
     ],
+    movements: [],
     users: (window.SEEMAX_APP_CONFIG.demoAccounts || []).map((u, i) => ({ id: u.username, username: u.username, nome_visualizzato: u.displayName, email: u.email, telefono: u.phone, stato: "ATTIVO", ruolo: u.role, note: i === 0 ? "Account amministrativo demo" : "Account agente demo" })),
     settings: {
       iva_percentuale: 22,

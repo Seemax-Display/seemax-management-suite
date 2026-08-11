@@ -21,7 +21,7 @@
   }
 
   function entityKey(entity) {
-    const allowed = ["products", "clients", "practices", "documents", "activities", "users"];
+    const allowed = ["products", "clients", "practices", "documents", "activities", "users", "movements"];
     if (!allowed.includes(entity)) throw new Error("Entità non supportata: " + entity);
     return entity;
   }
@@ -39,6 +39,7 @@
   function upsert(entity, record) {
     const key = entityKey(entity);
     const db = loadDatabase();
+    db[key] ||= [];
     const value = clone(record || {});
     value.id = value.id || uid(key.slice(0, 3));
     const index = db[key].findIndex((item) => String(item.id) === String(value.id));
@@ -51,6 +52,7 @@
   function remove(entity, id) {
     const key = entityKey(entity);
     const db = loadDatabase();
+    db[key] ||= [];
     const before = db[key].length;
     db[key] = db[key].filter((item) => String(item.id) !== String(id));
     saveDatabase(db);
