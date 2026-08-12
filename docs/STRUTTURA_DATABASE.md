@@ -36,9 +36,9 @@ Dalla versione 1.9 la riga contiene inoltre destinatario dell'ordine, intestatar
 
 Registra nome, tipologia, ID e collegamento Google Drive del file caricato. `practiceId` collega il file alla pratica e `tipo_pratica_documento` distingue documento d'identità, tessera sanitaria, visura, preventivo Seemax, preventivo IFIS o altra documentazione. I byte del file non vengono inseriti nel Foglio: restano nella cartella Drive `SEEMAX MANAGEMENT DOCUMENTI`.
 
-### ATTIVITA
+### ATTIVITA (legacy, facoltativo)
 
-Il foglio può rimanere per compatibilità storica, ma dalla versione 1.5 le attività non vengono più lette o scritte nel database. Telefonate, email, appuntamenti e scadenze sono salvati localmente sul dispositivo.
+La sezione Attività è locale dalla versione 1.5 e non legge né scrive questo foglio. La versione 2.13 non lo crea più nelle nuove installazioni. Se un vecchio foglio `ATTIVITA` è vuoto, un amministratore può rimuoverlo eseguendo `removeEmptyLegacyActivitySheetV2130()`. L'utility rifiuta la cancellazione quando trova righe storiche.
 
 ### LOG
 
@@ -46,7 +46,7 @@ Registra le principali operazioni effettuate dagli utenti: salvataggi, modifiche
 
 ### NOTIFICHE
 
-Conserva le variazioni di stato destinate all'agente responsabile e lo stato letto/non letto mostrato dalla campanella.
+È un foglio **attivo e necessario**: conserva le variazioni di stato destinate all'agente responsabile e lo stato letto/non letto mostrato dalla campanella. Non deve essere eliminato.
 
 ## Fogli condivisi con il Quotation Planner
 
@@ -56,13 +56,19 @@ Utilizzato sia dal gestionale sia dal Planner per login e ruoli. `ultimo_accesso
 
 ### PRODOTTI_LED
 
-Listino comune a catalogo e calcolatore. Comprende ID prodotto, costi, giacenze, promozioni e singoli campi della scheda tecnica modificabili dal gestionale.
+Listino comune a catalogo e calcolatore. Comprende ID prodotto, costi, giacenze, promozioni e singoli campi della scheda tecnica modificabili dal gestionale. Dalla versione 2.13 la quantità mostrata nel Catalogo proviene esclusivamente dalla colonna `PRODOTTI_LED.giacenza_attuale`; il carico/scarico manuale modifica quella stessa riga e la rilegge prima di confermare l'operazione.
 
 ### MOVIMENTI_MAGAZZINO
 
 Registro immutabile dei carichi, scarichi e storni. I movimenti manuali riportano `tipo_movimento` (`CARICO_MANUALE` o `SCARICO_MANUALE`), quantità firmata, giacenza precedente e successiva, autore e causale. Le operazioni passano dal blocco globale Apps Script, così due amministratori non possono sovrascrivere contemporaneamente la stessa giacenza. La colonna `request_token` rende inoltre idempotente ogni movimento manuale: un doppio invio della medesima richiesta viene riconosciuto e non modifica nuovamente la quantità.
 
 Il valore letterale `0000` è una deroga riservata agli ADMIN per i dati temporaneamente sconosciuti di clienti e pratiche. Non equivale a un dato verificato e deve essere sostituito appena disponibile; il backend rifiuta questa deroga se inviata da un agente.
+
+## Affidabilità delle scritture dalla versione 2.13
+
+Clienti, pratiche, righe documento, movimenti di magazzino e creazione pratica dal Quotation Planner vengono inviati tramite `POST`, evitando il limite di lunghezza delle URL JSONP. Ogni salvataggio porta un `request_token` stabile e ogni richiesta un `requestId`: se la risposta tarda, il browser controlla l'esito e può riprendere la stessa richiesta senza creare duplicati. Le modifiche condivise continuano a passare dal lock globale e da `record_version`, per impedire sovrascritture silenziose tra agenti.
+
+Un refresh manuale prova sempre una nuova lettura del Foglio. Se Apps Script è temporaneamente indisponibile, l'ultima copia locale resta visibile con un avviso esplicito; non viene presentata come dato aggiornato.
 
 ### ARCHIVIO_PREVENTIVI
 

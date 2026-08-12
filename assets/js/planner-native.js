@@ -132,6 +132,11 @@
       const scopedHistory = { replaceState(_state, _title, url) { locationState.hash = String(url || "").replace(/^[^#]*#?/, "#"); } };
       const listeners = [];
       window.SEEMAX_NATIVE_CONTEXT = context;
+      /* Il Planner nativo usa lo stesso trasporto affidabile del gestionale
+         per creare la pratica: niente payload estesi in una URL JSONP. */
+      window.SEEMAX_NATIVE_API = {
+        createPracticeFromQuote: (payload) => window.SeemaxApi.createPracticeFromQuote(payload)
+      };
       const execute = new Function("document", "window", "location", "history", applicationScript);
       execute(scopedDocument, windowProxy(scopedDocument, locationState, listeners, container), locationState, scopedHistory);
       ["btnDatabaseRefresh", "btnAgentLogin", "btnAgentLogout"].forEach((id) => {

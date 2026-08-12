@@ -10,17 +10,18 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.12.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.13.0";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
 var RUNTIME_DEFERRED_EMAILS_ = [];
+var RUNTIME_DEFERRED_LOGS_ = [];
+var RUNTIME_MUTATION_LOCK_HELD_ = false;
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
   practices: "PRATICHE",
   documents: "DOCUMENTI",
-  activities: "ATTIVITA",
   users: "AGENTI",
   movements: "MOVIMENTI_MAGAZZINO"
 };
@@ -31,7 +32,6 @@ var SHEET_SCHEMAS = {
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  ATTIVITA: ["id", "practiceId", "titolo", "tipo", "scadenza", "stato", "assegnatoA", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
@@ -165,6 +165,39 @@ function upgradeSeemaxV2121() {
   return "SEEMAX v2.12.1 configurato: placeholder 0000 normalizzati e indirizzi con dati sconosciuti compatibili con le pratiche.";
 }
 
+function upgradeSeemaxV2130() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    /* Consolida eventuali righe prodotto legacy senza sostituire i valori
+       presenti nel foglio. PRODOTTI_LED resta l'unica fonte delle giacenze. */
+    initializeInventoryV11_();
+    backfillPracticeStockWarningsV2100_();
+    updatePatchNotesV2130_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.13.0 · connessione resiliente, giacenze PRODOTTI_LED e controllo avvisi per ADMIN.");
+    styleSheets_();
+    return "SEEMAX v2.13.0 configurato: sincronizzazione affidabile e controllo amministrativo degli avvisi giacenza attivi.";
+  });
+}
+
+/* ATTIVITA non viene piu usato come tabella condivisa: la sezione e locale
+   sul dispositivo. Questa utility elimina soltanto un vecchio foglio vuoto,
+   così nessun dato storico può essere cancellato per errore. */
+function removeEmptyLegacyActivitySheetV2130() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    var legacy = ss.getSheetByName("ATTIVITA");
+    if (!legacy) return "Il foglio legacy ATTIVITA non esiste.";
+    if (legacy.getLastRow() > 1) {
+      throw new Error("ATTIVITA contiene righe storiche. Esportale o eliminale manualmente prima di rimuovere il foglio.");
+    }
+    ss.deleteSheet(legacy);
+    resetRuntimeCaches_();
+    return "Foglio legacy ATTIVITA vuoto rimosso. Le attività continuano a essere salvate localmente sui dispositivi.";
+  });
+}
+
 function doGet(e) {
   resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
@@ -181,15 +214,26 @@ function doGet(e) {
 function doPost(e) {
   resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
-  var requestId = String(p.requestId || "");
+  var requestId = String(p.requestId || "").slice(0, 180);
   var result;
   try {
-    if (String(p.action || "") === "savequote") result = saveQuotation_(p);
+    /* Se il browser riprende un POST che sembrava interrotto, lo stesso
+       requestId restituisce l'esito precedente senza eseguire di nuovo la
+       mutazione. */
+    var cachedResult = requestId ? CacheService.getScriptCache().get(managementRequestCacheKey_(requestId)) : "";
+    var cachedPayload = cachedResult ? parseJson_(cachedResult, {}) : null;
+    /* Una risposta molto grande viene rappresentata in cache da un marker.
+       La mutazione viene quindi richiamata: il request_token scritto nel
+       record la rende idempotente e consente di ricostruire la risposta
+       completa senza superare il limite di CacheService. */
+    if (cachedPayload && !cachedPayload.recover_by_token) result = cachedPayload;
+    else if (String(p.action || "") === "savequote") result = saveQuotation_(p);
     else result = routeGet_(String(p.action || ""), p);
     if (result.ok === undefined) result.ok = true;
   } catch (error) {
     result = { ok: false, error: String(error && error.message ? error.message : error) };
   }
+  cacheManagementRequestResult_(requestId, result);
   var message = JSON.stringify({ requestId: requestId, payload: result }).replace(/</g, "\\u003c");
   return HtmlService.createHtmlOutput("<!doctype html><meta charset='utf-8'><script>parent.postMessage(" + message + ", '*');</script>");
 }
@@ -210,9 +254,11 @@ function routeGet_(action, p) {
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
     case "management_upload_document": return managementUploadDocument_(p);
     case "management_upload_status": return managementUploadStatus_(p);
+    case "management_mutation_status": return managementMutationStatus_(p);
     case "management_update_practice_documents": return managementUpdatePracticeDocuments_(p);
     case "management_verify_vat": return managementVerifyVat_(p);
     case "management_inventory_adjust": return managementInventoryAdjust_(p);
+    case "management_set_practice_stock_warning": return managementSetPracticeStockWarning_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -228,7 +274,10 @@ function routeGet_(action, p) {
 /* ========================= MANAGEMENT APP ========================= */
 
 function managementLogin_(p) {
-  return withMutationLock_(function () { return managementLoginLocked_(p); });
+  /* Il login e una lettura e non deve restare bloccato dietro a un upload o
+     a un salvataggio di un altro agente. L'ultimo accesso viene aggiornato
+     separatamente, con un lock breve e senza impedire l'accesso. */
+  return managementLoginLocked_(p);
 }
 
 function managementLoginLocked_(p) {
@@ -241,13 +290,15 @@ function managementLoginLocked_(p) {
   var firstAccess = !lastAccess;
   var visibleUser = publicUser_(user);
   visibleUser.primo_accesso = firstAccess;
-  touchLogin_(user.username);
+  touchLoginBestEffort_(user.username);
   return { ok: true, user: visibleUser, first_access: firstAccess, version: SEEMAX_VERSION };
 }
 
 function managementBootstrap_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
-  var products = rowsToObjects_(sheet_("PRODOTTI_LED"));
+  /* Lettura diretta ad ogni bootstrap: nessuna cache persistente puo
+     sostituire giacenza_attuale del foglio PRODOTTI_LED. */
+  var products = inventoryProductsForRead_();
   var allPractices = rowsToObjects_(sheet_("PRATICHE"));
   var allClients = rowsToObjects_(sheet_("CLIENTI"));
   var allUsers = rowsToObjects_(sheet_("AGENTI"));
@@ -268,7 +319,17 @@ function managementBootstrap_(p) {
   var movements = isAdmin_(user) ? rowsToObjects_(sheet_("MOVIMENTI_MAGAZZINO")).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 100) : [];
   var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, movements: movements, settings: settings, notifications: notifications };
   data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
-  return { ok: true, data: data, user: publicUser_(user), version: SEEMAX_VERSION };
+  return {
+    ok: true,
+    data: data,
+    user: publicUser_(user),
+    version: SEEMAX_VERSION,
+    database_meta: {
+      loaded_at: new Date().toISOString(),
+      inventory_source: "PRODOTTI_LED.giacenza_attuale",
+      products_count: products.length
+    }
+  };
 }
 
 function managementHealth_(p) {
@@ -291,6 +352,7 @@ function managementHealth_(p) {
     sheets: sheets,
     missing_sheets: missing,
     user: user.username,
+    inventory_source: "PRODOTTI_LED.giacenza_attuale",
     elapsed_ms: new Date().getTime() - started
   };
 }
@@ -313,8 +375,24 @@ function managementUpsertLocked_(p) {
   assertWritePermission_(entity, user);
   var payload = parseJson_(p.payload, {});
   if (!payload || typeof payload !== "object") throw new Error("Dati non validi.");
+  var earlyRequestToken = String(payload.request_token || "").trim();
+  if (earlyRequestToken && ENTITY_SHEETS[entity]) {
+    var earlyDuplicate = rowsToObjects_(sheet_(ENTITY_SHEETS[entity])).filter(function (candidate) {
+      return String(candidate.request_token || "") === earlyRequestToken;
+    })[0];
+    if (earlyDuplicate) {
+      if (entity === "practices" && !isAdmin_(user) && String(earlyDuplicate.agent_username || "") !== String(user.username)) throw new Error("Record non autorizzato.");
+      if (entity === "clients" && !canEditClient_(earlyDuplicate, user)) throw new Error("Record non autorizzato.");
+      return {
+        ok: true,
+        row: entity === "users" ? publicUser_(earlyDuplicate) : earlyDuplicate,
+        duplicate: true,
+        notifications: entity === "practices" ? listNotificationsForUser_(user) : undefined
+      };
+    }
+  }
   if (["clients", "practices"].indexOf(entity) >= 0) assertAdminUnknownUsage_(payload, user);
-  if (["clients", "practices", "documents", "activities"].indexOf(entity) >= 0) {
+  if (["clients", "practices", "documents"].indexOf(entity) >= 0) {
     var ownedRecord = entity === "practices" && payload.id ? findRowObject_("PRATICHE", "id", payload.id) : null;
     payload.agent_username = payload.agent_username || (ownedRecord && ownedRecord.agent_username) || user.username;
   }
@@ -813,14 +891,55 @@ function validIban_(value) {
 
 function cacheUploadResult_(requestId, result) {
   if (!requestId) return;
-  CacheService.getScriptCache().put("management_upload_" + requestId, JSON.stringify(result), 600);
+  try { CacheService.getScriptCache().put(managementUploadCacheKey_(requestId), JSON.stringify(result), 600); }
+  catch (error) { /* la verifica puo essere ripetuta dal documento salvato */ }
+}
+
+function hashedCacheKey_(prefix, requestId) {
+  var text = String(requestId || "");
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8);
+  return prefix + Utilities.base64EncodeWebSafe(digest).replace(/=+$/g, "");
+}
+
+function managementRequestCacheKey_(requestId) {
+  return hashedCacheKey_("management_request_", requestId);
+}
+
+function managementUploadCacheKey_(requestId) { return hashedCacheKey_("management_upload_", requestId); }
+
+function cacheManagementRequestResult_(requestId, result) {
+  /* Gli errori di convalida non vengono memorizzati: l'utente deve poter
+     correggere lo stesso modulo e reinviarlo subito. I successi, invece,
+     restano recuperabili e idempotenti. */
+  if (!requestId || !result || result.ok === false) return;
+  var serialized;
+  try { serialized = JSON.stringify(result); }
+  catch (error) { serialized = JSON.stringify({ ok: false, error: "Risposta non serializzabile." }); }
+  /* CacheService accetta valori limitati. Il marker conserva lo stato della
+     richiesta senza permettere a un risultato grande di far fallire il POST;
+     al retry il backend ricostruisce il record attraverso request_token. */
+  /* Usiamo una soglia prudenziale: il limite di CacheService e espresso in
+     byte, mentre String.length misura unita UTF-16. Testi accentati e dati
+     JSON possono quindi occupare piu byte dei caratteri conteggiati. */
+  if (serialized.length > 70000) serialized = JSON.stringify({ ok: true, recover_by_token: true });
+  try { CacheService.getScriptCache().put(managementRequestCacheKey_(requestId), serialized, 600); }
+  catch (error) { /* La cache e un aiuto al trasporto, non il dato definitivo. */ }
+}
+
+function managementMutationStatus_(p) {
+  authenticate_(p.agent_username, p.agent_key);
+  var requestId = String(p.requestId || "").slice(0, 180);
+  if (!requestId) throw new Error("Identificativo salvataggio mancante.");
+  var raw = CacheService.getScriptCache().get(managementRequestCacheKey_(requestId));
+  var result = raw ? parseJson_(raw, {}) : null;
+  return { ok: true, completed: !!raw && !(result && result.recover_by_token), result: result && !result.recover_by_token ? result : null, recover_by_token: !!(result && result.recover_by_token) };
 }
 
 function managementUploadStatus_(p) {
   authenticate_(p.agent_username, p.agent_key);
   var requestId = String(p.requestId || "");
   if (!requestId) throw new Error("Identificativo upload mancante.");
-  var raw = CacheService.getScriptCache().get("management_upload_" + requestId);
+  var raw = CacheService.getScriptCache().get(managementUploadCacheKey_(requestId));
   return { ok: true, completed: !!raw, upload: raw ? parseJson_(raw, {}) : null };
 }
 
@@ -834,11 +953,45 @@ function managementUpdatePracticeDocumentsLocked_(p) {
   var practice = findRowObject_("PRATICHE", "id", practiceId);
   if (!practice) throw new Error("Pratica non trovata.");
   if (!isAdmin_(user) && String(practice.agent_username || "") !== String(user.username)) throw new Error("Non sei autorizzato ad aggiornare questa pratica.");
+  var requestToken = String(p.request_token || "").trim() || Utilities.getUuid();
+  if (String(practice.request_token || "") === requestToken) return { ok: true, row: practice, duplicate: true };
   practice.documenti_caricati_json = String(p.documenti_caricati_json || "[]");
   practice.expected_record_version = Number(practice.record_version || 0);
-  prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
+  practice.request_token = requestToken;
+  var version = prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
+  if (version.duplicate) return { ok: true, row: version.duplicate, duplicate: true };
   var saved = upsertObject_("PRATICHE", "id", practice.id, practice);
   log_(user, "UPDATE_DOCUMENTS", "practices", practice.id, "Riepilogo allegati pratica aggiornato");
+  return { ok: true, row: saved };
+}
+
+function managementSetPracticeStockWarning_(p) {
+  return withMutationLock_(function () { return managementSetPracticeStockWarningLocked_(p); });
+}
+
+function managementSetPracticeStockWarningLocked_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
+  var practiceId = String(p.practice_id || p.id || "").trim();
+  var visibility = String(p.visible || p.avviso_giacenza || "SI").trim().toUpperCase();
+  if (!practiceId) throw new Error("Identificativo pratica mancante.");
+  if (["SI", "NO"].indexOf(visibility) < 0) throw new Error("Impostazione avviso non valida.");
+  var practice = findRowObject_("PRATICHE", "id", practiceId);
+  if (!practice) throw new Error("Pratica non trovata.");
+  var status = normalizePracticeStatus_(practice.stato || "Inserita");
+  if (["Inserita", "Sospesa", "Completata"].indexOf(status) < 0) {
+    throw new Error("L'avviso puo essere gestito nelle pratiche Inserite, Sospese o Completate.");
+  }
+  practice.expected_record_version = Number(p.expected_record_version || practice.record_version || 0);
+  practice.request_token = String(p.request_token || Utilities.getUuid());
+  practice.avviso_giacenza = visibility;
+  var assessment = practiceInventoryAssessment_(practice, String(practice.magazzino_applicato || "NO").toUpperCase() === "SI");
+  practice.giacenza_insufficiente = assessment.insufficient ? "SI" : "NO";
+  practice.dettaglio_giacenza = assessment.detail;
+  var version = prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
+  if (version.duplicate) return { ok: true, row: version.duplicate, duplicate: true };
+  var saved = upsertObject_("PRATICHE", "id", practice.id, practice);
+  log_(user, visibility === "SI" ? "SHOW_STOCK_WARNING" : "HIDE_STOCK_WARNING", "practices", practice.id, "Avviso giacenza " + visibility);
   return { ok: true, row: saved };
 }
 
@@ -849,20 +1002,31 @@ function managementCreateFromQuote_(p) {
 function managementCreateFromQuoteLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var payload = parseJson_(p.payload, {});
+  var requestToken = String(payload.request_token || "").trim() || Utilities.getUuid();
+  payload.request_token = requestToken;
   var type = String(payload.tipo_pratica || "").toUpperCase();
   if (["ACQUISTO", "NOLEGGIO", "LEASING"].indexOf(type) < 0) throw new Error("Scegli Acquisto, Noleggio o Leasing.");
   var company = String(payload.cliente_azienda || payload.cliente_referente || "").trim();
   if (!company) throw new Error("Inserisci almeno la ragione sociale o il referente cliente nel S.Q.P.");
-  var client = findClientForQuote_(payload, user);
   var items = Array.isArray(payload.righe) ? payload.righe : [];
   if (!items.length) throw new Error("Il preventivo non contiene Ledwall selezionati.");
   var quoteId = String(payload.preventivo_id || "").trim();
+  var tokenPractice = rowsToObjects_(sheet_("PRATICHE")).filter(function (row) {
+    return String(row.request_token || "") === requestToken;
+  })[0];
+  if (tokenPractice) {
+    return { ok: true, existing: true, duplicate: true, practice: tokenPractice, client: findRowObject_("CLIENTI", "id", tokenPractice.clientId) || {} };
+  }
   if (quoteId) {
     var existingPractice = rowsToObjects_(sheet_("PRATICHE")).filter(function (row) {
       return String(row.preventivo_id || "") === quoteId && String(row.agent_username || "") === String(user.username);
     })[0];
     if (existingPractice) return { ok: true, existing: true, practice: existingPractice, client: findRowObject_("CLIENTI", "id", existingPractice.clientId) || {} };
   }
+  /* Il cliente viene creato/aggiornato soltanto dopo i controlli di
+     idempotenza: una conferma tardiva non deve incrementarne nuovamente la
+     versione né ripetere una scrittura. */
+  var client = findClientForQuote_(payload, user);
   var finance = type === "ACQUISTO" ? "Acquisto diretto" : (type === "NOLEGGIO" ? "Grenke" : "IFIS");
   var number = nextPracticeIdentifier_(user);
   var title = items.map(function (item) {
@@ -900,11 +1064,16 @@ function managementCreateFromQuoteLocked_(p) {
     righe_magazzino_json: JSON.stringify(buildInventoryRowsFromItems_(items)),
     ledwall_configurazioni_json: JSON.stringify(buildLedwallConfigurationsFromItems_(items)),
     righe_json: JSON.stringify(items),
+    request_token: requestToken,
+    avviso_giacenza: "SI",
     magazzino_applicato: "NO",
     magazzino_in_attesa: "NO",
     creatoIl: new Date().toISOString(),
     aggiornatoIl: new Date().toISOString()
   };
+  var quoteInventoryAssessment = practiceInventoryAssessment_(practice, false);
+  practice.giacenza_insufficiente = quoteInventoryAssessment.insufficient ? "SI" : "NO";
+  practice.dettaglio_giacenza = quoteInventoryAssessment.detail;
   var version = prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
   if (version.duplicate) practice = version.duplicate;
   else practice = upsertObject_("PRATICHE", "id", practice.id, practice);
@@ -1012,9 +1181,12 @@ function upsertPracticeWithInventory_(payload, user, identifierUser) {
     var requiresStock = ["Accettata", "Completata"].indexOf(nextStatus) >= 0;
     var releasesStock = ["Inserita", "Sospesa", "Bocciata"].indexOf(nextStatus) >= 0;
     var shouldReverse = releasesStock && wasApplied;
-    payload.avviso_giacenza = existing && String(existing.avviso_giacenza || "").trim()
-      ? String(existing.avviso_giacenza).toUpperCase()
-      : String(payload.avviso_giacenza || "SI").toUpperCase();
+    var requestedWarningVisibility = String(payload.avviso_giacenza || "").toUpperCase();
+    payload.avviso_giacenza = existing && !isAdmin_(user)
+      ? String(existing.avviso_giacenza || "SI").toUpperCase()
+      : (["SI", "NO"].indexOf(requestedWarningVisibility) >= 0
+        ? requestedWarningVisibility
+        : String(existing && existing.avviso_giacenza || "SI").toUpperCase());
     var inventoryAssessment = practiceInventoryAssessment_(inventorySource, wasApplied);
     payload.giacenza_insufficiente = inventoryAssessment.insufficient ? "SI" : "NO";
     payload.dettaglio_giacenza = inventoryAssessment.detail;
@@ -1110,6 +1282,9 @@ function createPracticeStatusNotification_(before, after, actor) {
   var recipient = findRowObject_("AGENTI", "username", recipientUsername) || {};
   var title = "Pratica " + String(after.numero || after.id || "") + ": " + String(after.stato || "");
   var message = "La pratica " + String(after.numero || after.id || "") + " di " + String(after.cliente || "cliente") + " è passata da " + String(before.stato || "—") + " a " + String(after.stato || "—") + ".";
+  var recipientEmail = String(recipient.email || "").trim();
+  var outcomeState = String(after.stato || "");
+  var shouldPrepareEmail = !!recipientEmail && ["Accettata", "Completata", "Bocciata", "Sospesa"].indexOf(outcomeState) >= 0;
   var id = uid_("not");
   upsertObject_("NOTIFICHE", "id", id, {
     id: id, data: new Date().toISOString(), recipient_username: recipientUsername,
@@ -1117,10 +1292,9 @@ function createPracticeStatusNotification_(before, after, actor) {
     numero_pratica: after.numero || "", stato_precedente: before.stato || "", nuovo_stato: after.stato || "",
     titolo: title, messaggio: message, letta: "NO", letta_il: "", actor_username: actor.username || ""
   });
-  var email = String(recipient.email || "").trim();
-  if (email) {
+  if (shouldPrepareEmail) {
     try {
-      var state = String(after.stato || "");
+      var state = outcomeState;
       var outcome = state.toUpperCase();
       var practiceId = String(after.numero || after.id || "");
       var clientName = String(after.cliente || "cliente");
@@ -1136,7 +1310,7 @@ function createPracticeStatusNotification_(before, after, actor) {
       }
       if (emailText) {
         RUNTIME_DEFERRED_EMAILS_.push({ actor: actor, notificationId: id, message: {
-          to: email,
+          to: recipientEmail,
           subject: subject,
           name: "Seemax Management Suite",
           body: emailText,
@@ -1262,6 +1436,12 @@ function managementInventoryAdjustLocked_(p) {
   var version = prepareVersionedRecord_("PRODOTTI_LED", "id", product.id, product, user);
   if (version.duplicate) return { ok: true, product: version.duplicate, duplicate: true };
   var savedProduct = upsertObject_("PRODOTTI_LED", "id", product.id, product);
+  /* Verifica la stessa cella che verra letta dal Catalogo. */
+  invalidateTable_("PRODOTTI_LED");
+  savedProduct = findInventoryProduct_(product.id) || savedProduct;
+  if (Number(savedProduct.giacenza_attuale || 0) !== after) {
+    throw new Error("La giacenza non e stata confermata nel foglio PRODOTTI_LED.");
+  }
   var movementId = uid_("mov");
   var movement = upsertObject_("MOVIMENTI_MAGAZZINO", "id", movementId, {
     id: movementId,
@@ -1281,7 +1461,7 @@ function managementInventoryAdjustLocked_(p) {
     request_token: requestToken
   });
   log_(user, operation, "movements", movementId, note + " · " + savedProduct.id + " · " + delta);
-  return { ok: true, product: savedProduct, movement: movement };
+  return { ok: true, product: savedProduct, movement: movement, inventory_source: "PRODOTTI_LED.giacenza_attuale" };
 }
 
 function inventoryLinesFromPractice_(practice) {
@@ -1312,11 +1492,78 @@ function inventorySignature_(practice) {
 }
 
 function findInventoryProduct_(productId) {
-  var direct = findRowObject_("PRODOTTI_LED", "id", productId);
-  if (direct) return direct;
-  return rowsToObjects_(sheet_("PRODOTTI_LED")).filter(function (row) {
-    return canonicalProductId_(row.id || row.nome, row.cabX, row.cabY) === productId;
+  var canonicalId = canonicalProductId_(productId || "") || String(productId || "");
+  return inventoryProductsForRead_().filter(function (row) {
+    return String(row.id || "") === canonicalId;
   })[0] || null;
+}
+
+/* I valori iniziali servono esclusivamente a risolvere vecchie righe
+   duplicate. Non vengono mai usati come disponibilita del Catalogo: dopo la
+   migrazione la quantita continua a provenire da PRODOTTI_LED. Se una riga
+   contiene una quantita diversa dal vecchio valore iniziale, la consideriamo
+   una modifica operativa e le diamo precedenza rispetto a una riga seed. */
+function inventoryDefaultValue_(productId, field) {
+  var defaults = {
+    "p19-50100": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "p25-6464": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "p3-5757": { giacenza_iniziale: 60, giacenza_attuale: 60 },
+    "p391-50100": { giacenza_iniziale: 56, giacenza_attuale: 56 },
+    "p391-5050": { giacenza_iniziale: 64, giacenza_attuale: 64 },
+    "p4-9696": { giacenza_iniziale: 8, giacenza_attuale: 8 },
+    "p4-6464": { giacenza_iniziale: 4, giacenza_attuale: 4 }
+  };
+  var product = defaults[String(productId || "")] || {};
+  return Object.prototype.hasOwnProperty.call(product, field) ? product[field] : null;
+}
+
+function inventoryFieldPriority_(row, originalId, canonicalId, field, value) {
+  var priority = String(originalId || "").toLowerCase() === String(canonicalId || "") ? 20 : 10;
+  priority += Math.max(0, Math.min(9999, Number(row.record_version || 0))) * 100;
+  if (["giacenza_iniziale", "giacenza_attuale"].indexOf(field) >= 0) {
+    var initialValue = inventoryDefaultValue_(canonicalId, field);
+    if (initialValue !== null && Number(value) !== Number(initialValue)) priority += 1000000;
+  }
+  return priority;
+}
+
+function inventoryProductsForRead_() {
+  var rows = rowsToObjects_(sheet_("PRODOTTI_LED"));
+  var result = [];
+  var indexByCanonicalId = {};
+  var fieldPriorityByCanonicalId = {};
+  rows.forEach(function (sourceRow) {
+    var row = {};
+    Object.keys(sourceRow).forEach(function (key) { row[key] = sourceRow[key]; });
+    var originalId = String(row.id || "").trim();
+    var canonicalId = canonicalProductId_(originalId || row.nome, row.cabX, row.cabY);
+    if (!canonicalId) {
+      result.push(row);
+      return;
+    }
+    /* I dati non vuoti delle righe legacy vengono uniti. A parita di campo,
+       la riga con ID canonico (quella modificata dal carico/scarico) ha
+       precedenza. In questo modo un ID canonico incompleto non nasconde una
+       giacenza valorizzata nella vecchia riga. */
+    if (indexByCanonicalId[canonicalId] === undefined) {
+      indexByCanonicalId[canonicalId] = result.length;
+      fieldPriorityByCanonicalId[canonicalId] = {};
+      result.push({ id: canonicalId });
+    }
+    var target = result[indexByCanonicalId[canonicalId]];
+    var priorities = fieldPriorityByCanonicalId[canonicalId];
+    Object.keys(row).forEach(function (key) {
+      var value = row[key];
+      if (key === "id" || value === "" || value === null || value === undefined) return;
+      var score = inventoryFieldPriority_(row, originalId, canonicalId, key, value);
+      if (priorities[key] === undefined || score >= priorities[key]) {
+        target[key] = value;
+        priorities[key] = score;
+      }
+    });
+    target.id = canonicalId;
+  });
+  return result;
 }
 
 function buildInventoryRowsFromItems_(items) {
@@ -1498,7 +1745,7 @@ function listEntity_(entity, user) {
   if (!sheetName) throw new Error("Entità non supportata: " + entity);
   if (entity === "users" && !isAdmin_(user)) return [publicUser_(user)];
   if (entity === "movements" && !isAdmin_(user)) return [];
-  var rows = rowsToObjects_(sheet_(sheetName));
+  var rows = entity === "products" ? inventoryProductsForRead_() : rowsToObjects_(sheet_(sheetName));
   if (entity === "clients") {
     var linkedClientIds = {};
     rowsToObjects_(sheet_("PRATICHE")).forEach(function (practice) { if (practice.clientId) linkedClientIds[String(practice.clientId)] = true; });
@@ -1508,7 +1755,7 @@ function listEntity_(entity, user) {
       return row;
     });
   }
-  if (!isAdmin_(user) && ["practices", "documents", "activities"].indexOf(entity) >= 0) {
+  if (!isAdmin_(user) && ["practices", "documents"].indexOf(entity) >= 0) {
     rows = rows.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
   }
   return rows;
@@ -1679,7 +1926,7 @@ function plannerConfig_() {
     ok: true,
     version: String(settings.versione_config || SEEMAX_VERSION),
     impostazioni: settings,
-    prodotti: rowsToObjects_(sheet_("PRODOTTI_LED")).filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; }),
+    prodotti: inventoryProductsForRead_().filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; }),
     patchNotes: { version: notes.version || SEEMAX_VERSION, label: notes.label || "SEEMAX QUOTATION PLANNER", title: notes.title || "Aggiornamento", intro: notes.intro || "", footer: notes.footer || "", items: items }
   };
 }
@@ -1784,6 +2031,8 @@ function resetRuntimeCaches_() {
   RUNTIME_SHEET_CACHE_ = {};
   RUNTIME_TABLE_CACHE_ = {};
   RUNTIME_DEFERRED_EMAILS_ = [];
+  RUNTIME_DEFERRED_LOGS_ = [];
+  RUNTIME_MUTATION_LOCK_HELD_ = false;
 }
 
 function withMutationLock_(callback) {
@@ -1792,6 +2041,7 @@ function withMutationLock_(callback) {
   var result;
   var failure = null;
   try {
+    RUNTIME_MUTATION_LOCK_HELD_ = true;
     /* Una richiesta può avere letto dati prima di ottenere il lock: tutte le
        tabelle vengono quindi rilette dentro la sezione critica. */
     RUNTIME_TABLE_CACHE_ = {};
@@ -1799,11 +2049,30 @@ function withMutationLock_(callback) {
   } catch (error) {
     failure = error;
   } finally {
+    RUNTIME_MUTATION_LOCK_HELD_ = false;
     lock.releaseLock();
   }
   if (failure) throw failure;
+  flushDeferredLogs_();
   flushDeferredEmails_();
   return result;
+}
+
+function writeLogRows_(rows) {
+  if (!rows || !rows.length) return;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(2500)) return;
+  try {
+    var logSheet = sheet_("LOG");
+    logSheet.getRange(logSheet.getLastRow() + 1, 1, rows.length, 7).setValues(rows);
+    invalidateTable_("LOG");
+  } catch (error) { /* il log non deve bloccare l'operazione principale */ }
+  finally { lock.releaseLock(); }
+}
+
+function flushDeferredLogs_() {
+  var queue = RUNTIME_DEFERRED_LOGS_.splice(0);
+  writeLogRows_(queue);
 }
 
 function flushDeferredEmails_() {
@@ -1964,7 +2233,11 @@ function authenticate_(username, key) {
   var cached = CacheService.getScriptCache().get(cacheKey);
   if (cached) {
     var cachedUser = parseJson_(cached, null);
-    if (cachedUser && String(cachedUser.stato || "ATTIVO").toUpperCase() === "ATTIVO") return cachedUser;
+    if (cachedUser && String(cachedUser.stato || "ATTIVO").toUpperCase() === "ATTIVO") {
+      /* La cache non contiene la chiave in chiaro, ma la richiesta corrente
+         ha già prodotto lo stesso digest username|chiave. */
+      return cachedUser;
+    }
   }
   var user = findRowObject_("AGENTI", "username", username);
   if (!user || String(user.chiave_id_agente || "") !== key || String(user.stato || "ATTIVO").toUpperCase() !== "ATTIVO") throw new Error("Nome utente o Chiave ID non corretti.");
@@ -2027,6 +2300,20 @@ function assertWritePermission_(entity, user) {
 function touchLogin_(username) {
   var user = findRowObject_("AGENTI", "username", username);
   if (user) { user.ultimo_accesso = new Date().toISOString(); upsertObject_("AGENTI", "username", username, user); }
+}
+
+function touchLoginBestEffort_(username) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(2500)) return false;
+  try {
+    RUNTIME_TABLE_CACHE_ = {};
+    touchLogin_(username);
+    return true;
+  } catch (error) {
+    return false;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getSettings_() { return getKeyValueSheet_("IMPOSTAZIONI"); }
@@ -2099,10 +2386,12 @@ function migrateRevenueTargetV151_() {
 }
 
 function log_(user, action, entity, id, detail) {
-  try {
-    var sheet = sheet_("LOG");
-    sheet.appendRow([new Date().toISOString(), user.username || "", user.ruolo || "", action, entity, id, detail || ""]);
-  } catch (error) { /* il log non deve bloccare l'operazione principale */ }
+  var row = [new Date().toISOString(), user && user.username || "", user && user.ruolo || "", action, entity, id, detail || ""];
+  /* Il flag appartiene alla singola esecuzione ed evita di interrogare una
+     nuova istanza di LockService, il cui hasLock() non rappresenterebbe in
+     modo affidabile il lock acquisito da withMutationLock_. */
+  if (RUNTIME_MUTATION_LOCK_HELD_) RUNTIME_DEFERRED_LOGS_.push(row);
+  else writeLogRows_([row]);
 }
 
 function uid_(prefix) { return prefix + "-" + new Date().getTime().toString(36) + "-" + Math.random().toString(36).substring(2, 8); }
@@ -2200,9 +2489,9 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.12.1"], ["title", "Dati sconosciuti, pratiche sempre operative"],
-    ["intro", "Il placeholder amministrativo 0000 resta riconoscibile anche negli indirizzi memorizzati su Google Fogli."],
-    ["footer", "I clienti con informazioni parziali possono essere importati nelle pratiche senza che il valore 0000 venga confuso con un campo vuoto."]
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.13.0"], ["title", "Database resiliente e magazzino sincronizzato"],
+    ["intro", "Clienti e pratiche usano richieste POST idempotenti; il Catalogo legge le giacenze direttamente da PRODOTTI_LED."],
+    ["footer", "Il refresh manuale ricarica il database e gli ADMIN possono mostrare o nascondere l'avviso di giacenza nelle singole pratiche."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
 }
@@ -2272,6 +2561,54 @@ function updatePatchNotesV2121_() {
   });
 }
 
+function updatePatchNotesV2130_() {
+  var notes = {
+    version: SEEMAX_VERSION,
+    label: "SEEMAX MANAGEMENT SUITE 2.13.0",
+    title: "Database resiliente e magazzino sincronizzato",
+    intro: "Clienti e pratiche vengono salvati con richieste POST idempotenti; il Catalogo legge le giacenze direttamente da PRODOTTI_LED.",
+    footer: "Il refresh manuale ricarica il database, i carichi/scarichi aggiornano giacenza_attuale e l'ADMIN puo mostrare o nascondere l'avviso di giacenza nelle singole pratiche."
+  };
+  Object.keys(notes).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
+  });
+}
+
+/* Utility amministrativa: mostra le righe prodotto effettivamente restituite
+   al Catalogo e la sorgente della quantità. È utile per un collaudo rapido
+   dopo il deployment senza modificare il database. */
+function auditInventorySourceV2130() {
+  return inventoryProductsForRead_().map(function (product) {
+    return {
+      id: product.id,
+      sku: product.sku || "",
+      nome: product.nome || "",
+      cabinet: String(product.cabX || "") + "x" + String(product.cabY || ""),
+      giacenza_attuale: Number(product.giacenza_attuale || 0),
+      sorgente: "PRODOTTI_LED.giacenza_attuale"
+    };
+  });
+}
+
+/* Collaudo automatico della sola regola di merge: non accede al Foglio e
+   non modifica dati. Conferma che una vecchia riga P2.5 con giacenza 60 abbia
+   priorita su una riga seed canonica ancora ferma a zero. */
+function selfTestInventoryMergeV2130() {
+  var canonical = { id: "p25-6464", giacenza_attuale: 0, record_version: 0 };
+  var operational = { id: "prod-ledwall-display-p2-5-64-64", giacenza_attuale: 60, record_version: 0 };
+  var canonicalPriority = inventoryFieldPriority_(canonical, canonical.id, "p25-6464", "giacenza_attuale", canonical.giacenza_attuale);
+  var operationalPriority = inventoryFieldPriority_(operational, operational.id, "p25-6464", "giacenza_attuale", operational.giacenza_attuale);
+  if (operationalPriority <= canonicalPriority) throw new Error("Test merge giacenza non superato.");
+  return {
+    ok: true,
+    product_id: "p25-6464",
+    canonical_seed_stock: 0,
+    operational_stock: 60,
+    merged_stock: 60,
+    message: "Test merge giacenza superato: P2.5 operativo 60 prevale sul seed 0."
+  };
+}
+
 function seedProducts_() {
   var sheet = sheet_("PRODOTTI_LED");
   if (rowsToObjects_(sheet).length) return;
@@ -2301,6 +2638,7 @@ function initializeInventoryV11_() {
 
 function consolidateProductRows_(entry) {
   var productSheet = sheet_("PRODOTTI_LED");
+  invalidateTable_("PRODOTTI_LED");
   var values = productSheet.getDataRange().getValues();
   var headers = values[0].map(String);
   var matches = [];
@@ -2309,13 +2647,19 @@ function consolidateProductRows_(entry) {
     headers.forEach(function (header, index) { row[header] = values[i][index]; });
     if (canonicalProductId_(row.id || row.nome, row.cabX, row.cabY) === entry.id) matches.push({ sheetRow: i + 1, row: row });
   }
-  matches.sort(function (a, b) { return (a.row.id === entry.id ? 1 : 0) - (b.row.id === entry.id ? 1 : 0); });
   var merged = {};
+  var fieldPriorities = {};
   Object.keys(entry).forEach(function (key) { merged[key] = entry[key]; });
   matches.forEach(function (match) {
+    var originalId = String(match.row.id || "").trim();
     Object.keys(match.row).forEach(function (key) {
       var value = match.row[key];
-      if (value !== "" && value !== null && value !== undefined) merged[key] = value;
+      if (value === "" || value === null || value === undefined || key === "id") return;
+      var priority = inventoryFieldPriority_(match.row, originalId, entry.id, key, value);
+      if (fieldPriorities[key] === undefined || priority >= fieldPriorities[key]) {
+        merged[key] = value;
+        fieldPriorities[key] = priority;
+      }
     });
   });
   merged.id = entry.id;
@@ -2325,6 +2669,9 @@ function consolidateProductRows_(entry) {
   merged.cabY = entry.cabY;
   merged.attivo = merged.attivo || "SI";
   matches.map(function (match) { return match.sheetRow; }).sort(function (a, b) { return b - a; }).forEach(function (sheetRow) { productSheet.deleteRow(sheetRow); });
+  /* Le cancellazioni cambiano gli indici fisici delle righe; la cache della
+     richiesta va invalidata prima di riscrivere il prodotto consolidato. */
+  invalidateTable_("PRODOTTI_LED");
   upsertObject_("PRODOTTI_LED", "id", entry.id, merged);
 }
 
@@ -2345,7 +2692,6 @@ function backfillExistingIds_() {
   fillMissingIds_("CLIENTI", "id", function () { return uid_("cli"); });
   fillMissingIds_("PRATICHE", "id", function (row) { return row.numero ? "PR-" + row.numero : uid_("pra"); });
   fillMissingIds_("DOCUMENTI", "id", function () { return uid_("doc"); });
-  fillMissingIds_("ATTIVITA", "id", function () { return uid_("act"); });
 }
 
 function fillMissingIds_(sheetName, idField, factory) {

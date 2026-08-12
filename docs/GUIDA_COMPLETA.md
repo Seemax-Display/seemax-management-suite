@@ -62,14 +62,17 @@ Lo script crea o completa automaticamente:
 - `CLIENTI`;
 - `PRATICHE`;
 - `DOCUMENTI`;
-- `ATTIVITA`;
 - `IMPOSTAZIONI`;
 - `PATCH_NOTES`;
 - `PATCH_ITEMS`;
 - `ARCHIVIO_PREVENTIVI`;
+- `MOVIMENTI_MAGAZZINO`;
+- `NOTIFICHE`;
 - `LOG`.
 
 I fogli e le colonne già presenti non vengono cancellati.
+
+`ATTIVITA` non viene più creato: la relativa sezione è locale sul dispositivo. In una vecchia installazione il foglio può essere conservato come archivio oppure, se completamente vuoto, rimosso con `removeEmptyLegacyActivitySheetV2130()`. `NOTIFICHE`, invece, è usato dalla campanella e dalle variazioni di stato e non deve essere eliminato.
 
 Se `AGENTI` era vuoto viene creato un account placeholder:
 

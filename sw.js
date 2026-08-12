@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-12-1";
+const CACHE = "seemax-management-v2-13-0";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
@@ -27,11 +27,16 @@ self.addEventListener("fetch", (event) => {
     }).catch(() => caches.match("./index.html")));
     return;
   }
-  event.respondWith(caches.match(event.request).then((cached) => {
-    const update = fetch(event.request).then((response) => {
+  const liveCode = /\.(?:js|css)$/.test(url.pathname);
+  if (liveCode) {
+    event.respondWith(fetch(event.request).then((response) => {
       if (response && response.ok) caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
       return response;
-    });
-    return cached || update;
-  }));
+    }).catch(() => caches.match(event.request)));
+    return;
+  }
+  event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
+    if (response && response.ok) caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
+    return response;
+  })));
 });

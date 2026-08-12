@@ -30,3 +30,13 @@ Le email vengono inviate dopo il rilascio del lock, così una risposta lenta di 
 
 Le sole attività restano locali per scelta progettuale e non partecipano alla concorrenza del database.
 
+## Trasporto 2.13
+
+Le scritture principali non usano più JSONP/GET. Il browser invia un `POST` con un `requestId` stabile; se la risposta della Web App non raggiunge GitHub Pages, interroga `management_mutation_status`. Se il primo POST non è confermato, può effettuarne uno solo di ripresa con lo stesso identificativo. Il backend restituisce l'esito memorizzato oppure riconosce il `request_token` già scritto: la ripresa non applica una seconda volta l'operazione.
+
+Questa strategia risolve separatamente due problemi:
+
+- payload di clienti e pratiche troppo grandi per una URL;
+- risposta persa o timeout apparente dopo una scrittura già conclusa.
+
+Il lock resta necessario: l'idempotenza impedisce i duplicati della stessa richiesta, mentre il lock e `record_version` proteggono le richieste diverse eseguite contemporaneamente da più utenti.

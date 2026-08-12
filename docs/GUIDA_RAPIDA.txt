@@ -1,4 +1,14 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.12.1
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.13.0
+
+NOVITÀ VERSIONE 2.13
+- SALVATAGGI AFFIDABILI: clienti e pratiche viaggiano tramite POST, senza inserire l'intero record nell'URL.
+- NESSUN DOPPIONE DA TIMEOUT: ogni scrittura ha un token idempotente e viene confermata dal backend prima di essere considerata fallita.
+- QUOTATION PLANNER: anche “Inserisci pratica” usa il nuovo canale condiviso quando il Planner è aperto nel Management Suite.
+- REFRESH: ricaricare manualmente la pagina forza una lettura nuova del database; in caso di disservizio viene mostrata chiaramente l'ultima copia locale.
+- GIACENZE: Catalogo e Carico/Scarico usano entrambi PRODOTTI_LED > giacenza_attuale.
+- CONTROLLO ADMIN: nelle pratiche Inserite, Sospese e Completate l'ADMIN può mostrare o nascondere l'avviso di giacenza.
+- FOGLI: NOTIFICHE resta necessario; ATTIVITA è legacy e può essere rimosso solo se vuoto con removeEmptyLegacyActivitySheetV2130().
+- COLLAUDO MAGAZZINO: eseguire auditInventorySourceV2130() per vedere le quantità effettivamente lette dal Catalogo.
 
 CORREZIONE VERSIONE 2.12.1
 - PLACEHOLDER 0000: Google Fogli non può più trasformarlo in uno zero numerico nelle colonne anagrafiche e negli indirizzi.
@@ -48,7 +58,8 @@ NOVITÀ VERSIONE 1.5
 2) DATABASE
    Apri il Foglio Google > Estensioni > Apps Script.
    Incolla apps-script/Code.gs.
-   Esegui setupSeemaxDatabase.
+   Nuova installazione: esegui setupSeemaxDatabase.
+   Aggiornamento esistente: esegui upgradeSeemaxV2130.
 
 3) PUBBLICAZIONE APPS SCRIPT
    Nuovo deployment > Applicazione Web.

@@ -328,10 +328,10 @@
     } else banner.className = "connection-banner is-hidden";
   }
 
-  async function loadAll(showLoader = true) {
+  async function loadAll(showLoader = true, options = {}) {
     if (showLoader) setLoading(true, "Caricamento database…");
     try {
-      state.data = await api.bootstrap();
+      state.data = await api.bootstrap(options);
       if (api.isFastMode()) updateLocalDashboard();
       applyChampionTheme();
       updateNotificationBell();
@@ -521,17 +521,22 @@
     showTutorialStep();
   }
 
-  async function showApp() {
+  async function showApp(options = {}) {
     state.practiceLayout = "";
     resetListingStateForSession();
     $("loginScreen").classList.add("is-hidden");
     $("app").classList.remove("is-hidden");
     setUser();
     renderNav();
-    const cached = !config.demoMode && api.cachedBootstrap ? api.cachedBootstrap() : null;
+    /* Anche durante un refresh manuale proviamo prima il database. La copia
+       locale resta però disponibile come rete di sicurezza: un rallentamento
+       momentaneo di Apps Script non deve lasciare l'utente davanti a una
+       schermata vuota. */
+    const fallbackCached = !config.demoMode && api.cachedBootstrap ? api.cachedBootstrap() : null;
+    const cached = options.forceFresh ? null : fallbackCached;
     try {
       if (!cached) {
-        await loadAll();
+        await loadAll(true, { force: !!options.forceFresh });
         go(location.hash.replace("#", "") || "dashboard", false);
       } else {
         state.data = cached;
@@ -548,8 +553,16 @@
       }
       scheduleFirstAccessExperience();
     } catch (error) {
-      toast(error.message, "danger");
-      $("viewContainer").innerHTML = emptyState("Database non disponibile", "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
+      if (fallbackCached && String(error.code || "") !== "BACKEND_VERSION_MISMATCH") {
+        state.data = fallbackCached;
+        if (api.isFastMode()) updateLocalDashboard();
+        applyChampionTheme(); updateNotificationBell(); setConnectionState();
+        go(location.hash.replace("#", "") || "dashboard", false);
+        toast(`Database temporaneamente non raggiungibile. Stai visualizzando l'ultima copia locale: ${error.message}`, "warning");
+      } else {
+        toast(error.message, "danger");
+        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Pubblica Code.gs 2.13.0 come nuova versione del deployment Apps Script, quindi ricarica la pagina." : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
+      }
     }
   }
 
@@ -981,6 +994,20 @@
     return { detail: shortages.map((row) => `${row.name}: ${row.available} disponibili, ${row.requested} necessari`).join(" · ") };
   }
 
+  function canManagePracticeStockWarning(practice) {
+    return api.isAdmin() && practice && practice.id && ["Inserita", "Sospesa", "Completata"].includes(String(practice.stato || ""));
+  }
+
+  function practiceStockWarningAdminControl(practice) {
+    if (!canManagePracticeStockWarning(practice)) return "";
+    const visible = String(practice.avviso_giacenza || "SI").toUpperCase() !== "NO";
+    const actualIssue = String(practice.giacenza_insufficiente || "NO").toUpperCase() === "SI" || !!practiceStockWarning({ ...practice, avviso_giacenza: "SI" });
+    return `<section class="practice-stock-admin-control ${visible ? "visible" : "hidden"}">
+      <span>${visible ? "⚠️" : "🔕"}</span><div><small>CONTROLLO ADMIN GIACENZA</small><strong>Avviso ${visible ? "visibile" : "nascosto"} su questa pratica</strong><p>${actualIssue ? esc(practice.dettaglio_giacenza || "Il sistema rileva una possibile insufficienza di cabinet.") : "Al momento il calcolo non rileva una carenza effettiva."}</p></div>
+      <button type="button" class="btn ${visible ? "ghost" : "soft"}" data-action="toggle-practice-stock-warning" data-id="${esc(practice.id)}" data-visible="${visible ? "NO" : "SI"}">${visible ? "Nascondi avviso" : "Mostra avviso"}</button>
+    </section>`;
+  }
+
   function practiceLayoutKey() {
     return `SEEMAX_PRACTICE_LAYOUT_V1_${String((api.getSession() || {}).username || "local")}`;
   }
@@ -1103,7 +1130,8 @@
   function renderCatalog() {
     const rows = filterRows(state.data.products, ["nome", "categoria", "descrizione"]);
     const inventoryAction = api.isAdmin() ? `<button class="btn inventory-button" data-action="inventory-adjust">📦 Carico / Scarico</button>` : "";
-    return `${viewToolbar("Nuovo prodotto", api.isAdmin() ? "new-product" : "", `<div class="catalog-toolbar-info"><p class="toolbar-note">Listino ${api.isAdmin() ? "amministrativo" : "agente"} · ${rows.length} configurazioni</p>${inventoryAction}</div>`)}<div class="product-grid">${rows.map((p) => {
+    const source = state.data.database_meta && state.data.database_meta.inventory_source;
+    return `${viewToolbar("Nuovo prodotto", api.isAdmin() ? "new-product" : "", `<div class="catalog-toolbar-info"><p class="toolbar-note">Listino ${api.isAdmin() ? "amministrativo" : "agente"} · ${rows.length} configurazioni${source ? " · Giacenze sincronizzate" : ""}</p>${inventoryAction}</div>`)}<div class="product-grid">${rows.map((p) => {
       const promo = Number(p.prezzoPromoAgenti || 0);
       const price = promo || Number(p.prezzoAgente || 0);
       const promoActive = promo || String(p.promo_attiva || "NO").toUpperCase() === "SI";
@@ -1327,6 +1355,7 @@
         <section class="completed-documents-section"><div class="completed-section-heading"><span>🗂️</span><div><small>DOCUMENTI</small><h4>Allegati archiviati</h4></div></div><ul class="completed-document-list">${documentList}</ul></section>
         ${record.note ? `<section><div class="completed-section-heading"><span>💬</span><div><small>ANNOTAZIONI</small><h4>Note finali</h4></div></div><p class="completed-notes">${esc(record.note)}</p></section>` : ""}
       </div>
+      ${practiceStockWarningAdminControl(record)}
       <footer class="completed-practice-footer"><div><span>${String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "⚠" : "✓"}</span><p><strong>${String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "Scarico magazzino in attesa" : "Magazzino consolidato"}</strong><small>${String(record.magazzino_applicato || "NO").toUpperCase() === "SI" ? "I cabinet previsti risultano già contabilizzati." : String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "La pratica è salvata; i cabinet non sono stati sottratti perché la giacenza è insufficiente." : "Nessun movimento di magazzino risulta applicato."}</small></p></div><button type="button" class="btn primary" data-action="close-modal">Chiudi archivio</button></footer>
     </article>`;
     openModal(`Pratica ${record.numero}`, body, { wide: true, panelClass: "completed-practice-modal", kicker: "Archivio pratiche concluse", subtitle: "Consultazione definitiva · sola lettura" });
@@ -1508,7 +1537,7 @@
       ? tabPanel("recipient", purchaseDestination + identityFields + personalData + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") }))
       : tabPanel("client", identityFields + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("finance", financeFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") })) + tabPanel("documents", uploads);
     const plannerImportNotice = isPlannerPracticePending(record) ? `<div class="planner-practice-notice full"><span>✦</span><div><strong>Pratica importata dal Quotation Planner</strong><p>Completa e verifica i dati mancanti prima di proseguire con l’iter commerciale.</p></div></div>` : "";
-    const fields = plannerImportNotice + typeSummary + tabNavigation + tabContent +
+    const fields = plannerImportNotice + typeSummary + practiceStockWarningAdminControl(record) + tabNavigation + tabContent +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
       `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="bifacciale" value="${esc(record.bifacciale || "NO")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}"><input type="hidden" name="ledwall_configurazioni_json" value="${esc(record.ledwall_configurazioni_json || "[]")}"><input type="hidden" name="p391_unificato" value="${esc(record.p391_unificato || "NO")}"><input type="hidden" name="p391_cabinet_50100" value="${esc(record.p391_cabinet_50100 || "0")}"><input type="hidden" name="p391_cabinet_5050" value="${esc(record.p391_cabinet_5050 || "0")}">` +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "");
@@ -1919,7 +1948,7 @@
       <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Registra movimento</button></div>
     </form>
     <section class="inventory-history"><div class="panel-head"><div><span class="section-kicker">Registro condiviso</span><h3>Ultimi movimenti</h3></div></div>${recent.length ? `<div class="inventory-history-list">${recent.map((movement) => `<article><span class="movement-delta ${Number(movement.quantita || 0) >= 0 ? "positive" : "negative"}">${Number(movement.quantita || 0) >= 0 ? "+" : ""}${Number(movement.quantita || 0)}</span><div><strong>${esc(movement.prodotto || movement.product_id)}</strong><p>${esc(movement.note || movement.tipo_movimento || "Movimento magazzino")}</p><small>${dateIt(movement.data)} · ${esc(movement.username || "Sistema")} · ${Number(movement.giacenza_prima || 0)} → ${Number(movement.giacenza_dopo || 0)}</small></div></article>`).join("")}</div>` : `<p class="field-help">Nessun movimento ancora registrato.</p>`}</section>`;
-    openModal("Carico / Scarico magazzino", body, { wide: true, kicker: "Amministrazione giacenze", subtitle: "Ogni variazione viene registrata con autore, data e descrizione." });
+    openModal("Carico / Scarico magazzino", body, { wide: true, kicker: "Amministrazione giacenze", subtitle: "Aggiorna direttamente PRODOTTI_LED.giacenza_attuale; ogni variazione viene registrata con autore, data e descrizione." });
     const form = document.getElementById("inventoryAdjustmentForm");
     const refreshCurrent = () => {
       const product = products.find((item) => String(item.id) === String(form.elements.product_id.value)) || products[0];
@@ -2480,6 +2509,25 @@
       "back-practice-types": () => openPracticeTypeChooser(),
       "new-product": () => openProduct(), "edit-product": () => openProduct(id), "product-tech": () => openProductTech(id), "delete-product": () => removeEntity("products", id),
       "inventory-adjust": openInventoryAdjustment,
+      "toggle-practice-stock-warning": async () => {
+        const practice = (state.data.practices || []).find((item) => String(item.id) === String(id));
+        if (!practice || !api.isAdmin()) return;
+        const visible = String(data.visible || "SI").toUpperCase() === "SI";
+        setLoading(true, visible ? "Attivazione avviso giacenza…" : "Disattivazione avviso giacenza…");
+        try {
+          const saved = await api.setPracticeStockWarning(practice, visible);
+          replaceLocalEntity("practices", saved);
+          closeModal();
+          renderRoute();
+          if (isCompletedPractice(saved)) openCompletedPractice(saved); else openPractice(saved.id);
+          toast(visible ? "Avviso giacenza reso visibile sulla pratica." : "Avviso giacenza nascosto sulla pratica.");
+        } catch (error) {
+          if (String(error.message || "").includes("CONFLICT_RECORD")) {
+            toast("La pratica è stata aggiornata da un altro utente. Ricarico i dati prima di riprovare.", "danger");
+            try { await loadAll(false, { force: true }); renderRoute(); } catch (refreshError) { /* mantiene i dati visibili */ }
+          } else toast(error.message, "danger");
+        } finally { setLoading(false); }
+      },
       "set-practice-layout": () => {
         const layout = data.layout === "type" ? "type" : "table";
         state.practiceLayout = layout;
@@ -2531,7 +2579,7 @@
       "confirm-fast-mode": enableFastMode,
       "disable-fast-mode": disableFastMode,
       "sync-all": syncAll,
-      "reload": async () => { await loadAll(); renderRoute(); },
+      "reload": async () => { await loadAll(true, { force: true }); renderRoute(); },
       "reload-planner": () => { if (state.route === "planner") renderRoute(); },
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.health(); setConnectionState(); toast(response.ok ? `Database collegato · ${response.elapsed_ms || 0} ms.` : `Database incompleto: ${(response.missing_sheets || []).join(", ")}.`, response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
@@ -2678,7 +2726,7 @@
       event.preventDefault();
       $("loginError").textContent = "";
       setLoading(true, "Verifica accesso…");
-      try { await api.login($("loginUsername").value, $("loginKey").value); await showApp(); }
+      try { await api.login($("loginUsername").value, $("loginKey").value); await showApp({ forceFresh: true }); }
       catch (error) { $("loginError").textContent = error.message; }
       finally { setLoading(false); }
       return;
@@ -2702,7 +2750,11 @@
       setLoading(true, "Registrazione movimento magazzino…");
       try {
         const result = await api.adjustInventory(payload);
-        if (result.product) replaceLocalEntity("products", result.product);
+        if (Array.isArray(result.products)) {
+          state.data.products = result.products;
+          updateLocalDashboard();
+          scheduleBootstrapCache();
+        } else if (result.product) replaceLocalEntity("products", result.product);
         if (result.movement) {
           state.data.movements ||= [];
           state.data.movements.unshift(result.movement);
@@ -2789,6 +2841,15 @@
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { if (tutorialState.active) stopTutorial(false); else closeModal(); $("sidebar").classList.remove("open"); } if (tutorialState.active && event.key === "ArrowRight") moveTutorial(1); if (tutorialState.active && event.key === "ArrowLeft") moveTutorial(-1); });
   window.addEventListener("resize", () => { if (tutorialState.active) positionTutorialSpotlight(tutorialState.steps[tutorialState.index].selector); });
   window.addEventListener("hashchange", () => { if (api.getSession()) go(location.hash.replace("#", "") || "dashboard", false); });
+  window.addEventListener("online", async () => {
+    if (!api.getSession() || api.isFastMode() || state.loading) return;
+    try { await loadAll(false, { force: true }); renderRoute(); toast("Connessione al database ripristinata.", "info"); }
+    catch (error) { setConnectionState(); }
+  });
+  window.addEventListener("pageshow", async (event) => {
+    if (!event.persisted || !api.getSession() || api.isFastMode()) return;
+    try { await loadAll(false, { force: true }); renderRoute(); } catch (error) { setConnectionState(); }
+  });
   window.addEventListener("seemax:practice-created", async (event) => {
     await loadAll();
     state.practiceQuery = String((event.detail && event.detail.practice && event.detail.practice.numero) || "");
@@ -2802,7 +2863,9 @@
 
   async function boot() {
     if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
-    if (api.getSession()) await showApp(); else showLogin();
+    const navigation = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+    const manualReload = navigation ? navigation.type === "reload" : !!(performance.navigation && performance.navigation.type === 1);
+    if (api.getSession()) await showApp({ forceFresh: manualReload }); else showLogin();
   }
 
   boot();

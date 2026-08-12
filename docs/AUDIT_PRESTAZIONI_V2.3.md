@@ -34,6 +34,14 @@ La riduzione del solo documento Planner è superiore al 90%. Le immagini sono or
 
 Google Apps Script può avere avvii a freddo e tempi variabili. Anche Google Drive, l’invio email e la verifica VIES sono servizi esterni: la loro latenza non può essere eliminata dal frontend. La versione 2.3.0 riduce le chiamate evitabili e mantiene l’interfaccia utilizzabile durante un aggiornamento lento.
 
+## Integrazione versione 2.13
+
+La versione 2.13 interviene sul problema che rimaneva più visibile: i record cresciuti nel tempo venivano ancora inseriti in URL JSONP. Clienti, pratiche e metadati documentali ora usano POST; timeout e risposte perse sono gestiti mediante stato richiesta e token idempotenti. Il login non attende più il lock globale per aggiornare `ultimo_accesso`: l'accesso viene concesso dopo l'autenticazione e il timestamp viene aggiornato con un lock breve best-effort.
+
+Il bootstrap continua a usare una sola lettura per foglio nella singola esecuzione e le giacenze vengono deduplicate in memoria direttamente da `PRODOTTI_LED`, senza una seconda fonte persistente.
+
+Gli eventi `LOG` generati durante una mutazione vengono inoltre accodati in memoria e scritti in un solo blocco dopo la sezione critica. Questo conserva la tracciabilità riducendo il tempo nel quale gli altri agenti restano in attesa del lock globale.
+
 ## Controlli eseguiti
 
 - controllo sintattico di tutti i file JavaScript e di `Code.gs`;
@@ -41,4 +49,3 @@ Google Apps Script può avere avvii a freddo e tempi variabili. Anche Google Dri
 - verifica che l’ottimizzazione del Planner sia idempotente;
 - verifica della dimensione del Planner e della presenza degli asset estratti;
 - verifica della nuova versione della cache PWA.
-

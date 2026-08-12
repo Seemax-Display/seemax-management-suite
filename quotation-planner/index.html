@@ -2034,7 +2034,9 @@
       databaseState.loadedAt = new Date().toLocaleString('it-IT');
       rebuildAllLedQuotesFromDatabase();
       setDatabaseStatus('online', productsApplied ? 'Dati caricati aggiornati al 02/07/2026' : 'Dati online recuperati, ma nessun prodotto compatibile è stato aggiornato.');
-      if(patchApplied) showPatchNotes(false);
+      /* Nel Management Suite le Patch Notes vengono orchestrate dalla shell
+         principale: il Planner integrato non deve aprire un secondo popup. */
+      if(patchApplied && !window.SEEMAX_NATIVE_CONTEXT) showPatchNotes(false);
       if(options.showAlert) sqpAlert('Dati online aggiornati correttamente.', {title:'Database aggiornato'});
     }
 
@@ -2060,9 +2062,9 @@
 
     function setupDatabaseTest(){
       const btn = $('btnDatabaseRefresh');
-      if(btn) btn.addEventListener('click', () => loadDatabaseConfig({showAlert:true}));
       const nativeContext = window.SEEMAX_NATIVE_CONTEXT;
       if(nativeContext && Array.isArray(nativeContext.products)){
+        if(btn) btn.hidden = true;
         applyDatabaseConfig({
           ok:true,
           prodotti:nativeContext.products,
@@ -2071,6 +2073,7 @@
         });
         setDatabaseStatus('online', 'Catalogo e impostazioni condivisi con il Seemax Management Suite.');
       }else{
+        if(btn) btn.addEventListener('click', () => loadDatabaseConfig({showAlert:true}));
         setDatabaseStatus('locale', 'Il Planner userà il listino locale finché il database online non sarà caricato.');
         setTimeout(() => loadDatabaseConfig({showAlert:false}), 600);
       }
@@ -4721,11 +4724,15 @@
       closePracticeTypeModal();
       showPersistentCalcLoading('Inserimento pratica', 'Trasferimento di cliente, valori e cabinet al gestionale...');
       try{
-        const response = await jsonpRequest('management_create_from_quote', 25000, {
-          agent_username:agentSession.username,
-          agent_key:agentSession.key,
-          payload:JSON.stringify(practicePayloadFromSummary(type))
-        });
+        const practicePayload = practicePayloadFromSummary(type);
+        const nativeApi = window.SEEMAX_NATIVE_API;
+        const response = nativeApi && typeof nativeApi.createPracticeFromQuote === 'function'
+          ? await nativeApi.createPracticeFromQuote(practicePayload)
+          : await jsonpRequest('management_create_from_quote', 45000, {
+              agent_username:agentSession.username,
+              agent_key:agentSession.key,
+              payload:JSON.stringify(practicePayload)
+            });
         if(!response || response.ok === false) throw new Error((response && response.error) || 'Inserimento non riuscito.');
         hideCalcLoading();
         const label = response.existing ? 'già presente' : 'creata correttamente';

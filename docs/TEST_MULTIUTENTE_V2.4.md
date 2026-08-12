@@ -20,19 +20,18 @@ Usare due finestre in incognito con due account differenti.
 
 1. Aprire due pratiche che utilizzano lo stesso prodotto.
 2. Impostarle su **Accettata** quasi contemporaneamente.
-3. Controllare che gli scarichi siano progressivi e che una richiesta eccedente venga respinta.
+3. Controllare che gli scarichi siano progressivi. Se la seconda pratica eccede la disponibilità, deve essere salvata senza scarico, con `magazzino_in_attesa = SI` e relativo avviso; `PRODOTTI_LED` non deve mai diventare negativo.
 4. Verificare una sola coppia coerente `giacenza_prima`/`giacenza_dopo` per ogni movimento.
 
 ## Richiesta ripetuta
 
-1. Durante un salvataggio non premere nuovamente il pulsante.
-2. Se si verifica un timeout, riprovare dalla stessa schermata.
-3. Il token deve impedire la creazione di un duplicato.
+1. Durante un salvataggio non è necessario premere nuovamente il pulsante: dalla 2.13 il client controlla e riprende automaticamente la richiesta.
+2. Simulare una rete lenta e attendere la conferma.
+3. Verificare che esista una sola riga con quel `request_token` e che il cliente/pratica non sia duplicato.
+4. Ripetere anche con **Inserisci pratica** dal Quotation Planner e con un movimento manuale di magazzino.
 
 ## Agente del mese
 
 1. Aprire **Dashboard → Agente del mese → Maggiori dettagli** come ADMIN.
-2. Premere **Prova messaggio iniziale**.
-3. Verificare il nome dell’agente, la pratica principale e il fatturato.
-4. Chiudere e ripetere: l’anteprima deve essere sempre disponibile e non deve modificare il database.
-
+2. Verificare che mese, agente, pratica principale e fatturato appartengano tutti allo stesso periodo di riferimento.
+3. Per collaudare il messaggio iniziale senza attendere il primo del mese, usa la procedura amministrativa descritta nella guida della relativa versione; il vecchio pulsante **Prova messaggio** non fa più parte dell'interfaccia.

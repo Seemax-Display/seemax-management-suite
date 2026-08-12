@@ -35,12 +35,16 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - importazione dei clienti visibili nel Planner oppure compilazione manuale;
 - modalità demo locale;
 - PWA installabile da browser;
-- backend Apps Script già predisposto.
+- backend Apps Script già predisposto;
 - avvio accelerato con cache locale per utente e aggiornamento del database in background;
 - backend ottimizzato con letture per richiesta e salvataggi aggregati;
-- Planner alleggerito di oltre il 90% separando immagini e codice.
+- Planner alleggerito di oltre il 90% separando immagini e codice;
 - protezione multiutente con coda delle scritture, versioni record e prevenzione dei duplicati;
-- rilevamento dei conflitti senza sovrascritture silenziose.
+- rilevamento dei conflitti senza sovrascritture silenziose;
+- salvataggi POST idempotenti per clienti, pratiche e movimenti, con recupero automatico dopo timeout;
+- giacenze del Catalogo lette e verificate direttamente in `PRODOTTI_LED.giacenza_attuale`;
+- controllo ADMIN dell'avviso giacenza per ogni pratica Inserita, Sospesa o Completata;
+- refresh manuale con nuova lettura del database e fallback locale dichiarato in caso di disservizio.
 
 ## Prova immediata
 
@@ -60,7 +64,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.12.1 segui [docs/AGGIORNAMENTO_V2.12.1.md](docs/AGGIORNAMENTO_V2.12.1.md). Consulta anche [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
+Per aggiornare un'installazione già operativa alla versione 2.13.0 segui [docs/AGGIORNAMENTO_V2.13.0.md](docs/AGGIORNAMENTO_V2.13.0.md). Consulta anche il [rapporto tecnico 2.13](docs/RAPPORTO_TECNICO_V2.13.0.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
 
 ## Placeholder
 

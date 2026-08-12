@@ -11,6 +11,7 @@
   let session = demo.getSession();
   let online = !!config.demoMode;
   let serverVersion = "";
+  let bootstrapPromise = null;
 
   function readLocal(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -81,6 +82,28 @@
     return !config.demoMode && /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(config.appsScriptUrl || "");
   }
 
+  function transportError(message, code) {
+    const error = new Error(message);
+    error.code = code || "NETWORK_ERROR";
+    error.transient = true;
+    return error;
+  }
+
+  function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+  async function retryRead(operation, attempts = 2) {
+    let lastError = null;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try { return await operation(attempt); }
+      catch (error) {
+        lastError = error;
+        if (!error || error.transient !== true || attempt === attempts - 1) throw error;
+        await wait(500 + attempt * 900);
+      }
+    }
+    throw lastError;
+  }
+
   function jsonp(action, params = {}, timeout = 45000) {
     return new Promise((resolve, reject) => {
       if (!isConfigured()) return reject(new Error("URL Apps Script non configurato."));
@@ -95,13 +118,13 @@
         delete window[callback];
         script.remove();
       };
-      const timer = setTimeout(() => { cleanup(); reject(new Error("Il database non ha risposto in tempo.")); }, timeout);
+      const timer = setTimeout(() => { cleanup(); online = false; reject(transportError("Il database non ha risposto in tempo.", "TIMEOUT")); }, timeout);
       window[callback] = (response) => {
         cleanup();
         if (response && response.ok !== false) { online = true; resolve(response); }
         else reject(new Error((response && response.error) || "Operazione non riuscita."));
       };
-      script.onerror = () => { cleanup(); online = false; reject(new Error("Impossibile raggiungere Google Apps Script.")); };
+      script.onerror = () => { cleanup(); online = false; reject(transportError("Impossibile raggiungere Google Apps Script.", "NETWORK_ERROR")); };
       script.src = config.appsScriptUrl + "?" + query.toString();
       document.head.appendChild(script);
     });
@@ -131,7 +154,7 @@
       localStorage.setItem(marker, "1");
     }
     else {
-      const response = await jsonp("management_login", { agent_username: username, agent_key: key }, 60000);
+      const response = await retryRead((attempt) => jsonp("management_login", { agent_username: username, agent_key: key }, attempt ? 75000 : 45000), 2);
       serverVersion = String(response.version || serverVersion || "");
       const firstAccess = response.first_access === true || response.user && response.user.primo_accesso === true;
       user = { ...response.user, username, key, firstAccess, primo_accesso: firstAccess, authenticatedAt: new Date().toISOString() };
@@ -148,7 +171,7 @@
 
   async function ping() {
     if (config.demoMode) return { ok: true, mode: "demo" };
-    const response = await jsonp("ping", {}, 45000);
+    const response = await retryRead((attempt) => jsonp("ping", {}, attempt ? 60000 : 30000), 2);
     serverVersion = String(response.version || serverVersion || "");
     online = !!response.ok;
     return response;
@@ -156,37 +179,50 @@
 
   async function health() {
     if (config.demoMode) return { ok: true, mode: "demo", version: config.version, elapsed_ms: 0 };
-    const response = await jsonp("management_health", authParams(), 90000);
+    const response = await retryRead((attempt) => jsonp("management_health", authParams(), attempt ? 90000 : 55000), 2);
     serverVersion = String(response.version || serverVersion || "");
     online = !!response.ok;
     return response;
   }
 
-  async function bootstrap() {
+  async function bootstrap(options = {}) {
     if (config.demoMode) {
       const data = demo.bootstrap();
+      data.database_meta = { loaded_at: new Date().toISOString(), inventory_source: "DEMO_LOCALE", products_count: (data.products || []).length };
       const local = localActivities();
       if (local.length) data.activities = local; else setLocalActivities(data.activities || []);
       return applyPending(data);
     }
-    const response = await jsonp("management_bootstrap", authParams(), 90000);
-    serverVersion = String(response.version || serverVersion || "");
-    const data = response.data;
-    const local = localActivities();
-    data.activities = local.length ? local : [];
-    saveBootstrapCache(data);
-    return applyPending(data);
+    if (bootstrapPromise && !options.force) return bootstrapPromise;
+    const request = (async () => {
+      const response = await retryRead((attempt) => jsonp("management_bootstrap", authParams(), attempt ? 90000 : 55000), 2);
+      serverVersion = String(response.version || serverVersion || "");
+      if (serverVersion && !serverVersion.includes(String(config.version))) {
+        const versionError = new Error(`Backend non aggiornato: atteso ${config.version}, ricevuto ${serverVersion}.`);
+        versionError.code = "BACKEND_VERSION_MISMATCH";
+        throw versionError;
+      }
+      const data = response.data;
+      data.database_meta = response.database_meta || {};
+      const local = localActivities();
+      data.activities = local.length ? local : [];
+      saveBootstrapCache(data);
+      return applyPending(data);
+    })();
+    bootstrapPromise = request;
+    try { return await request; }
+    finally { if (bootstrapPromise === request) bootstrapPromise = null; }
   }
 
   async function list(entity) {
     if (config.demoMode) return demo.list(entity);
-    const response = await jsonp("management_list", { ...authParams(), entity });
+    const response = await retryRead((attempt) => jsonp("management_list", { ...authParams(), entity }, attempt ? 65000 : 40000), 2);
     return response.rows || [];
   }
 
   async function upsert(entity, record) {
     if (entity === "activities") return upsertLocalActivity(record);
-    const value = { ...record, id: record.id || uid(entity.slice(0, 3)), aggiornatoIl: new Date().toISOString() };
+    const value = { ...record, id: record.id || uid(entity.slice(0, 3)), request_token: record.request_token || uid("save-req"), aggiornatoIl: new Date().toISOString() };
     if (isFastMode()) {
       queueOperation({ type: "upsert", entity, record: value });
       return value;
@@ -209,7 +245,11 @@
       value.file_id = confirmedUpload.file_id;
       delete value.file_base64;
     }
-    const response = await jsonp("management_upsert", { ...authParams(), entity, payload: JSON.stringify(value) }, 60000);
+    const response = await postMutation("management_upsert", { entity, payload: JSON.stringify(value) }, {
+      entity,
+      requestToken: value.request_token,
+      maxWait: ["clients", "practices"].includes(entity) ? 150000 : 120000
+    });
     const row = response.row || {};
     if (response.notifications) row.__notifications = response.notifications;
     return row;
@@ -241,9 +281,12 @@
       const current = demo.list("practices").find((row) => String(row.id) === String(practiceId)) || { id: practiceId };
       return demo.upsert("practices", { ...current, documenti_caricati_json: documentsJson, aggiornatoIl: new Date().toISOString() });
     }
-    const response = await jsonp("management_update_practice_documents", {
-      ...authParams(), practice_id: practiceId, documenti_caricati_json: documentsJson
-    }, 20000);
+    const requestToken = uid("practice-docs");
+    const response = await postMutation("management_update_practice_documents", {
+      practice_id: practiceId,
+      documenti_caricati_json: documentsJson,
+      request_token: requestToken
+    }, { entity: "practices", requestToken });
     return response.row || {};
   }
 
@@ -280,16 +323,17 @@
 
   function postForm(action, values) {
     return new Promise((resolve, reject) => {
-      const requestId = uid("post");
+      const requestId = String(values && values.requestId || uid("post"));
       const iframe = document.createElement("iframe");
       const form = document.createElement("form");
-      iframe.name = requestId;
+      const frameTarget = `${requestId}-${uid("frame")}`;
+      iframe.name = frameTarget;
       iframe.hidden = true;
       form.method = "POST";
       form.action = config.appsScriptUrl;
-      form.target = requestId;
+      form.target = frameTarget;
       form.hidden = true;
-      const params = { action, requestId, ...authParams(), ...values };
+      const params = { action, ...authParams(), ...values, requestId };
       Object.entries(params).forEach(([name, value]) => {
         const input = document.createElement("input");
         input.type = "hidden"; input.name = name; input.value = value == null ? "" : String(value);
@@ -303,10 +347,10 @@
         form.remove();
         /* Il POST può proseguire anche se Apps Script non riesce a fare
            postMessage verso GitHub Pages. Conserviamo l'iframe e verifichiamo
-           il risultato tramite management_upload_status. */
+           il risultato tramite il relativo endpoint di stato. */
         setTimeout(() => iframe.remove(), 120000);
         resolve({ ok: true, pending: true, requestId });
-      }, 35000);
+      }, 22000);
       function finish(error, result) {
         if (done) return;
         done = true;
@@ -326,6 +370,62 @@
       document.body.append(iframe, form);
       form.submit();
     });
+  }
+
+  async function waitForMutation(requestId, options = {}) {
+    const started = Date.now();
+    let lastError = null;
+    while (Date.now() - started < Number(options.maxWait || 120000)) {
+      try {
+        const response = await jsonp("management_mutation_status", { ...authParams(), requestId }, 30000);
+        if (response.completed) {
+          const result = response.result || {};
+          if (result.ok === false) throw new Error(result.error || "Salvataggio non riuscito.");
+          return result;
+        }
+      } catch (error) {
+        if (!error.transient) throw error;
+        lastError = error;
+      }
+      await wait(1800);
+    }
+    /* Il POST potrebbe essere terminato dopo la scadenza della cache. La
+       verifica per token interroga il record senza ripetere alla cieca. */
+    if (!options.skipFallback && options.entity && options.requestToken) {
+      try {
+        const rows = await list(options.entity);
+        const existing = rows.find((row) => String(row.request_token || "") === String(options.requestToken));
+        if (existing) return { ok: true, row: existing, recovered: true };
+      } catch (error) { lastError = error; }
+    }
+    const confirmationError = new Error(lastError && lastError.message
+      ? `Il salvataggio non è stato confermato: ${lastError.message}`
+      : "Il salvataggio non è stato confermato dal database.");
+    confirmationError.code = "MUTATION_UNCONFIRMED";
+    confirmationError.transient = true;
+    throw confirmationError;
+  }
+
+  async function postMutation(action, values, options = {}) {
+    const mutationRequestId = options.requestToken ? `mutation-${String(options.requestToken).replace(/[^A-Za-z0-9_-]/g, "-")}` : uid("mutation");
+    const requestValues = { ...values, requestId: mutationRequestId };
+    let response = await postForm(action, requestValues);
+    let result;
+    if (!response.pending) result = response;
+    else {
+      try {
+        result = await waitForMutation(response.requestId, { ...options, maxWait: Math.min(Number(options.maxWait || 120000), 18000), skipFallback: true });
+      } catch (error) {
+        if (!error || error.code !== "MUTATION_UNCONFIRMED") throw error;
+        /* Un solo reinvio con lo stesso token. Il backend riconosce la
+           richiesta già applicata, quindi questa ripresa non può creare un
+           secondo cliente, pratica o movimento di magazzino. */
+        response = await postForm(action, requestValues);
+        result = response.pending ? await waitForMutation(response.requestId, options) : response;
+      }
+    }
+    online = true;
+    return result;
   }
 
   async function waitForUpload(requestId) {
@@ -396,8 +496,85 @@
       });
       return { product: savedProduct, movement };
     }
-    const response = await jsonp("management_inventory_adjust", { ...authParams(), payload: JSON.stringify(payload) }, 60000);
-    return { product: response.product, movement: response.movement, duplicate: response.duplicate === true };
+    const response = await postMutation("management_inventory_adjust", { payload: JSON.stringify(payload) }, {
+      entity: "movements",
+      requestToken: payload.request_token
+    });
+    /* La risposta e poi verificata rileggendo PRODOTTI_LED, la stessa fonte
+       mostrata nel Catalogo. */
+    const products = await list("products");
+    const confirmed = products.find((row) => String(row.id) === String(response.product && response.product.id || payload.product_id));
+    return { product: confirmed || response.product, products, movement: response.movement, duplicate: response.duplicate === true };
+  }
+
+  async function setPracticeStockWarning(practice, visible) {
+    if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
+    const requestToken = uid("stock-warning");
+    const response = await postMutation("management_set_practice_stock_warning", {
+      practice_id: practice.id,
+      visible: visible ? "SI" : "NO",
+      expected_record_version: Number(practice.record_version || 0),
+      request_token: requestToken
+    }, { entity: "practices", requestToken });
+    return response.row || {};
+  }
+
+  async function createPracticeFromQuote(sourcePayload) {
+    const payload = { ...(sourcePayload || {}), request_token: (sourcePayload && sourcePayload.request_token) || uid("quote-practice") };
+    if (config.demoMode) {
+      const sessionUser = session || {};
+      const clientId = String(payload.cliente_id_gestionale || "") || uid("cli");
+      let client = demo.list("clients").find((row) => String(row.id) === clientId);
+      if (!client) client = demo.upsert("clients", {
+        id: clientId,
+        ragioneSociale: payload.cliente_azienda || payload.cliente_referente || "Cliente S.Q.P.",
+        referente: payload.cliente_referente || "",
+        piva: payload.cliente_piva_cf || "",
+        email: payload.cliente_email || "",
+        telefono: payload.cliente_telefono || "",
+        comune: payload.cliente_localita || "",
+        citta: payload.cliente_localita || "",
+        agent_username: sessionUser.username || "",
+        creato_da_username: sessionUser.username || "",
+        creato_da_nome: sessionUser.displayName || sessionUser.nome_visualizzato || sessionUser.username || "",
+        condiviso: "NO",
+        creatoIl: new Date().toISOString()
+      });
+      const existing = demo.list("practices").find((row) => String(row.preventivo_id || "") === String(payload.preventivo_id || "") && String(row.agent_username || "") === String(sessionUser.username || ""));
+      if (existing) return { ok: true, existing: true, practice: existing, client };
+      const items = Array.isArray(payload.righe) ? payload.righe : [];
+      const numero = demo.nextPracticeNumber();
+      const practice = demo.upsert("practices", {
+        id: `PR-${numero}`,
+        numero,
+        clientId: client.id,
+        cliente: client.ragioneSociale,
+        titolo: items.map((item) => `${item.prodotto || "Ledwall"} ${item.misura_m || item.misura_cm || ""}`).join(" + "),
+        stato: "Inserita",
+        tipo_pratica: payload.tipo_pratica,
+        finanziaria: payload.tipo_pratica === "NOLEGGIO" ? "Grenke" : payload.tipo_pratica === "LEASING" ? "IFIS" : "Acquisto diretto",
+        valore: Number(payload.valore || 0),
+        valore_provvigione: Number(payload.valore_provvigione || 0),
+        preventivo_id: payload.preventivo_id || "",
+        origine: "SEEMAX QUOTATION PLANNER",
+        agent_username: sessionUser.username || "",
+        agente: sessionUser.displayName || sessionUser.nome_visualizzato || sessionUser.username || "",
+        righe_json: JSON.stringify(items),
+        request_token: payload.request_token,
+        creatoIl: new Date().toISOString(),
+        aggiornatoIl: new Date().toISOString()
+      });
+      return { ok: true, practice, client };
+    }
+    const response = await postMutation("management_create_from_quote", {
+      payload: JSON.stringify(payload)
+    }, { entity: "practices", requestToken: payload.request_token, maxWait: 150000 });
+    /* Se la cache temporanea dell'esito e gia scaduta, postMutation puo
+       recuperare la pratica dal relativo request_token. Uniformiamo tale
+       risposta a quella restituita direttamente dal backend, cosi il
+       Quotation Planner non deve conoscere il percorso di ripristino. */
+    if (!response.practice && response.row) response.practice = response.row;
+    return response;
   }
 
   async function markNotificationsRead() {
@@ -426,5 +603,5 @@
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length, serverVersion };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();
