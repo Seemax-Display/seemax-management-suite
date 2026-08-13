@@ -296,8 +296,23 @@
       return values;
     }
     if (config.demoMode) return demo.settings(values);
-    const response = await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(values) }, 60000);
+    const response = await postMutation("management_save_settings", { payload: JSON.stringify(values) }, { maxWait: 90000 });
     return response.settings;
+  }
+
+  async function acknowledgeAnnouncement(type, revision) {
+    if (config.demoMode) {
+      const key = type === "welcome" ? "welcome_seen_revision" : "patch_seen_revision";
+      session = { ...(session || {}), [key]: String(revision || "") };
+      demo.setSession(session);
+      return { ok: true, user: session };
+    }
+    const response = await postMutation("management_acknowledge_announcement", {
+      announcement_type: type,
+      revision: String(revision || "")
+    }, { maxWait: 60000 });
+    if (response.user) { session = { ...(session || {}), ...response.user }; demo.setSession(session); }
+    return response;
   }
 
   async function saveProfile(values) {
@@ -457,7 +472,7 @@
       let result;
       if (op.type === "upsert") result = await remoteUpsert(op.entity, op.record);
       else if (op.type === "remove") result = config.demoMode ? demo.remove(op.entity, op.id) : await jsonp("management_remove", { ...authParams(), entity: op.entity, id: op.id, expected_record_version: op.expectedRecordVersion || 0 }, 60000);
-      else if (op.type === "settings") result = config.demoMode ? demo.settings(op.values) : await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(op.values) }, 60000);
+      else if (op.type === "settings") result = config.demoMode ? demo.settings(op.values) : await postMutation("management_save_settings", { payload: JSON.stringify(op.values) }, { maxWait: 90000 });
       results.push(result);
       writeLocal(FAST_QUEUE_KEY, queue.slice(index + 1));
     }
@@ -603,5 +618,5 @@
   function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length, serverVersion };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, acknowledgeAnnouncement, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

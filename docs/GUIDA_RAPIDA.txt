@@ -1,4 +1,4 @@
-SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.13.0
+SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.14.0
 
 NOVITÀ VERSIONE 2.13
 - SALVATAGGI AFFIDABILI: clienti e pratiche viaggiano tramite POST, senza inserire l'intero record nell'URL.

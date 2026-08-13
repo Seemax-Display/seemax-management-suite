@@ -4,7 +4,7 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "" };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "", settingsTab: "general" };
   let installPrompt = null;
   let heldDocumentId = "";
   let documentHoldTimer = null;
@@ -15,7 +15,9 @@
   const uploadState = { batches: new Map(), expanded: false };
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
   let pendingFirstAccessTutorial = false;
-  let pendingBetaWelcome = false;
+  let pendingManagedWelcome = false;
+  let pendingManagedPatchNotes = false;
+  let activeAnnouncement = null;
   let profileBoardDraft = [];
 
   const NAV = [
@@ -415,36 +417,57 @@
     openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
   }
 
-  function showBetaWelcome() {
+  function managedAnnouncement(type) {
+    const settings = (state.data && state.data.settings) || {};
+    const session = api.getSession() || {};
+    const prefix = type === "welcome" ? "welcome_message" : "patch_notes";
+    const enabled = String(settings[`${prefix}_enabled`] || "NO").toUpperCase() === "SI";
+    const frequency = String(settings[`${prefix}_frequency`] || "ONCE").toUpperCase() === "ALWAYS" ? "ALWAYS" : "ONCE";
+    const revision = String(settings[`${prefix}_revision`] || "1");
+    const seen = String(session[type === "welcome" ? "welcome_seen_revision" : "patch_seen_revision"] || "");
+    return { type, prefix, enabled, frequency, revision, seen, shouldShow: enabled && (frequency === "ALWAYS" || seen !== revision) };
+  }
+
+  function showManagedWelcome() {
+    const settings = state.data.settings || {};
+    const message = managedAnnouncement("welcome");
+    activeAnnouncement = message;
+    const paragraphs = String(settings.welcome_message_body || "").split(/\n{2,}/).filter(Boolean).map((paragraph) => `<p>${esc(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
     const body = `<div class="beta-welcome">
       <section class="beta-welcome-hero">
-        <div class="beta-welcome-icon" aria-hidden="true">🧪</div>
-        <span class="beta-welcome-pill">SEEMAX MANAGEMENT SUITE · VERSIONE BETA</span>
-        <h3>BENVENUTO NELLA FASE DI TEST</h3>
-        <p>Stai utilizzando Seemax Management Suite in modalità di prova. Il sistema entra ora nella sua fase di test operativo e resterà accessibile nei prossimi giorni per permetterti di conoscerlo e metterlo alla prova.</p>
+        <div class="beta-welcome-icon" aria-hidden="true">📣</div>
+        <span class="beta-welcome-pill">COMUNICAZIONE SEEMAX</span>
+        <h3>${esc(settings.welcome_message_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE")}</h3>
+        ${paragraphs || "<p>Benvenuto nel tuo spazio di lavoro.</p>"}
       </section>
-      <div class="beta-welcome-grid">
-        <article><span>🚀</span><div><h4>Esplora il tuo nuovo spazio di lavoro</h4><p>Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.</p></div></article>
-        <article><span>🏆</span><div><h4>Personalizza profilo e bacheca</h4><p>Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.</p></div></article>
-      </div>
-      <section class="beta-welcome-warning">
-        <span aria-hidden="true">⚠️</span>
-        <div><strong>Ambiente di prova</strong><p>I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in <strong>Seemax For You</strong> verranno invece importati in Seemax Management Suite.</p></div>
-      </section>
-      <section class="beta-welcome-feedback">
-        <span aria-hidden="true">💬</span>
-        <p>Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da <strong>PC</strong> sia da <strong>smartphone</strong>. Il tuo feedback ci aiuterà a plasmare la versione finale.</p>
-      </section>
-      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="close-modal">🚀 Inizia a esplorare</button></div>
+      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="acknowledge-announcement">${esc(settings.welcome_message_button || "Continua")}</button></div>
     </div>`;
-    openModal("Benvenuto nella Beta", body, { wide: true, kicker: "Seemax Management Suite", subtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova", panelClass: "beta-welcome-modal" });
+    openModal(settings.welcome_message_title || "Benvenuto", body, { wide: true, kicker: "Seemax Management Suite", subtitle: message.frequency === "ALWAYS" ? "Messaggio mostrato ad ogni avvio" : "Comunicazione personale", panelClass: "beta-welcome-modal" });
+  }
+
+  function parseManagedPatchItems(value) {
+    return String(value || "").split(/\r?\n/).map((line) => { const parts = line.split("|"); return { emoji: parts.shift() || "✨", title: parts.shift() || "Aggiornamento", text: parts.join("|") }; }).filter((item) => item.title || item.text);
+  }
+
+  function showManagedPatchNotes() {
+    const settings = state.data.settings || {};
+    const message = managedAnnouncement("patch");
+    activeAnnouncement = message;
+    const items = parseManagedPatchItems(settings.patch_notes_items).map((item) => `<article><span>${esc(item.emoji)}</span><div><h4>${esc(item.title)}</h4><p>${esc(item.text)}</p></div></article>`).join("");
+    const body = `<div class="beta-welcome"><section class="beta-welcome-hero"><div class="beta-welcome-icon">✨</div><span class="beta-welcome-pill">${esc(settings.patch_notes_label || "NOVITÀ SEEMAX")}</span><h3>${esc(settings.patch_notes_title || "Aggiornamento")}</h3><p>${esc(settings.patch_notes_intro || "")}</p></section>${items ? `<div class="beta-welcome-grid">${items}</div>` : ""}${settings.patch_notes_footer ? `<section class="beta-welcome-feedback"><span>ℹ️</span><p>${esc(settings.patch_notes_footer)}</p></section>` : ""}<div class="form-actions"><button class="btn primary beta-welcome-start" data-action="acknowledge-announcement">Ho capito</button></div></div>`;
+    openModal(settings.patch_notes_title || "Novità", body, { wide: true, kicker: "Patch Notes", subtitle: message.frequency === "ALWAYS" ? "Mostrate ad ogni avvio" : `Revisione ${message.revision}`, panelClass: "beta-welcome-modal" });
   }
 
   function showNextWelcomeMessage() {
     if (tutorialState.active || $("modalRoot").children.length) return false;
-    if (pendingBetaWelcome) {
-      pendingBetaWelcome = false;
-      showBetaWelcome();
+    if (pendingManagedWelcome) {
+      pendingManagedWelcome = false;
+      showManagedWelcome();
+      return true;
+    }
+    if (pendingManagedPatchNotes) {
+      pendingManagedPatchNotes = false;
+      showManagedPatchNotes();
       return true;
     }
     if (pendingFirstAccessTutorial) {
@@ -457,7 +480,8 @@
 
   function scheduleFirstAccessExperience() {
     pendingFirstAccessTutorial = api.isFirstAccess ? api.isFirstAccess() : false;
-    pendingBetaWelcome = betaTestActive();
+    pendingManagedWelcome = managedAnnouncement("welcome").shouldShow;
+    pendingManagedPatchNotes = managedAnnouncement("patch").shouldShow;
     setTimeout(() => {
       if (showMonthlyAwardIfNeeded()) return;
       showNextWelcomeMessage();
@@ -561,7 +585,7 @@
         toast(`Database temporaneamente non raggiungibile. Stai visualizzando l'ultima copia locale: ${error.message}`, "warning");
       } else {
         toast(error.message, "danger");
-        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Pubblica Code.gs 2.13.0 come nuova versione del deployment Apps Script, quindi ricarica la pagina." : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
+        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? `Pubblica Code.gs ${config.version} come nuova versione del deployment Apps Script, quindi ricarica la pagina.` : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
       }
     }
   }
@@ -712,7 +736,7 @@
     const award = data && data.award;
     if (!award) { openAgentMonthDetails(); return; }
     const top = award.topPractice || {};
-    const body = `<div class="agent-month-welcome"><div class="agent-month-trophy">🏆</div><span class="agent-month-label">AGENTE DEL MESE</span><h3>${esc(award.agent)}</h3><p class="agent-month-period">Risultato di ${esc(award.label)}</p><div class="agent-month-winning-practice"><small>PRATICA DI MAGGIOR VALORE</small><strong>${esc(top.id || "—")} · ${esc(top.client || "—")}</strong><span>${euros(top.value || 0)}</span></div><div class="agent-month-total"><span>Fatturato totale completato</span><strong>${euros(award.total)}</strong><small>${award.count} ${award.count === 1 ? "pratica completata" : "pratiche completate"}</small></div><div class="form-actions"><button class="btn ghost" data-action="close-modal">Continua</button><button class="btn primary" data-action="agent-month-details">Maggiori dettagli</button></div></div>`;
+    const body = `<div class="agent-month-welcome"><div class="agent-month-trophy">🏆</div><span class="agent-month-label">AGENTE DEL MESE</span><h3>${esc(award.agent)}</h3><p class="agent-month-period">Risultato di ${esc(award.label)}</p><div class="agent-month-winning-practice"><small>PRATICA DI MAGGIOR VALORE</small><strong>${esc(top.id || "—")} · ${esc(top.client || "—")}</strong><span>${euros(top.value || 0)}</span></div><div class="agent-month-total"><span>Fatturato totale completato</span><strong>${euros(award.total)}</strong><small>${award.count} ${award.count === 1 ? "pratica completata" : "pratiche completate"}</small></div><div class="form-actions"><button class="btn ghost" data-action="close-modal-next-welcome">Continua</button><button class="btn primary" data-action="agent-month-details">Maggiori dettagli</button></div></div>`;
     openModal("Benvenuto nel nuovo mese!", body, { wide: true, kicker: "Seemax celebra i risultati" });
   }
 
@@ -1232,7 +1256,14 @@
       const checked = String(s[settingKey] || "NO").toUpperCase() === "SI";
       return `<label><input type="hidden" name="${esc(settingKey)}" value="NO"><input type="checkbox" name="${esc(settingKey)}" value="SI" ${checked ? "checked" : ""}><span><strong>${esc(label)}</strong><small>${checked ? "Attualmente obbligatorio" : "Attualmente facoltativo"}</small></span></label>`;
     }).join("")}</div></fieldset>`).join("");
-    return `<form id="settingsForm"><div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono sempre memorizzate sul dispositivo e non rallentano il database. In Modalità Rapida le altre modifiche vengono accodate fino a “SALVA TUTTO”.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Le stesse impostazioni sono modificabili nella configurazione del database usando SI oppure NO.</p></div></div><div class="required-settings-grid">${requirements}</div><div class="form-actions"><button class="btn primary" type="submit">Salva tutte le impostazioni</button></div></section></div></form>`;
+    const tab = state.settingsTab || "general";
+    const checked = (key) => String(s[key] || "NO").toUpperCase() === "SI" ? "checked" : "";
+    const frequencyOptions = (value) => `<option value="ONCE" ${String(value || "ONCE").toUpperCase() === "ONCE" ? "selected" : ""}>Mostra una volta</option><option value="ALWAYS" ${String(value || "").toUpperCase() === "ALWAYS" ? "selected" : ""}>Mostra ad ogni avvio</option>`;
+    const tabs = `<nav class="admin-settings-tabs"><button type="button" data-action="settings-tab" data-tab="general" class="${tab === "general" ? "active" : ""}">⚙️ Generale</button><button type="button" data-action="settings-tab" data-tab="communications" class="${tab === "communications" ? "active" : ""}">📣 Comunicazioni</button><button type="button" data-action="settings-tab" data-tab="practices" class="${tab === "practices" ? "active" : ""}">📋 Pratiche</button></nav>`;
+    const general = `<div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono memorizzate sul dispositivo. In Modalità Rapida le altre modifiche vengono accodate fino a SALVA TUTTO.</p><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></section></div>`;
+    const communications = `<div class="communication-settings-grid"><section class="panel communication-editor"><div class="panel-head"><div><span class="section-kicker">Messaggio iniziale</span><h3>Messaggio di benvenuto</h3><p>Modifica la comunicazione attualmente usata per la fase di test.</p></div><label class="visibility-switch"><input type="hidden" name="welcome_message_enabled" value="NO"><input type="checkbox" name="welcome_message_enabled" value="SI" ${checked("welcome_message_enabled")}><span>Mostra messaggio</span></label></div><div class="form-grid"><label class="full">Titolo<input name="welcome_message_title" maxlength="120" value="${esc(s.welcome_message_title || "")}"></label><label class="full">Testo<textarea name="welcome_message_body" rows="9">${esc(s.welcome_message_body || "")}</textarea><small>Lascia una riga vuota per separare i paragrafi.</small></label><label>Frequenza<select name="welcome_message_frequency">${frequencyOptions(s.welcome_message_frequency)}</select></label><label>Pulsante<input name="welcome_message_button" maxlength="50" value="${esc(s.welcome_message_button || "Continua")}"></label><label class="full rearm-option"><input type="hidden" name="welcome_message_rearm" value="NO"><input type="checkbox" name="welcome_message_rearm" value="SI"><span><strong>Ripubblica questa revisione</strong><small>Aumenta la revisione e la mostra nuovamente anche a chi l’aveva già accettata.</small></span></label></div><small class="revision-label">Revisione attuale: ${esc(s.welcome_message_revision || 1)}</small></section><section class="panel communication-editor"><div class="panel-head"><div><span class="section-kicker">Aggiornamenti</span><h3>Patch Notes</h3><p>Gestisci le novità mostrate nella shell e nel Quotation Planner.</p></div><label class="visibility-switch"><input type="hidden" name="patch_notes_enabled" value="NO"><input type="checkbox" name="patch_notes_enabled" value="SI" ${checked("patch_notes_enabled")}><span>Mostra Patch Notes</span></label></div><div class="form-grid"><label>Etichetta<input name="patch_notes_label" value="${esc(s.patch_notes_label || "")}"></label><label>Titolo<input name="patch_notes_title" value="${esc(s.patch_notes_title || "")}"></label><label class="full">Introduzione<textarea name="patch_notes_intro" rows="3">${esc(s.patch_notes_intro || "")}</textarea></label><label class="full">Elementi<textarea name="patch_notes_items" rows="7">${esc(s.patch_notes_items || "")}</textarea><small>Una novità per riga nel formato: emoji | titolo | descrizione.</small></label><label class="full">Nota finale<textarea name="patch_notes_footer" rows="3">${esc(s.patch_notes_footer || "")}</textarea></label><label>Frequenza<select name="patch_notes_frequency">${frequencyOptions(s.patch_notes_frequency)}</select></label><label class="rearm-option"><input type="hidden" name="patch_notes_rearm" value="NO"><input type="checkbox" name="patch_notes_rearm" value="SI"><span><strong>Ripubblica</strong><small>Mostra nuovamente questa revisione.</small></span></label></div><small class="revision-label">Revisione attuale: ${esc(s.patch_notes_revision || 1)}</small></section></div>`;
+    const practices = `<section class="panel"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Le impostazioni vengono applicate a tutti gli agenti.</p></div></div><div class="required-settings-grid">${requirements}</div></section>`;
+    return `<form id="settingsForm">${tabs}<div class="admin-settings-page">${tab === "communications" ? communications : tab === "practices" ? practices : general}</div><div class="settings-save-bar"><span>Le modifiche vengono condivise con tutti gli utenti.</span><button class="btn primary" type="submit">Salva impostazioni</button></div></form>`;
   }
 
   function filterRows(rows, fields) {
@@ -2557,6 +2588,18 @@
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
       "close-modal": closeModal,
+      "close-modal-next-welcome": () => { closeModal(); setTimeout(showNextWelcomeMessage, 180); },
+      "acknowledge-announcement": async () => {
+        const current = activeAnnouncement;
+        activeAnnouncement = null;
+        closeModal();
+        if (current && current.frequency === "ONCE") {
+          try { await api.acknowledgeAnnouncement(current.type, current.revision); }
+          catch (error) { toast("La conferma del messaggio verrà riprovata al prossimo accesso.", "warning"); }
+        }
+        setTimeout(showNextWelcomeMessage, 180);
+      },
+      "settings-tab": () => { state.settingsTab = data.tab || "general"; renderRoute(); },
       "toggle-login-password": toggleLoginPassword,
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,

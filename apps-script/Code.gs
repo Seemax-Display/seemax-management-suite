@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.13.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.14.0";
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
@@ -27,7 +27,7 @@ var ENTITY_SHEETS = {
 };
 
 var SHEET_SCHEMAS = {
-  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -181,6 +181,18 @@ function upgradeSeemaxV2130() {
   });
 }
 
+function upgradeSeemaxV2140() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    seedPatchNotes_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.0 · comunicazioni ADMIN configurabili e ricevute per utente.");
+    styleSheets_();
+    return "SEEMAX v2.14.0 configurato: messaggio di benvenuto e Patch Notes gestibili dall'ADMIN.";
+  });
+}
+
 /* ATTIVITA non viene piu usato come tabella condivisa: la sezione e locale
    sul dispositivo. Questa utility elimina soltanto un vecchio foglio vuoto,
    così nessun dato storico può essere cancellato per errore. */
@@ -259,6 +271,7 @@ function routeGet_(action, p) {
     case "management_verify_vat": return managementVerifyVat_(p);
     case "management_inventory_adjust": return managementInventoryAdjust_(p);
     case "management_set_practice_stock_warning": return managementSetPracticeStockWarning_(p);
+    case "management_acknowledge_announcement": return managementAcknowledgeAnnouncement_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -330,6 +343,28 @@ function managementBootstrap_(p) {
       products_count: products.length
     }
   };
+}
+
+function managementAcknowledgeAnnouncement_(p) {
+  return withMutationLock_(function () {
+    var user = authenticate_(p.agent_username, p.agent_key);
+    var type = String(p.announcement_type || "").toLowerCase();
+    if (["welcome", "patch"].indexOf(type) < 0) throw new Error("Comunicazione non riconosciuta.");
+    var settings = getSettings_();
+    var revisionKey = type === "welcome" ? "welcome_message_revision" : "patch_notes_revision";
+    var seenKey = type === "welcome" ? "welcome_seen_revision" : "patch_seen_revision";
+    var currentRevision = String(settings[revisionKey] || "1");
+    var requestedRevision = String(p.revision || currentRevision);
+    if (requestedRevision !== currentRevision) return { ok: true, stale: true, revision: currentRevision };
+    var row = findRowObject_("AGENTI", "username", user.username);
+    if (!row) throw new Error("Utente non trovato.");
+    row[seenKey] = currentRevision;
+    row.aggiornatoIl = new Date().toISOString();
+    row.aggiornato_da = user.username;
+    row.record_version = Number(row.record_version || 0) + 1;
+    upsertObject_("AGENTI", "username", user.username, row);
+    return { ok: true, type: type, revision: currentRevision, user: publicUser_(row) };
+  });
 }
 
 function managementHealth_(p) {
@@ -1734,10 +1769,37 @@ function managementSaveSettingsLocked_(p) {
   var expectedRevision = Number(values.expected_settings_revision || 0);
   if (currentRevision > 0 && expectedRevision !== currentRevision) throw new Error("CONFLICT_RECORD: le impostazioni sono state aggiornate da un altro amministratore.");
   delete values.expected_settings_revision;
+  values = normalizeAnnouncementSettings_(values, currentSettings);
   values.settings_revision = currentRevision + 1;
   var settings = upsertSettingsBatch_(values, "Aggiornato da Management Suite");
   log_(user, "UPDATE", "settings", "IMPOSTAZIONI", "Impostazioni generali aggiornate");
   return { ok: true, settings: settings };
+}
+
+function normalizeAnnouncementSettings_(values, currentSettings) {
+  var result = {};
+  Object.keys(values || {}).forEach(function (key) { result[key] = values[key]; });
+  ["welcome_message", "patch_notes"].forEach(function (prefix) {
+    var enabledKey = prefix + "_enabled";
+    var frequencyKey = prefix + "_frequency";
+    var revisionKey = prefix + "_revision";
+    if (Object.prototype.hasOwnProperty.call(result, enabledKey)) result[enabledKey] = String(result[enabledKey] || "NO").toUpperCase() === "SI" ? "SI" : "NO";
+    if (Object.prototype.hasOwnProperty.call(result, frequencyKey)) result[frequencyKey] = String(result[frequencyKey] || "ONCE").toUpperCase() === "ALWAYS" ? "ALWAYS" : "ONCE";
+    var contentKeys = prefix === "welcome_message"
+      ? ["welcome_message_title", "welcome_message_body", "welcome_message_button"]
+      : ["patch_notes_label", "patch_notes_title", "patch_notes_intro", "patch_notes_items", "patch_notes_footer"];
+    var changed = contentKeys.some(function (key) {
+      return Object.prototype.hasOwnProperty.call(result, key) && String(result[key] || "") !== String(currentSettings[key] || "");
+    });
+    var rearmed = String(result[prefix + "_rearm"] || "NO").toUpperCase() === "SI";
+    var republished = Object.prototype.hasOwnProperty.call(result, enabledKey)
+      && String(currentSettings[enabledKey] || "NO").toUpperCase() !== "SI"
+      && result[enabledKey] === "SI";
+    if (changed || rearmed || republished) result[revisionKey] = Number(currentSettings[revisionKey] || 1) + 1;
+    else delete result[revisionKey];
+    delete result[prefix + "_rearm"];
+  });
+  return result;
 }
 
 function listEntity_(entity, user) {
@@ -1922,13 +1984,30 @@ function plannerConfig_() {
   var settings = getSettings_();
   var notes = getKeyValueSheet_("PATCH_NOTES");
   var items = rowsToObjects_(sheet_("PATCH_ITEMS")).filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; });
+  var managedItems = parseManagedPatchItems_(settings.patch_notes_items);
   return {
     ok: true,
     version: String(settings.versione_config || SEEMAX_VERSION),
     impostazioni: settings,
     prodotti: inventoryProductsForRead_().filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; }),
-    patchNotes: { version: notes.version || SEEMAX_VERSION, label: notes.label || "SEEMAX QUOTATION PLANNER", title: notes.title || "Aggiornamento", intro: notes.intro || "", footer: notes.footer || "", items: items }
+    patchNotes: {
+      version: String(settings.patch_notes_revision || notes.version || SEEMAX_VERSION),
+      enabled: String(settings.patch_notes_enabled || "SI").toUpperCase() === "SI",
+      frequency: String(settings.patch_notes_frequency || "ONCE").toUpperCase(),
+      label: settings.patch_notes_label || notes.label || "SEEMAX QUOTATION PLANNER",
+      title: settings.patch_notes_title || notes.title || "Aggiornamento",
+      intro: settings.patch_notes_intro || notes.intro || "",
+      footer: settings.patch_notes_footer || notes.footer || "",
+      items: managedItems.length ? managedItems : items
+    }
   };
+}
+
+function parseManagedPatchItems_(value) {
+  return String(value || "").split(/\r?\n/).map(function (line) {
+    var parts = line.split("|");
+    return { emoji: String(parts.shift() || "✨").trim(), title: String(parts.shift() || "Aggiornamento").trim(), text: parts.join("|").trim() };
+  }).filter(function (item) { return item.title || item.text; });
 }
 
 function plannerAgentLogin_(p) {
@@ -2247,7 +2326,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", welcome_seen_revision: String(user.welcome_seen_revision || ""), patch_seen_revision: String(user.patch_seen_revision || ""), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
@@ -2418,6 +2497,20 @@ function seedSettings_() {
     obiettivo_fatturato: 500000,
     beta_test_attiva: "SI",
     beta_sblocca_trofei: "SI",
+    welcome_message_enabled: "SI",
+    welcome_message_frequency: "ALWAYS",
+    welcome_message_revision: 1,
+    welcome_message_title: "BENVENUTO NELLA FASE DI TEST",
+    welcome_message_body: "Stai utilizzando Seemax Management Suite in modalità di prova. Esplora il sistema, crea clienti e pratiche, utilizza il calcolatore e consulta catalogo e giacenze. Personalizza inoltre il tuo profilo e la tua bacheca.\n\nATTENZIONE: i dati inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico. Ricorda di lasciare un feedback all’amministratore Seemax sulla tua esperienza da PC e smartphone.",
+    welcome_message_button: "🚀 Inizia a esplorare",
+    patch_notes_enabled: "SI",
+    patch_notes_frequency: "ONCE",
+    patch_notes_revision: 1,
+    patch_notes_label: "SEEMAX MANAGEMENT SUITE 2.14.0",
+    patch_notes_title: "Comunicazioni amministrative",
+    patch_notes_intro: "Messaggi di benvenuto e novità sono ora controllati direttamente dall’amministratore.",
+    patch_notes_items: "📣|Messaggio configurabile|Titolo e contenuto possono essere aggiornati dalla sezione ADMIN.\n🔁|Frequenza personalizzata|Ogni comunicazione può apparire una volta oppure ad ogni avvio.\n✅|Lettura per utente|La conferma viene conservata sul profilo e vale anche cambiando dispositivo.",
+    patch_notes_footer: "Una modifica del contenuto genera una nuova revisione e rende nuovamente visibile la comunicazione impostata su Mostra una volta.",
     req_acquisto_destinatario_ordine: "SI",
     req_acquisto_clientid: "SI",
     req_acquisto_valore: "SI",

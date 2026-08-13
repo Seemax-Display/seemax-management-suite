@@ -64,7 +64,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.13.0 segui [docs/AGGIORNAMENTO_V2.13.0.md](docs/AGGIORNAMENTO_V2.13.0.md). Consulta anche il [rapporto tecnico 2.13](docs/RAPPORTO_TECNICO_V2.13.0.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e l’[audit prestazioni 2.3](docs/AUDIT_PRESTAZIONI_V2.3.md).
+Per aggiornare un'installazione già operativa alla versione 2.14.0 segui [docs/AGGIORNAMENTO_V2.14.0.md](docs/AGGIORNAMENTO_V2.14.0.md). Il rapporto tecnico della base resiliente rimane disponibile in [docs/RAPPORTO_TECNICO_V2.13.0.md](docs/RAPPORTO_TECNICO_V2.13.0.md), insieme a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md).
 
 ## Placeholder
 

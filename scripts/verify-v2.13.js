@@ -63,9 +63,9 @@ for (const [name, source] of [["Code.gs", backend], ["api.js", api], ["app.js", 
   check(duplicates.length === 0, `${name}: nessuna funzione top-level duplicata`);
 }
 
-check(/SEEMAX_VERSION\s*=\s*"seemax-management-suite-2\.13\.0"/.test(backend), "Backend versione 2.13.0");
-check(/version:\s*"2\.13\.0"/.test(config), "Frontend versione 2.13.0");
-check(/seemax-management-v2-13-0/.test(worker), "Cache PWA versione 2.13.0");
+check(/SEEMAX_VERSION\s*=\s*"seemax-management-suite-2\.14\.0"/.test(backend), "Backend versione 2.14.0");
+check(/version:\s*"2\.14\.0"/.test(config), "Frontend versione 2.14.0");
+check(/seemax-management-v2-14-0/.test(worker), "Cache PWA versione 2.14.0");
 check(/case\s+"management_mutation_status"/.test(backend), "Endpoint di conferma mutazioni presente");
 check(/case\s+"management_set_practice_stock_warning"/.test(backend), "Endpoint ADMIN avviso giacenza presente");
 check(/function\s+inventoryProductsForRead_/.test(backend), "Resolver unico delle giacenze presente");
@@ -90,4 +90,8 @@ if (failures.length) {
   process.exit(1);
 }
 
-process.stdout.write("\nVerifica statica 2.13.0 completata senza errori.\n");
+check(/management_acknowledge_announcement/.test(backend), "Ricevuta comunicazioni per utente presente");
+check(/welcome_message_frequency/.test(backend) && /patch_notes_frequency/.test(backend), "Frequenze comunicazioni configurabili");
+check(/admin-settings-tabs/.test(app), "Impostazioni ADMIN organizzate in tab");
+check(/acknowledgeAnnouncement/.test(api), "Conferma comunicazioni collegata alla API");
+process.stdout.write("\nVerifica statica 2.14.0 completata senza errori.\n");

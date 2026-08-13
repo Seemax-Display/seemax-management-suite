@@ -48,6 +48,8 @@
       obiettivo_fatturato: 500000,
       beta_test_attiva: "SI",
       beta_sblocca_trofei: "SI",
+      welcome_message_enabled: "SI", welcome_message_frequency: "ALWAYS", welcome_message_revision: 1, welcome_message_title: "BENVENUTO NELLA FASE DI TEST", welcome_message_body: "Stai utilizzando Seemax Management Suite in modalità di prova. Esplora tutte le funzioni e condividi il tuo feedback con l’amministratore Seemax.", welcome_message_button: "🚀 Inizia a esplorare",
+      patch_notes_enabled: "SI", patch_notes_frequency: "ONCE", patch_notes_revision: 1, patch_notes_label: "SEEMAX MANAGEMENT SUITE 2.14.0", patch_notes_title: "Comunicazioni amministrative", patch_notes_intro: "Benvenuto nel nuovo aggiornamento.", patch_notes_items: "📣|Messaggi configurabili|L’amministratore controlla contenuti e frequenza.", patch_notes_footer: "Le comunicazioni sono sincronizzate per utente.",
       req_acquisto_destinatario_ordine: "SI", req_acquisto_clientid: "SI", req_acquisto_valore: "SI", req_acquisto_valore_provvigione: "NO",
       req_acquisto_installazione_regione: "NO", req_acquisto_installazione_provincia: "NO", req_acquisto_installazione_comune: "SI", req_acquisto_installazione_cap: "SI", req_acquisto_installazione_localita: "NO", req_acquisto_installazione_indirizzo: "SI", req_acquisto_installazione_civico: "SI", req_acquisto_gestione_ledwall: "SI", req_acquisto_cloud_username: "NO", req_acquisto_cloud_password: "NO", req_acquisto_note: "NO",
       req_noleggio_clientid: "SI", req_noleggio_valore: "SI", req_noleggio_valore_provvigione: "SI", req_noleggio_numero_rate: "SI", req_noleggio_periodicita_pagamento: "SI",
