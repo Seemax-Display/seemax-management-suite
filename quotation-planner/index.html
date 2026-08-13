@@ -1966,8 +1966,6 @@
         ? patchNotes.items.filter(item => String((item && (item.title || item.text)) || '').trim())
         : [];
       PATCH_NOTES.version = dbVersion;
-      PATCH_NOTES.enabled = patchNotes.enabled !== false;
-      PATCH_NOTES.frequency = String(patchNotes.frequency || 'ONCE').toUpperCase();
       databasePatchNotesForceKey = `database:${dbVersion}|config:${cfgVersion || dbVersion}`;
       PATCH_NOTES.label = patchNotes.label || PATCH_NOTES.label;
       PATCH_NOTES.title = patchNotes.title || PATCH_NOTES.title;
@@ -5691,8 +5689,7 @@
       // Il popup automatico deve usare solo le Patch Notes recuperate dal DATABASE SEEMAX.
       // Il blocco interno resta come fallback tecnico, ma non viene mostrato automaticamente.
       if(!force && (!databasePatchNotesReady || patchNotesSource !== 'database')) return;
-      if(!force && PATCH_NOTES.enabled === false) return;
-      if(!force && PATCH_NOTES.frequency !== 'ALWAYS' && patchNotesWasSeen()) return;
+      if(!force && patchNotesWasSeen()) return;
       renderPatchNotes();
       const layer = $('patchNotesLayer');
       if(layer) layer.classList.remove('hidden');

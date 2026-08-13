@@ -1,0 +1,55 @@
+SEEMAX MANAGEMENT SUITE 2.14.0 - BACKEND GOOGLE APPS SCRIPT
+============================================================
+
+CONTENUTO DEL PACCHETTO
+- Code.gs            backend completo da incollare/sostituire in Apps Script
+- appsscript.json     manifest V8 (facoltativo se il progetto esistente è già configurato)
+- INSTALLAZIONE...    questa guida rapida
+
+PRIMA DI PROCEDERE
+1. Crea una copia di sicurezza del Foglio Google.
+2. Conserva una copia del Code.gs attualmente pubblicato.
+3. Evita che gli agenti salvino dati durante l'aggiornamento.
+
+AGGIORNAMENTO DI UN'INSTALLAZIONE ESISTENTE
+1. Apri il Foglio Google del gestionale.
+2. Vai in Estensioni > Apps Script.
+3. Apri Code.gs e sostituisci tutto con il nuovo Code.gs.
+4. Salva il progetto.
+5. Dal selettore delle funzioni esegui: upgradeSeemaxV2140
+6. Autorizza lo script, se richiesto.
+7. Apri Esegui il deployment > Gestisci deployment.
+8. Modifica la Web App esistente, scegli Nuova versione e pubblica.
+9. L'URL /exec normalmente non cambia. Se cambia, aggiornalo in
+   assets/js/config.js del pacchetto GitHub.
+
+NUOVA INSTALLAZIONE
+1. Incolla Code.gs nel progetto Apps Script collegato al Foglio.
+2. Esegui: setupSeemaxDatabase
+3. Pubblica come Applicazione Web:
+   - Esegui come: utente che esegue il deployment
+   - Accesso: chiunque, come previsto dall'installazione Seemax
+4. Copia l'URL finale /exec in assets/js/config.js.
+
+MANIFEST
+Il file appsscript.json è già impostato con runtime V8 e fuso Europe/Rome.
+Per visualizzare/modificare il manifest nell'editor Apps Script, abilita
+"Mostra il file manifest appsscript.json" nelle impostazioni del progetto.
+Se il progetto esistente funziona già, non è obbligatorio sostituirlo.
+
+COLLAUDO MINIMO
+- Crea un cliente di prova e verifica una sola riga in CLIENTI.
+- Crea una pratica Inserita e verifica una sola riga in PRATICHE.
+- Controlla il progressivo pratica.
+- Apri la Console del browser e usa:
+  SeemaxApi.getLastPerformance()
+
+NOTE PRESTAZIONI
+- Nessun foglio o colonna esistente viene rinominato o eliminato.
+- I contatori pratica vengono salvati nelle Proprietà script.
+- I normali log UPSERT cliente/pratica sono disattivati per ridurre la latenza.
+- Cambi di stato, cancellazioni, magazzino ed errori restano registrati.
+- La latenza reale dipende anche da cold start, rete e servizi Google.
+
+GUIDA COMPLETA
+Vedi docs/AGGIORNAMENTO_V2.14.0.md nel pacchetto completo/GitHub.

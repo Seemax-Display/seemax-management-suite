@@ -12,6 +12,7 @@
   let online = !!config.demoMode;
   let serverVersion = "";
   let bootstrapPromise = null;
+  let lastPerformance = null;
 
   function readLocal(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -90,6 +91,43 @@
   }
 
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+  function captureMutationPerformance(action, result, clientStarted, error = null) {
+    const backend = result && result.performance ? result.performance : null;
+    const clientTotalMs = Math.max(0, Date.now() - Number(clientStarted || Date.now()));
+    const backendTotalMs = Number(backend && backend.total_ms || 0);
+    lastPerformance = {
+      action: String(action || "mutation"),
+      observedAt: new Date().toISOString(),
+      ok: !error,
+      client_total_ms: clientTotalMs,
+      backend_total_ms: backendTotalMs,
+      transport_overhead_ms: Math.max(0, clientTotalMs - backendTotalMs),
+      lock_wait_ms: Number(backend && backend.lock_wait_ms || 0),
+      lock_hold_ms: Number(backend && backend.lock_hold_ms || 0),
+      totals_ms: backend && backend.totals_ms || {},
+      events: backend && Array.isArray(backend.events) ? backend.events : [],
+      error: error ? String(error.message || error) : ""
+    };
+    if (config.performanceDiagnostics && window.console && typeof console.info === "function") {
+      console.info("[SEEMAX PERFORMANCE]", {
+        action: lastPerformance.action,
+        client_total_ms: lastPerformance.client_total_ms,
+        backend_total_ms: lastPerformance.backend_total_ms,
+        transport_overhead_ms: lastPerformance.transport_overhead_ms,
+        lock_wait_ms: lastPerformance.lock_wait_ms,
+        lock_hold_ms: lastPerformance.lock_hold_ms,
+        totals_ms: lastPerformance.totals_ms,
+        ok: lastPerformance.ok
+      });
+      if (lastPerformance.events.length && typeof console.table === "function") console.table(lastPerformance.events);
+    }
+    return lastPerformance;
+  }
+
+  function getLastPerformance() {
+    return lastPerformance ? JSON.parse(JSON.stringify(lastPerformance)) : null;
+  }
 
   async function retryRead(operation, attempts = 2) {
     let lastError = null;
@@ -296,23 +334,8 @@
       return values;
     }
     if (config.demoMode) return demo.settings(values);
-    const response = await postMutation("management_save_settings", { payload: JSON.stringify(values) }, { maxWait: 90000 });
+    const response = await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(values) }, 60000);
     return response.settings;
-  }
-
-  async function acknowledgeAnnouncement(type, revision) {
-    if (config.demoMode) {
-      const key = type === "welcome" ? "welcome_seen_revision" : "patch_seen_revision";
-      session = { ...(session || {}), [key]: String(revision || "") };
-      demo.setSession(session);
-      return { ok: true, user: session };
-    }
-    const response = await postMutation("management_acknowledge_announcement", {
-      announcement_type: type,
-      revision: String(revision || "")
-    }, { maxWait: 60000 });
-    if (response.user) { session = { ...(session || {}), ...response.user }; demo.setSession(session); }
-    return response;
   }
 
   async function saveProfile(values) {
@@ -422,25 +445,32 @@
   }
 
   async function postMutation(action, values, options = {}) {
+    const clientStarted = Date.now();
     const mutationRequestId = options.requestToken ? `mutation-${String(options.requestToken).replace(/[^A-Za-z0-9_-]/g, "-")}` : uid("mutation");
     const requestValues = { ...values, requestId: mutationRequestId };
-    let response = await postForm(action, requestValues);
-    let result;
-    if (!response.pending) result = response;
-    else {
-      try {
-        result = await waitForMutation(response.requestId, { ...options, maxWait: Math.min(Number(options.maxWait || 120000), 18000), skipFallback: true });
-      } catch (error) {
-        if (!error || error.code !== "MUTATION_UNCONFIRMED") throw error;
-        /* Un solo reinvio con lo stesso token. Il backend riconosce la
-           richiesta già applicata, quindi questa ripresa non può creare un
-           secondo cliente, pratica o movimento di magazzino. */
-        response = await postForm(action, requestValues);
-        result = response.pending ? await waitForMutation(response.requestId, options) : response;
+    try {
+      let response = await postForm(action, requestValues);
+      let result;
+      if (!response.pending) result = response;
+      else {
+        try {
+          result = await waitForMutation(response.requestId, { ...options, maxWait: Math.min(Number(options.maxWait || 120000), 18000), skipFallback: true });
+        } catch (error) {
+          if (!error || error.code !== "MUTATION_UNCONFIRMED") throw error;
+          /* Un solo reinvio con lo stesso token. Il backend riconosce la
+             richiesta già applicata, quindi questa ripresa non può creare un
+             secondo cliente, pratica o movimento di magazzino. */
+          response = await postForm(action, requestValues);
+          result = response.pending ? await waitForMutation(response.requestId, options) : response;
+        }
       }
+      online = true;
+      captureMutationPerformance(action, result, clientStarted);
+      return result;
+    } catch (error) {
+      captureMutationPerformance(action, null, clientStarted, error);
+      throw error;
     }
-    online = true;
-    return result;
   }
 
   async function waitForUpload(requestId) {
@@ -472,7 +502,7 @@
       let result;
       if (op.type === "upsert") result = await remoteUpsert(op.entity, op.record);
       else if (op.type === "remove") result = config.demoMode ? demo.remove(op.entity, op.id) : await jsonp("management_remove", { ...authParams(), entity: op.entity, id: op.id, expected_record_version: op.expectedRecordVersion || 0 }, 60000);
-      else if (op.type === "settings") result = config.demoMode ? demo.settings(op.values) : await postMutation("management_save_settings", { payload: JSON.stringify(op.values) }, { maxWait: 90000 });
+      else if (op.type === "settings") result = config.demoMode ? demo.settings(op.values) : await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(op.values) }, 60000);
       results.push(result);
       writeLocal(FAST_QUEUE_KEY, queue.slice(index + 1));
     }
@@ -615,8 +645,17 @@
     return shouldShow;
   }
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
-  function status() { return { demo: config.demoMode, configured: isConfigured(), online, fast: isFastMode(), pending: pendingOperations().length, serverVersion };
+  function status() {
+    return {
+      demo: config.demoMode,
+      configured: isConfigured(),
+      online,
+      fast: isFastMode(),
+      pending: pendingOperations().length,
+      serverVersion,
+      lastPerformance: getLastPerformance()
+    };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, acknowledgeAnnouncement, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

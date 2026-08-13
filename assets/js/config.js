@@ -8,6 +8,7 @@ window.SEEMAX_APP_CONFIG = {
   appName: "Seemax Management Suite",
   version: "2.14.0",
   demoMode: false,
+  performanceDiagnostics: true,
   appsScriptUrl: "https://script.google.com/macros/s/AKfycbxNBdyg27CBYRu9M1FRFCw3Sm701hUZ5UQTyHPI3cE3AuoW8LaBRx_E6TLOoAxzHQCf/exec",
   /*
    * CAMPAGNA BETA TEMPORANEA

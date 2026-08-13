@@ -1,5 +1,14 @@
 SEEMAX MANAGEMENT SUITE - GUIDA RAPIDA 2.14.0
 
+NOVITÀ VERSIONE 2.14
+- SALVATAGGI PIÙ RAPIDI: clienti e pratiche usano lookup puntuali e scrivono soltanto la riga interessata.
+- CONTATORE PRATICHE: il progressivo usa le Proprietà script e non scansiona l'intero foglio ad ogni creazione.
+- IMPOSTAZIONI: cache breve di 90 secondi, invalidata automaticamente quando l'ADMIN salva.
+- NOTIFICHE: non vengono più rilette interamente dopo un normale salvataggio pratica.
+- LOG: gli UPSERT ordinari di clienti/pratiche sono disattivati per ridurre una scrittura; restano eventi critici e amministrativi.
+- DIAGNOSTICA: dopo un salvataggio apri la Console e usa SeemaxApi.getLastPerformance().
+- UPGRADE: sostituisci Code.gs, esegui upgradeSeemaxV2140 e pubblica una nuova versione del deployment.
+
 NOVITÀ VERSIONE 2.13
 - SALVATAGGI AFFIDABILI: clienti e pratiche viaggiano tramite POST, senza inserire l'intero record nell'URL.
 - NESSUN DOPPIONE DA TIMEOUT: ogni scrittura ha un token idempotente e viene confermata dal backend prima di essere considerata fallita.
@@ -59,7 +68,7 @@ NOVITÀ VERSIONE 1.5
    Apri il Foglio Google > Estensioni > Apps Script.
    Incolla apps-script/Code.gs.
    Nuova installazione: esegui setupSeemaxDatabase.
-   Aggiornamento esistente: esegui upgradeSeemaxV2130.
+   Aggiornamento esistente: esegui upgradeSeemaxV2140.
 
 3) PUBBLICAZIONE APPS SCRIPT
    Nuovo deployment > Applicazione Web.
