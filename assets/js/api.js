@@ -8,6 +8,8 @@
   const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
   const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_V1_";
   const DEMO_FIRST_ACCESS_PREFIX = "SEEMAX_MANAGEMENT_DEMO_ACCESSED_V1_";
+  const POST_MESSAGE_GRACE_MS = 2600;
+  const MUTATION_POLL_INTERVAL_MS = 700;
   let session = demo.getSession();
   let online = !!config.demoMode;
   let serverVersion = "";
@@ -92,7 +94,7 @@
 
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
-  function captureMutationPerformance(action, result, clientStarted, error = null) {
+  function captureMutationPerformance(action, result, clientStarted, error = null, transport = {}) {
     const backend = result && result.performance ? result.performance : null;
     const clientTotalMs = Math.max(0, Date.now() - Number(clientStarted || Date.now()));
     const backendTotalMs = Number(backend && backend.total_ms || 0);
@@ -103,6 +105,12 @@
       client_total_ms: clientTotalMs,
       backend_total_ms: backendTotalMs,
       transport_overhead_ms: Math.max(0, clientTotalMs - backendTotalMs),
+      transport_mode: String(transport.mode || (error ? "error" : "unknown")),
+      post_wait_ms: Number(transport.post_wait_ms || 0),
+      status_poll_count: Number(transport.status_poll_count || 0),
+      status_poll_ms: Number(transport.status_poll_ms || 0),
+      fallback_triggered: transport.fallback_triggered === true,
+      retry_post: transport.retry_post === true,
       lock_wait_ms: Number(backend && backend.lock_wait_ms || 0),
       lock_hold_ms: Number(backend && backend.lock_hold_ms || 0),
       totals_ms: backend && backend.totals_ms || {},
@@ -115,6 +123,11 @@
         client_total_ms: lastPerformance.client_total_ms,
         backend_total_ms: lastPerformance.backend_total_ms,
         transport_overhead_ms: lastPerformance.transport_overhead_ms,
+        transport_mode: lastPerformance.transport_mode,
+        post_wait_ms: lastPerformance.post_wait_ms,
+        status_poll_count: lastPerformance.status_poll_count,
+        status_poll_ms: lastPerformance.status_poll_ms,
+        fallback_triggered: lastPerformance.fallback_triggered,
         lock_wait_ms: lastPerformance.lock_wait_ms,
         lock_hold_ms: lastPerformance.lock_hold_ms,
         totals_ms: lastPerformance.totals_ms,
@@ -361,6 +374,7 @@
 
   function postForm(action, values) {
     return new Promise((resolve, reject) => {
+      const started = Date.now();
       const requestId = String(values && values.requestId || uid("post"));
       const iframe = document.createElement("iframe");
       const form = document.createElement("form");
@@ -371,7 +385,13 @@
       form.action = config.appsScriptUrl;
       form.target = frameTarget;
       form.hidden = true;
-      const params = { action, ...authParams(), ...values, requestId };
+      const params = {
+        action,
+        ...authParams(),
+        ...values,
+        requestId,
+        response_origin: String(window.location.origin || "")
+      };
       Object.entries(params).forEach(([name, value]) => {
         const input = document.createElement("input");
         input.type = "hidden"; input.name = name; input.value = value == null ? "" : String(value);
@@ -383,26 +403,45 @@
         done = true;
         window.removeEventListener("message", onMessage);
         form.remove();
-        /* Il POST può proseguire anche se Apps Script non riesce a fare
-           postMessage verso GitHub Pages. Conserviamo l'iframe e verifichiamo
-           il risultato tramite il relativo endpoint di stato. */
+        /* Se il browser blocca la pagina di risposta di Apps Script o il
+           postMessage non attraversa il sandbox Google, non aspettiamo 22
+           secondi: passiamo subito alla conferma per requestId. */
         setTimeout(() => iframe.remove(), 120000);
-        resolve({ ok: true, pending: true, requestId });
-      }, 22000);
-      function finish(error, result) {
+        resolve({
+          ok: true,
+          pending: true,
+          requestId,
+          __seemax_transport: {
+            mode: "status_poll",
+            post_wait_ms: Date.now() - started,
+            fallback_triggered: true
+          }
+        });
+      }, POST_MESSAGE_GRACE_MS);
+      function finish(error, result, eventOrigin = "") {
         if (done) return;
         done = true;
         clearTimeout(timer);
         window.removeEventListener("message", onMessage);
         form.remove(); iframe.remove();
-        if (error) reject(error); else resolve(result);
+        if (error) reject(error);
+        else {
+          const payload = result && typeof result === "object" ? result : { ok: true, value: result };
+          payload.__seemax_transport = {
+            mode: "post_message",
+            post_wait_ms: Date.now() - started,
+            fallback_triggered: false,
+            message_origin: String(eventOrigin || "")
+          };
+          resolve(payload);
+        }
       }
       function onMessage(event) {
         const data = event.data || {};
         if (data.requestId !== requestId) return;
         const payload = data.payload || {};
-        if (payload.ok === false) finish(new Error(payload.error || "Caricamento non riuscito."));
-        else finish(null, payload);
+        if (payload.ok === false) finish(new Error(payload.error || "Caricamento non riuscito."), null, event.origin);
+        else finish(null, payload, event.origin);
       }
       window.addEventListener("message", onMessage);
       document.body.append(iframe, form);
@@ -413,19 +452,37 @@
   async function waitForMutation(requestId, options = {}) {
     const started = Date.now();
     let lastError = null;
+    let statusPollCount = 0;
+    let statusPollMs = 0;
     while (Date.now() - started < Number(options.maxWait || 120000)) {
+      const pollStarted = Date.now();
+      statusPollCount += 1;
+      let response;
       try {
-        const response = await jsonp("management_mutation_status", { ...authParams(), requestId }, 30000);
-        if (response.completed) {
-          const result = response.result || {};
-          if (result.ok === false) throw new Error(result.error || "Salvataggio non riuscito.");
-          return result;
-        }
+        response = await jsonp("management_mutation_status", { ...authParams(), requestId }, 30000);
       } catch (error) {
+        statusPollMs += Date.now() - pollStarted;
         if (!error.transient) throw error;
         lastError = error;
+        await wait(MUTATION_POLL_INTERVAL_MS);
+        continue;
       }
-      await wait(1800);
+      statusPollMs += Date.now() - pollStarted;
+      if (response.completed) {
+        const result = response.result || {};
+        if (result.ok === false) throw new Error(result.error || "Salvataggio non riuscito.");
+        return {
+          result,
+          transport: {
+            mode: "status_poll",
+            status_poll_count: statusPollCount,
+            status_poll_ms: statusPollMs,
+            confirmation_ms: Date.now() - started,
+            fallback_triggered: true
+          }
+        };
+      }
+      await wait(MUTATION_POLL_INTERVAL_MS);
     }
     /* Il POST potrebbe essere terminato dopo la scadenza della cache. La
        verifica per token interroga il record senza ripetere alla cieca. */
@@ -433,7 +490,18 @@
       try {
         const rows = await list(options.entity);
         const existing = rows.find((row) => String(row.request_token || "") === String(options.requestToken));
-        if (existing) return { ok: true, row: existing, recovered: true };
+        if (existing) {
+          return {
+            result: { ok: true, row: existing, recovered: true },
+            transport: {
+              mode: "record_recovery",
+              status_poll_count: statusPollCount,
+              status_poll_ms: statusPollMs,
+              confirmation_ms: Date.now() - started,
+              fallback_triggered: true
+            }
+          };
+        }
       } catch (error) { lastError = error; }
     }
     const confirmationError = new Error(lastError && lastError.message
@@ -441,6 +509,13 @@
       : "Il salvataggio non è stato confermato dal database.");
     confirmationError.code = "MUTATION_UNCONFIRMED";
     confirmationError.transient = true;
+    confirmationError.transport = {
+      mode: "status_poll_timeout",
+      status_poll_count: statusPollCount,
+      status_poll_ms: statusPollMs,
+      confirmation_ms: Date.now() - started,
+      fallback_triggered: true
+    };
     throw confirmationError;
   }
 
@@ -448,27 +523,55 @@
     const clientStarted = Date.now();
     const mutationRequestId = options.requestToken ? `mutation-${String(options.requestToken).replace(/[^A-Za-z0-9_-]/g, "-")}` : uid("mutation");
     const requestValues = { ...values, requestId: mutationRequestId };
+    let transport = {};
     try {
       let response = await postForm(action, requestValues);
+      transport = { ...(response.__seemax_transport || {}) };
+      delete response.__seemax_transport;
       let result;
       if (!response.pending) result = response;
       else {
         try {
-          result = await waitForMutation(response.requestId, { ...options, maxWait: Math.min(Number(options.maxWait || 120000), 18000), skipFallback: true });
+          const confirmation = await waitForMutation(response.requestId, { ...options, maxWait: Math.min(Number(options.maxWait || 120000), 18000), skipFallback: true });
+          result = confirmation.result;
+          transport = { ...transport, ...confirmation.transport };
         } catch (error) {
           if (!error || error.code !== "MUTATION_UNCONFIRMED") throw error;
+          transport = { ...transport, ...(error.transport || {}) };
           /* Un solo reinvio con lo stesso token. Il backend riconosce la
              richiesta già applicata, quindi questa ripresa non può creare un
              secondo cliente, pratica o movimento di magazzino. */
           response = await postForm(action, requestValues);
-          result = response.pending ? await waitForMutation(response.requestId, options) : response;
+          const retryTransport = { ...(response.__seemax_transport || {}) };
+          delete response.__seemax_transport;
+          transport = {
+            ...transport,
+            retry_post: true,
+            retry_post_wait_ms: Number(retryTransport.post_wait_ms || 0)
+          };
+          if (response.pending) {
+            const previousPollCount = Number(transport.status_poll_count || 0);
+            const previousPollMs = Number(transport.status_poll_ms || 0);
+            const confirmation = await waitForMutation(response.requestId, options);
+            result = confirmation.result;
+            transport = {
+              ...transport,
+              ...confirmation.transport,
+              status_poll_count: previousPollCount + Number(confirmation.transport.status_poll_count || 0),
+              status_poll_ms: previousPollMs + Number(confirmation.transport.status_poll_ms || 0)
+            };
+          } else {
+            result = response;
+            transport = { ...transport, ...retryTransport, mode: "post_message_retry" };
+          }
         }
       }
       online = true;
-      captureMutationPerformance(action, result, clientStarted);
+      captureMutationPerformance(action, result, clientStarted, null, transport);
       return result;
     } catch (error) {
-      captureMutationPerformance(action, null, clientStarted, error);
+      transport = { ...transport, ...((error && error.transport) || {}) };
+      captureMutationPerformance(action, null, clientStarted, error, transport);
       throw error;
     }
   }

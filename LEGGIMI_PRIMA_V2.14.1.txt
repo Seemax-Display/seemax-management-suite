@@ -1,0 +1,30 @@
+SEEMAX MANAGEMENT SUITE 2.14.1
+==============================
+
+Questa versione corregge il ritardo rilevato nel salvataggio:
+- browser: 24,572 secondi
+- backend Apps Script: 1,698 secondi
+- attesa artificiale di trasporto: circa 22 secondi
+
+AGGIORNAMENTO OBBLIGATORIO SU ENTRAMBI I LATI
+---------------------------------------------
+1. GOOGLE APPS SCRIPT
+   - sostituisci Code.gs
+   - esegui upgradeSeemaxV2141
+   - pubblica una nuova versione del deployment esistente
+
+2. GITHUB PAGES
+   - carica tutti i file del pacchetto GitHub
+   - verifica che assets/js/config.js mantenga il tuo URL /exec
+   - esegui un aggiornamento forzato della pagina o riapri la PWA
+
+DOPO IL TEST
+------------
+Apri la console del browser ed esegui:
+
+SeemaxApi.getLastPerformance()
+
+Il campo transport_mode dovrebbe essere post_message; se compare status_poll,
+il recupero rapido ha comunque evitato l'attesa precedente di 22 secondi.
+
+Guida completa: docs/AGGIORNAMENTO_V2.14.1.md

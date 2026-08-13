@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.14.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.14.1";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -203,6 +203,17 @@ function upgradeSeemaxV2140() {
   });
 }
 
+function upgradeSeemaxV2141() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    updatePatchNotesV2141_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.1 · risposta POST diretta, iframe compatibile e fallback rapido.");
+    return "SEEMAX v2.14.1 configurato: risposta immediata del salvataggio e conferma rapida di sicurezza attive.";
+  });
+}
+
 /* ATTIVITA non viene piu usato come tabella condivisa: la sezione e locale
    sul dispositivo. Questa utility elimina soltanto un vecchio foglio vuoto,
    così nessun dato storico può essere cancellato per errore. */
@@ -263,9 +274,41 @@ function doPost(e) {
     result.performance = performanceSnapshot_();
   }
   cacheManagementRequestResult_(requestId, result);
-  var message = JSON.stringify({ requestId: requestId, payload: result }).replace(/</g, "\\u003c");
-  return HtmlService.createHtmlOutput("<!doctype html><meta charset='utf-8'><script>parent.postMessage(" + message + ", '*');</script>");
+  return postResponseOutput_(requestId, result, p.response_origin);
 }
+
+function inlineJsonForScript_(value) {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+function sanitizeResponseOrigin_(value) {
+  var origin = String(value || "").trim();
+  if (/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(origin)) return origin;
+  if (/^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)) return origin;
+  return "*";
+}
+
+function postResponseOutput_(requestId, result, requestedOrigin) {
+  var message = inlineJsonForScript_({ requestId: requestId, payload: result });
+  var targetOrigin = inlineJsonForScript_(sanitizeResponseOrigin_(requestedOrigin));
+  /* HtmlService applica per impostazione predefinita protezioni che possono
+     impedire a una risposta POST di essere eseguita dentro l'iframe nascosto
+     di GitHub Pages. Questa pagina non contiene interfaccia o comandi: serve
+     soltanto a recapitare l'esito autenticato al chiamante. */
+  var html = "<!doctype html><html><head><meta charset='utf-8'></head><body><script>" +
+    "(function(){var m=" + message + ",o=" + targetOrigin + ";" +
+    "function s(w){try{if(w&&w.postMessage)w.postMessage(m,o);}catch(e){}}" +
+    "s(window.parent);s(window.top);" +
+    "setTimeout(function(){s(window.parent);s(window.top);},60);" +
+    "setTimeout(function(){s(window.parent);s(window.top);},240);" +
+    "})();</script></body></html>";
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
 
 function routeGet_(action, p) {
   switch (action) {
@@ -486,7 +529,11 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
       };
     } else if (isAdmin_(user)) {
       var requestedOwnerUsername = String(payload.client_owner_username || payload.creato_da_username || user.username).trim();
-      var requestedOwner = findRowObject_("AGENTI", "username", requestedOwnerUsername);
+      /* L'utente autenticato è già disponibile: evitiamo una seconda ricerca
+         AGENTI quando l'ADMIN assegna il nuovo cliente a sé stesso. */
+      var requestedOwner = String(requestedOwnerUsername) === String(user.username)
+        ? user
+        : findRowObject_("AGENTI", "username", requestedOwnerUsername);
       if (!requestedOwner || String(requestedOwner.stato || "ATTIVO").toUpperCase() !== "ATTIVO") throw new Error("L’utente scelto per il cliente non è disponibile o non è attivo.");
       if (isAdmin_(requestedOwner) && String(requestedOwner.username) !== String(user.username)) throw new Error("Il cliente può essere associato a un agente oppure al tuo profilo amministratore.");
       clientOwner = requestedOwner;
@@ -2936,9 +2983,9 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.14.0"], ["title", "Salvataggi piu rapidi e diagnostica integrata"],
-    ["intro", "Clienti e pratiche usano ricerche puntuali e scritture di una sola riga, evitando riletture complete non necessarie."],
-    ["footer", "La diagnostica prestazioni mostra i tempi backend e il contatore pratiche evita scansioni ripetute."]
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.14.1"], ["title", "Conferma salvataggi senza attese artificiali"],
+    ["intro", "La risposta POST attraversa correttamente l'iframe di Apps Script e raggiunge subito GitHub Pages."],
+    ["footer", "Se il browser blocca il messaggio diretto, il controllo di sicurezza parte dopo pochi secondi invece di attendere 22 secondi."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
 }
@@ -3028,6 +3075,19 @@ function updatePatchNotesV2140_() {
     title: "Salvataggi piu rapidi e diagnostica integrata",
     intro: "Clienti e pratiche usano ricerche puntuali e scritture di una sola riga, evitando riletture complete non necessarie di Google Fogli.",
     footer: "Il contatore pratiche, la cache breve delle impostazioni e i tempi backend visibili nella console rendono il sistema piu reattivo e misurabile."
+  };
+  Object.keys(notes).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
+  });
+}
+
+function updatePatchNotesV2141_() {
+  var notes = {
+    version: SEEMAX_VERSION,
+    label: "SEEMAX MANAGEMENT SUITE 2.14.1",
+    title: "Conferma salvataggi senza attese artificiali",
+    intro: "La risposta delle mutazioni POST può attraversare l'iframe di Apps Script e raggiungere direttamente GitHub Pages.",
+    footer: "Il fallback di conferma parte dopo 2,6 secondi e la diagnostica indica se il risultato è arrivato via postMessage o tramite controllo di stato."
   };
   Object.keys(notes).forEach(function (key) {
     upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });

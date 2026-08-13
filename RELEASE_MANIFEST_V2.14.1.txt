@@ -1,0 +1,44 @@
+SEEMAX MANAGEMENT SUITE 2.14.1 - RELEASE MANIFEST
+==================================================
+
+OBIETTIVO
+Correggere l'attesa artificiale di circa 22 secondi rilevata dopo il salvataggio,
+quando il backend Apps Script aveva già completato la mutazione.
+
+FILE PRINCIPALI MODIFICATI
+- assets/js/api.js
+- assets/js/config.js
+- sw.js
+- apps-script/Code.gs
+- README.md
+
+NUOVI FILE
+- docs/AGGIORNAMENTO_V2.14.1.md
+- docs/RAPPORTO_TRASPORTO_V2.14.1.md
+- apps-script/INSTALLAZIONE_V2.14.1.txt
+- scripts/verify-v2.14.1.js
+- scripts/test-transport-v2.14.1.js
+- VERIFICA_V2.14.1.txt
+- TEST_TRASPORTO_V2.14.1.txt
+
+VERSIONI
+- Frontend: 2.14.1
+- Backend: seemax-management-suite-2.14.1
+- Cache PWA: seemax-management-v2-14-1
+
+COLLAUDI
+- sintassi frontend e backend
+- sintassi Quotation Planner
+- assenza di funzioni top-level duplicate
+- lookup puntuali e upsert di una sola riga
+- contatore pratiche
+- sicurezza payload inline
+- HtmlOutput con XFrameOptionsMode.ALLOWALL
+- postMessage verso parent e top
+- targetOrigin validato
+- fallback ridotto a 2.600 ms
+- simulazione risposta postMessage
+- simulazione conferma status_poll
+
+ESITO
+Verifica statica e funzionale 2.14.1 completata senza errori.

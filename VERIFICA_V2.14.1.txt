@@ -1,0 +1,59 @@
+✓ Code.gs: sintassi JavaScript valida
+✓ api.js: sintassi JavaScript valida
+✓ app.js: sintassi JavaScript valida
+✓ config.js: sintassi JavaScript valida
+✓ sw.js: sintassi JavaScript valida
+✓ planner-native.js: sintassi JavaScript valida
+✓ Quotation Planner: JavaScript inline valido
+✓ Code.gs: nessuna funzione top-level duplicata
+✓ api.js: nessuna funzione top-level duplicata
+✓ app.js: nessuna funzione top-level duplicata
+✓ planner-native.js: nessuna funzione top-level duplicata
+✓ Backend versione 2.14.1
+✓ Frontend versione 2.14.1
+✓ Cache PWA versione 2.14.1
+✓ Funzione upgradeSeemaxV2141 presente
+✓ Patch notes 2.14.1 presenti
+✓ Contatori pratica 2.14 presenti
+✓ Lookup puntuale tramite TextFinder presente
+✓ Controllo P.IVA limitato alla colonna interessata
+✓ Ricerca cliente S.Q.P. limitata alle colonne interessate
+✓ Idempotenza S.Q.P. usa lookup puntuale
+✓ Cache breve IMPOSTAZIONI presente
+✓ Log di routine escluso dal percorso critico
+✓ Diagnostica backend allegata alle mutazioni POST
+✓ Diagnostica frontend disponibile
+✓ Risposta POST incorporabile nell’iframe GitHub Pages
+✓ postMessage inviato sia al parent sia alla pagina top
+✓ Origine destinataria del postMessage esplicita e validata
+✓ Fallback POST ridotto da 22 secondi a 2,6 secondi
+✓ Attesa artificiale di 22 secondi rimossa
+✓ Diagnostica del canale di trasporto presente
+✓ Diagnostica frontend attiva
+✓ Nessuna rilettura notifiche nella risposta duplicata
+✓ Salvataggio pratica restituisce il record senza rilettura NOTIFICHE
+✓ Controllo versione senza invalidazione e rilettura forzata
+✓ Upsert scrive una sola riga
+✓ Payload postMessage protetto da sequenze HTML
+✓ Endpoint di conferma mutazioni presente
+✓ Upsert clienti/pratiche usa POST idempotente
+✓ Nessun upsert ordinario via URL JSONP
+✓ Frontend blocca backend non allineato
+✓ Self-test P2.5: la giacenza operativa 60 prevale sul seed 0
+✓ HtmlOutput POST usa XFrameOptionsMode.ALLOWALL
+✓ Risposta POST raggiunge la pagina GitHub con targetOrigin dedicato
+✓ Payload inline protegge la chiusura script
+✓ Origini non HTTP/HTTPS non vengono accettate come target dedicato
+✓ Lookup puntuale restituisce il cliente corretto
+✓ Lookup puntuale non legge l'intera tabella CLIENTI
+✓ Lookup ripetuto riusa la cache della richiesta
+✓ Ricerca normalizzata S.Q.P. trova il cliente senza tabella completa
+✓ Ricerca normalizzata S.Q.P. non legge l'intera tabella CLIENTI
+✓ Upsert puntuale aggiorna il record corretto
+✓ Upsert puntuale esegue una sola scrittura di riga
+✓ Upsert puntuale non legge l'intera tabella CLIENTI
+✓ Contatore pratica prosegue dal massimo esistente
+✓ Contatore pratica incrementa senza nuova scansione completa
+✓ Secondo numero pratica evita la scansione della colonna completa
+
+Verifica statica e funzionale 2.14.1 completata senza errori.

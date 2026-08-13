@@ -1,0 +1,40 @@
+Transport test OK {
+  direct: {
+    action: 'management_upsert',
+    observedAt: '2026-08-13T12:12:32.558Z',
+    ok: true,
+    client_total_ms: 2,
+    backend_total_ms: 7,
+    transport_overhead_ms: 0,
+    transport_mode: 'post_message',
+    post_wait_ms: 2,
+    status_poll_count: 0,
+    status_poll_ms: 0,
+    fallback_triggered: false,
+    retry_post: false,
+    lock_wait_ms: 1,
+    lock_hold_ms: 3,
+    totals_ms: { write: 1 },
+    events: [],
+    error: ''
+  },
+  fallback: {
+    action: 'management_upsert',
+    observedAt: '2026-08-13T12:12:32.582Z',
+    ok: true,
+    client_total_ms: 23,
+    backend_total_ms: 7,
+    transport_overhead_ms: 16,
+    transport_mode: 'status_poll',
+    post_wait_ms: 21,
+    status_poll_count: 1,
+    status_poll_ms: 1,
+    fallback_triggered: true,
+    retry_post: false,
+    lock_wait_ms: 1,
+    lock_hold_ms: 3,
+    totals_ms: { write: 1 },
+    events: [],
+    error: ''
+  }
+}

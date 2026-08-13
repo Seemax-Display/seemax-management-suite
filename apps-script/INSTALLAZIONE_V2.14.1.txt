@@ -1,0 +1,37 @@
+SEEMAX MANAGEMENT SUITE 2.14.1 - GOOGLE APPS SCRIPT
+====================================================
+
+1. Crea una copia di sicurezza del Foglio Google e del precedente Code.gs.
+2. Apri Foglio Google > Estensioni > Apps Script.
+3. Sostituisci tutto Code.gs con il file incluso in questo pacchetto.
+4. Salva.
+5. Seleziona ed esegui una volta la funzione:
+
+   upgradeSeemaxV2141
+
+6. Autorizza lo script, se richiesto.
+7. Apri Esegui il deployment > Gestisci deployment.
+8. Modifica la Web App esistente e scegli Nuova versione.
+9. Pubblica mantenendo il deployment esistente, così l'URL /exec resta normalmente invariato.
+10. Aggiorna anche i file GitHub della versione 2.14.1.
+
+NESSUNA MODIFICA MANUALE AI FOGLI
+---------------------------------
+La 2.14.1 non aggiunge colonne, non rinomina schede e non elimina dati.
+Corregge il canale di risposta POST e riduce il fallback da 22 secondi a 2,6 secondi.
+
+VERIFICA
+--------
+Dopo aver creato un nuovo cliente, apri la console del browser ed esegui:
+
+SeemaxApi.getLastPerformance()
+
+Controlla soprattutto:
+- transport_mode
+- post_wait_ms
+- status_poll_count
+- fallback_triggered
+- client_total_ms
+- backend_total_ms
+
+Consulta docs/AGGIORNAMENTO_V2.14.1.md per l'interpretazione completa.
