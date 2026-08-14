@@ -4,7 +4,7 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "" };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "", settingsTab: "general" };
   let installPrompt = null;
   let heldDocumentId = "";
   let documentHoldTimer = null;
@@ -14,8 +14,10 @@
   let clientToolsPromise = null;
   const uploadState = { batches: new Map(), expanded: false };
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
-  let pendingFirstAccessTutorial = false;
+  let pendingWelcomeMessage = false;
+  let pendingPatchNotesMessage = false;
   let pendingBetaWelcome = false;
+  let activeStartupMessage = null;
   let profileBoardDraft = [];
 
   const NAV = [
@@ -370,17 +372,99 @@
   }
 
 
+  const MESSAGE_SEEN_STORAGE_PREFIX = "SEEMAX_MESSAGE_SEEN_V1_";
+
+  function normalizeMessageDisplayMode(value) {
+    const mode = String(value || "ONCE").trim().toUpperCase().replace(/[\s-]+/g, "_");
+    return ["ALWAYS", "SEMPRE", "OGNI_APERTURA"].includes(mode) ? "ALWAYS" : "ONCE";
+  }
+
+  function messageEnabled(value, fallback = true) {
+    if (value === undefined || value === null || value === "") return !!fallback;
+    return String(value).trim().toUpperCase() !== "NO";
+  }
+
   function welcomeContentSettings() {
     const settings = (state.data && state.data.settings) || {};
     const adminContent = (state.data && state.data.adminContent) || {};
     const welcome = adminContent.welcome || {};
     return {
-      enabled: String(welcome.enabled || settings.welcome_enabled || "SI").trim().toUpperCase() !== "NO",
+      enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_enabled, true),
+      displayMode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_display_mode || "ONCE"),
+      publicationKey: String(welcome.publication_key || settings.welcome_publication_key || `welcome-${config.version}`),
+      publicationRevision: Math.max(1, Number(welcome.publication_revision || settings.welcome_message_revision || 1)),
+      publishedAt: String(welcome.published_at || settings.welcome_published_at || ""),
+      publishedBy: String(welcome.published_by || settings.welcome_published_by || ""),
       kicker: String(welcome.kicker || settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO").trim(),
       title: String(welcome.title || settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!").trim(),
       message: String(welcome.message || settings.welcome_message || "Seemax Management Suite raccoglie clienti, pratiche, preventivi e documenti in un unico ambiente.").trim(),
       primaryButton: String(welcome.primary_button || settings.welcome_primary_button || "Spiegami tutto").trim()
     };
+  }
+
+  function patchNotesContentSettings() {
+    const adminContent = (state.data && state.data.adminContent) || {};
+    const source = (state.data && state.data.patchNotes) || adminContent.patchNotes || {};
+    return {
+      enabled: messageEnabled(source.enabled, true),
+      displayMode: normalizeMessageDisplayMode(source.display_mode || "ONCE"),
+      publicationKey: String(source.publication_key || `patch-${source.version || config.version}`),
+      publicationRevision: Math.max(1, Number(source.publication_revision || ((state.data && state.data.settings) || {}).patch_notes_revision || 1)),
+      publishedAt: String(source.published_at || ""),
+      publishedBy: String(source.published_by || ""),
+      version: String(source.version || config.version || ""),
+      label: String(source.label || `SEEMAX MANAGEMENT SUITE ${config.version || ""}`),
+      title: String(source.title || "Aggiornamento"),
+      intro: String(source.intro || ""),
+      footer: String(source.footer || ""),
+      items: Array.isArray(source.items) ? source.items : []
+    };
+  }
+
+  function messageSeenStorageKey(type) {
+    const user = api.getSession() || {};
+    return `${MESSAGE_SEEN_STORAGE_PREFIX}${String(type || "MESSAGE").toUpperCase()}_${encodeURIComponent(user.username || "anonymous")}`;
+  }
+
+  function messageSeenRevision(type) {
+    const normalized = String(type || "").toUpperCase();
+    const field = normalized === "WELCOME" ? "welcome_seen_revision" : "patch_seen_revision";
+    const dataState = (state.data && state.data.messageState) || {};
+    const user = api.getSession() || {};
+    return Number(dataState[field] !== undefined ? dataState[field] : user[field] || 0);
+  }
+
+  function messageShouldDisplay(type, content) {
+    if (!content || !content.enabled) return false;
+    if (normalizeMessageDisplayMode(content.displayMode) === "ALWAYS") return true;
+    const publicationRevision = Math.max(1, Number(content.publicationRevision || 1));
+    const serverSeenRevision = messageSeenRevision(type);
+    if (serverSeenRevision >= publicationRevision) return false;
+    try {
+      const locallySeen = localStorage.getItem(messageSeenStorageKey(type)) === String(content.publicationKey || "");
+      if (locallySeen) {
+        /* Se una precedente sincronizzazione era fallita, il refresh non
+           riapre il popup sul dispositivo ma ritenta la registrazione account. */
+        if (api.markMessageSeen) api.markMessageSeen(type, content).catch(() => {});
+        return false;
+      }
+      return true;
+    } catch (error) { return true; }
+  }
+
+  function markMessageSeen(type, content) {
+    if (!content || normalizeMessageDisplayMode(content.displayMode) === "ALWAYS") return;
+    const normalized = String(type || "").toUpperCase();
+    const field = normalized === "WELCOME" ? "welcome_seen_revision" : "patch_seen_revision";
+    const revision = Math.max(1, Number(content.publicationRevision || 1));
+    try { localStorage.setItem(messageSeenStorageKey(type), String(content.publicationKey || "")); }
+    catch (error) { /* cache locale facoltativa */ }
+    if (state.data) {
+      state.data.messageState = { ...(state.data.messageState || {}), [field]: Math.max(revision, Number((state.data.messageState || {})[field] || 0)) };
+    }
+    /* La cache locale rende immediata la chiusura; il Foglio AGENTI rende la
+       memoria valida per lo stesso account anche su altri dispositivi. */
+    if (api.markMessageSeen) api.markMessageSeen(normalized, content).catch(() => {});
   }
 
   function welcomeMessageMarkup(message) {
@@ -392,17 +476,28 @@
     const settings = (state.data && state.data.settings) || {};
     const source = (state.data && state.data.adminContent) || {};
     const welcome = source.welcome || {};
-    const patch = source.patchNotes || {};
+    const patch = source.patchNotes || (state.data && state.data.patchNotes) || {};
     return {
       revision: Number(source.revision || settings.admin_content_revision || 0),
       welcome: {
-        enabled: String(welcome.enabled || settings.welcome_enabled || "SI").toUpperCase() === "NO" ? "NO" : "SI",
+        enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_enabled, true) ? "SI" : "NO",
+        display_mode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_display_mode || "ONCE"),
+        publication_key: String(welcome.publication_key || settings.welcome_publication_key || `welcome-${config.version}`),
+        publication_revision: Math.max(1, Number(welcome.publication_revision || settings.welcome_message_revision || 1)),
+        published_at: String(welcome.published_at || settings.welcome_published_at || ""),
+        published_by: String(welcome.published_by || settings.welcome_published_by || ""),
         kicker: String(welcome.kicker || settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO"),
         title: String(welcome.title || settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!"),
         message: String(welcome.message || settings.welcome_message || ""),
         primary_button: String(welcome.primary_button || settings.welcome_primary_button || "Spiegami tutto")
       },
       patchNotes: {
+        enabled: messageEnabled(patch.enabled, true) ? "SI" : "NO",
+        display_mode: normalizeMessageDisplayMode(patch.display_mode || "ONCE"),
+        publication_key: String(patch.publication_key || `patch-${patch.version || config.version}`),
+        publication_revision: Math.max(1, Number(patch.publication_revision || settings.patch_notes_revision || 1)),
+        published_at: String(patch.published_at || ""),
+        published_by: String(patch.published_by || ""),
         version: String(patch.version || config.version || ""),
         label: String(patch.label || `SEEMAX MANAGEMENT SUITE ${config.version || ""}`),
         title: String(patch.title || "Aggiornamento"),
@@ -437,7 +532,7 @@
     });
     const empty = editor.querySelector("[data-patch-empty]");
     if (empty) empty.hidden = cards.length > 0;
-    const addButton = document.querySelector("#adminContentForm [data-action='add-patch-item']");
+    const addButton = document.querySelector("#patchNotesForm [data-action='add-patch-item']");
     if (addButton) {
       addButton.disabled = cards.length >= 12;
       addButton.title = cards.length >= 12 ? "È possibile pubblicare al massimo 12 voci." : "";
@@ -466,7 +561,23 @@
     refreshPatchItemEditorState();
   }
 
-  function collectAdminContentForm(form) {
+  function collectWelcomeMessageForm(form) {
+    const field = (name) => String((form.elements[name] && form.elements[name].value) || "").trim();
+    return {
+      expected_revision: Number(form.dataset.revision || 0),
+      section: "WELCOME",
+      welcome: {
+        enabled: form.elements.welcome_enabled && form.elements.welcome_enabled.checked ? "SI" : "NO",
+        display_mode: field("welcome_display_mode") || "ONCE",
+        kicker: field("welcome_kicker"),
+        title: field("welcome_title"),
+        message: field("welcome_message"),
+        primary_button: field("welcome_primary_button")
+      }
+    };
+  }
+
+  function collectPatchNotesForm(form) {
     const field = (name) => String((form.elements[name] && form.elements[name].value) || "").trim();
     const items = Array.from(form.querySelectorAll("[data-patch-item]")).map((card) => {
       const value = (name) => String((card.querySelector(`[data-patch-field="${name}"]`) || {}).value || "").trim();
@@ -475,14 +586,10 @@
     }).filter((item) => item.title || item.text);
     return {
       expected_revision: Number(form.dataset.revision || 0),
-      welcome: {
-        enabled: form.elements.welcome_enabled && form.elements.welcome_enabled.checked ? "SI" : "NO",
-        kicker: field("welcome_kicker"),
-        title: field("welcome_title"),
-        message: field("welcome_message"),
-        primary_button: field("welcome_primary_button")
-      },
+      section: "PATCH_NOTES",
       patchNotes: {
+        enabled: form.elements.patch_enabled && form.elements.patch_enabled.checked ? "SI" : "NO",
+        display_mode: field("patch_display_mode") || "ONCE",
         version: field("patch_version"),
         label: field("patch_label"),
         title: field("patch_title"),
@@ -493,39 +600,86 @@
     };
   }
 
-  function renderAdminContentSettings() {
+  function messagePolicyMarkup(prefix, mode) {
+    const normalized = normalizeMessageDisplayMode(mode);
+    return `<fieldset class="message-policy-fieldset"><legend>Quando deve apparire?</legend><div class="message-policy-grid">
+      <label class="message-mode-card ${normalized === "ONCE" ? "selected" : ""}"><input type="radio" name="${esc(prefix)}_display_mode" value="ONCE" ${normalized === "ONCE" ? "checked" : ""}><span class="message-mode-icon">①</span><span><strong>Solo una volta</strong><small>Ogni account lo vede una sola volta, anche cambiando dispositivo. Ripubblica per mostrarlo nuovamente a tutti.</small></span></label>
+      <label class="message-mode-card ${normalized === "ALWAYS" ? "selected" : ""}"><input type="radio" name="${esc(prefix)}_display_mode" value="ALWAYS" ${normalized === "ALWAYS" ? "checked" : ""}><span class="message-mode-icon">↻</span><span><strong>Sempre</strong><small>Compare a ogni apertura o aggiornamento completo del sistema.</small></span></label>
+    </div></fieldset>`;
+  }
+
+  function publicationStatusMarkup(content) {
+    const date = content.published_at ? new Date(content.published_at) : null;
+    const validDate = date && !Number.isNaN(date.getTime());
+    const published = validDate ? date.toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" }) : "Non ancora ripubblicato";
+    const key = String(content.publication_key || "");
+    const revision = Math.max(1, Number(content.publication_revision || 1));
+    const author = content.published_by ? `da ${esc(content.published_by)}` : "La chiave viene creata al primo salvataggio.";
+    return `<div class="publication-status"><div><span class="publication-status-icon">📣</span><div><small>Pubblicazione corrente</small><strong>${esc(published)}</strong><span>${author} · revisione ${revision}</span></div></div><code title="Chiave di pubblicazione">${esc(key ? key.slice(-22) : "—")}</code></div>`;
+  }
+
+  function communicationActionsMarkup(type, fastMode) {
+    return `<div class="message-editor-actions"><p>${fastMode ? "Passa alla Modalità Standard per modificare le comunicazioni condivise." : "Salva modifica i contenuti senza disturbare chi li ha già letti. Salva e ripubblica crea una nuova pubblicazione visibile a tutti."}</p><div><button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn soft" type="submit" value="save" ${fastMode ? "disabled" : ""}>Salva</button><button class="btn primary" type="submit" value="republish" ${fastMode ? "disabled" : ""}>Salva e ripubblica</button></div></div>`;
+  }
+
+  function renderWelcomeSettingsTab() {
     const content = adminContentState();
     const welcome = content.welcome;
-    const patch = content.patchNotes;
-    const itemMarkup = patch.items.map((item, index) => patchItemEditorMarkup(item, index, `patch-${index}`)).join("");
     const fastMode = api.isFastMode();
-    return `<form id="adminContentForm" data-revision="${esc(content.revision)}"><div class="settings-grid admin-content-settings-grid"><section class="panel span-2 admin-content-panel">
-      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Benvenuto e patch notes</h3><p>Personalizza il messaggio mostrato al primo accesso e le novità pubblicate nel Quotation Planner.</p></div>${badge(`REV. ${content.revision}`)}</div>
-      <div class="admin-content-grid">
-        <section class="admin-content-card">
-          <div class="admin-content-card-head"><div><span class="section-kicker">Primo accesso</span><h4>Messaggio di benvenuto</h4></div><label class="admin-enabled-toggle"><input name="welcome_enabled" type="checkbox" ${welcome.enabled !== "NO" ? "checked" : ""}><span>Attivo</span></label></div>
-          <div class="form-grid">
-            <label class="full">Sovratitolo<input name="welcome_kicker" value="${esc(welcome.kicker)}" maxlength="100" required></label>
-            <label class="full">Titolo<input name="welcome_title" value="${esc(welcome.title)}" maxlength="180" required></label>
-            <label class="full">Messaggio<textarea name="welcome_message" rows="8" maxlength="3500" required>${esc(welcome.message)}</textarea><small>Lascia una riga vuota per creare un nuovo paragrafo.</small></label>
-            <label class="full">Testo pulsante principale<input name="welcome_primary_button" value="${esc(welcome.primary_button)}" maxlength="70" required></label>
-          </div>
-        </section>
-        <section class="admin-content-card">
-          <div class="admin-content-card-head"><div><span class="section-kicker">Quotation Planner</span><h4>Intestazione patch notes</h4></div></div>
-          <div class="form-grid">
-            <label>Versione<input name="patch_version" value="${esc(patch.version)}" maxlength="120" required><small>Modificala per mostrare nuovamente l’avviso sui dispositivi.</small></label>
-            <label>Etichetta<input name="patch_label" value="${esc(patch.label)}" maxlength="160" required></label>
-            <label class="full">Titolo<input name="patch_title" value="${esc(patch.title)}" maxlength="220" required></label>
-            <label class="full">Introduzione<textarea name="patch_intro" rows="5" maxlength="1600">${esc(patch.intro)}</textarea></label>
-            <label class="full">Testo finale<textarea name="patch_footer" rows="4" maxlength="1600">${esc(patch.footer)}</textarea></label>
-          </div>
-        </section>
+    return `<form id="welcomeMessageForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel">
+      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Messaggio di benvenuto</h3><p>Configura il messaggio iniziale del Management Suite e la frequenza con cui deve essere mostrato.</p></div><label class="admin-enabled-toggle"><input name="welcome_enabled" type="checkbox" ${welcome.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
+      ${messagePolicyMarkup("welcome", welcome.display_mode)}
+      ${publicationStatusMarkup(welcome)}
+      <div class="message-editor-fields form-grid">
+        <label class="full">Sovratitolo<input name="welcome_kicker" value="${esc(welcome.kicker)}" maxlength="100" required></label>
+        <label class="full">Titolo<input name="welcome_title" value="${esc(welcome.title)}" maxlength="180" required></label>
+        <label class="full">Messaggio<textarea name="welcome_message" rows="9" maxlength="3500" required>${esc(welcome.message)}</textarea><small>Lascia una riga vuota per creare un nuovo paragrafo.</small></label>
+        <label class="full">Testo pulsante principale<input name="welcome_primary_button" value="${esc(welcome.primary_button)}" maxlength="70" required><small>Il pulsante apre il tutorial guidato; il pulsante Chiudi resta sempre disponibile.</small></label>
       </div>
-      <div class="patch-items-toolbar"><div><span class="section-kicker">Contenuto</span><h4>Voci delle patch notes</h4><p>Le voci disattivate restano salvate ma non vengono mostrate nel Planner.</p></div><button class="btn soft" type="button" data-action="add-patch-item">+ Aggiungi voce</button></div>
+      ${communicationActionsMarkup("welcome", fastMode)}
+    </section></form>`;
+  }
+
+  function renderPatchNotesSettingsTab() {
+    const content = adminContentState();
+    const patch = content.patchNotes;
+    const fastMode = api.isFastMode();
+    const itemMarkup = patch.items.map((item, index) => patchItemEditorMarkup(item, index, `patch-${index}`)).join("");
+    return `<form id="patchNotesForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel">
+      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Patch notes</h3><p>Pubblica le novità nella schermata iniziale del Management Suite e nel Quotation Planner non integrato.</p></div><label class="admin-enabled-toggle"><input name="patch_enabled" type="checkbox" ${patch.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
+      ${messagePolicyMarkup("patch", patch.display_mode)}
+      ${publicationStatusMarkup(patch)}
+      <div class="admin-content-card patch-heading-card"><div class="form-grid">
+        <label>Versione<input name="patch_version" value="${esc(patch.version)}" maxlength="120" required><small>È descrittiva: la ripubblicazione è gestita dal pulsante dedicato.</small></label>
+        <label>Etichetta<input name="patch_label" value="${esc(patch.label)}" maxlength="160" required></label>
+        <label class="full">Titolo<input name="patch_title" value="${esc(patch.title)}" maxlength="220" required></label>
+        <label class="full">Introduzione<textarea name="patch_intro" rows="5" maxlength="1600">${esc(patch.intro)}</textarea></label>
+        <label class="full">Testo finale<textarea name="patch_footer" rows="4" maxlength="1600">${esc(patch.footer)}</textarea></label>
+      </div></div>
+      <div class="patch-items-toolbar"><div><span class="section-kicker">Contenuto</span><h4>Voci delle patch notes</h4><p>Le voci disattivate restano salvate nell'editor ma non vengono mostrate agli utenti.</p></div><button class="btn soft" type="button" data-action="add-patch-item">+ Aggiungi voce</button></div>
       <div id="patchItemsEditor" class="patch-items-editor">${itemMarkup}<p class="patch-items-empty" data-patch-empty ${patch.items.length ? "hidden" : ""}>Non ci sono voci. Puoi pubblicare soltanto titolo e introduzione oppure aggiungere fino a 12 novità.</p></div>
-      <div class="admin-content-save-row"><p>${fastMode ? "Passa alla Modalità Standard per salvare questi contenuti nel database condiviso." : "Il salvataggio aggiorna i fogli IMPOSTAZIONI, PATCH_NOTES e PATCH_ITEMS."}</p><button class="btn primary" type="submit" ${fastMode ? "disabled" : ""}>Salva benvenuto e patch notes</button></div>
-    </section></div></form>`;
+      ${communicationActionsMarkup("patch", fastMode)}
+    </section></form>`;
+  }
+
+  function patchNotesMessageMarkup(patch, options = {}) {
+    const items = (patch.items || []).filter((item) => String(item.attivo || "SI").toUpperCase() !== "NO" && (item.title || item.text));
+    return `<div class="suite-patch-message ${options.preview ? "preview" : ""}"><div class="suite-patch-hero"><span class="suite-patch-icon">🚀</span><div><small>${esc(patch.label || patch.version || "AGGIORNAMENTO")}</small><h3>${esc(patch.title || "Novità Seemax")}</h3>${patch.intro ? `<p>${esc(patch.intro).replace(/\n/g, "<br>")}</p>` : ""}</div></div>${items.length ? `<div class="suite-patch-list">${items.map((item) => `<article><span>${esc(item.emoji || "✨")}</span><div><strong>${esc(item.title || "Aggiornamento")}</strong><p>${esc(item.text || "").replace(/\n/g, "<br>")}</p></div></article>`).join("")}</div>` : ""}${patch.footer ? `<p class="suite-patch-footer">${esc(patch.footer).replace(/\n/g, "<br>")}</p>` : ""}<div class="form-actions"><button class="btn primary" data-action="close-modal">Ho capito</button></div></div>`;
+  }
+
+  function previewWelcomeMessage() {
+    const form = $("welcomeMessageForm");
+    if (!form) return;
+    const source = collectWelcomeMessageForm(form).welcome;
+    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>${esc(source.kicker)}</span><h3>${esc(source.title)}</h3>${welcomeMessageMarkup(source.message)}<div class="form-actions"><button class="btn primary" data-action="close-modal">${esc(source.primary_button || "Continua")}</button></div></div>`;
+    openModal("Anteprima messaggio", body, { wide: true, kicker: "Anteprima amministratore" });
+  }
+
+  function previewPatchNotesMessage() {
+    const form = $("patchNotesForm");
+    if (!form) return;
+    const source = collectPatchNotesForm(form).patchNotes;
+    openModal("Anteprima patch notes", patchNotesMessageMarkup(source, { preview: true }), { wide: true, kicker: "Anteprima amministratore" });
   }
 
   function tutorialSteps() {
@@ -562,18 +716,20 @@
     if (api.isAdmin()) steps.push(
       { chapter: "Amministrazione", route: "users", selector: ".view-toolbar", title: "Agenti e accessi", text: "Crea e gestisci gli account, assegna i ruoli e attiva o disattiva l'accesso degli utenti." },
       { chapter: "Amministrazione", selector: ".panel", title: "Elenco degli account", text: "Consulta username, contatti, ruolo e stato di ogni agente. Le modifiche sono riservate agli amministratori." },
-      { chapter: "Amministrazione", route: "settings", selector: ".settings-grid", title: "Impostazioni generali", text: "Configura parametri aziendali, obbligatorietà dei campi, messaggio di benvenuto e patch notes del Quotation Planner." }
+      { chapter: "Amministrazione", route: "settings", selector: ".admin-settings-tabs", title: "Impostazioni organizzate", text: "Le schede separano dati generali, campi obbligatori, benvenuto, patch notes e diagnostica del sistema." }
     );
     steps.push({ chapter: "Hai concluso", route: "dashboard", selector: "#tutorialButton", title: "Il tutorial rimane sempre disponibile", text: "Puoi riaprire questa guida in qualsiasi momento tramite il piccolo pulsante Tutorial nella barra superiore. Buon lavoro con Seemax Management Suite!" });
     return steps;
   }
 
-  function showTutorialWelcome() {
+  function showWelcomeMessage() {
     const welcome = welcomeContentSettings();
-    if (!welcome.enabled) return;
-    if (api.consumeFirstAccess) api.consumeFirstAccess();
-    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>${esc(welcome.kicker)}</span><h3>${esc(welcome.title)}</h3>${welcomeMessageMarkup(welcome.message)}<div class="form-actions"><button class="btn ghost" data-action="disable-tutorial">Disattiva tutorial</button><button class="btn primary" data-action="start-tutorial">${esc(welcome.primaryButton)}</button></div></div>`;
+    if (!messageShouldDisplay("WELCOME", welcome)) return false;
+    activeStartupMessage = { type: "WELCOME", content: welcome };
+    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>${esc(welcome.kicker)}</span><h3>${esc(welcome.title)}</h3>${welcomeMessageMarkup(welcome.message)}<div class="form-actions"><button class="btn ghost" data-action="close-modal">Chiudi</button><button class="btn primary" data-action="start-tutorial">${esc(welcome.primaryButton)}</button></div></div>`;
     openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
+    markMessageSeen("WELCOME", welcome);
+    return true;
   }
 
   function showBetaWelcome() {
@@ -601,27 +757,40 @@
     openModal("Benvenuto nella Beta", body, { wide: true, kicker: "Seemax Management Suite", subtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova", panelClass: "beta-welcome-modal" });
   }
 
-  function showNextWelcomeMessage() {
+  function showPatchNotesMessage() {
+    const patch = patchNotesContentSettings();
+    if (!messageShouldDisplay("PATCH_NOTES", patch)) return false;
+    activeStartupMessage = { type: "PATCH_NOTES", content: patch };
+    openModal("Novità Seemax", patchNotesMessageMarkup(patch), { wide: true, kicker: patch.version || "Patch notes", panelClass: "suite-patch-modal" });
+    markMessageSeen("PATCH_NOTES", patch);
+    return true;
+  }
+
+  function showNextStartupMessage() {
     if (tutorialState.active || $("modalRoot").children.length) return false;
     if (pendingBetaWelcome) {
       pendingBetaWelcome = false;
       showBetaWelcome();
       return true;
     }
-    if (pendingFirstAccessTutorial) {
-      pendingFirstAccessTutorial = false;
-      showTutorialWelcome();
-      return true;
+    if (pendingWelcomeMessage) {
+      pendingWelcomeMessage = false;
+      if (showWelcomeMessage()) return true;
+    }
+    if (pendingPatchNotesMessage) {
+      pendingPatchNotesMessage = false;
+      if (showPatchNotesMessage()) return true;
     }
     return false;
   }
 
-  function scheduleFirstAccessExperience() {
-    pendingFirstAccessTutorial = (api.isFirstAccess ? api.isFirstAccess() : false) && welcomeContentSettings().enabled;
+  function scheduleStartupExperience() {
+    pendingWelcomeMessage = messageShouldDisplay("WELCOME", welcomeContentSettings());
+    pendingPatchNotesMessage = messageShouldDisplay("PATCH_NOTES", patchNotesContentSettings());
     pendingBetaWelcome = betaTestActive();
     setTimeout(() => {
       if (showMonthlyAwardIfNeeded()) return;
-      showNextWelcomeMessage();
+      showNextStartupMessage();
     }, 350);
   }
 
@@ -641,7 +810,8 @@
     document.body.classList.remove("tutorial-active");
     $("sidebar").classList.remove("open");
     localStorage.setItem(tutorialStorageKey(), JSON.stringify({ status: completed ? "completed" : "interrupted", index: tutorialState.index }));
-    if (completed) { go("dashboard"); toast("Super Tutorial completato. Potrai riaprirlo quando vuoi."); setTimeout(showMonthlyAwardIfNeeded, 500); }
+    if (completed) { go("dashboard"); toast("Super Tutorial completato. Potrai riaprirlo quando vuoi."); }
+    setTimeout(() => { if (!showMonthlyAwardIfNeeded()) showNextStartupMessage(); }, 500);
   }
 
   function showTutorialStep() {
@@ -712,7 +882,7 @@
           toast("Dati locali disponibili. Il database verrà aggiornato al prossimo collegamento.", "warning");
         }
       }
-      scheduleFirstAccessExperience();
+      scheduleStartupExperience();
     } catch (error) {
       if (fallbackCached && String(error.code || "") !== "BACKEND_VERSION_MISMATCH") {
         state.data = fallbackCached;
@@ -775,6 +945,7 @@
         clients: state.data.clients || [],
         products: state.data.products || [],
         settings: state.data.settings || {},
+        patchNotes: state.data.patchNotes || {},
         version: config.version,
         fastMode: api.isFastMode()
       });
@@ -1380,21 +1551,57 @@
     return `${viewToolbar("Nuovo agente", "new-user", `<p class="toolbar-note">${rows.filter((u) => u.stato === "ATTIVO").length} account attivi</p>`)}<section class="panel"><div class="table-wrap"><table><thead><tr><th>Agente</th><th>Username</th><th>Contatti</th><th>Ruolo</th><th>Stato</th><th></th></tr></thead><tbody>${rows.map((u) => `<tr><td><div class="agent-cell"><span class="avatar small">${initials(u.nome_visualizzato)}</span><strong>${esc(u.nome_visualizzato)}</strong></div></td><td>${esc(u.username)}</td><td>${esc(u.email || "—")}<small>${esc(u.telefono || "")}</small></td><td>${badge(String(u.ruolo).toUpperCase())}</td><td>${badge(u.stato)}</td><td><button class="table-action" data-action="edit-user" data-id="${esc(u.id || u.username)}">Modifica</button></td></tr>`).join("")}</tbody></table></div></section>`;
   }
 
-  function renderSettings() {
+  function settingsTabsMarkup() {
+    const tabs = [
+      ["general", "🏢", "Generali", "Azienda e parametri"],
+      ["practices", "📋", "Pratiche", "Campi obbligatori"],
+      ["welcome", "👋", "Benvenuto", "Messaggio iniziale"],
+      ["patch", "🚀", "Patch notes", "Novità e release"],
+      ["system", "⚙️", "Sistema", "Database e diagnostica"]
+    ];
+    return `<nav class="admin-settings-tabs" role="tablist" aria-label="Sezioni impostazioni amministrative">${tabs.map(([id, icon, label, sub]) => `<button type="button" role="tab" aria-selected="${state.settingsTab === id ? "true" : "false"}" class="admin-settings-tab ${state.settingsTab === id ? "active" : ""}" data-action="settings-tab" data-id="${id}"><span>${icon}</span><div><strong>${label}</strong><small>${sub}</small></div></button>`).join("")}</nav>`;
+  }
+
+  function renderGeneralSettingsTab() {
     const s = state.data ? state.data.settings : {};
-    const status = api.status();
-    const groups = {
+    return `<form id="settingsForm"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3><p>Parametri commerciali condivisi dal Management Suite e dal Quotation Planner.</p></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div><div class="form-actions"><button class="btn primary" type="submit">Salva dati generali</button></div></section></form>`;
+  }
+
+  function practiceRequirementGroups() {
+    return {
       ACQUISTO: [["destinatario_ordine", "Destinatario ordine"], ["clientid", "Cliente (se Per Cliente)"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["installazione_regione", "Regione installazione"], ["installazione_provincia", "Provincia installazione"], ["installazione_comune", "Comune installazione"], ["installazione_cap", "CAP installazione"], ["installazione_localita", "Località installazione"], ["installazione_indirizzo", "Indirizzo installazione"], ["installazione_civico", "Civico installazione"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ["note", "Note installazione"]],
       NOLEGGIO: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.NOLEGGIO],
       LEASING: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.LEASING]
     };
-    const requirements = Object.entries(groups).map(([type, fields]) => `<fieldset class="required-settings-group"><legend>${type}</legend><div class="required-settings-list">${fields.map(([key, label]) => {
+  }
+
+  function renderPracticeSettingsTab() {
+    const s = state.data ? state.data.settings : {};
+    const requirements = Object.entries(practiceRequirementGroups()).map(([type, fields]) => `<fieldset class="required-settings-group"><legend>${type}</legend><div class="required-settings-list">${fields.map(([key, label]) => {
       const settingKey = `req_${type.toLowerCase()}_${key}`;
       const checked = String(s[settingKey] || "NO").toUpperCase() === "SI";
       return `<label><input type="hidden" name="${esc(settingKey)}" value="NO"><input type="checkbox" name="${esc(settingKey)}" value="SI" ${checked ? "checked" : ""}><span><strong>${esc(label)}</strong><small>${checked ? "Attualmente obbligatorio" : "Attualmente facoltativo"}</small></span></label>`;
     }).join("")}</div></fieldset>`).join("");
-    const generalSettings = `<form id="settingsForm"><div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono sempre memorizzate sul dispositivo e non rallentano il database. In Modalità Rapida le altre modifiche vengono accodate fino a “SALVA TUTTO”.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Le stesse impostazioni sono modificabili nella configurazione del database usando SI oppure NO.</p></div></div><div class="required-settings-grid">${requirements}</div><div class="form-actions"><button class="btn primary" type="submit">Salva tutte le impostazioni</button></div></section></div></form>`;
-    return `<div class="settings-page-stack">${generalSettings}${renderAdminContentSettings()}</div>`;
+    return `<form id="settingsForm"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Definisci separatamente i dati richiesti per Acquisto, Noleggio e Leasing.</p></div></div><div class="required-settings-grid">${requirements}</div><div class="form-actions"><button class="btn primary" type="submit">Salva campi obbligatori</button></div></section></form>`;
+  }
+
+  function renderSystemSettingsTab() {
+    const status = api.status();
+    const meta = (state.data && state.data.database_meta) || {};
+    return `<div class="settings-grid"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione frontend</dt><dd>${esc(config.version)}</dd></div><div><dt>Fonte magazzino</dt><dd>${esc(meta.inventory_source || "PRODOTTI_LED")}</dd></div></dl><p>Le Attività restano locali. Le altre sezioni comunicano con Google Apps Script e con il Foglio condiviso.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Diagnostica</span><h3>Stato tecnico</h3></div></div><div class="config-summary"><dl><div><dt>Prodotti caricati</dt><dd>${Number(meta.products_count || (state.data.products || []).length)}</dd></div><div><dt>Ultimo caricamento</dt><dd>${meta.loaded_at ? esc(new Date(meta.loaded_at).toLocaleString("it-IT")) : "—"}</dd></div><div><dt>Comunicazioni</dt><dd>Revisioni per account</dd></div></dl><p>La modalità “Solo una volta” viene registrata nella riga dell’agente e affiancata da una cache locale: lo stesso account non rivede il messaggio neppure cambiando dispositivo. “Ripubblica” crea una nuova revisione per tutti.</p></div></section></div>`;
+  }
+
+  function renderSettings() {
+    const allowed = ["general", "practices", "welcome", "patch", "system"];
+    if (!allowed.includes(state.settingsTab)) state.settingsTab = "general";
+    const content = {
+      general: renderGeneralSettingsTab,
+      practices: renderPracticeSettingsTab,
+      welcome: renderWelcomeSettingsTab,
+      patch: renderPatchNotesSettingsTab,
+      system: renderSystemSettingsTab
+    }[state.settingsTab]();
+    return `<div class="admin-settings-shell">${settingsTabsMarkup()}<section class="admin-settings-content" role="tabpanel">${content}</section></div>`;
   }
 
   function filterRows(rows, fields) {
@@ -1411,9 +1618,12 @@
   }
 
   function closeModal() {
+    const viewedMessage = activeStartupMessage;
+    activeStartupMessage = null;
     $("modalRoot").innerHTML = "";
     document.body.classList.remove("modal-open");
-    if (pendingBetaWelcome || pendingFirstAccessTutorial) setTimeout(showNextWelcomeMessage, 280);
+    /* Il messaggio viene marcato quando diventa realmente visibile. */
+    if (pendingBetaWelcome || pendingWelcomeMessage || pendingPatchNotesMessage) setTimeout(showNextStartupMessage, 280);
   }
 
   function field(label, name, value = "", options = {}) {
@@ -2718,6 +2928,9 @@
       },
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
+      "settings-tab": () => { state.settingsTab = ["general", "practices", "welcome", "patch", "system"].includes(id) ? id : "general"; renderRoute(); },
+      "preview-welcome-message": previewWelcomeMessage,
+      "preview-patch-message": previewPatchNotesMessage,
       "add-patch-item": addPatchItemEditor,
       "remove-patch-item": () => removePatchItemEditor(id),
       "close-modal": closeModal,
@@ -2885,6 +3098,44 @@
     if (documentId) moveDocumentLocal(documentId, folderId);
   });
 
+  async function saveAdminCommunicationForm(form, section, republish) {
+    const payload = section === "WELCOME" ? collectWelcomeMessageForm(form) : collectPatchNotesForm(form);
+    payload.republish = republish ? "SI" : "NO";
+    setLoading(true, republish ? "Salvataggio e ripubblicazione…" : "Salvataggio comunicazione…");
+    try {
+      const saved = await api.saveAdminContent(payload);
+      state.data.adminContent = saved || state.data.adminContent || {};
+      if (saved && saved.patchNotes) state.data.patchNotes = { ...saved.patchNotes, items: (saved.patchNotes.items || []).filter((item) => String(item.attivo || "SI").toUpperCase() !== "NO") };
+      if (saved && saved.welcome) {
+        state.data.settings = {
+          ...(state.data.settings || {}),
+          welcome_enabled: saved.welcome.enabled,
+          welcome_display_mode: saved.welcome.display_mode,
+          welcome_publication_key: saved.welcome.publication_key,
+          welcome_message_revision: Number(saved.welcome.publication_revision || (state.data.settings || {}).welcome_message_revision || 1),
+          welcome_published_at: saved.welcome.published_at,
+          welcome_published_by: saved.welcome.published_by,
+          welcome_kicker: saved.welcome.kicker,
+          welcome_title: saved.welcome.title,
+          welcome_message: saved.welcome.message,
+          welcome_primary_button: saved.welcome.primary_button,
+          admin_content_revision: Number(saved.revision || payload.expected_revision + 1)
+        };
+      } else if (saved) {
+        state.data.settings = { ...(state.data.settings || {}), admin_content_revision: Number(saved.revision || payload.expected_revision + 1) };
+      }
+      scheduleBootstrapCache();
+      renderRoute();
+      const label = section === "WELCOME" ? "Messaggio di benvenuto" : "Patch notes";
+      toast(republish ? `${label} salvato e ripubblicato.` : `${label} salvato senza nuova pubblicazione.`);
+    } catch (error) {
+      if (String(error.message || "").includes("CONFLICT_RECORD")) {
+        toast("Le comunicazioni sono state modificate da un altro amministratore. Ricarico i dati aggiornati.", "danger");
+        try { await loadAll(false, { force: true }); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
+      } else toast(error.message, "danger");
+    } finally { setLoading(false); }
+  }
+
   document.addEventListener("submit", async (event) => {
     if (event.target.id === "loginForm") {
       event.preventDefault();
@@ -2963,33 +3214,14 @@
       return;
     }
     if (event.target.matches(".entity-form")) { event.preventDefault(); await saveEntity(event.target); return; }
-    if (event.target.id === "adminContentForm") {
+    if (event.target.id === "welcomeMessageForm") {
       event.preventDefault();
-      const form = event.target;
-      const payload = collectAdminContentForm(form);
-      setLoading(true, "Salvataggio comunicazioni…");
-      try {
-        const saved = await api.saveAdminContent(payload);
-        state.data.adminContent = saved || payload;
-        const welcome = (saved && saved.welcome) || payload.welcome;
-        state.data.settings = {
-          ...(state.data.settings || {}),
-          welcome_enabled: welcome.enabled,
-          welcome_kicker: welcome.kicker,
-          welcome_title: welcome.title,
-          welcome_message: welcome.message,
-          welcome_primary_button: welcome.primary_button,
-          admin_content_revision: Number((saved && saved.revision) || payload.expected_revision + 1)
-        };
-        scheduleBootstrapCache();
-        renderRoute();
-        toast("Messaggio di benvenuto e patch notes salvati.");
-      } catch (error) {
-        if (String(error.message || "").includes("CONFLICT_RECORD")) {
-          toast("Le comunicazioni sono state modificate da un altro amministratore. Ricarico i dati aggiornati.", "danger");
-          try { await loadAll(false, { force: true }); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
-        } else toast(error.message, "danger");
-      } finally { setLoading(false); }
+      await saveAdminCommunicationForm(event.target, "WELCOME", String(event.submitter && event.submitter.value || "save") === "republish");
+      return;
+    }
+    if (event.target.id === "patchNotesForm") {
+      event.preventDefault();
+      await saveAdminCommunicationForm(event.target, "PATCH_NOTES", String(event.submitter && event.submitter.value || "save") === "republish");
       return;
     }
     if (event.target.id === "settingsForm") {

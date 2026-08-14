@@ -1756,10 +1756,14 @@
     // PATCH NOTES DI SICUREZZA INTERNE:
     // Da questa versione il popup automatico usa le Patch Notes recuperate dal DATABASE SEEMAX.
     // Questo blocco resta solo come struttura/fallback tecnico se il database non fornisce dati validi.
-    // Il browser salva la versione vista in localStorage, quindi la finestra appare una sola volta per dispositivo/browser.
-    const PATCH_NOTES_STORAGE_KEY = 'SEEMAX_QUOTATION_PLANNER_PATCH_NOTES_VERSION';
-    const PATCH_NOTES_DATABASE_STORAGE_KEY = 'SEEMAX_QUOTATION_PLANNER_DATABASE_PATCH_NOTES_VERSION';
+    // La cache locale usa la stessa chiave della shell principale; quando l’agente è autenticato,
+    // la revisione vista viene registrata anche in AGENTI e vale su tutti i suoi dispositivi.
+    const MESSAGE_SEEN_STORAGE_PREFIX = 'SEEMAX_MESSAGE_SEEN_V1_';
     const PATCH_NOTES = {
+      enabled:true,
+      displayMode:'ONCE',
+      publicationKey:'patch-local-2026-07-02',
+      publicationRevision:1,
       version:'2026-07-02-database-seemax-loader-tutorial-01',
       label:'Aggiornamento · Database Seemax',
       title:'Novità del Seemax Quotation Planner',
@@ -1771,7 +1775,7 @@
         {emoji:'🔄', title:'Aggiorna dati online', text:'Dalla schermata Dati puoi forzare il caricamento del listino online con un pulsante dedicato.'},
         {emoji:'🧪', title:'Ramo test', text:'Questa versione resta separata dalla stabile Promo Ledwall e possiamo fare step-back in qualsiasi momento.'}
       ],
-      footer:'Le Patch Notes vengono mostrate in base alla versione pubblicata nel DATABASE SEEMAX e ricordate su questo dispositivo/browser.'
+      footer:'Le Patch Notes seguono la pubblicazione del DATABASE SEEMAX; per gli agenti autenticati la visualizzazione viene ricordata anche cambiando dispositivo.'
     };
 
     let patchNotesSource = 'local';
@@ -1953,6 +1957,17 @@
       businessSettings.telefono_commerciale = dbText(impostazioni.telefono_commerciale, businessSettings.telefono_commerciale);
     }
 
+    function normalizePatchNotesMode(value){
+      const mode = String(value || 'ONCE').trim().toUpperCase().replace(/[\s-]+/g,'_');
+      return ['ALWAYS','SEMPRE','OGNI_APERTURA'].includes(mode) ? 'ALWAYS' : 'ONCE';
+    }
+
+    function patchNotesFlag(value, fallback=true){
+      if(value === undefined || value === null || value === '') return !!fallback;
+      if(value === false || value === 0) return false;
+      return !['NO','N','FALSE','0','OFF','DISATTIVO','DISABILITATO'].includes(String(value).trim().toUpperCase());
+    }
+
     function applyDatabasePatchNotes(patchNotes, configVersion=''){
       databasePatchNotesReady = false;
       patchNotesSource = 'local';
@@ -1960,18 +1975,23 @@
       if(!patchNotes) return false;
       const patchVersion = String(patchNotes.version || patchNotes.versione || patchNotes.versione_patch_notes || '').trim();
       const cfgVersion = String(configVersion || '').trim();
-      const dbVersion = patchVersion || cfgVersion;
+      const publicationKey = String(patchNotes.publication_key || patchNotes.publicationKey || '').trim();
+      const dbVersion = patchVersion || cfgVersion || publicationKey;
       if(!dbVersion) return false;
       const dbItems = Array.isArray(patchNotes.items)
         ? patchNotes.items.filter(item => String((item && (item.title || item.text)) || '').trim())
         : [];
+      PATCH_NOTES.enabled = patchNotesFlag(patchNotes.enabled, true);
+      PATCH_NOTES.displayMode = normalizePatchNotesMode(patchNotes.display_mode || patchNotes.displayMode || 'ONCE');
+      PATCH_NOTES.publicationKey = publicationKey || `database:${dbVersion}|config:${cfgVersion || dbVersion}`;
+      PATCH_NOTES.publicationRevision = Math.max(1, Number(patchNotes.publication_revision || patchNotes.publicationRevision || 1));
       PATCH_NOTES.version = dbVersion;
-      databasePatchNotesForceKey = `database:${dbVersion}|config:${cfgVersion || dbVersion}`;
+      databasePatchNotesForceKey = PATCH_NOTES.publicationKey;
       PATCH_NOTES.label = patchNotes.label || PATCH_NOTES.label;
       PATCH_NOTES.title = patchNotes.title || PATCH_NOTES.title;
-      PATCH_NOTES.intro = patchNotes.intro || PATCH_NOTES.intro;
-      if(dbItems.length) PATCH_NOTES.items = dbItems;
-      PATCH_NOTES.footer = patchNotes.footer || PATCH_NOTES.footer;
+      PATCH_NOTES.intro = patchNotes.intro || '';
+      PATCH_NOTES.items = dbItems;
+      PATCH_NOTES.footer = patchNotes.footer || '';
       patchNotesSource = 'database';
       databasePatchNotesReady = true;
       return true;
@@ -2069,6 +2089,7 @@
           ok:true,
           prodotti:nativeContext.products,
           impostazioni:nativeContext.settings || {},
+          patchNotes:nativeContext.patchNotes || {},
           version:nativeContext.version || 'management-suite'
         });
         setDatabaseStatus('online', 'Catalogo e impostazioni condivisi con il Seemax Management Suite.');
@@ -2633,7 +2654,9 @@
               nome_visualizzato:managementSession.displayName || managementSession.nome_visualizzato || managementSession.username,
               email:managementSession.email || '',
               telefono:managementSession.telefono || managementSession.phone || '',
-              role:managementSession.role || managementSession.ruolo || 'AGENTE'
+              role:managementSession.role || managementSession.ruolo || 'AGENTE',
+              welcome_seen_revision:Number(managementSession.welcome_seen_revision || 0),
+              patch_seen_revision:Number(managementSession.patch_seen_revision || 0)
             };
           }
         }
@@ -2818,9 +2841,12 @@
           email: res.email || '',
           telefono: res.telefono || res.phone || '',
           role: authenticatedRole,
+          welcome_seen_revision:Number(res.welcome_seen_revision || 0),
+          patch_seen_revision:Number(res.patch_seen_revision || 0),
           loggedAt: new Date().toISOString()
         });
         applyRuntimeRole(authenticatedRole);
+        syncPatchNotesSeenToAccount();
         hideCalcLoading();
         closeAgentModal();
         applyAgentProfileToData();
@@ -5636,26 +5662,60 @@
 
 
 
+    function patchNotesViewerUsername(){
+      if(agentSession && agentSession.username) return String(agentSession.username);
+      try{
+        const management = JSON.parse(localStorage.getItem('SEEMAX_MANAGEMENT_SESSION_V1') || '{}');
+        if(management && management.username) return String(management.username);
+      }catch(err){}
+      return 'anonymous';
+    }
+
     function patchNotesStorageKey(){
-      return patchNotesSource === 'database' ? PATCH_NOTES_DATABASE_STORAGE_KEY : PATCH_NOTES_STORAGE_KEY;
+      return `${MESSAGE_SEEN_STORAGE_PREFIX}PATCH_NOTES_${encodeURIComponent(patchNotesViewerUsername())}`;
+    }
+
+    function patchNotesPublicationValue(){
+      return String(PATCH_NOTES.publicationKey || databasePatchNotesForceKey || PATCH_NOTES.version || 'patch-notes');
     }
 
     function patchNotesWasSeen(){
+      if(normalizePatchNotesMode(PATCH_NOTES.displayMode) === 'ALWAYS') return false;
+      const publicationRevision = Math.max(1, Number(PATCH_NOTES.publicationRevision || 1));
+      if(agentSession && Number(agentSession.patch_seen_revision || 0) >= publicationRevision) return true;
       try{
-        const key = patchNotesStorageKey();
-        const value = patchNotesSource === 'database' ? (databasePatchNotesForceKey || `database:${PATCH_NOTES.version}`) : PATCH_NOTES.version;
-        return localStorage.getItem(key) === value;
+        const locallySeen = localStorage.getItem(patchNotesStorageKey()) === patchNotesPublicationValue();
+        if(locallySeen) syncPatchNotesSeenToAccount();
+        return locallySeen;
       }catch(err){
         return false;
       }
     }
 
+    function syncPatchNotesSeenToAccount(){
+      if(!agentLoggedIn() || normalizePatchNotesMode(PATCH_NOTES.displayMode) === 'ALWAYS') return;
+      const publicationRevision = Math.max(1, Number(PATCH_NOTES.publicationRevision || 1));
+      if(Number(agentSession.patch_seen_revision || 0) >= publicationRevision) return;
+      jsonpRequest('management_mark_message_seen', 30000, {
+        agent_username:agentSession.username,
+        agent_key:agentSession.key,
+        message_type:'PATCH_NOTES',
+        publication_key:patchNotesPublicationValue(),
+        publication_revision:publicationRevision
+      }).then(res => {
+        if(res && res.user){
+          agentSession = {...agentSession, ...res.user, key:agentSession.key};
+          saveAgentSession(agentSession);
+        }
+      }).catch(() => {});
+    }
+
     function markPatchNotesSeen(){
+      if(normalizePatchNotesMode(PATCH_NOTES.displayMode) === 'ALWAYS') return;
       try{
-        const key = patchNotesStorageKey();
-        const value = patchNotesSource === 'database' ? (databasePatchNotesForceKey || `database:${PATCH_NOTES.version}`) : PATCH_NOTES.version;
-        localStorage.setItem(key, value);
+        localStorage.setItem(patchNotesStorageKey(), patchNotesPublicationValue());
       }catch(err){}
+      syncPatchNotesSeenToAccount();
     }
 
     function renderPatchNotes(){
@@ -5682,17 +5742,18 @@
     function closePatchNotes(){
       const layer = $('patchNotesLayer');
       if(layer) layer.classList.add('hidden');
-      markPatchNotesSeen();
     }
 
     function showPatchNotes(force=false){
       // Il popup automatico deve usare solo le Patch Notes recuperate dal DATABASE SEEMAX.
       // Il blocco interno resta come fallback tecnico, ma non viene mostrato automaticamente.
       if(!force && (!databasePatchNotesReady || patchNotesSource !== 'database')) return;
+      if(!force && !PATCH_NOTES.enabled) return;
       if(!force && patchNotesWasSeen()) return;
       renderPatchNotes();
       const layer = $('patchNotesLayer');
       if(layer) layer.classList.remove('hidden');
+      markPatchNotesSeen();
     }
 
     function setupPatchNotes(){
@@ -5703,7 +5764,7 @@
         if(e.key === 'Escape' && layer && !layer.classList.contains('hidden')) closePatchNotes();
       });
       // Nessuna apertura automatica locale: le Patch Notes vengono mostrate solo dopo il recupero dal DATABASE SEEMAX.
-      // Per evitare conflitti con versioni precedenti viste dal browser, le Patch Notes del DATABASE SEEMAX usano una memoria separata.
+      // La cache locale e la revisione AGENTI impediscono la riapertura finché l’ADMIN non ripubblica.
     }
 
     function boot(){

@@ -248,7 +248,10 @@
   async function bootstrap(options = {}) {
     if (config.demoMode) {
       const data = demo.bootstrap();
+      const communications = demoAdminContent();
       data.database_meta = { loaded_at: new Date().toISOString(), inventory_source: "DEMO_LOCALE", products_count: (data.products || []).length };
+      data.patchNotes = communications.patchNotes;
+      if (isAdmin()) data.adminContent = communications;
       const local = localActivities();
       if (local.length) data.activities = local; else setLocalActivities(data.activities || []);
       return applyPending(data);
@@ -263,6 +266,10 @@
         throw versionError;
       }
       const data = response.data;
+      if (response.user && session) {
+        session = { ...session, ...response.user, key: session.key };
+        demo.setSession(session);
+      }
       data.database_meta = response.database_meta || {};
       const local = localActivities();
       data.activities = local.length ? local : [];
@@ -366,16 +373,27 @@
       revision: Number(settings.admin_content_revision || 0),
       welcome: {
         enabled: settings.welcome_enabled || "SI",
+        display_mode: settings.welcome_display_mode || "ONCE",
+        publication_key: settings.welcome_publication_key || `welcome-${config.version}`,
+        publication_revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
+        published_at: settings.welcome_published_at || "",
+        published_by: settings.welcome_published_by || "",
         kicker: settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO",
         title: settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!",
         message: settings.welcome_message || "Seemax Management Suite raccoglie clienti, pratiche, preventivi e documenti in un unico ambiente.",
         primary_button: settings.welcome_primary_button || "Spiegami tutto"
       },
       patchNotes: {
+        enabled: "SI",
+        display_mode: "ONCE",
+        publication_key: `patch-${config.version}`,
+        publication_revision: Math.max(1, Number(settings.patch_notes_revision || 1)),
+        published_at: "",
+        published_by: "",
         version: config.version,
         label: `SEEMAX MANAGEMENT SUITE ${config.version}`,
         title: "Aggiornamento",
-        intro: "Personalizza qui le novità mostrate dal Quotation Planner.",
+        intro: "Personalizza qui le novità mostrate dal Management Suite e dal Quotation Planner.",
         footer: "",
         items: []
       }
@@ -392,13 +410,65 @@
   async function saveAdminContent(content) {
     if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
     if (isFastMode()) throw new Error("Salva le comunicazioni in Modalità Standard.");
-    if (config.demoMode) return { ...demoAdminContent(), ...(content || {}), revision: Number(content && content.expected_revision || 0) + 1 };
+    if (config.demoMode) {
+      const current = demoAdminContent();
+      const source = content || {};
+      const section = String(source.section || "ALL").toUpperCase();
+      const republish = source.republish === true || String(source.republish || "NO").toUpperCase() === "SI";
+      const next = { ...current, revision: Number(source.expected_revision || current.revision || 0) + 1 };
+      if (["ALL", "WELCOME", "BENVENUTO"].includes(section)) {
+        next.welcome = { ...current.welcome, ...(source.welcome || {}) };
+        if (republish) {
+          next.welcome.publication_key = uid("welcome-pub");
+          next.welcome.publication_revision = Math.max(1, Number(current.welcome.publication_revision || 1)) + 1;
+          next.welcome.published_at = new Date().toISOString();
+          next.welcome.published_by = String((session || {}).username || "demo");
+        }
+      }
+      if (["ALL", "PATCH", "PATCHNOTES", "PATCH_NOTES"].includes(section)) {
+        next.patchNotes = { ...current.patchNotes, ...(source.patchNotes || {}) };
+        if (republish) {
+          next.patchNotes.publication_key = uid("patch-pub");
+          next.patchNotes.publication_revision = Math.max(1, Number(current.patchNotes.publication_revision || 1)) + 1;
+          next.patchNotes.published_at = new Date().toISOString();
+          next.patchNotes.published_by = String((session || {}).username || "demo");
+        }
+      }
+      return next;
+    }
     const requestToken = uid("admin-content");
     const response = await postMutation("management_save_admin_content", {
       payload: JSON.stringify(content || {}),
       request_token: requestToken
     }, { requestToken, maxWait: 120000 });
     return response.content || content || {};
+  }
+
+
+  async function markMessageSeen(messageType, content = {}) {
+    const normalized = String(messageType || "").toUpperCase() === "WELCOME" ? "WELCOME" : "PATCH_NOTES";
+    const field = normalized === "WELCOME" ? "welcome_seen_revision" : "patch_seen_revision";
+    const revision = Math.max(1, Number(content.publicationRevision || content.publication_revision || 1));
+    if (!session) return { ok: false, offline: true };
+    if (config.demoMode) {
+      session = { ...session, [field]: Math.max(revision, Number(session[field] || 0)) };
+      demo.setSession(session);
+      return { ok: true, message_state: { [field]: session[field] }, user: session };
+    }
+    const response = await jsonp("management_mark_message_seen", {
+      ...authParams(),
+      message_type: normalized,
+      publication_key: String(content.publicationKey || content.publication_key || ""),
+      publication_revision: revision
+    }, 45000);
+    if (response.user) {
+      session = { ...session, ...response.user, key: session.key };
+      demo.setSession(session);
+    } else if (!response.stale) {
+      session = { ...session, [field]: Math.max(revision, Number(session[field] || 0)) };
+      demo.setSession(session);
+    }
+    return response;
   }
 
   async function saveProfile(values) {
@@ -892,5 +962,5 @@
     };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

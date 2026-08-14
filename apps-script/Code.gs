@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.14.2";
+var SEEMAX_VERSION = "seemax-management-suite-2.14.3";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -36,7 +36,7 @@ var ENTITY_SHEETS = {
 };
 
 var SHEET_SCHEMAS = {
-  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -62,9 +62,11 @@ function setupSeemaxDatabase() {
   if (!ss) throw new Error("Apri questo script dal Foglio Google da utilizzare come database.");
   PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", ss.getId());
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+  migrateLegacyMessageSettingsV2143_();
   seedSettings_();
   migrateRevenueTargetV151_();
   seedPatchNotes_();
+  ensureMessagePublicationFieldsV2143_();
   seedProducts_();
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
@@ -225,6 +227,19 @@ function upgradeSeemaxV2142() {
   });
 }
 
+function upgradeSeemaxV2143() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    migrateLegacyMessageSettingsV2143_();
+    seedSettings_();
+    seedPatchNotes_();
+    ensureMessagePublicationFieldsV2143_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.3 · schede Admin, migrazione comunicazioni legacy e regole indipendenti di pubblicazione messaggi.");
+    return "SEEMAX v2.14.3 configurato: schede Admin, modalità Una volta/Sempre, ripubblicazione indipendente e memoria per account attive.";
+  });
+}
+
 /* ATTIVITA non viene piu usato come tabella condivisa: la sezione e locale
    sul dispositivo. Questa utility elimina soltanto un vecchio foglio vuoto,
    così nessun dato storico può essere cancellato per errore. */
@@ -334,6 +349,7 @@ function routeGet_(action, p) {
     case "management_save_settings": return managementSaveSettings_(p);
     case "management_admin_content": return managementAdminContent_(p);
     case "management_save_admin_content": return managementSaveAdminContent_(p);
+    case "management_mark_message_seen": return managementMarkMessageSeen_(p);
     case "management_save_profile": return managementSaveProfile_(p);
     case "management_create_from_quote": return managementCreateFromQuote_(p);
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
@@ -387,6 +403,10 @@ function managementBootstrap_(p) {
   var allPractices = rowsToObjects_(sheet_("PRATICHE"));
   var allClients = rowsToObjects_(sheet_("CLIENTI"));
   var allUsers = rowsToObjects_(sheet_("AGENTI"));
+  /* authenticate_ puo usare una cache breve. Per le revisioni dei messaggi
+     usiamo invece la riga appena letta dal Foglio, cosi la visualizzazione
+     rimane coerente anche passando da un dispositivo a un altro. */
+  var currentUserRow = allUsers.filter(function (row) { return String(row.username || "") === String(user.username || ""); })[0] || user;
   var linkedClientIds = {};
   allPractices.forEach(function (practice) { if (practice.clientId) linkedClientIds[String(practice.clientId)] = true; });
   var clients = allClients.filter(function (row) { return canAccessClient_(row, user); }).map(function (row) {
@@ -398,17 +418,22 @@ function managementBootstrap_(p) {
   var allDocuments = rowsToObjects_(sheet_("DOCUMENTI"));
   var documents = isAdmin_(user) ? allDocuments : allDocuments.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
   var activities = [];
-  var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(user)];
+  var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(currentUserRow)];
   var settings = getSettings_(true);
   var notifications = listNotificationsForUser_(user);
   var movements = isAdmin_(user) ? rowsToObjects_(sheet_("MOVIMENTI_MAGAZZINO")).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 100) : [];
   var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, movements: movements, settings: settings, notifications: notifications };
-  if (isAdmin_(user)) data.adminContent = adminContent_();
+  /* Le patch notes pubbliche vengono caricate anche nella shell principale,
+     così la regola Una volta/Sempre vale all'apertura dell'intero sistema e
+     non soltanto quando si entra nel Quotation Planner. */
+  data.patchNotes = patchNotesContent_(false, settings);
+  data.messageState = messageStateForUser_(currentUserRow, settings, data.patchNotes);
+  if (isAdmin_(user)) data.adminContent = adminContent_(settings);
   data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
   return {
     ok: true,
     data: data,
-    user: publicUser_(user),
+    user: publicUser_(currentUserRow),
     version: SEEMAX_VERSION,
     database_meta: {
       loaded_at: new Date().toISOString(),
@@ -572,6 +597,90 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
   if (entity === "clients") logRoutineUpsert_(user, entity, row.id || "", "Salvataggio da Management Suite");
   else log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
   return { ok: true, row: entity === "users" ? publicUser_(row) : row };
+}
+
+
+function messagePublicationState_(messageType, settingsOverride, patchOverride) {
+  var type = String(messageType || "").trim().toUpperCase();
+  var settings = settingsOverride || getSettings_(true);
+  if (["WELCOME", "BENVENUTO"].indexOf(type) >= 0) {
+    return {
+      type: "WELCOME",
+      seen_field: "welcome_seen_revision",
+      revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
+      publication_key: String(settings.welcome_publication_key || legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION))
+    };
+  }
+  if (["PATCH", "PATCH_NOTES", "PATCHNOTES"].indexOf(type) >= 0) {
+    /* Per la sola marcatura non servono le voci PATCH_ITEMS: basta la tabella
+       chiave/valore PATCH_NOTES, evitando una lettura non necessaria. */
+    var patch = patchOverride || getKeyValueSheet_("PATCH_NOTES");
+    return {
+      type: "PATCH_NOTES",
+      seen_field: "patch_seen_revision",
+      revision: Math.max(1, Number(patch.publication_revision || settings.patch_notes_revision || 1)),
+      publication_key: String(patch.publication_key || legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, patch.version || SEEMAX_VERSION))
+    };
+  }
+  throw new Error("Tipo di messaggio non riconosciuto.");
+}
+
+function messageStateForUser_(user, settingsOverride, patchOverride) {
+  var settings = settingsOverride || getSettings_(true);
+  var welcome = messagePublicationState_("WELCOME", settings, patchOverride);
+  var patch = messagePublicationState_("PATCH_NOTES", settings, patchOverride);
+  return {
+    welcome_seen_revision: Number(user && user.welcome_seen_revision || 0),
+    patch_seen_revision: Number(user && user.patch_seen_revision || 0),
+    welcome_publication_revision: welcome.revision,
+    patch_publication_revision: patch.revision
+  };
+}
+
+function managementMarkMessageSeen_(p) {
+  var authenticatedUser = authenticate_(p.agent_username, p.agent_key);
+  return withMutationLock_(function () {
+    return managementMarkMessageSeenLocked_(authenticatedUser, p);
+  });
+}
+
+function managementMarkMessageSeenLocked_(authenticatedUser, p) {
+  var user = findRowObject_("AGENTI", "username", authenticatedUser.username);
+  if (!user) throw new Error("Utente non trovato.");
+  var settings = getSettings_(true);
+  var patch = getKeyValueSheet_("PATCH_NOTES");
+  var publication = messagePublicationState_(p.message_type || p.type, settings, patch);
+  var requestedKey = String(p.publication_key || "").trim();
+  var requestedRevision = Number(p.publication_revision || 0);
+
+  /* Un popup aperto mentre l'ADMIN ripubblica non deve marcare come vista la
+     nuova edizione. In tal caso la richiesta vecchia viene ignorata. */
+  if ((requestedKey && requestedKey !== publication.publication_key) ||
+      (requestedRevision > 0 && requestedRevision !== publication.revision)) {
+    return {
+      ok: true,
+      stale: true,
+      message_type: publication.type,
+      publication_revision: publication.revision,
+      message_state: messageStateForUser_(user, settings, patch),
+      user: publicUser_(user)
+    };
+  }
+
+  var alreadySeen = Number(user[publication.seen_field] || 0);
+  if (alreadySeen < publication.revision) {
+    var update = { username: user.username };
+    update[publication.seen_field] = publication.revision;
+    user = upsertObject_("AGENTI", "username", user.username, update);
+  }
+  return {
+    ok: true,
+    stale: false,
+    message_type: publication.type,
+    publication_revision: publication.revision,
+    message_state: messageStateForUser_(user, settings, patch),
+    user: publicUser_(user)
+  };
 }
 
 function managementSaveProfile_(p) {
@@ -1937,68 +2046,185 @@ function managementSaveAdminContentLocked_(user, payload) {
     throw new Error("CONFLICT_RECORD: benvenuto o patch notes sono stati aggiornati da un altro amministratore.");
   }
 
-  var welcome = payload.welcome && typeof payload.welcome === "object" ? payload.welcome : {};
-  var welcomeValues = {
-    welcome_enabled: String(welcome.enabled || "SI").toUpperCase() === "NO" ? "NO" : "SI",
-    welcome_kicker: String(welcome.kicker || "IL TUO NUOVO CENTRO OPERATIVO").trim().slice(0, 100),
-    welcome_title: String(welcome.title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!").trim().slice(0, 180),
-    welcome_message: String(welcome.message || defaultWelcomeMessage_()).trim().slice(0, 3500),
-    welcome_primary_button: String(welcome.primary_button || "Spiegami tutto").trim().slice(0, 70),
-    admin_content_revision: currentRevision + 1
-  };
-  upsertSettingsBatch_(welcomeValues, "Comunicazioni aggiornate da Management Suite");
+  var section = String(payload.section || "ALL").trim().toUpperCase();
+  var updateWelcome = ["ALL", "WELCOME", "BENVENUTO"].indexOf(section) >= 0;
+  var updatePatch = ["ALL", "PATCH", "PATCHNOTES", "PATCH_NOTES"].indexOf(section) >= 0;
+  if (!updateWelcome && !updatePatch) throw new Error("Sezione comunicazioni non riconosciuta.");
+  var republish = payload.republish === true || String(payload.republish || "NO").toUpperCase() === "SI";
+  var nextRevision = currentRevision + 1;
+  var now = new Date().toISOString();
+  var logParts = [];
 
-  var patch = payload.patchNotes && typeof payload.patchNotes === "object" ? payload.patchNotes : {};
-  var patchValues = {
-    version: String(patch.version || SEEMAX_VERSION).trim().slice(0, 120),
-    label: String(patch.label || "SEEMAX MANAGEMENT SUITE").trim().slice(0, 160),
-    title: String(patch.title || "Aggiornamento").trim().slice(0, 220),
-    intro: String(patch.intro || "").trim().slice(0, 1600),
-    footer: String(patch.footer || "").trim().slice(0, 1600)
-  };
-  var sourceItems = Array.isArray(patch.items) ? patch.items : [];
-  var items = sourceItems.slice(0, 12).map(function (item) {
-    item = item && typeof item === "object" ? item : {};
-    return {
-      emoji: String(item.emoji || "✨").trim().slice(0, 16),
-      title: String(item.title || "").trim().slice(0, 180),
-      text: String(item.text || "").trim().slice(0, 900),
-      attivo: String(item.attivo || item.active || "SI").toUpperCase() === "NO" ? "NO" : "SI"
+  if (updateWelcome) {
+    var welcome = payload.welcome && typeof payload.welcome === "object" ? payload.welcome : {};
+    var existingWelcomeKey = String(settings.welcome_publication_key || "").trim();
+    var welcomePublicationKey = republish || !existingWelcomeKey ? uid_("welcome-pub") : existingWelcomeKey;
+    var welcomeEnabled = normalizeYesNo_(welcome.enabled, settings.welcome_enabled || settings.welcome_message_enabled || "SI");
+    var welcomeMode = normalizeMessageDisplayMode_(welcome.display_mode || settings.welcome_display_mode || settings.welcome_message_frequency || "ONCE");
+    var welcomeTitle = String(welcome.title !== undefined ? welcome.title : settings.welcome_title || settings.welcome_message_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!").trim().slice(0, 180);
+    var welcomeMessage = String(welcome.message !== undefined ? welcome.message : settings.welcome_message || settings.welcome_message_body || defaultWelcomeMessage_()).trim().slice(0, 3500);
+    var welcomeButton = String(welcome.primary_button !== undefined ? welcome.primary_button : settings.welcome_primary_button || settings.welcome_message_button || "Spiegami tutto").trim().slice(0, 70);
+    var legacyWelcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1) + (republish ? 1 : 0));
+    var welcomeValues = {
+      welcome_enabled: welcomeEnabled,
+      welcome_display_mode: welcomeMode,
+      welcome_publication_key: welcomePublicationKey,
+      welcome_published_at: republish || !existingWelcomeKey ? now : String(settings.welcome_published_at || ""),
+      welcome_published_by: republish || !existingWelcomeKey ? String(user.username || "") : String(settings.welcome_published_by || ""),
+      welcome_kicker: String(welcome.kicker !== undefined ? welcome.kicker : settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO").trim().slice(0, 100),
+      welcome_title: welcomeTitle,
+      welcome_message: welcomeMessage,
+      welcome_primary_button: welcomeButton,
+      /* Compatibilità con la precedente personalizzazione già presente nel
+         Foglio aziendale allegato: le vecchie chiavi restano sincronizzate. */
+      welcome_message_enabled: welcomeEnabled,
+      welcome_message_frequency: welcomeMode,
+      welcome_message_revision: legacyWelcomeRevision,
+      welcome_message_title: welcomeTitle,
+      welcome_message_body: welcomeMessage,
+      welcome_message_button: welcomeButton,
+      admin_content_revision: nextRevision
     };
-  }).filter(function (item) { return item.title || item.text; });
-  writePatchContentBatch_(patchValues, items);
-  log_(user, "UPDATE", "admin_content", "PATCH_NOTES", "Benvenuto e patch notes aggiornati");
+    upsertSettingsBatch_(welcomeValues, "Messaggio di benvenuto aggiornato da Management Suite");
+    logParts.push("benvenuto" + (republish ? " ripubblicato" : " aggiornato"));
+  }
+
+  if (updatePatch) {
+    var currentNotes = getKeyValueSheet_("PATCH_NOTES");
+    var patch = payload.patchNotes && typeof payload.patchNotes === "object" ? payload.patchNotes : {};
+    var existingPatchKey = String(currentNotes.publication_key || "").trim();
+    var patchPublicationKey = republish || !existingPatchKey ? uid_("patch-pub") : existingPatchKey;
+    var legacyPatchRevision = Math.max(1, Number(settings.patch_notes_revision || currentNotes.publication_revision || 1) + (republish ? 1 : 0));
+    var patchValues = {
+      enabled: normalizeYesNo_(patch.enabled, currentNotes.enabled || "SI"),
+      publication_revision: legacyPatchRevision,
+      display_mode: normalizeMessageDisplayMode_(patch.display_mode || currentNotes.display_mode || "ONCE"),
+      publication_key: patchPublicationKey,
+      published_at: republish || !existingPatchKey ? now : String(currentNotes.published_at || ""),
+      published_by: republish || !existingPatchKey ? String(user.username || "") : String(currentNotes.published_by || ""),
+      version: String(patch.version !== undefined ? patch.version : currentNotes.version || SEEMAX_VERSION).trim().slice(0, 120),
+      label: String(patch.label !== undefined ? patch.label : currentNotes.label || "SEEMAX MANAGEMENT SUITE").trim().slice(0, 160),
+      title: String(patch.title !== undefined ? patch.title : currentNotes.title || "Aggiornamento").trim().slice(0, 220),
+      intro: String(patch.intro !== undefined ? patch.intro : currentNotes.intro || "").trim().slice(0, 1600),
+      footer: String(patch.footer !== undefined ? patch.footer : currentNotes.footer || "").trim().slice(0, 1600)
+    };
+    var sourceItems = Array.isArray(patch.items)
+      ? patch.items
+      : rowsToObjects_(sheet_("PATCH_ITEMS"));
+    var items = sourceItems.slice(0, 12).map(function (item) {
+      item = item && typeof item === "object" ? item : {};
+      return {
+        emoji: String(item.emoji || "✨").trim().slice(0, 16),
+        title: String(item.title || "").trim().slice(0, 180),
+        text: String(item.text || "").trim().slice(0, 900),
+        attivo: normalizeYesNo_(item.attivo !== undefined ? item.attivo : item.active, "SI")
+      };
+    }).filter(function (item) { return item.title || item.text; });
+    writePatchContentBatch_(patchValues, items);
+    var legacyPatchValues = {
+      patch_notes_enabled: patchValues.enabled,
+      patch_notes_frequency: patchValues.display_mode,
+      patch_notes_revision: legacyPatchRevision,
+      patch_notes_label: patchValues.label,
+      patch_notes_title: patchValues.title,
+      patch_notes_intro: patchValues.intro,
+      patch_notes_items: serializeLegacyPatchItemsV2143_(items),
+      patch_notes_footer: patchValues.footer
+    };
+    if (!updateWelcome) legacyPatchValues.admin_content_revision = nextRevision;
+    upsertSettingsBatch_(legacyPatchValues, "Compatibilità comunicazioni precedenti aggiornata da Management Suite");
+    logParts.push("patch notes" + (republish ? " ripubblicate" : " aggiornate"));
+  }
+
+  log_(user, "UPDATE", "admin_content", section, logParts.join(" e "));
   return { ok: true, content: adminContent_() };
 }
 
-function adminContent_() {
-  var settings = getSettings_(true);
+function normalizeYesNo_(value, fallback) {
+  var source = value === undefined || value === null || value === "" ? fallback : value;
+  if (source === true) return "SI";
+  if (source === false) return "NO";
+  var normalized = String(source === undefined || source === null ? "NO" : source).trim().toUpperCase();
+  return ["NO", "N", "FALSE", "0", "OFF", "DISATTIVO", "DISABILITATO"].indexOf(normalized) >= 0 ? "NO" : "SI";
+}
+
+function normalizeMessageDisplayMode_(value) {
+  var mode = String(value || "ONCE").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return ["ALWAYS", "SEMPRE", "OGNI_APERTURA"].indexOf(mode) >= 0 ? "ALWAYS" : "ONCE";
+}
+
+function legacyPublicationKeyV2143_(prefix, revision, fallback) {
+  var normalized = String(revision === undefined || revision === null ? "" : revision).trim().replace(/[^0-9A-Za-z._-]+/g, "-");
+  return prefix + "-legacy-" + (normalized || String(fallback || SEEMAX_VERSION).replace(/[^0-9A-Za-z._-]+/g, "-"));
+}
+
+function parseLegacyPatchItemsV2143_(value) {
+  return String(value || "").split(/\r?\n/).map(function (line) {
+    var parts = String(line || "").split("|");
+    if (parts.length < 2) return null;
+    return {
+      emoji: String(parts.shift() || "✨").trim().slice(0, 16),
+      title: String(parts.shift() || "").trim().slice(0, 180),
+      text: String(parts.join("|") || "").trim().slice(0, 900),
+      attivo: "SI"
+    };
+  }).filter(function (item) { return item && (item.title || item.text); }).slice(0, 12);
+}
+
+function serializeLegacyPatchItemsV2143_(items) {
+  return (items || []).map(function (item) {
+    var clean = function (value) { return String(value || "").replace(/[|\r\n]+/g, " ").trim(); };
+    return [clean(item.emoji || "✨"), clean(item.title), clean(item.text)].join("|");
+  }).join("\n");
+}
+
+function adminContent_(settingsOverride) {
+  var settings = settingsOverride || getSettings_(true);
+  return {
+    revision: Number(settings.admin_content_revision || settings.settings_revision || 0),
+    welcome: {
+      enabled: normalizeYesNo_(settings.welcome_enabled !== undefined ? settings.welcome_enabled : settings.welcome_message_enabled, "SI"),
+      display_mode: normalizeMessageDisplayMode_(settings.welcome_display_mode || settings.welcome_message_frequency || "ONCE"),
+      publication_key: String(settings.welcome_publication_key || legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION)),
+      publication_revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
+      published_at: String(settings.welcome_published_at || ""),
+      published_by: String(settings.welcome_published_by || ""),
+      kicker: String(settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO"),
+      title: String(settings.welcome_title || settings.welcome_message_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!"),
+      message: String(settings.welcome_message || settings.welcome_message_body || defaultWelcomeMessage_()),
+      primary_button: String(settings.welcome_primary_button || settings.welcome_message_button || "Spiegami tutto")
+    },
+    patchNotes: patchNotesContent_(true, settings)
+  };
+}
+
+function patchNotesContent_(includeInactive, settingsOverride) {
   var notes = getKeyValueSheet_("PATCH_NOTES");
+  var settings = settingsOverride || getSettings_(true);
   var items = rowsToObjects_(sheet_("PATCH_ITEMS")).map(function (row) {
     return {
       emoji: String(row.emoji || "✨"),
       title: String(row.title || ""),
       text: String(row.text || ""),
-      attivo: String(row.attivo || "SI").toUpperCase() === "NO" ? "NO" : "SI"
+      attivo: normalizeYesNo_(row.attivo, "SI")
     };
   });
+  if (!items.length && settings.patch_notes_items) items = parseLegacyPatchItemsV2143_(settings.patch_notes_items);
+  if (!includeInactive) items = items.filter(function (item) { return item.attivo !== "NO"; });
+  var noteVersion = String(notes.version || settings.versione_patch_notes || SEEMAX_VERSION);
   return {
-    revision: Number(settings.admin_content_revision || 0),
-    welcome: {
-      enabled: String(settings.welcome_enabled || "SI").toUpperCase() === "NO" ? "NO" : "SI",
-      kicker: String(settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO"),
-      title: String(settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!"),
-      message: String(settings.welcome_message || defaultWelcomeMessage_()),
-      primary_button: String(settings.welcome_primary_button || "Spiegami tutto")
-    },
-    patchNotes: {
-      version: String(notes.version || SEEMAX_VERSION),
-      label: String(notes.label || "SEEMAX MANAGEMENT SUITE"),
-      title: String(notes.title || "Aggiornamento"),
-      intro: String(notes.intro || ""),
-      footer: String(notes.footer || ""),
-      items: items
-    }
+    enabled: normalizeYesNo_(notes.enabled !== undefined ? notes.enabled : settings.patch_notes_enabled, "SI"),
+    display_mode: normalizeMessageDisplayMode_(notes.display_mode || settings.patch_notes_frequency || "ONCE"),
+    publication_key: String(notes.publication_key || legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, noteVersion)),
+    publication_revision: Math.max(1, Number(notes.publication_revision || settings.patch_notes_revision || 1)),
+    published_at: String(notes.published_at || ""),
+    published_by: String(notes.published_by || ""),
+    version: noteVersion,
+    label: String(notes.label || settings.patch_notes_label || "SEEMAX MANAGEMENT SUITE"),
+    title: String(notes.title || settings.patch_notes_title || "Aggiornamento"),
+    intro: String(notes.intro || settings.patch_notes_intro || ""),
+    footer: String(notes.footer || settings.patch_notes_footer || ""),
+    items: items
   };
 }
 
@@ -2008,7 +2234,7 @@ function defaultWelcomeMessage_() {
 
 function writePatchContentBatch_(notes, items) {
   var notesSheet = sheet_("PATCH_NOTES");
-  var noteRows = ["version", "label", "title", "intro", "footer"].map(function (key) { return [key, notes[key] || ""]; });
+  var noteRows = ["enabled", "display_mode", "publication_key", "publication_revision", "published_at", "published_by", "version", "label", "title", "intro", "footer"].map(function (key) { return [key, notes[key] || ""]; });
   var noteLastRow = notesSheet.getLastRow();
   if (noteLastRow > 1) notesSheet.getRange(2, 1, noteLastRow - 1, Math.max(2, notesSheet.getLastColumn())).clearContent();
   if (noteRows.length) notesSheet.getRange(2, 1, noteRows.length, 2).setValues(noteRows);
@@ -2197,21 +2423,20 @@ function agentOfMonth_(practices, clients, currentUser, userRows) {
 
 function plannerConfig_() {
   var settings = getSettings_();
-  var notes = getKeyValueSheet_("PATCH_NOTES");
-  var items = rowsToObjects_(sheet_("PATCH_ITEMS")).filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; });
   return {
     ok: true,
     version: String(settings.versione_config || SEEMAX_VERSION),
     impostazioni: settings,
     prodotti: inventoryProductsForRead_().filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; }),
-    patchNotes: { version: notes.version || SEEMAX_VERSION, label: notes.label || "SEEMAX QUOTATION PLANNER", title: notes.title || "Aggiornamento", intro: notes.intro || "", footer: notes.footer || "", items: items }
+    patchNotes: patchNotesContent_(false)
   };
 }
 
 function plannerAgentLogin_(p) {
-  var user = authenticate_(p.agent_username, p.agent_key);
+  var authenticatedUser = authenticate_(p.agent_username, p.agent_key);
+  var user = findRowObject_("AGENTI", "username", authenticatedUser.username) || authenticatedUser;
   touchLoginBestEffort_(user.username);
-  return { ok: true, username: user.username, displayName: user.nome_visualizzato, nome_visualizzato: user.nome_visualizzato, email: user.email || "", telefono: user.telefono || "", ruolo: String(user.ruolo || "AGENTE").toUpperCase() };
+  return { ok: true, username: user.username, displayName: user.nome_visualizzato, nome_visualizzato: user.nome_visualizzato, email: user.email || "", telefono: user.telefono || "", ruolo: String(user.ruolo || "AGENTE").toUpperCase(), welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0) };
 }
 
 function nextQuote_(p) {
@@ -2388,6 +2613,11 @@ function withMutationLock_(callback) {
        possono diventare lo snapshot usato dalla mutazione. */
     resetRequestDataCaches_();
     result = callback();
+    /* Conferma le scritture pendenti prima di cedere il lock globale. In
+       questo modo un secondo agente rilegge sempre lo stato già consolidato. */
+    var flushStarted = new Date().getTime();
+    SpreadsheetApp.flush();
+    performanceEvent_("write", "SpreadsheetApp.flush", new Date().getTime() - flushStarted, { synchronized: true });
   } catch (error) {
     failure = error;
   } finally {
@@ -2837,7 +3067,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
@@ -3051,6 +3281,12 @@ function seedSettings_() {
     beta_test_attiva: "SI",
     beta_sblocca_trofei: "SI",
     welcome_enabled: "SI",
+    welcome_display_mode: "ONCE",
+    welcome_publication_key: "welcome-" + SEEMAX_VERSION,
+    welcome_message_revision: 1,
+    patch_notes_revision: 1,
+    welcome_published_at: "",
+    welcome_published_by: "",
     welcome_kicker: "IL TUO NUOVO CENTRO OPERATIVO",
     welcome_title: "BENVENUTO IN SEEMAX MANAGEMENT SUITE!",
     welcome_message: defaultWelcomeMessage_(),
@@ -3127,11 +3363,85 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.14.2"], ["title", "Comunicazioni amministrative e conferma anticipata"],
-    ["intro", "L'amministratore può personalizzare benvenuto e patch notes dalla sezione Impostazioni."],
-    ["footer", "La conferma del salvataggio parte in parallelo alla risposta iframe per ridurre l'attesa residua."]
+    ["enabled", "SI"], ["display_mode", "ONCE"], ["publication_key", "patch-" + SEEMAX_VERSION], ["publication_revision", 1], ["published_at", ""], ["published_by", ""],
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.14.3"], ["title", "Schede Admin e pubblicazione messaggi"],
+    ["intro", "L'amministratore può organizzare le impostazioni in schede e scegliere se mostrare ogni comunicazione una volta oppure sempre."],
+    ["footer", "Il comando Ripubblica rende nuovamente visibile il messaggio a tutti gli utenti senza cancellare manualmente la cache."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
+  invalidateTable_("PATCH_NOTES");
+}
+
+function migrateLegacyMessageSettingsV2143_() {
+  var settings = getSettings_(true);
+  var welcomeValues = {};
+  if ((settings.welcome_enabled === undefined || settings.welcome_enabled === "") && settings.welcome_message_enabled !== undefined) welcomeValues.welcome_enabled = normalizeYesNo_(settings.welcome_message_enabled, "SI");
+  if ((settings.welcome_display_mode === undefined || settings.welcome_display_mode === "") && settings.welcome_message_frequency) welcomeValues.welcome_display_mode = normalizeMessageDisplayMode_(settings.welcome_message_frequency);
+  if ((settings.welcome_publication_key === undefined || settings.welcome_publication_key === "") && settings.welcome_message_revision !== undefined) welcomeValues.welcome_publication_key = legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION);
+  if (settings.welcome_message_revision === undefined || settings.welcome_message_revision === "") welcomeValues.welcome_message_revision = 1;
+  if ((settings.welcome_title === undefined || settings.welcome_title === "") && settings.welcome_message_title) welcomeValues.welcome_title = settings.welcome_message_title;
+  if ((settings.welcome_message === undefined || settings.welcome_message === "") && settings.welcome_message_body) welcomeValues.welcome_message = settings.welcome_message_body;
+  if ((settings.welcome_primary_button === undefined || settings.welcome_primary_button === "") && settings.welcome_message_button) welcomeValues.welcome_primary_button = settings.welcome_message_button;
+  if (Object.keys(welcomeValues).length) upsertSettingsBatch_(welcomeValues, "Migrazione comunicazioni precedenti v2.14.3");
+
+  var notes = getKeyValueSheet_("PATCH_NOTES");
+  var noteValues = {};
+  if ((notes.enabled === undefined || notes.enabled === "") && settings.patch_notes_enabled !== undefined) noteValues.enabled = normalizeYesNo_(settings.patch_notes_enabled, "SI");
+  if ((notes.display_mode === undefined || notes.display_mode === "") && settings.patch_notes_frequency) noteValues.display_mode = normalizeMessageDisplayMode_(settings.patch_notes_frequency);
+  if ((notes.publication_key === undefined || notes.publication_key === "") && settings.patch_notes_revision !== undefined) noteValues.publication_key = legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, notes.version || SEEMAX_VERSION);
+  if (notes.publication_revision === undefined || notes.publication_revision === "") noteValues.publication_revision = Math.max(1, Number(settings.patch_notes_revision || 1));
+  if (!notes.label && settings.patch_notes_label) noteValues.label = settings.patch_notes_label;
+  if (!notes.title && settings.patch_notes_title) noteValues.title = settings.patch_notes_title;
+  if (!notes.intro && settings.patch_notes_intro) noteValues.intro = settings.patch_notes_intro;
+  if (!notes.footer && settings.patch_notes_footer) noteValues.footer = settings.patch_notes_footer;
+  Object.keys(noteValues).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: noteValues[key] });
+  });
+  if (Object.keys(noteValues).length) invalidateTable_("PATCH_NOTES");
+
+  var currentItems = rowsToObjects_(sheet_("PATCH_ITEMS"));
+  var legacyItems = parseLegacyPatchItemsV2143_(settings.patch_notes_items);
+  if (!currentItems.length && legacyItems.length) {
+    sheet_("PATCH_ITEMS").getRange(2, 1, legacyItems.length, 4).setValues(legacyItems.map(function (item) {
+      return [item.emoji, item.title, item.text, item.attivo];
+    }));
+    invalidateTable_("PATCH_ITEMS");
+  }
+}
+
+function ensureMessagePublicationFieldsV2143_() {
+  var settings = getSettings_(true);
+  var welcomeDefaults = {
+    welcome_display_mode: normalizeMessageDisplayMode_(settings.welcome_message_frequency || "ONCE"),
+    welcome_publication_key: settings.welcome_message_revision !== undefined
+      ? legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION)
+      : "welcome-" + SEEMAX_VERSION,
+    welcome_published_at: "",
+    welcome_published_by: "",
+    welcome_message_revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
+    patch_notes_revision: Math.max(1, Number(settings.patch_notes_revision || 1))
+  };
+  var welcomeMissing = {};
+  Object.keys(welcomeDefaults).forEach(function (key) {
+    if (settings[key] === undefined || settings[key] === "") welcomeMissing[key] = welcomeDefaults[key];
+  });
+  if (Object.keys(welcomeMissing).length) upsertSettingsBatch_(welcomeMissing, "Configurazione pubblicazione messaggi v2.14.3");
+
+  var notes = getKeyValueSheet_("PATCH_NOTES");
+  var patchDefaults = {
+    enabled: normalizeYesNo_(settings.patch_notes_enabled, "SI"),
+    display_mode: normalizeMessageDisplayMode_(settings.patch_notes_frequency || "ONCE"),
+    publication_key: settings.patch_notes_revision !== undefined
+      ? legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, notes.version || SEEMAX_VERSION)
+      : "patch-" + String(notes.version || SEEMAX_VERSION),
+    publication_revision: Math.max(1, Number(notes.publication_revision || settings.patch_notes_revision || 1)),
+    published_at: "",
+    published_by: ""
+  };
+  Object.keys(patchDefaults).forEach(function (key) {
+    if (notes[key] === undefined || notes[key] === "") upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: patchDefaults[key] });
+  });
+  invalidateTable_("PATCH_NOTES");
 }
 
 function updatePatchNotesV290_() {

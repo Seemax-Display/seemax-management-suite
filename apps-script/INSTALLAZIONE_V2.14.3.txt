@@ -1,0 +1,45 @@
+SEEMAX MANAGEMENT SUITE 2.14.3 - GOOGLE APPS SCRIPT
+
+ORDINE CONSIGLIATO
+
+1. Crea una copia di sicurezza del Foglio Google e del precedente Code.gs.
+2. Apri Foglio Google > Estensioni > Apps Script.
+3. Sostituisci tutto il contenuto di Code.gs con il file 2.14.3.
+4. Salva.
+5. Seleziona la funzione upgradeSeemaxV2143.
+6. Premi Esegui e autorizza lo script, se richiesto.
+7. Verifica il messaggio:
+
+   SEEMAX v2.14.3 configurato: schede Admin, modalità Una volta/Sempre,
+   ripubblicazione indipendente e memoria per account attive.
+
+8. Apri Esegui il deployment > Gestisci deployment.
+9. Modifica il deployment Web App esistente.
+10. Seleziona Nuova versione e pubblica.
+11. Controlla che l'URL /exec sia quello configurato in assets/js/config.js.
+12. Aggiorna GitHub con i file della versione 2.14.3.
+13. Esegui Ctrl+F5 oppure chiudi e riapri completamente la PWA.
+
+LA FUNZIONE DI UPGRADE
+
+- non elimina clienti, pratiche, agenti, prodotti o documenti;
+- non richiede di importare nuovamente il file Excel;
+- preserva i testi già presenti in IMPOSTAZIONI, PATCH_NOTES e PATCH_ITEMS;
+- migra le precedenti chiavi welcome_message_* e patch_notes_*;
+- usa le colonne AGENTI welcome_seen_revision e patch_seen_revision;
+- aggiunge le due colonne solo se mancanti in un'installazione differente;
+- mantiene la protezione multiutente e consolida le scritture prima del rilascio del lock.
+
+DOPO L'INSTALLAZIONE
+
+Accedi come ADMIN > Impostazioni e verifica le schede:
+Generali, Pratiche, Benvenuto, Patch notes, Sistema.
+
+Per ogni messaggio prova:
+- Solo una volta;
+- Sempre;
+- Anteprima;
+- Salva;
+- Salva e ripubblica.
+
+Consulta docs/AGGIORNAMENTO_V2.14.3.md per la procedura completa.
