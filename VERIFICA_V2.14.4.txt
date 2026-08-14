@@ -1,0 +1,5 @@
+Verifica statica e funzionale 2.14.4 completata senza errori: 163 controlli.
+Controllo sintassi JavaScript runtime: superato.
+Controllo sintassi Code.gs in runtime V8: superato.
+Controllo script inline Quotation Planner: superato.
+Funzioni nominate duplicate in app.js, api.js e Code.gs: nessuna.

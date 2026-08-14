@@ -1,0 +1,21 @@
+TEST INTERFACCIA SEEMAX 2.14.4
+
+Rendering locale eseguito con il frontend 2.14.4 in modalita demo.
+
+- Popup Benvenuto Beta desktop: OK — 1640x1000px — docs/screenshots/v2.14.4/beta-welcome-desktop.png
+- Editor Benvenuto Beta desktop: OK — 1640x2271px — docs/screenshots/v2.14.4/admin-welcome-desktop.png
+- Anteprima Benvenuto desktop: OK — 1640x1000px — docs/screenshots/v2.14.4/admin-welcome-preview-desktop.png
+- Editor Benvenuto Beta mobile: OK — 430x2838px — docs/screenshots/v2.14.4/admin-welcome-mobile.png
+- Anteprima Benvenuto mobile: OK — 430x932px — docs/screenshots/v2.14.4/admin-welcome-preview-mobile.png
+
+Controlli visuali completati:
+- il popup mostrato agli utenti e quello aperto da Anteprima usano lo stesso componente grafico;
+- la finestra corrisponde al Benvenuto Beta originario, con hero, due schede, avviso, feedback e pulsante;
+- non compare un secondo popup generico di benvenuto;
+- l editor ADMIN e organizzato nella scheda Benvenuto Beta;
+- i controlli Solo una volta, Sempre, Anteprima, Salva e Salva e ripubblica sono visibili;
+- il layout desktop non presenta sovrapposizioni;
+- il layout smartphone impila correttamente campi e pulsanti e mantiene lo scorrimento del modal;
+- nessun errore JavaScript e stato raccolto durante la sessione di rendering.
+
+Esito: SUPERATO.

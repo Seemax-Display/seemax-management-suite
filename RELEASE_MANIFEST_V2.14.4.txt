@@ -1,0 +1,65 @@
+SEEMAX MANAGEMENT SUITE 2.14.4 - RELEASE MANIFEST
+
+VERSIONI
+- Frontend: 2.14.4
+- Backend: seemax-management-suite-2.14.4
+- Cache PWA: seemax-management-v2-14-4
+- Funzione upgrade: upgradeSeemaxV2144
+- Funzione audit: auditCommunicationsV2144
+
+CORREZIONE PRINCIPALE
+- Un solo messaggio Benvenuto.
+- L'editor modifica direttamente il popup grafico “Benvenuto nella Beta”.
+- Rimossi il popup generico duplicato e i relativi percorsi runtime.
+
+SORGENTI DATI CANONICHE
+- Benvenuto Beta: chiavi welcome_message_* in IMPOSTAZIONI.
+- Patch notes: PATCH_NOTES e PATCH_ITEMS.
+- Memoria account: AGENTI.welcome_seen_revision e AGENTI.patch_seen_revision.
+
+FUNZIONI ADMIN
+- Schede Generali, Pratiche, Benvenuto Beta, Patch notes e Sistema.
+- Modalità Solo una volta o Sempre indipendente per ogni comunicazione.
+- Salva senza nuova pubblicazione.
+- Salva e ripubblica con revisione indipendente.
+- Anteprima identica al popup reale.
+- Conflitto controllato tra due amministratori.
+
+PULIZIA
+- Rimossi file di release/test 2.14.3 dalla radice del pacchetto corrente.
+- Rimossi i vecchi script di verifica e trasporto non più necessari.
+- Rimossi report e screenshot dell'editor Benvenuto duplicato.
+- Rimossi i fallback runtime del Planner alla vecchia chiave versione_patch_notes.
+- Le chiavi legacy restano solo nel codice di migrazione, quindi vengono lette una volta e poi eliminate dal Foglio.
+
+FILE RUNTIME PRINCIPALI
+- assets/js/app.js
+- assets/js/api.js
+- assets/js/config.js
+- assets/js/seed.js
+- assets/css/app.css
+- quotation-planner/index.html
+- apps-script/Code.gs
+- apps-script/appsscript.json
+- sw.js
+
+DOCUMENTAZIONE
+- docs/AGGIORNAMENTO_V2.14.4.md
+- docs/RAPPORTO_EDITOR_UNIFICATO_V2.14.4.md
+- docs/ANALISI_FOGLIO_SEEMAX_V2.14.4.md
+- apps-script/INSTALLAZIONE_V2.14.4.txt
+- TEST_INTERFACCIA_V2.14.4.txt
+- TEST_FOGLIO_V2.14.4.txt
+- TEST_TRASPORTO_V2.14.4.txt
+- VERIFICA_V2.14.4.txt
+
+ANTEPRIME
+- docs/screenshots/v2.14.4/beta-welcome-desktop.png
+- docs/screenshots/v2.14.4/admin-welcome-desktop.png
+- docs/screenshots/v2.14.4/admin-welcome-preview-desktop.png
+- docs/screenshots/v2.14.4/admin-welcome-mobile.png
+- docs/screenshots/v2.14.4/admin-welcome-preview-mobile.png
+
+LIMITAZIONE
+Il pacchetto non è stato distribuito direttamente nel progetto Apps Script aziendale.
+Il collaudo finale deve essere eseguito dopo il deployment reale.

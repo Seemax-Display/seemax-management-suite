@@ -1,0 +1,28 @@
+TEST COMPATIBILITA FOGLIO SEEMAX 2.14.4
+
+File analizzato: Seemax Management Suite (1).xlsx
+
+Fogli richiesti: OK
+AGENTI.welcome_seen_revision: OK
+AGENTI.patch_seen_revision: OK
+IMPOSTAZIONI.welcome_message_enabled: PRESENTE
+IMPOSTAZIONI.welcome_message_frequency: PRESENTE
+IMPOSTAZIONI.welcome_message_revision: PRESENTE
+IMPOSTAZIONI.welcome_message_title: PRESENTE
+IMPOSTAZIONI.welcome_message_body: PRESENTE
+IMPOSTAZIONI.welcome_message_button: PRESENTE
+PATCH_NOTES: 11 chiavi valorizzate — struttura chiave/valore compatibile
+PATCH_ITEMS: 3 righe valorizzate — struttura emoji/title/text/attivo compatibile
+
+Migrazione 2.14.4 verificata sullo scenario del Foglio:
+- i valori welcome_message_title/body/button sono prioritari e vengono conservati;
+- i nuovi campi grafici vengono aggiunti solo quando mancanti;
+- PATCH_NOTES e PATCH_ITEMS vengono conservati;
+- le chiavi duplicate vengono usate solo come ripiego e poi rimosse;
+- nessuna modifica e richiesta a CLIENTI, PRATICHE, PRODOTTI_LED o MOVIMENTI_MAGAZZINO;
+- non e necessario importare nuovamente il file Excel.
+
+Chiavi legacy rilevate nella copia e gestite dalla migrazione:
+beta_test_attiva, welcome_enabled, welcome_display_mode, welcome_publication_key, welcome_published_at, welcome_published_by, welcome_kicker, welcome_title, welcome_message, welcome_primary_button, patch_notes_enabled, patch_notes_frequency, patch_notes_revision, patch_notes_label, patch_notes_title, patch_notes_intro, patch_notes_items, patch_notes_footer
+
+Esito: COMPATIBILE.

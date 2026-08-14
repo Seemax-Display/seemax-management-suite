@@ -1,0 +1,18 @@
+SEEMAX MANAGEMENT SUITE 2.14.4
+
+Questa release:
+- collega l'editor al popup grafico originario “Benvenuto nella Beta”;
+- elimina il secondo messaggio di benvenuto introdotto per errore;
+- mantiene le cinque schede organizzative nelle Impostazioni ADMIN;
+- consente Solo una volta o Sempre separatamente per Benvenuto e Patch notes;
+- conserva Salva, Salva e ripubblica e Anteprima;
+- centralizza le Patch notes nei fogli PATCH_NOTES e PATCH_ITEMS;
+- migra e rimuove le chiavi di comunicazione obsolete in IMPOSTAZIONI;
+- conserva memoria per account e protezione multiutente;
+- mantiene le ottimizzazioni di salvataggio e trasporto delle release 2.14.x.
+
+INSTALLAZIONE: aggiornare prima Apps Script, eseguire upgradeSeemaxV2144,
+pubblicare una nuova versione della Web App e solo dopo aggiornare GitHub.
+
+Non importare nuovamente il file Excel: è stato usato soltanto per verificare
+la compatibilità della struttura esistente.
