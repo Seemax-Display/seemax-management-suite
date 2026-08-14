@@ -1,0 +1,42 @@
+SEEMAX MANAGEMENT SUITE 2.14.2 - RELEASE MANIFEST
+
+FILE RUNTIME MODIFICATI
+- assets/js/api.js
+- assets/js/app.js
+- assets/js/config.js
+- assets/css/app.css
+- apps-script/Code.gs
+- sw.js
+- README.md
+
+FILE NUOVI/AGGIORNATI
+- docs/AGGIORNAMENTO_V2.14.2.md
+- docs/RAPPORTO_TRASPORTO_E_COMUNICAZIONI_V2.14.2.md
+- apps-script/INSTALLAZIONE_V2.14.2.txt
+- scripts/verify-v2.14.2.js
+- scripts/test-transport-v2.14.2.js
+- VERIFICA_V2.14.2.txt
+- TEST_TRASPORTO_V2.14.2.txt
+- TEST_INTERFACCIA_V2.14.2.txt
+
+VERSIONI
+- Frontend: 2.14.2
+- Backend: seemax-management-suite-2.14.2
+- Cache PWA: seemax-management-v2-14-2
+
+FUNZIONE DI UPGRADE
+- upgradeSeemaxV2142
+
+FOGLI UTILIZZATI DALL'EDITOR ADMIN
+- IMPOSTAZIONI
+- PATCH_NOTES
+- PATCH_ITEMS
+
+NUOVI ENDPOINT
+- management_admin_content
+- management_save_admin_content
+
+TRASPORTO MUTAZIONI
+- conferma alternativa dopo 700 ms
+- attesa server-side fino a 2.500 ms
+- risposta iframe tardiva mantenuta per 30 secondi
