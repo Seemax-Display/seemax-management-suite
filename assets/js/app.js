@@ -16,8 +16,6 @@
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
   let pendingWelcomeMessage = false;
   let pendingPatchNotesMessage = false;
-  let pendingBetaWelcome = false;
-  let activeStartupMessage = null;
   let profileBoardDraft = [];
 
   const NAV = [
@@ -363,16 +361,27 @@
     return !!fallback;
   }
 
-  function betaTestActive() {
-    return settingEnabled("beta_test_attiva", !!(config.betaTest && config.betaTest.enabled));
-  }
-
   function betaTrophiesUnlocked() {
     return settingEnabled("beta_sblocca_trofei", !!(config.betaTest && config.betaTest.unlockAllTrophies));
   }
 
 
   const MESSAGE_SEEN_STORAGE_PREFIX = "SEEMAX_MESSAGE_SEEN_V1_";
+  const BETA_WELCOME_DEFAULTS = Object.freeze({
+    modalTitle: "Benvenuto nella Beta",
+    modalSubtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova",
+    badge: "SEEMAX MANAGEMENT SUITE · VERSIONE BETA",
+    title: "BENVENUTO NELLA FASE DI TEST",
+    message: "Stai utilizzando Seemax Management Suite in modalità di prova. Il sistema entra ora nella sua fase di test operativo e resterà accessibile nei prossimi giorni per permetterti di conoscerlo e metterlo alla prova.",
+    featureOneTitle: "Esplora il tuo nuovo spazio di lavoro",
+    featureOneMessage: "Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.",
+    featureTwoTitle: "Personalizza profilo e bacheca",
+    featureTwoMessage: "Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.",
+    warningTitle: "Ambiente di prova",
+    warningMessage: "I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in Seemax For You verranno invece importati in Seemax Management Suite.",
+    feedbackMessage: "Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da PC sia da smartphone. Il tuo feedback ci aiuterà a plasmare la versione finale.",
+    primaryButton: "🚀 Inizia a esplorare"
+  });
 
   function normalizeMessageDisplayMode(value) {
     const mode = String(value || "ONCE").trim().toUpperCase().replace(/[\s-]+/g, "_");
@@ -384,21 +393,36 @@
     return String(value).trim().toUpperCase() !== "NO";
   }
 
+  function contentText(source, property, settings, settingKey, fallback = "") {
+    if (source && source[property] !== undefined && source[property] !== null) return String(source[property]).trim();
+    if (settings && settings[settingKey] !== undefined && settings[settingKey] !== null) return String(settings[settingKey]).trim();
+    return String(fallback || "").trim();
+  }
+
   function welcomeContentSettings() {
     const settings = (state.data && state.data.settings) || {};
     const adminContent = (state.data && state.data.adminContent) || {};
     const welcome = adminContent.welcome || {};
     return {
-      enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_enabled, true),
-      displayMode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_display_mode || "ONCE"),
-      publicationKey: String(welcome.publication_key || settings.welcome_publication_key || `welcome-${config.version}`),
+      enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_message_enabled, true),
+      displayMode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_message_frequency || "ONCE"),
+      publicationKey: String(welcome.publication_key || settings.welcome_message_publication_key || `welcome-${config.version}`),
       publicationRevision: Math.max(1, Number(welcome.publication_revision || settings.welcome_message_revision || 1)),
-      publishedAt: String(welcome.published_at || settings.welcome_published_at || ""),
-      publishedBy: String(welcome.published_by || settings.welcome_published_by || ""),
-      kicker: String(welcome.kicker || settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO").trim(),
-      title: String(welcome.title || settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!").trim(),
-      message: String(welcome.message || settings.welcome_message || "Seemax Management Suite raccoglie clienti, pratiche, preventivi e documenti in un unico ambiente.").trim(),
-      primaryButton: String(welcome.primary_button || settings.welcome_primary_button || "Spiegami tutto").trim()
+      publishedAt: String(welcome.published_at || settings.welcome_message_published_at || ""),
+      publishedBy: String(welcome.published_by || settings.welcome_message_published_by || ""),
+      modalTitle: contentText(welcome, "modal_title", settings, "welcome_message_modal_title", BETA_WELCOME_DEFAULTS.modalTitle),
+      modalSubtitle: contentText(welcome, "modal_subtitle", settings, "welcome_message_modal_subtitle", BETA_WELCOME_DEFAULTS.modalSubtitle),
+      badge: contentText(welcome, "badge", settings, "welcome_message_badge", BETA_WELCOME_DEFAULTS.badge),
+      title: contentText(welcome, "title", settings, "welcome_message_title", BETA_WELCOME_DEFAULTS.title),
+      message: contentText(welcome, "message", settings, "welcome_message_body", BETA_WELCOME_DEFAULTS.message),
+      featureOneTitle: contentText(welcome, "feature_one_title", settings, "welcome_message_feature_1_title", BETA_WELCOME_DEFAULTS.featureOneTitle),
+      featureOneMessage: contentText(welcome, "feature_one_message", settings, "welcome_message_feature_1_body", BETA_WELCOME_DEFAULTS.featureOneMessage),
+      featureTwoTitle: contentText(welcome, "feature_two_title", settings, "welcome_message_feature_2_title", BETA_WELCOME_DEFAULTS.featureTwoTitle),
+      featureTwoMessage: contentText(welcome, "feature_two_message", settings, "welcome_message_feature_2_body", BETA_WELCOME_DEFAULTS.featureTwoMessage),
+      warningTitle: contentText(welcome, "warning_title", settings, "welcome_message_warning_title", BETA_WELCOME_DEFAULTS.warningTitle),
+      warningMessage: contentText(welcome, "warning_message", settings, "welcome_message_warning_body", BETA_WELCOME_DEFAULTS.warningMessage),
+      feedbackMessage: contentText(welcome, "feedback_message", settings, "welcome_message_feedback_body", BETA_WELCOME_DEFAULTS.feedbackMessage),
+      primaryButton: contentText(welcome, "primary_button", settings, "welcome_message_button", BETA_WELCOME_DEFAULTS.primaryButton)
     };
   }
 
@@ -406,14 +430,14 @@
     const adminContent = (state.data && state.data.adminContent) || {};
     const source = (state.data && state.data.patchNotes) || adminContent.patchNotes || {};
     return {
-      enabled: messageEnabled(source.enabled, true),
+      enabled: messageEnabled(source.enabled, false),
       displayMode: normalizeMessageDisplayMode(source.display_mode || "ONCE"),
       publicationKey: String(source.publication_key || `patch-${source.version || config.version}`),
-      publicationRevision: Math.max(1, Number(source.publication_revision || ((state.data && state.data.settings) || {}).patch_notes_revision || 1)),
+      publicationRevision: Math.max(1, Number(source.publication_revision || 1)),
       publishedAt: String(source.published_at || ""),
       publishedBy: String(source.published_by || ""),
       version: String(source.version || config.version || ""),
-      label: String(source.label || `SEEMAX MANAGEMENT SUITE ${config.version || ""}`),
+      label: String(source.label || "SEEMAX MANAGEMENT SUITE"),
       title: String(source.title || "Aggiornamento"),
       intro: String(source.intro || ""),
       footer: String(source.footer || ""),
@@ -467,11 +491,6 @@
     if (api.markMessageSeen) api.markMessageSeen(normalized, content).catch(() => {});
   }
 
-  function welcomeMessageMarkup(message) {
-    const paragraphs = String(message || "").split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
-    return (paragraphs.length ? paragraphs : [""]).map((paragraph) => `<p>${esc(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
-  }
-
   function adminContentState() {
     const settings = (state.data && state.data.settings) || {};
     const source = (state.data && state.data.adminContent) || {};
@@ -480,26 +499,35 @@
     return {
       revision: Number(source.revision || settings.admin_content_revision || 0),
       welcome: {
-        enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_enabled, true) ? "SI" : "NO",
-        display_mode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_display_mode || "ONCE"),
-        publication_key: String(welcome.publication_key || settings.welcome_publication_key || `welcome-${config.version}`),
+        enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_message_enabled, true) ? "SI" : "NO",
+        display_mode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_message_frequency || "ONCE"),
+        publication_key: String(welcome.publication_key || settings.welcome_message_publication_key || `welcome-${config.version}`),
         publication_revision: Math.max(1, Number(welcome.publication_revision || settings.welcome_message_revision || 1)),
-        published_at: String(welcome.published_at || settings.welcome_published_at || ""),
-        published_by: String(welcome.published_by || settings.welcome_published_by || ""),
-        kicker: String(welcome.kicker || settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO"),
-        title: String(welcome.title || settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!"),
-        message: String(welcome.message || settings.welcome_message || ""),
-        primary_button: String(welcome.primary_button || settings.welcome_primary_button || "Spiegami tutto")
+        published_at: String(welcome.published_at || settings.welcome_message_published_at || ""),
+        published_by: String(welcome.published_by || settings.welcome_message_published_by || ""),
+        modal_title: contentText(welcome, "modal_title", settings, "welcome_message_modal_title", BETA_WELCOME_DEFAULTS.modalTitle),
+        modal_subtitle: contentText(welcome, "modal_subtitle", settings, "welcome_message_modal_subtitle", BETA_WELCOME_DEFAULTS.modalSubtitle),
+        badge: contentText(welcome, "badge", settings, "welcome_message_badge", BETA_WELCOME_DEFAULTS.badge),
+        title: contentText(welcome, "title", settings, "welcome_message_title", BETA_WELCOME_DEFAULTS.title),
+        message: contentText(welcome, "message", settings, "welcome_message_body", BETA_WELCOME_DEFAULTS.message),
+        feature_one_title: contentText(welcome, "feature_one_title", settings, "welcome_message_feature_1_title", BETA_WELCOME_DEFAULTS.featureOneTitle),
+        feature_one_message: contentText(welcome, "feature_one_message", settings, "welcome_message_feature_1_body", BETA_WELCOME_DEFAULTS.featureOneMessage),
+        feature_two_title: contentText(welcome, "feature_two_title", settings, "welcome_message_feature_2_title", BETA_WELCOME_DEFAULTS.featureTwoTitle),
+        feature_two_message: contentText(welcome, "feature_two_message", settings, "welcome_message_feature_2_body", BETA_WELCOME_DEFAULTS.featureTwoMessage),
+        warning_title: contentText(welcome, "warning_title", settings, "welcome_message_warning_title", BETA_WELCOME_DEFAULTS.warningTitle),
+        warning_message: contentText(welcome, "warning_message", settings, "welcome_message_warning_body", BETA_WELCOME_DEFAULTS.warningMessage),
+        feedback_message: contentText(welcome, "feedback_message", settings, "welcome_message_feedback_body", BETA_WELCOME_DEFAULTS.feedbackMessage),
+        primary_button: contentText(welcome, "primary_button", settings, "welcome_message_button", BETA_WELCOME_DEFAULTS.primaryButton)
       },
       patchNotes: {
-        enabled: messageEnabled(patch.enabled, true) ? "SI" : "NO",
+        enabled: messageEnabled(patch.enabled, false) ? "SI" : "NO",
         display_mode: normalizeMessageDisplayMode(patch.display_mode || "ONCE"),
         publication_key: String(patch.publication_key || `patch-${patch.version || config.version}`),
-        publication_revision: Math.max(1, Number(patch.publication_revision || settings.patch_notes_revision || 1)),
+        publication_revision: Math.max(1, Number(patch.publication_revision || 1)),
         published_at: String(patch.published_at || ""),
         published_by: String(patch.published_by || ""),
         version: String(patch.version || config.version || ""),
-        label: String(patch.label || `SEEMAX MANAGEMENT SUITE ${config.version || ""}`),
+        label: String(patch.label || "SEEMAX MANAGEMENT SUITE"),
         title: String(patch.title || "Aggiornamento"),
         intro: String(patch.intro || ""),
         footer: String(patch.footer || ""),
@@ -569,9 +597,18 @@
       welcome: {
         enabled: form.elements.welcome_enabled && form.elements.welcome_enabled.checked ? "SI" : "NO",
         display_mode: field("welcome_display_mode") || "ONCE",
-        kicker: field("welcome_kicker"),
+        modal_title: field("welcome_modal_title"),
+        modal_subtitle: field("welcome_modal_subtitle"),
+        badge: field("welcome_badge"),
         title: field("welcome_title"),
         message: field("welcome_message"),
+        feature_one_title: field("welcome_feature_one_title"),
+        feature_one_message: field("welcome_feature_one_message"),
+        feature_two_title: field("welcome_feature_two_title"),
+        feature_two_message: field("welcome_feature_two_message"),
+        warning_title: field("welcome_warning_title"),
+        warning_message: field("welcome_warning_message"),
+        feedback_message: field("welcome_feedback_message"),
         primary_button: field("welcome_primary_button")
       }
     };
@@ -626,15 +663,32 @@
     const content = adminContentState();
     const welcome = content.welcome;
     const fastMode = api.isFastMode();
-    return `<form id="welcomeMessageForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel">
-      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Messaggio di benvenuto</h3><p>Configura il messaggio iniziale del Management Suite e la frequenza con cui deve essere mostrato.</p></div><label class="admin-enabled-toggle"><input name="welcome_enabled" type="checkbox" ${welcome.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
+    return `<form id="welcomeMessageForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel beta-welcome-editor-panel">
+      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Benvenuto Beta</h3><p>Modifica la finestra grafica “Benvenuto nella Beta” mostrata all’apertura del Management Suite. Non viene più creato un secondo messaggio di benvenuto.</p></div><label class="admin-enabled-toggle"><input name="welcome_enabled" type="checkbox" ${welcome.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
       ${messagePolicyMarkup("welcome", welcome.display_mode)}
       ${publicationStatusMarkup(welcome)}
-      <div class="message-editor-fields form-grid">
-        <label class="full">Sovratitolo<input name="welcome_kicker" value="${esc(welcome.kicker)}" maxlength="100" required></label>
-        <label class="full">Titolo<input name="welcome_title" value="${esc(welcome.title)}" maxlength="180" required></label>
-        <label class="full">Messaggio<textarea name="welcome_message" rows="9" maxlength="3500" required>${esc(welcome.message)}</textarea><small>Lascia una riga vuota per creare un nuovo paragrafo.</small></label>
-        <label class="full">Testo pulsante principale<input name="welcome_primary_button" value="${esc(welcome.primary_button)}" maxlength="70" required><small>Il pulsante apre il tutorial guidato; il pulsante Chiudi resta sempre disponibile.</small></label>
+      <div class="welcome-editor-sections">
+        <section class="welcome-editor-section"><header><span>1</span><div><h4>Testata della finestra</h4><p>Titolo e sottotitolo visualizzati sopra il riquadro blu.</p></div></header><div class="form-grid">
+          <label class="full">Titolo finestra<input name="welcome_modal_title" value="${esc(welcome.modal_title)}" maxlength="120" required></label>
+          <label class="full">Sottotitolo finestra<input name="welcome_modal_subtitle" value="${esc(welcome.modal_subtitle)}" maxlength="260"></label>
+        </div></section>
+        <section class="welcome-editor-section"><header><span>2</span><div><h4>Riquadro principale</h4><p>Contenuto del banner blu nella parte alta del messaggio.</p></div></header><div class="form-grid">
+          <label class="full">Etichetta Beta<input name="welcome_badge" value="${esc(welcome.badge)}" maxlength="160"></label>
+          <label class="full">Titolo principale<input name="welcome_title" value="${esc(welcome.title)}" maxlength="180" required></label>
+          <label class="full">Testo principale<textarea name="welcome_message" rows="6" maxlength="2400" required>${esc(welcome.message)}</textarea><small>Le interruzioni di riga vengono mantenute nell’anteprima.</small></label>
+        </div></section>
+        <section class="welcome-editor-section"><header><span>3</span><div><h4>Schede informative</h4><p>I due riquadri con le icone 🚀 e 🏆. Lascia titolo e testo vuoti per nascondere una scheda.</p></div></header><div class="welcome-editor-two-columns">
+          <div class="welcome-editor-card"><strong>🚀 Prima scheda</strong><label>Titolo<input name="welcome_feature_one_title" value="${esc(welcome.feature_one_title)}" maxlength="160"></label><label>Testo<textarea name="welcome_feature_one_message" rows="6" maxlength="1600">${esc(welcome.feature_one_message)}</textarea></label></div>
+          <div class="welcome-editor-card"><strong>🏆 Seconda scheda</strong><label>Titolo<input name="welcome_feature_two_title" value="${esc(welcome.feature_two_title)}" maxlength="160"></label><label>Testo<textarea name="welcome_feature_two_message" rows="6" maxlength="1600">${esc(welcome.feature_two_message)}</textarea></label></div>
+        </div></section>
+        <section class="welcome-editor-section"><header><span>4</span><div><h4>Avviso e richiesta feedback</h4><p>I riquadri giallo e azzurro visibili nella parte inferiore.</p></div></header><div class="form-grid">
+          <label class="full">Titolo avviso<input name="welcome_warning_title" value="${esc(welcome.warning_title)}" maxlength="120"></label>
+          <label class="full">Testo avviso<textarea name="welcome_warning_message" rows="5" maxlength="1800">${esc(welcome.warning_message)}</textarea></label>
+          <label class="full">Testo feedback<textarea name="welcome_feedback_message" rows="5" maxlength="1800">${esc(welcome.feedback_message)}</textarea></label>
+        </div></section>
+        <section class="welcome-editor-section"><header><span>5</span><div><h4>Pulsante finale</h4><p>Il pulsante chiude il messaggio e consente di iniziare a usare il sistema.</p></div></header><div class="form-grid">
+          <label class="full">Testo pulsante<input name="welcome_primary_button" value="${esc(welcome.primary_button)}" maxlength="70" required></label>
+        </div></section>
       </div>
       ${communicationActionsMarkup("welcome", fastMode)}
     </section></form>`;
@@ -667,12 +721,54 @@
     return `<div class="suite-patch-message ${options.preview ? "preview" : ""}"><div class="suite-patch-hero"><span class="suite-patch-icon">🚀</span><div><small>${esc(patch.label || patch.version || "AGGIORNAMENTO")}</small><h3>${esc(patch.title || "Novità Seemax")}</h3>${patch.intro ? `<p>${esc(patch.intro).replace(/\n/g, "<br>")}</p>` : ""}</div></div>${items.length ? `<div class="suite-patch-list">${items.map((item) => `<article><span>${esc(item.emoji || "✨")}</span><div><strong>${esc(item.title || "Aggiornamento")}</strong><p>${esc(item.text || "").replace(/\n/g, "<br>")}</p></div></article>`).join("")}</div>` : ""}${patch.footer ? `<p class="suite-patch-footer">${esc(patch.footer).replace(/\n/g, "<br>")}</p>` : ""}<div class="form-actions"><button class="btn primary" data-action="close-modal">Ho capito</button></div></div>`;
   }
 
+  function formatCommunicationText(value) {
+    return esc(String(value || "")).replace(/\n/g, "<br>");
+  }
+
+  function betaWelcomeMessageMarkup(welcome, options = {}) {
+    const featureOneVisible = !!(welcome.featureOneTitle || welcome.featureOneMessage);
+    const featureTwoVisible = !!(welcome.featureTwoTitle || welcome.featureTwoMessage);
+    const features = [
+      featureOneVisible ? `<article><span>🚀</span><div>${welcome.featureOneTitle ? `<h4>${esc(welcome.featureOneTitle)}</h4>` : ""}${welcome.featureOneMessage ? `<p>${formatCommunicationText(welcome.featureOneMessage)}</p>` : ""}</div></article>` : "",
+      featureTwoVisible ? `<article><span>🏆</span><div>${welcome.featureTwoTitle ? `<h4>${esc(welcome.featureTwoTitle)}</h4>` : ""}${welcome.featureTwoMessage ? `<p>${formatCommunicationText(welcome.featureTwoMessage)}</p>` : ""}</div></article>` : ""
+    ].filter(Boolean).join("");
+    return `<div class="beta-welcome ${options.preview ? "preview" : ""}">
+      <section class="beta-welcome-hero">
+        <div class="beta-welcome-icon" aria-hidden="true">🧪</div>
+        ${welcome.badge ? `<span class="beta-welcome-pill">${esc(welcome.badge)}</span>` : ""}
+        <h3>${esc(welcome.title || BETA_WELCOME_DEFAULTS.title)}</h3>
+        ${welcome.message ? `<p>${formatCommunicationText(welcome.message)}</p>` : ""}
+      </section>
+      ${features ? `<div class="beta-welcome-grid">${features}</div>` : ""}
+      ${(welcome.warningTitle || welcome.warningMessage) ? `<section class="beta-welcome-warning"><span aria-hidden="true">⚠️</span><div>${welcome.warningTitle ? `<strong>${esc(welcome.warningTitle)}</strong>` : ""}${welcome.warningMessage ? `<p>${formatCommunicationText(welcome.warningMessage)}</p>` : ""}</div></section>` : ""}
+      ${welcome.feedbackMessage ? `<section class="beta-welcome-feedback"><span aria-hidden="true">💬</span><p>${formatCommunicationText(welcome.feedbackMessage)}</p></section>` : ""}
+      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="close-modal">${esc(welcome.primaryButton || BETA_WELCOME_DEFAULTS.primaryButton)}</button></div>
+    </div>`;
+  }
+
+  function welcomePreviewContent(source) {
+    return {
+      modalTitle: String(source.modal_title || BETA_WELCOME_DEFAULTS.modalTitle),
+      modalSubtitle: String(source.modal_subtitle || ""),
+      badge: String(source.badge || ""),
+      title: String(source.title || BETA_WELCOME_DEFAULTS.title),
+      message: String(source.message || ""),
+      featureOneTitle: String(source.feature_one_title || ""),
+      featureOneMessage: String(source.feature_one_message || ""),
+      featureTwoTitle: String(source.feature_two_title || ""),
+      featureTwoMessage: String(source.feature_two_message || ""),
+      warningTitle: String(source.warning_title || ""),
+      warningMessage: String(source.warning_message || ""),
+      feedbackMessage: String(source.feedback_message || ""),
+      primaryButton: String(source.primary_button || BETA_WELCOME_DEFAULTS.primaryButton)
+    };
+  }
+
   function previewWelcomeMessage() {
     const form = $("welcomeMessageForm");
     if (!form) return;
-    const source = collectWelcomeMessageForm(form).welcome;
-    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>${esc(source.kicker)}</span><h3>${esc(source.title)}</h3>${welcomeMessageMarkup(source.message)}<div class="form-actions"><button class="btn primary" data-action="close-modal">${esc(source.primary_button || "Continua")}</button></div></div>`;
-    openModal("Anteprima messaggio", body, { wide: true, kicker: "Anteprima amministratore" });
+    const welcome = welcomePreviewContent(collectWelcomeMessageForm(form).welcome);
+    openModal(welcome.modalTitle, betaWelcomeMessageMarkup(welcome, { preview: true }), { wide: true, kicker: "Seemax Management Suite", subtitle: welcome.modalSubtitle, panelClass: "beta-welcome-modal" });
   }
 
   function previewPatchNotesMessage() {
@@ -716,7 +812,7 @@
     if (api.isAdmin()) steps.push(
       { chapter: "Amministrazione", route: "users", selector: ".view-toolbar", title: "Agenti e accessi", text: "Crea e gestisci gli account, assegna i ruoli e attiva o disattiva l'accesso degli utenti." },
       { chapter: "Amministrazione", selector: ".panel", title: "Elenco degli account", text: "Consulta username, contatti, ruolo e stato di ogni agente. Le modifiche sono riservate agli amministratori." },
-      { chapter: "Amministrazione", route: "settings", selector: ".admin-settings-tabs", title: "Impostazioni organizzate", text: "Le schede separano dati generali, campi obbligatori, benvenuto, patch notes e diagnostica del sistema." }
+      { chapter: "Amministrazione", route: "settings", selector: ".admin-settings-tabs", title: "Impostazioni organizzate", text: "Le schede separano dati generali, campi obbligatori, Benvenuto Beta, patch notes e diagnostica del sistema." }
     );
     steps.push({ chapter: "Hai concluso", route: "dashboard", selector: "#tutorialButton", title: "Il tutorial rimane sempre disponibile", text: "Puoi riaprire questa guida in qualsiasi momento tramite il piccolo pulsante Tutorial nella barra superiore. Buon lavoro con Seemax Management Suite!" });
     return steps;
@@ -725,42 +821,14 @@
   function showWelcomeMessage() {
     const welcome = welcomeContentSettings();
     if (!messageShouldDisplay("WELCOME", welcome)) return false;
-    activeStartupMessage = { type: "WELCOME", content: welcome };
-    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>${esc(welcome.kicker)}</span><h3>${esc(welcome.title)}</h3>${welcomeMessageMarkup(welcome.message)}<div class="form-actions"><button class="btn ghost" data-action="close-modal">Chiudi</button><button class="btn primary" data-action="start-tutorial">${esc(welcome.primaryButton)}</button></div></div>`;
-    openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
+    openModal(welcome.modalTitle, betaWelcomeMessageMarkup(welcome), { wide: true, kicker: "Seemax Management Suite", subtitle: welcome.modalSubtitle, panelClass: "beta-welcome-modal" });
     markMessageSeen("WELCOME", welcome);
     return true;
-  }
-
-  function showBetaWelcome() {
-    const body = `<div class="beta-welcome">
-      <section class="beta-welcome-hero">
-        <div class="beta-welcome-icon" aria-hidden="true">🧪</div>
-        <span class="beta-welcome-pill">SEEMAX MANAGEMENT SUITE · VERSIONE BETA</span>
-        <h3>BENVENUTO NELLA FASE DI TEST</h3>
-        <p>Stai utilizzando Seemax Management Suite in modalità di prova. Il sistema entra ora nella sua fase di test operativo e resterà accessibile nei prossimi giorni per permetterti di conoscerlo e metterlo alla prova.</p>
-      </section>
-      <div class="beta-welcome-grid">
-        <article><span>🚀</span><div><h4>Esplora il tuo nuovo spazio di lavoro</h4><p>Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.</p></div></article>
-        <article><span>🏆</span><div><h4>Personalizza profilo e bacheca</h4><p>Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.</p></div></article>
-      </div>
-      <section class="beta-welcome-warning">
-        <span aria-hidden="true">⚠️</span>
-        <div><strong>Ambiente di prova</strong><p>I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in <strong>Seemax For You</strong> verranno invece importati in Seemax Management Suite.</p></div>
-      </section>
-      <section class="beta-welcome-feedback">
-        <span aria-hidden="true">💬</span>
-        <p>Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da <strong>PC</strong> sia da <strong>smartphone</strong>. Il tuo feedback ci aiuterà a plasmare la versione finale.</p>
-      </section>
-      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="close-modal">🚀 Inizia a esplorare</button></div>
-    </div>`;
-    openModal("Benvenuto nella Beta", body, { wide: true, kicker: "Seemax Management Suite", subtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova", panelClass: "beta-welcome-modal" });
   }
 
   function showPatchNotesMessage() {
     const patch = patchNotesContentSettings();
     if (!messageShouldDisplay("PATCH_NOTES", patch)) return false;
-    activeStartupMessage = { type: "PATCH_NOTES", content: patch };
     openModal("Novità Seemax", patchNotesMessageMarkup(patch), { wide: true, kicker: patch.version || "Patch notes", panelClass: "suite-patch-modal" });
     markMessageSeen("PATCH_NOTES", patch);
     return true;
@@ -768,11 +836,6 @@
 
   function showNextStartupMessage() {
     if (tutorialState.active || $("modalRoot").children.length) return false;
-    if (pendingBetaWelcome) {
-      pendingBetaWelcome = false;
-      showBetaWelcome();
-      return true;
-    }
     if (pendingWelcomeMessage) {
       pendingWelcomeMessage = false;
       if (showWelcomeMessage()) return true;
@@ -787,7 +850,6 @@
   function scheduleStartupExperience() {
     pendingWelcomeMessage = messageShouldDisplay("WELCOME", welcomeContentSettings());
     pendingPatchNotesMessage = messageShouldDisplay("PATCH_NOTES", patchNotesContentSettings());
-    pendingBetaWelcome = betaTestActive();
     setTimeout(() => {
       if (showMonthlyAwardIfNeeded()) return;
       showNextStartupMessage();
@@ -1555,7 +1617,7 @@
     const tabs = [
       ["general", "🏢", "Generali", "Azienda e parametri"],
       ["practices", "📋", "Pratiche", "Campi obbligatori"],
-      ["welcome", "👋", "Benvenuto", "Messaggio iniziale"],
+      ["welcome", "👋", "Benvenuto Beta", "Finestra iniziale"],
       ["patch", "🚀", "Patch notes", "Novità e release"],
       ["system", "⚙️", "Sistema", "Database e diagnostica"]
     ];
@@ -1618,12 +1680,9 @@
   }
 
   function closeModal() {
-    const viewedMessage = activeStartupMessage;
-    activeStartupMessage = null;
     $("modalRoot").innerHTML = "";
     document.body.classList.remove("modal-open");
-    /* Il messaggio viene marcato quando diventa realmente visibile. */
-    if (pendingBetaWelcome || pendingWelcomeMessage || pendingPatchNotesMessage) setTimeout(showNextStartupMessage, 280);
+    if (pendingWelcomeMessage || pendingPatchNotesMessage) setTimeout(showNextStartupMessage, 280);
   }
 
   function field(label, name, value = "", options = {}) {
@@ -3106,27 +3165,12 @@
       const saved = await api.saveAdminContent(payload);
       state.data.adminContent = saved || state.data.adminContent || {};
       if (saved && saved.patchNotes) state.data.patchNotes = { ...saved.patchNotes, items: (saved.patchNotes.items || []).filter((item) => String(item.attivo || "SI").toUpperCase() !== "NO") };
-      if (saved && saved.welcome) {
-        state.data.settings = {
-          ...(state.data.settings || {}),
-          welcome_enabled: saved.welcome.enabled,
-          welcome_display_mode: saved.welcome.display_mode,
-          welcome_publication_key: saved.welcome.publication_key,
-          welcome_message_revision: Number(saved.welcome.publication_revision || (state.data.settings || {}).welcome_message_revision || 1),
-          welcome_published_at: saved.welcome.published_at,
-          welcome_published_by: saved.welcome.published_by,
-          welcome_kicker: saved.welcome.kicker,
-          welcome_title: saved.welcome.title,
-          welcome_message: saved.welcome.message,
-          welcome_primary_button: saved.welcome.primary_button,
-          admin_content_revision: Number(saved.revision || payload.expected_revision + 1)
-        };
-      } else if (saved) {
+      if (saved) {
         state.data.settings = { ...(state.data.settings || {}), admin_content_revision: Number(saved.revision || payload.expected_revision + 1) };
       }
       scheduleBootstrapCache();
       renderRoute();
-      const label = section === "WELCOME" ? "Messaggio di benvenuto" : "Patch notes";
+      const label = section === "WELCOME" ? "Benvenuto Beta" : "Patch notes";
       toast(republish ? `${label} salvato e ripubblicato.` : `${label} salvato senza nuova pubblicazione.`);
     } catch (error) {
       if (String(error.message || "").includes("CONFLICT_RECORD")) {

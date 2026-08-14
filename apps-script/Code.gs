@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Esegui una volta setupSeemaxDatabase() e autorizza lo script.
- * 4. Distribuisci come Applicazione Web: esegui come "Me", accesso "Chiunque".
- * 5. Copia l'URL /exec in assets/js/config.js.
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2144().
+ * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
+ * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.14.3";
+var SEEMAX_VERSION = "seemax-management-suite-2.14.4";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -62,11 +62,9 @@ function setupSeemaxDatabase() {
   if (!ss) throw new Error("Apri questo script dal Foglio Google da utilizzare come database.");
   PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", ss.getId());
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-  migrateLegacyMessageSettingsV2143_();
   seedSettings_();
+  prepareCommunicationsV2144_();
   migrateRevenueTargetV151_();
-  seedPatchNotes_();
-  ensureMessagePublicationFieldsV2143_();
   seedProducts_();
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
@@ -80,8 +78,9 @@ function setupSeemaxDatabase() {
   backfillExistingIds_();
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
-  return "DATABASE SEEMAX configurato correttamente.";
+  return "DATABASE SEEMAX configurato correttamente con l'editor unificato delle comunicazioni.";
 }
+
 
 function upgradeSeemaxV11() {
   var ss = db_();
@@ -137,7 +136,6 @@ function upgradeSeemaxV2100() {
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
   backfillPracticeStockWarningsV2100_();
-  updatePatchNotesV2100_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.10.0 · Deroga ADMIN 0000, avvisi giacenza, movimenti manuali e organizzazione pratiche.");
   styleSheets_();
   return "SEEMAX v2.10.0 configurato: deroga ADMIN, avvisi giacenza e carico/scarico magazzino attivi.";
@@ -147,7 +145,6 @@ function upgradeSeemaxV2110() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
-  updatePatchNotesV2110_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.11.0 · Paginazione a 6 elementi, ordinamento cronologico e assegnazione clienti agli agenti.");
   styleSheets_();
   return "SEEMAX v2.11.0 configurato: elenchi paginati e assegnazione clienti ADMIN attivi.";
@@ -158,7 +155,6 @@ function upgradeSeemaxV2120() {
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
   backfillLedwallConfigurationsV2120_();
-  updatePatchNotesV2120_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.12.0 · Pratiche multi-Ledwall e gestione non bloccante delle giacenze insufficienti.");
   styleSheets_();
   return "SEEMAX v2.12.0 configurato: pratiche multi-Ledwall e impegni magazzino in attesa attivi.";
@@ -170,7 +166,6 @@ function upgradeSeemaxV2121() {
   seedSettings_();
   backfillExistingIds_();
   normalizeAdminUnknownPlaceholdersV2121_();
-  updatePatchNotesV2121_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.12.1 · Placeholder ADMIN 0000 preservati negli indirizzi e durante l'inserimento delle pratiche.");
   styleSheets_();
   return "SEEMAX v2.12.1 configurato: placeholder 0000 normalizzati e indirizzi con dati sconosciuti compatibili con le pratiche.";
@@ -185,7 +180,6 @@ function upgradeSeemaxV2130() {
        presenti nel foglio. PRODOTTI_LED resta l'unica fonte delle giacenze. */
     initializeInventoryV11_();
     backfillPracticeStockWarningsV2100_();
-    updatePatchNotesV2130_();
     setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.13.0 · connessione resiliente, giacenze PRODOTTI_LED e controllo avvisi per ADMIN.");
     styleSheets_();
     return "SEEMAX v2.13.0 configurato: sincronizzazione affidabile e controllo amministrativo degli avvisi giacenza attivi.";
@@ -198,7 +192,6 @@ function upgradeSeemaxV2140() {
     Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
     seedSettings_();
     rebuildPracticeCountersV2140_();
-    updatePatchNotesV2140_();
     setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.0 · salvataggi diretti, letture mirate e diagnostica prestazioni.");
     styleSheets_();
     return "SEEMAX v2.14.0 configurato: percorso rapido per clienti e pratiche, contatori pratica e diagnostica tempi attivi.";
@@ -210,35 +203,32 @@ function upgradeSeemaxV2141() {
     var ss = db_();
     Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
     seedSettings_();
-    updatePatchNotesV2141_();
     setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.1 · risposta POST diretta, iframe compatibile e fallback rapido.");
     return "SEEMAX v2.14.1 configurato: risposta immediata del salvataggio e conferma rapida di sicurezza attive.";
   });
 }
 
 function upgradeSeemaxV2142() {
+  return upgradeSeemaxV2144();
+}
+
+
+function upgradeSeemaxV2143() {
+  return upgradeSeemaxV2144();
+}
+function upgradeSeemaxV2144() {
   return withMutationLock_(function () {
     var ss = db_();
     Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
     seedSettings_();
-    seedPatchNotes_();
-    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.2 · editor comunicazioni amministrative e conferma salvataggi anticipata.");
-    return "SEEMAX v2.14.2 configurato: personalizzazione benvenuto e patch notes ripristinata; conferma salvataggi anticipata attiva.";
+    prepareCommunicationsV2144_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.4 · editor unificato del Benvenuto Beta e sorgenti comunicazioni ripulite.");
+    styleSheets_();
+    return "SEEMAX v2.14.4 configurato: unico Benvenuto Beta editabile, patch notes centralizzate e chiavi obsolete rimosse.";
   });
 }
 
-function upgradeSeemaxV2143() {
-  return withMutationLock_(function () {
-    var ss = db_();
-    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
-    migrateLegacyMessageSettingsV2143_();
-    seedSettings_();
-    seedPatchNotes_();
-    ensureMessagePublicationFieldsV2143_();
-    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.3 · schede Admin, migrazione comunicazioni legacy e regole indipendenti di pubblicazione messaggi.");
-    return "SEEMAX v2.14.3 configurato: schede Admin, modalità Una volta/Sempre, ripubblicazione indipendente e memoria per account attive.";
-  });
-}
+
 
 /* ATTIVITA non viene piu usato come tabella condivisa: la sezione e locale
    sul dispositivo. Questa utility elimina soltanto un vecchio foglio vuoto,
@@ -426,7 +416,7 @@ function managementBootstrap_(p) {
   /* Le patch notes pubbliche vengono caricate anche nella shell principale,
      così la regola Una volta/Sempre vale all'apertura dell'intero sistema e
      non soltanto quando si entra nel Quotation Planner. */
-  data.patchNotes = patchNotesContent_(false, settings);
+  data.patchNotes = patchNotesContent_(false);
   data.messageState = messageStateForUser_(currentUserRow, settings, data.patchNotes);
   if (isAdmin_(user)) data.adminContent = adminContent_(settings);
   data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
@@ -604,26 +594,28 @@ function messagePublicationState_(messageType, settingsOverride, patchOverride) 
   var type = String(messageType || "").trim().toUpperCase();
   var settings = settingsOverride || getSettings_(true);
   if (["WELCOME", "BENVENUTO"].indexOf(type) >= 0) {
+    var welcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1));
     return {
       type: "WELCOME",
       seen_field: "welcome_seen_revision",
-      revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
-      publication_key: String(settings.welcome_publication_key || legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION))
+      revision: welcomeRevision,
+      publication_key: String(settings.welcome_message_publication_key || publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION))
     };
   }
   if (["PATCH", "PATCH_NOTES", "PATCHNOTES"].indexOf(type) >= 0) {
-    /* Per la sola marcatura non servono le voci PATCH_ITEMS: basta la tabella
-       chiave/valore PATCH_NOTES, evitando una lettura non necessaria. */
+    /* PATCH_NOTES è l'unica sorgente runtime delle patch notes. */
     var patch = patchOverride || getKeyValueSheet_("PATCH_NOTES");
+    var patchRevision = Math.max(1, Number(patch.publication_revision || 1));
     return {
       type: "PATCH_NOTES",
       seen_field: "patch_seen_revision",
-      revision: Math.max(1, Number(patch.publication_revision || settings.patch_notes_revision || 1)),
-      publication_key: String(patch.publication_key || legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, patch.version || SEEMAX_VERSION))
+      revision: patchRevision,
+      publication_key: String(patch.publication_key || publicationKeyFromRevisionV2144_("patch", patchRevision, patch.version || SEEMAX_VERSION))
     };
   }
   throw new Error("Tipo di messaggio non riconosciuto.");
 }
+
 
 function messageStateForUser_(user, settingsOverride, patchOverride) {
   var settings = settingsOverride || getSettings_(true);
@@ -2054,63 +2046,65 @@ function managementSaveAdminContentLocked_(user, payload) {
   var nextRevision = currentRevision + 1;
   var now = new Date().toISOString();
   var logParts = [];
+  var settingsValues = { admin_content_revision: nextRevision };
 
   if (updateWelcome) {
     var welcome = payload.welcome && typeof payload.welcome === "object" ? payload.welcome : {};
-    var existingWelcomeKey = String(settings.welcome_publication_key || "").trim();
+    var defaults = defaultBetaWelcomeContent_();
+    var existingWelcomeKey = String(settings.welcome_message_publication_key || "").trim();
+    var currentWelcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1));
+    var welcomePublicationRevision = republish ? currentWelcomeRevision + 1 : currentWelcomeRevision;
     var welcomePublicationKey = republish || !existingWelcomeKey ? uid_("welcome-pub") : existingWelcomeKey;
-    var welcomeEnabled = normalizeYesNo_(welcome.enabled, settings.welcome_enabled || settings.welcome_message_enabled || "SI");
-    var welcomeMode = normalizeMessageDisplayMode_(welcome.display_mode || settings.welcome_display_mode || settings.welcome_message_frequency || "ONCE");
-    var welcomeTitle = String(welcome.title !== undefined ? welcome.title : settings.welcome_title || settings.welcome_message_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!").trim().slice(0, 180);
-    var welcomeMessage = String(welcome.message !== undefined ? welcome.message : settings.welcome_message || settings.welcome_message_body || defaultWelcomeMessage_()).trim().slice(0, 3500);
-    var welcomeButton = String(welcome.primary_button !== undefined ? welcome.primary_button : settings.welcome_primary_button || settings.welcome_message_button || "Spiegami tutto").trim().slice(0, 70);
-    var legacyWelcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1) + (republish ? 1 : 0));
-    var welcomeValues = {
-      welcome_enabled: welcomeEnabled,
-      welcome_display_mode: welcomeMode,
-      welcome_publication_key: welcomePublicationKey,
-      welcome_published_at: republish || !existingWelcomeKey ? now : String(settings.welcome_published_at || ""),
-      welcome_published_by: republish || !existingWelcomeKey ? String(user.username || "") : String(settings.welcome_published_by || ""),
-      welcome_kicker: String(welcome.kicker !== undefined ? welcome.kicker : settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO").trim().slice(0, 100),
-      welcome_title: welcomeTitle,
-      welcome_message: welcomeMessage,
-      welcome_primary_button: welcomeButton,
-      /* Compatibilità con la precedente personalizzazione già presente nel
-         Foglio aziendale allegato: le vecchie chiavi restano sincronizzate. */
-      welcome_message_enabled: welcomeEnabled,
-      welcome_message_frequency: welcomeMode,
-      welcome_message_revision: legacyWelcomeRevision,
-      welcome_message_title: welcomeTitle,
-      welcome_message_body: welcomeMessage,
-      welcome_message_button: welcomeButton,
-      admin_content_revision: nextRevision
+    var publishWelcomeNow = republish || !existingWelcomeKey;
+    var take = function (field, fallback, limit) {
+      var value = Object.prototype.hasOwnProperty.call(welcome, field) ? welcome[field] : fallback;
+      return String(value === undefined || value === null ? "" : value).trim().slice(0, limit);
     };
-    upsertSettingsBatch_(welcomeValues, "Messaggio di benvenuto aggiornato da Management Suite");
-    logParts.push("benvenuto" + (republish ? " ripubblicato" : " aggiornato"));
+
+    settingsValues.welcome_message_enabled = normalizeYesNo_(welcome.enabled, settings.welcome_message_enabled || "SI");
+    settingsValues.welcome_message_frequency = normalizeMessageDisplayMode_(welcome.display_mode || settings.welcome_message_frequency || "ONCE");
+    settingsValues.welcome_message_publication_key = welcomePublicationKey;
+    settingsValues.welcome_message_revision = welcomePublicationRevision;
+    settingsValues.welcome_message_published_at = publishWelcomeNow ? now : String(settings.welcome_message_published_at || "");
+    settingsValues.welcome_message_published_by = publishWelcomeNow ? String(user.username || "") : String(settings.welcome_message_published_by || "");
+    settingsValues.welcome_message_modal_title = take("modal_title", settings.welcome_message_modal_title || defaults.modal_title, 120);
+    settingsValues.welcome_message_modal_subtitle = take("modal_subtitle", settings.welcome_message_modal_subtitle || defaults.modal_subtitle, 260);
+    settingsValues.welcome_message_badge = take("badge", settings.welcome_message_badge || defaults.badge, 160);
+    settingsValues.welcome_message_title = take("title", settings.welcome_message_title || defaults.title, 180);
+    settingsValues.welcome_message_body = take("message", settings.welcome_message_body || defaults.message, 2400);
+    settingsValues.welcome_message_feature_1_title = take("feature_one_title", settings.welcome_message_feature_1_title !== undefined ? settings.welcome_message_feature_1_title : defaults.feature_one_title, 160);
+    settingsValues.welcome_message_feature_1_body = take("feature_one_message", settings.welcome_message_feature_1_body !== undefined ? settings.welcome_message_feature_1_body : defaults.feature_one_message, 1600);
+    settingsValues.welcome_message_feature_2_title = take("feature_two_title", settings.welcome_message_feature_2_title !== undefined ? settings.welcome_message_feature_2_title : defaults.feature_two_title, 160);
+    settingsValues.welcome_message_feature_2_body = take("feature_two_message", settings.welcome_message_feature_2_body !== undefined ? settings.welcome_message_feature_2_body : defaults.feature_two_message, 1600);
+    settingsValues.welcome_message_warning_title = take("warning_title", settings.welcome_message_warning_title !== undefined ? settings.welcome_message_warning_title : defaults.warning_title, 120);
+    settingsValues.welcome_message_warning_body = take("warning_message", settings.welcome_message_warning_body !== undefined ? settings.welcome_message_warning_body : defaults.warning_message, 1800);
+    settingsValues.welcome_message_feedback_body = take("feedback_message", settings.welcome_message_feedback_body !== undefined ? settings.welcome_message_feedback_body : defaults.feedback_message, 1800);
+    settingsValues.welcome_message_button = take("primary_button", settings.welcome_message_button || defaults.primary_button, 70);
+    logParts.push("Benvenuto Beta" + (republish ? " ripubblicato" : " aggiornato"));
   }
 
   if (updatePatch) {
     var currentNotes = getKeyValueSheet_("PATCH_NOTES");
     var patch = payload.patchNotes && typeof payload.patchNotes === "object" ? payload.patchNotes : {};
     var existingPatchKey = String(currentNotes.publication_key || "").trim();
+    var currentPatchRevision = Math.max(1, Number(currentNotes.publication_revision || 1));
+    var patchPublicationRevision = republish ? currentPatchRevision + 1 : currentPatchRevision;
     var patchPublicationKey = republish || !existingPatchKey ? uid_("patch-pub") : existingPatchKey;
-    var legacyPatchRevision = Math.max(1, Number(settings.patch_notes_revision || currentNotes.publication_revision || 1) + (republish ? 1 : 0));
+    var publishPatchNow = republish || !existingPatchKey;
     var patchValues = {
-      enabled: normalizeYesNo_(patch.enabled, currentNotes.enabled || "SI"),
-      publication_revision: legacyPatchRevision,
+      enabled: normalizeYesNo_(patch.enabled, currentNotes.enabled || "NO"),
+      publication_revision: patchPublicationRevision,
       display_mode: normalizeMessageDisplayMode_(patch.display_mode || currentNotes.display_mode || "ONCE"),
       publication_key: patchPublicationKey,
-      published_at: republish || !existingPatchKey ? now : String(currentNotes.published_at || ""),
-      published_by: republish || !existingPatchKey ? String(user.username || "") : String(currentNotes.published_by || ""),
+      published_at: publishPatchNow ? now : String(currentNotes.published_at || ""),
+      published_by: publishPatchNow ? String(user.username || "") : String(currentNotes.published_by || ""),
       version: String(patch.version !== undefined ? patch.version : currentNotes.version || SEEMAX_VERSION).trim().slice(0, 120),
       label: String(patch.label !== undefined ? patch.label : currentNotes.label || "SEEMAX MANAGEMENT SUITE").trim().slice(0, 160),
       title: String(patch.title !== undefined ? patch.title : currentNotes.title || "Aggiornamento").trim().slice(0, 220),
       intro: String(patch.intro !== undefined ? patch.intro : currentNotes.intro || "").trim().slice(0, 1600),
       footer: String(patch.footer !== undefined ? patch.footer : currentNotes.footer || "").trim().slice(0, 1600)
     };
-    var sourceItems = Array.isArray(patch.items)
-      ? patch.items
-      : rowsToObjects_(sheet_("PATCH_ITEMS"));
+    var sourceItems = Array.isArray(patch.items) ? patch.items : rowsToObjects_(sheet_("PATCH_ITEMS"));
     var items = sourceItems.slice(0, 12).map(function (item) {
       item = item && typeof item === "object" ? item : {};
       return {
@@ -2121,24 +2115,14 @@ function managementSaveAdminContentLocked_(user, payload) {
       };
     }).filter(function (item) { return item.title || item.text; });
     writePatchContentBatch_(patchValues, items);
-    var legacyPatchValues = {
-      patch_notes_enabled: patchValues.enabled,
-      patch_notes_frequency: patchValues.display_mode,
-      patch_notes_revision: legacyPatchRevision,
-      patch_notes_label: patchValues.label,
-      patch_notes_title: patchValues.title,
-      patch_notes_intro: patchValues.intro,
-      patch_notes_items: serializeLegacyPatchItemsV2143_(items),
-      patch_notes_footer: patchValues.footer
-    };
-    if (!updateWelcome) legacyPatchValues.admin_content_revision = nextRevision;
-    upsertSettingsBatch_(legacyPatchValues, "Compatibilità comunicazioni precedenti aggiornata da Management Suite");
     logParts.push("patch notes" + (republish ? " ripubblicate" : " aggiornate"));
   }
 
+  upsertSettingsBatch_(settingsValues, "Comunicazioni aggiornate da Management Suite");
   log_(user, "UPDATE", "admin_content", section, logParts.join(" e "));
   return { ok: true, content: adminContent_() };
 }
+
 
 function normalizeYesNo_(value, fallback) {
   var source = value === undefined || value === null || value === "" ? fallback : value;
@@ -2153,12 +2137,12 @@ function normalizeMessageDisplayMode_(value) {
   return ["ALWAYS", "SEMPRE", "OGNI_APERTURA"].indexOf(mode) >= 0 ? "ALWAYS" : "ONCE";
 }
 
-function legacyPublicationKeyV2143_(prefix, revision, fallback) {
+function publicationKeyFromRevisionV2144_(prefix, revision, fallback) {
   var normalized = String(revision === undefined || revision === null ? "" : revision).trim().replace(/[^0-9A-Za-z._-]+/g, "-");
   return prefix + "-legacy-" + (normalized || String(fallback || SEEMAX_VERSION).replace(/[^0-9A-Za-z._-]+/g, "-"));
 }
 
-function parseLegacyPatchItemsV2143_(value) {
+function parseLegacyPatchItemsForMigrationV2144_(value) {
   return String(value || "").split(/\r?\n/).map(function (line) {
     var parts = String(line || "").split("|");
     if (parts.length < 2) return null;
@@ -2171,36 +2155,41 @@ function parseLegacyPatchItemsV2143_(value) {
   }).filter(function (item) { return item && (item.title || item.text); }).slice(0, 12);
 }
 
-function serializeLegacyPatchItemsV2143_(items) {
-  return (items || []).map(function (item) {
-    var clean = function (value) { return String(value || "").replace(/[|\r\n]+/g, " ").trim(); };
-    return [clean(item.emoji || "✨"), clean(item.title), clean(item.text)].join("|");
-  }).join("\n");
-}
 
 function adminContent_(settingsOverride) {
   var settings = settingsOverride || getSettings_(true);
+  var defaults = defaultBetaWelcomeContent_();
+  var welcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1));
   return {
     revision: Number(settings.admin_content_revision || settings.settings_revision || 0),
     welcome: {
-      enabled: normalizeYesNo_(settings.welcome_enabled !== undefined ? settings.welcome_enabled : settings.welcome_message_enabled, "SI"),
-      display_mode: normalizeMessageDisplayMode_(settings.welcome_display_mode || settings.welcome_message_frequency || "ONCE"),
-      publication_key: String(settings.welcome_publication_key || legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION)),
-      publication_revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
-      published_at: String(settings.welcome_published_at || ""),
-      published_by: String(settings.welcome_published_by || ""),
-      kicker: String(settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO"),
-      title: String(settings.welcome_title || settings.welcome_message_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!"),
-      message: String(settings.welcome_message || settings.welcome_message_body || defaultWelcomeMessage_()),
-      primary_button: String(settings.welcome_primary_button || settings.welcome_message_button || "Spiegami tutto")
+      enabled: normalizeYesNo_(settings.welcome_message_enabled, "SI"),
+      display_mode: normalizeMessageDisplayMode_(settings.welcome_message_frequency || "ONCE"),
+      publication_key: String(settings.welcome_message_publication_key || publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION)),
+      publication_revision: welcomeRevision,
+      published_at: String(settings.welcome_message_published_at || ""),
+      published_by: String(settings.welcome_message_published_by || ""),
+      modal_title: String(settings.welcome_message_modal_title !== undefined ? settings.welcome_message_modal_title : defaults.modal_title),
+      modal_subtitle: String(settings.welcome_message_modal_subtitle !== undefined ? settings.welcome_message_modal_subtitle : defaults.modal_subtitle),
+      badge: String(settings.welcome_message_badge !== undefined ? settings.welcome_message_badge : defaults.badge),
+      title: String(settings.welcome_message_title !== undefined ? settings.welcome_message_title : defaults.title),
+      message: String(settings.welcome_message_body !== undefined ? settings.welcome_message_body : defaults.message),
+      feature_one_title: String(settings.welcome_message_feature_1_title !== undefined ? settings.welcome_message_feature_1_title : defaults.feature_one_title),
+      feature_one_message: String(settings.welcome_message_feature_1_body !== undefined ? settings.welcome_message_feature_1_body : defaults.feature_one_message),
+      feature_two_title: String(settings.welcome_message_feature_2_title !== undefined ? settings.welcome_message_feature_2_title : defaults.feature_two_title),
+      feature_two_message: String(settings.welcome_message_feature_2_body !== undefined ? settings.welcome_message_feature_2_body : defaults.feature_two_message),
+      warning_title: String(settings.welcome_message_warning_title !== undefined ? settings.welcome_message_warning_title : defaults.warning_title),
+      warning_message: String(settings.welcome_message_warning_body !== undefined ? settings.welcome_message_warning_body : defaults.warning_message),
+      feedback_message: String(settings.welcome_message_feedback_body !== undefined ? settings.welcome_message_feedback_body : defaults.feedback_message),
+      primary_button: String(settings.welcome_message_button !== undefined ? settings.welcome_message_button : defaults.primary_button)
     },
-    patchNotes: patchNotesContent_(true, settings)
+    patchNotes: patchNotesContent_(true)
   };
 }
 
-function patchNotesContent_(includeInactive, settingsOverride) {
+
+function patchNotesContent_(includeInactive) {
   var notes = getKeyValueSheet_("PATCH_NOTES");
-  var settings = settingsOverride || getSettings_(true);
   var items = rowsToObjects_(sheet_("PATCH_ITEMS")).map(function (row) {
     return {
       emoji: String(row.emoji || "✨"),
@@ -2208,29 +2197,45 @@ function patchNotesContent_(includeInactive, settingsOverride) {
       text: String(row.text || ""),
       attivo: normalizeYesNo_(row.attivo, "SI")
     };
-  });
-  if (!items.length && settings.patch_notes_items) items = parseLegacyPatchItemsV2143_(settings.patch_notes_items);
+  }).filter(function (item) { return item.title || item.text; });
   if (!includeInactive) items = items.filter(function (item) { return item.attivo !== "NO"; });
-  var noteVersion = String(notes.version || settings.versione_patch_notes || SEEMAX_VERSION);
+  var noteVersion = String(notes.version || SEEMAX_VERSION);
+  var revision = Math.max(1, Number(notes.publication_revision || 1));
   return {
-    enabled: normalizeYesNo_(notes.enabled !== undefined ? notes.enabled : settings.patch_notes_enabled, "SI"),
-    display_mode: normalizeMessageDisplayMode_(notes.display_mode || settings.patch_notes_frequency || "ONCE"),
-    publication_key: String(notes.publication_key || legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, noteVersion)),
-    publication_revision: Math.max(1, Number(notes.publication_revision || settings.patch_notes_revision || 1)),
+    enabled: normalizeYesNo_(notes.enabled, "NO"),
+    display_mode: normalizeMessageDisplayMode_(notes.display_mode || "ONCE"),
+    publication_key: String(notes.publication_key || publicationKeyFromRevisionV2144_("patch", revision, noteVersion)),
+    publication_revision: revision,
     published_at: String(notes.published_at || ""),
     published_by: String(notes.published_by || ""),
     version: noteVersion,
-    label: String(notes.label || settings.patch_notes_label || "SEEMAX MANAGEMENT SUITE"),
-    title: String(notes.title || settings.patch_notes_title || "Aggiornamento"),
-    intro: String(notes.intro || settings.patch_notes_intro || ""),
-    footer: String(notes.footer || settings.patch_notes_footer || ""),
+    label: String(notes.label || "SEEMAX MANAGEMENT SUITE"),
+    title: String(notes.title || "Aggiornamento"),
+    intro: String(notes.intro || ""),
+    footer: String(notes.footer || ""),
     items: items
   };
 }
 
-function defaultWelcomeMessage_() {
-  return "Seemax Management Suite raccoglie tutto ciò che conoscevi di Seemax For You e lo porta a un livello completamente nuovo. Niente più reindirizzamenti esterni, navigazioni eccessive o perdite di tempo: ora hai tutto a portata di click o di tocco.\n\nCrea preventivi, controlla le giacenze direttamente nel calcolatore, registra clienti e pratiche, gestisci i documenti e monitora il tuo lavoro da un unico ambiente.";
+
+function defaultBetaWelcomeContent_() {
+  return {
+    modal_title: "Benvenuto nella Beta",
+    modal_subtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova",
+    badge: "SEEMAX MANAGEMENT SUITE · VERSIONE BETA",
+    title: "BENVENUTO NELLA FASE DI TEST",
+    message: "Stai utilizzando Seemax Management Suite in modalità di prova. Il sistema entra ora nella sua fase di test operativo e resterà accessibile nei prossimi giorni per permetterti di conoscerlo e metterlo alla prova.",
+    feature_one_title: "Esplora il tuo nuovo spazio di lavoro",
+    feature_one_message: "Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.",
+    feature_two_title: "Personalizza profilo e bacheca",
+    feature_two_message: "Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.",
+    warning_title: "Ambiente di prova",
+    warning_message: "I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in Seemax For You verranno invece importati in Seemax Management Suite.",
+    feedback_message: "Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da PC sia da smartphone. Il tuo feedback ci aiuterà a plasmare la versione finale.",
+    primary_button: "🚀 Inizia a esplorare"
+  };
 }
+
 
 function writePatchContentBatch_(notes, items) {
   var notesSheet = sheet_("PATCH_NOTES");
@@ -3139,7 +3144,7 @@ function touchLoginBestEffort_(username) {
   }
 }
 
-function settingsCacheKey_() { return "SEEMAX_SETTINGS_V2140"; }
+function settingsCacheKey_() { return "SEEMAX_SETTINGS_V2144"; }
 
 function invalidateSettingsCache_() {
   try { CacheService.getScriptCache().remove(settingsCacheKey_()); } catch (error) { /* cache opzionale */ }
@@ -3278,20 +3283,7 @@ function seedSettings_() {
     numero_preventivo_admin_iniziale: 1,
     numero_preventivo_agenti_iniziale: 1,
     obiettivo_fatturato: 500000,
-    beta_test_attiva: "SI",
     beta_sblocca_trofei: "SI",
-    welcome_enabled: "SI",
-    welcome_display_mode: "ONCE",
-    welcome_publication_key: "welcome-" + SEEMAX_VERSION,
-    welcome_message_revision: 1,
-    patch_notes_revision: 1,
-    welcome_published_at: "",
-    welcome_published_by: "",
-    welcome_kicker: "IL TUO NUOVO CENTRO OPERATIVO",
-    welcome_title: "BENVENUTO IN SEEMAX MANAGEMENT SUITE!",
-    welcome_message: defaultWelcomeMessage_(),
-    welcome_primary_button: "Spiegami tutto",
-    admin_content_revision: 0,
     req_acquisto_destinatario_ordine: "SI",
     req_acquisto_clientid: "SI",
     req_acquisto_valore: "SI",
@@ -3360,206 +3352,128 @@ function seedSettings_() {
   Object.keys(defaults).forEach(function (key) { if (current[key] === undefined || current[key] === "") setSetting_(key, defaults[key], "Valore iniziale Seemax Management Suite"); });
 }
 
-function seedPatchNotes_() {
-  if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
-  var rows = [
-    ["enabled", "SI"], ["display_mode", "ONCE"], ["publication_key", "patch-" + SEEMAX_VERSION], ["publication_revision", 1], ["published_at", ""], ["published_by", ""],
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.14.3"], ["title", "Schede Admin e pubblicazione messaggi"],
-    ["intro", "L'amministratore può organizzare le impostazioni in schede e scegliere se mostrare ogni comunicazione una volta oppure sempre."],
-    ["footer", "Il comando Ripubblica rende nuovamente visibile il messaggio a tutti gli utenti senza cancellare manualmente la cache."]
-  ];
-  sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
-  invalidateTable_("PATCH_NOTES");
-}
 
-function migrateLegacyMessageSettingsV2143_() {
-  var settings = getSettings_(true);
-  var welcomeValues = {};
-  if ((settings.welcome_enabled === undefined || settings.welcome_enabled === "") && settings.welcome_message_enabled !== undefined) welcomeValues.welcome_enabled = normalizeYesNo_(settings.welcome_message_enabled, "SI");
-  if ((settings.welcome_display_mode === undefined || settings.welcome_display_mode === "") && settings.welcome_message_frequency) welcomeValues.welcome_display_mode = normalizeMessageDisplayMode_(settings.welcome_message_frequency);
-  if ((settings.welcome_publication_key === undefined || settings.welcome_publication_key === "") && settings.welcome_message_revision !== undefined) welcomeValues.welcome_publication_key = legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION);
-  if (settings.welcome_message_revision === undefined || settings.welcome_message_revision === "") welcomeValues.welcome_message_revision = 1;
-  if ((settings.welcome_title === undefined || settings.welcome_title === "") && settings.welcome_message_title) welcomeValues.welcome_title = settings.welcome_message_title;
-  if ((settings.welcome_message === undefined || settings.welcome_message === "") && settings.welcome_message_body) welcomeValues.welcome_message = settings.welcome_message_body;
-  if ((settings.welcome_primary_button === undefined || settings.welcome_primary_button === "") && settings.welcome_message_button) welcomeValues.welcome_primary_button = settings.welcome_message_button;
-  if (Object.keys(welcomeValues).length) upsertSettingsBatch_(welcomeValues, "Migrazione comunicazioni precedenti v2.14.3");
-
-  var notes = getKeyValueSheet_("PATCH_NOTES");
-  var noteValues = {};
-  if ((notes.enabled === undefined || notes.enabled === "") && settings.patch_notes_enabled !== undefined) noteValues.enabled = normalizeYesNo_(settings.patch_notes_enabled, "SI");
-  if ((notes.display_mode === undefined || notes.display_mode === "") && settings.patch_notes_frequency) noteValues.display_mode = normalizeMessageDisplayMode_(settings.patch_notes_frequency);
-  if ((notes.publication_key === undefined || notes.publication_key === "") && settings.patch_notes_revision !== undefined) noteValues.publication_key = legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, notes.version || SEEMAX_VERSION);
-  if (notes.publication_revision === undefined || notes.publication_revision === "") noteValues.publication_revision = Math.max(1, Number(settings.patch_notes_revision || 1));
-  if (!notes.label && settings.patch_notes_label) noteValues.label = settings.patch_notes_label;
-  if (!notes.title && settings.patch_notes_title) noteValues.title = settings.patch_notes_title;
-  if (!notes.intro && settings.patch_notes_intro) noteValues.intro = settings.patch_notes_intro;
-  if (!notes.footer && settings.patch_notes_footer) noteValues.footer = settings.patch_notes_footer;
-  Object.keys(noteValues).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: noteValues[key] });
-  });
-  if (Object.keys(noteValues).length) invalidateTable_("PATCH_NOTES");
-
-  var currentItems = rowsToObjects_(sheet_("PATCH_ITEMS"));
-  var legacyItems = parseLegacyPatchItemsV2143_(settings.patch_notes_items);
-  if (!currentItems.length && legacyItems.length) {
-    sheet_("PATCH_ITEMS").getRange(2, 1, legacyItems.length, 4).setValues(legacyItems.map(function (item) {
-      return [item.emoji, item.title, item.text, item.attivo];
-    }));
-    invalidateTable_("PATCH_ITEMS");
+function firstDefinedValueV2144_(source, keys, fallback) {
+  var object = source && typeof source === "object" ? source : {};
+  for (var i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(object, keys[i])) return object[keys[i]];
   }
+  return fallback;
 }
 
-function ensureMessagePublicationFieldsV2143_() {
+function deleteSettingKeysV2144_(keys) {
+  var remove = {};
+  (keys || []).forEach(function (key) { remove[String(key)] = true; });
+  var settingsSheet = sheet_("IMPOSTAZIONI");
+  var lastRow = settingsSheet.getLastRow();
+  var lastColumn = Math.max(3, settingsSheet.getLastColumn());
+  if (lastRow < 2) return [];
+  var range = settingsSheet.getRange(2, 1, lastRow - 1, lastColumn);
+  var values = range.getValues();
+  var kept = [];
+  var removed = [];
+  values.forEach(function (row) {
+    var key = String(row[0] || "");
+    if (remove[key]) removed.push(key);
+    else if (row.some(function (value) { return value !== "" && value !== null; })) kept.push(row);
+  });
+  if (!removed.length) return [];
+  range.clearContent();
+  if (kept.length) settingsSheet.getRange(2, 1, kept.length, lastColumn).setValues(kept);
+  invalidateTable_("IMPOSTAZIONI");
+  invalidateSettingsCache_();
+  return removed;
+}
+
+function prepareCommunicationsV2144_() {
   var settings = getSettings_(true);
-  var welcomeDefaults = {
-    welcome_display_mode: normalizeMessageDisplayMode_(settings.welcome_message_frequency || "ONCE"),
-    welcome_publication_key: settings.welcome_message_revision !== undefined
-      ? legacyPublicationKeyV2143_("welcome", settings.welcome_message_revision, SEEMAX_VERSION)
-      : "welcome-" + SEEMAX_VERSION,
-    welcome_published_at: "",
-    welcome_published_by: "",
-    welcome_message_revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
-    patch_notes_revision: Math.max(1, Number(settings.patch_notes_revision || 1))
+  var defaults = defaultBetaWelcomeContent_();
+  var welcomeRevision = Math.max(1, Number(firstDefinedValueV2144_(settings, ["welcome_message_revision"], 1)));
+  var welcomePublicationKey = String(firstDefinedValueV2144_(settings, ["welcome_message_publication_key", "welcome_publication_key"], publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION)) || "");
+  var welcomeValues = {
+    welcome_message_enabled: normalizeYesNo_(firstDefinedValueV2144_(settings, ["welcome_message_enabled", "welcome_enabled"], "SI"), "SI"),
+    welcome_message_frequency: normalizeMessageDisplayMode_(firstDefinedValueV2144_(settings, ["welcome_message_frequency", "welcome_display_mode"], "ONCE")),
+    welcome_message_publication_key: welcomePublicationKey || publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION),
+    welcome_message_revision: welcomeRevision,
+    welcome_message_published_at: String(firstDefinedValueV2144_(settings, ["welcome_message_published_at", "welcome_published_at"], "") || ""),
+    welcome_message_published_by: String(firstDefinedValueV2144_(settings, ["welcome_message_published_by", "welcome_published_by"], "") || ""),
+    welcome_message_modal_title: String(firstDefinedValueV2144_(settings, ["welcome_message_modal_title"], defaults.modal_title)),
+    welcome_message_modal_subtitle: String(firstDefinedValueV2144_(settings, ["welcome_message_modal_subtitle"], defaults.modal_subtitle)),
+    welcome_message_badge: String(firstDefinedValueV2144_(settings, ["welcome_message_badge"], defaults.badge)),
+    /* Le vecchie chiavi welcome_title/welcome_message appartenevano al
+       secondo popup introdotto per errore. Vengono usate solo come ripiego
+       quando il messaggio Beta originario non possiede ancora i propri dati. */
+    welcome_message_title: String(firstDefinedValueV2144_(settings, ["welcome_message_title", "welcome_title"], defaults.title)),
+    welcome_message_body: String(firstDefinedValueV2144_(settings, ["welcome_message_body", "welcome_message"], defaults.message)),
+    welcome_message_feature_1_title: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_1_title"], defaults.feature_one_title)),
+    welcome_message_feature_1_body: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_1_body"], defaults.feature_one_message)),
+    welcome_message_feature_2_title: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_2_title"], defaults.feature_two_title)),
+    welcome_message_feature_2_body: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_2_body"], defaults.feature_two_message)),
+    welcome_message_warning_title: String(firstDefinedValueV2144_(settings, ["welcome_message_warning_title"], defaults.warning_title)),
+    welcome_message_warning_body: String(firstDefinedValueV2144_(settings, ["welcome_message_warning_body"], defaults.warning_message)),
+    welcome_message_feedback_body: String(firstDefinedValueV2144_(settings, ["welcome_message_feedback_body"], defaults.feedback_message)),
+    welcome_message_button: String(firstDefinedValueV2144_(settings, ["welcome_message_button", "welcome_primary_button"], defaults.primary_button)),
+    admin_content_revision: Math.max(0, Number(settings.admin_content_revision || 0))
   };
-  var welcomeMissing = {};
-  Object.keys(welcomeDefaults).forEach(function (key) {
-    if (settings[key] === undefined || settings[key] === "") welcomeMissing[key] = welcomeDefaults[key];
-  });
-  if (Object.keys(welcomeMissing).length) upsertSettingsBatch_(welcomeMissing, "Configurazione pubblicazione messaggi v2.14.3");
+  upsertSettingsBatch_(welcomeValues, "Comunicazioni canoniche v2.14.4");
 
+  /* PATCH_NOTES e PATCH_ITEMS diventano le sole sorgenti delle patch notes.
+     Le vecchie chiavi IMPOSTAZIONI vengono lette solo in questa migrazione. */
   var notes = getKeyValueSheet_("PATCH_NOTES");
-  var patchDefaults = {
-    enabled: normalizeYesNo_(settings.patch_notes_enabled, "SI"),
-    display_mode: normalizeMessageDisplayMode_(settings.patch_notes_frequency || "ONCE"),
-    publication_key: settings.patch_notes_revision !== undefined
-      ? legacyPublicationKeyV2143_("patch", settings.patch_notes_revision, notes.version || SEEMAX_VERSION)
-      : "patch-" + String(notes.version || SEEMAX_VERSION),
-    publication_revision: Math.max(1, Number(notes.publication_revision || settings.patch_notes_revision || 1)),
-    published_at: "",
-    published_by: ""
+  var patchRevision = Math.max(1, Number(firstDefinedValueV2144_(notes, ["publication_revision"], firstDefinedValueV2144_(settings, ["patch_notes_revision"], 1))));
+  var patchVersion = String(firstDefinedValueV2144_(notes, ["version"], SEEMAX_VERSION));
+  var patchValues = {
+    enabled: normalizeYesNo_(firstDefinedValueV2144_(notes, ["enabled"], firstDefinedValueV2144_(settings, ["patch_notes_enabled"], "NO")), "NO"),
+    display_mode: normalizeMessageDisplayMode_(firstDefinedValueV2144_(notes, ["display_mode"], firstDefinedValueV2144_(settings, ["patch_notes_frequency"], "ONCE"))),
+    publication_key: String(firstDefinedValueV2144_(notes, ["publication_key"], publicationKeyFromRevisionV2144_("patch", patchRevision, patchVersion))),
+    publication_revision: patchRevision,
+    published_at: String(firstDefinedValueV2144_(notes, ["published_at"], "") || ""),
+    published_by: String(firstDefinedValueV2144_(notes, ["published_by"], "") || ""),
+    version: patchVersion,
+    label: String(firstDefinedValueV2144_(notes, ["label"], firstDefinedValueV2144_(settings, ["patch_notes_label"], "SEEMAX MANAGEMENT SUITE"))),
+    title: String(firstDefinedValueV2144_(notes, ["title"], firstDefinedValueV2144_(settings, ["patch_notes_title"], "Aggiornamento"))),
+    intro: String(firstDefinedValueV2144_(notes, ["intro"], firstDefinedValueV2144_(settings, ["patch_notes_intro"], ""))),
+    footer: String(firstDefinedValueV2144_(notes, ["footer"], firstDefinedValueV2144_(settings, ["patch_notes_footer"], "")))
   };
-  Object.keys(patchDefaults).forEach(function (key) {
-    if (notes[key] === undefined || notes[key] === "") upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: patchDefaults[key] });
-  });
-  invalidateTable_("PATCH_NOTES");
+  var currentItems = rowsToObjects_(sheet_("PATCH_ITEMS")).map(function (item) {
+    return {
+      emoji: String(item.emoji || "✨").trim().slice(0, 16),
+      title: String(item.title || "").trim().slice(0, 180),
+      text: String(item.text || "").trim().slice(0, 900),
+      attivo: normalizeYesNo_(item.attivo, "SI")
+    };
+  }).filter(function (item) { return item.title || item.text; }).slice(0, 12);
+  if (!currentItems.length) currentItems = parseLegacyPatchItemsForMigrationV2144_(settings.patch_notes_items);
+  writePatchContentBatch_(patchValues, currentItems);
+
+  var obsoleteKeys = [
+    "beta_test_attiva",
+    "welcome_enabled", "welcome_display_mode", "welcome_publication_key", "welcome_published_at", "welcome_published_by",
+    "welcome_kicker", "welcome_title", "welcome_message", "welcome_primary_button",
+    "patch_notes_enabled", "patch_notes_frequency", "patch_notes_revision", "patch_notes_label", "patch_notes_title",
+    "patch_notes_intro", "patch_notes_items", "patch_notes_footer", "versione_patch_notes"
+  ];
+  var removed = deleteSettingKeysV2144_(obsoleteKeys);
+  resetRequestDataCaches_();
+  return { removed_settings: removed, welcome_revision: welcomeRevision, patch_revision: patchRevision };
 }
 
-function updatePatchNotesV290_() {
-  var notes = {
+function auditCommunicationsV2144() {
+  var settings = getSettings_(true);
+  var obsolete = [
+    "beta_test_attiva", "welcome_enabled", "welcome_display_mode", "welcome_publication_key", "welcome_published_at", "welcome_published_by",
+    "welcome_kicker", "welcome_title", "welcome_message", "welcome_primary_button",
+    "patch_notes_enabled", "patch_notes_frequency", "patch_notes_revision", "patch_notes_label", "patch_notes_title", "patch_notes_intro", "patch_notes_items", "patch_notes_footer", "versione_patch_notes"
+  ].filter(function (key) { return Object.prototype.hasOwnProperty.call(settings, key); });
+  return {
     version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.9",
-    title: "Pratiche protette e assegnazione commerciale",
-    intro: "Le pratiche concluse diventano archivi professionali in sola lettura e gli ADMIN possono scegliere l’agente responsabile durante la creazione.",
-    footer: "Le importazioni dal Quotation Planner sono evidenziate come pratiche da completare."
+    welcome: adminContent_(settings).welcome,
+    patch_notes: patchNotesContent_(true),
+    obsolete_settings_still_present: obsolete
   };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
 }
 
-function updatePatchNotesV2100_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.10",
-    title: "Magazzino amministrativo e pratiche più flessibili",
-    intro: "Gli ADMIN possono registrare dati temporaneamente sconosciuti con 0000 e gestire carichi o scarichi di magazzino con uno storico completo.",
-    footer: "Le pratiche restano inseribili anche senza giacenza e possono essere organizzate per tipologia sul singolo dispositivo."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
 
-function updatePatchNotesV2110_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.11",
-    title: "Elenchi più ordinati e assegnazione clienti",
-    intro: "Clienti e pratiche mostrano sei elementi per pagina. Gli amministratori vedono per primi i record più recenti.",
-    footer: "Durante la creazione di un cliente, un ADMIN può associarlo direttamente all’agente responsabile."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2120_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.12",
-    title: "Una pratica, più Ledwall",
-    intro: "Ogni pratica può comprendere più Ledwall, anche installati presso indirizzi differenti.",
-    footer: "Una giacenza insufficiente viene segnalata senza bloccare il salvataggio: lo scarico resta in attesa e il magazzino non scende mai sotto zero."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2121_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.12.1",
-    title: "Dati sconosciuti, pratiche sempre operative",
-    intro: "Il placeholder amministrativo 0000 resta riconoscibile anche negli indirizzi memorizzati su Google Fogli.",
-    footer: "I clienti con informazioni parziali possono essere importati nelle pratiche senza che il valore 0000 venga confuso con un campo vuoto."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2130_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.13.0",
-    title: "Database resiliente e magazzino sincronizzato",
-    intro: "Clienti e pratiche vengono salvati con richieste POST idempotenti; il Catalogo legge le giacenze direttamente da PRODOTTI_LED.",
-    footer: "Il refresh manuale ricarica il database, i carichi/scarichi aggiornano giacenza_attuale e l'ADMIN puo mostrare o nascondere l'avviso di giacenza nelle singole pratiche."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2140_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.14.0",
-    title: "Salvataggi piu rapidi e diagnostica integrata",
-    intro: "Clienti e pratiche usano ricerche puntuali e scritture di una sola riga, evitando riletture complete non necessarie di Google Fogli.",
-    footer: "Il contatore pratiche, la cache breve delle impostazioni e i tempi backend visibili nella console rendono il sistema piu reattivo e misurabile."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2141_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.14.1",
-    title: "Conferma salvataggi senza attese artificiali",
-    intro: "La risposta delle mutazioni POST può attraversare l'iframe di Apps Script e raggiungere direttamente GitHub Pages.",
-    footer: "Il fallback di conferma parte dopo 2,6 secondi e la diagnostica indica se il risultato è arrivato via postMessage o tramite controllo di stato."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2142_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.14.2",
-    title: "Comunicazioni amministrative ripristinate",
-    intro: "L'amministratore può nuovamente personalizzare il messaggio di benvenuto e le patch notes dalla sezione Impostazioni.",
-    footer: "La conferma del salvataggio parte in parallelo alla risposta iframe e riduce ulteriormente l'attesa quando postMessage non è disponibile."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
 
 /* Utility amministrativa: mostra le righe prodotto effettivamente restituite
    al Catalogo e la sorgente della quantità. È utile per un collaudo rapido

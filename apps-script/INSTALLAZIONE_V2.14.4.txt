@@ -1,0 +1,42 @@
+SEEMAX MANAGEMENT SUITE 2.14.4 - GOOGLE APPS SCRIPT
+
+ORDINE CONSIGLIATO
+
+1. Crea una copia di sicurezza del Foglio Google e del precedente Code.gs.
+2. Apri Foglio Google > Estensioni > Apps Script.
+3. Sostituisci tutto il contenuto di Code.gs con il file 2.14.4.
+4. Salva.
+5. Seleziona la funzione upgradeSeemaxV2144.
+6. Premi Esegui e autorizza lo script, se richiesto.
+7. Verifica il messaggio:
+
+   SEEMAX v2.14.4 configurato: unico Benvenuto Beta editabile,
+   patch notes centralizzate e chiavi obsolete rimosse.
+
+8. Facoltativo: esegui auditCommunicationsV2144 e verifica che
+   obsolete_settings_still_present sia un array vuoto.
+9. Apri Esegui il deployment > Gestisci deployment.
+10. Modifica il deployment Web App esistente.
+11. Seleziona Nuova versione e pubblica.
+12. Controlla che l'URL /exec coincida con assets/js/config.js.
+13. Aggiorna GitHub con il pacchetto 2.14.4.
+14. Esegui Ctrl+F5 oppure chiudi e riapri completamente la PWA.
+
+COSA FA LA MIGRAZIONE
+
+- collega l'editor al popup grafico originario “Benvenuto nella Beta”;
+- conserva i testi welcome_message_title/body/button già presenti;
+- aggiunge i campi grafici mancanti del popup;
+- conserva PATCH_NOTES e PATCH_ITEMS;
+- elimina soltanto le chiavi di comunicazione duplicate o obsolete;
+- conserva clienti, pratiche, agenti, prodotti, documenti e magazzino;
+- non richiede di importare nuovamente il file Excel;
+- mantiene memoria per account, lock multiutente e SpreadsheetApp.flush().
+
+DOPO L'INSTALLAZIONE
+
+Accedi come ADMIN > Impostazioni > Benvenuto Beta.
+Usa Anteprima e verifica che venga mostrato il popup grafico completo,
+non un secondo messaggio generico.
+
+Consulta docs/AGGIORNAMENTO_V2.14.4.md per la procedura completa.

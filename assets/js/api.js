@@ -366,41 +366,50 @@
     const response = await jsonp("management_save_settings", { ...authParams(), payload: JSON.stringify(values) }, 60000);
     return response.settings;
   }
-
   function demoAdminContent() {
     const settings = demo.settings();
+    const welcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1));
     return {
       revision: Number(settings.admin_content_revision || 0),
       welcome: {
-        enabled: settings.welcome_enabled || "SI",
-        display_mode: settings.welcome_display_mode || "ONCE",
-        publication_key: settings.welcome_publication_key || `welcome-${config.version}`,
-        publication_revision: Math.max(1, Number(settings.welcome_message_revision || 1)),
-        published_at: settings.welcome_published_at || "",
-        published_by: settings.welcome_published_by || "",
-        kicker: settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO",
-        title: settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!",
-        message: settings.welcome_message || "Seemax Management Suite raccoglie clienti, pratiche, preventivi e documenti in un unico ambiente.",
-        primary_button: settings.welcome_primary_button || "Spiegami tutto"
+        enabled: settings.welcome_message_enabled || "SI",
+        display_mode: settings.welcome_message_frequency || "ONCE",
+        publication_key: settings.welcome_message_publication_key || `welcome-${config.version}`,
+        publication_revision: welcomeRevision,
+        published_at: settings.welcome_message_published_at || "",
+        published_by: settings.welcome_message_published_by || "",
+        modal_title: settings.welcome_message_modal_title || "Benvenuto nella Beta",
+        modal_subtitle: settings.welcome_message_modal_subtitle || "La nuova esperienza di lavoro entra ufficialmente nella fase di prova",
+        badge: settings.welcome_message_badge || "SEEMAX MANAGEMENT SUITE · VERSIONE BETA",
+        title: settings.welcome_message_title || "BENVENUTO NELLA FASE DI TEST",
+        message: settings.welcome_message_body || "Stai utilizzando Seemax Management Suite in modalità di prova.",
+        feature_one_title: settings.welcome_message_feature_1_title || "Esplora il tuo nuovo spazio di lavoro",
+        feature_one_message: settings.welcome_message_feature_1_body || "Crea clienti, inserisci pratiche e prepara preventivi da un unico ambiente.",
+        feature_two_title: settings.welcome_message_feature_2_title || "Personalizza profilo e bacheca",
+        feature_two_message: settings.welcome_message_feature_2_body || "Scegli i tuoi trofei e personalizza il profilo.",
+        warning_title: settings.welcome_message_warning_title || "Ambiente di prova",
+        warning_message: settings.welcome_message_warning_body || "I dati inseriti nella demo sono esclusivamente dimostrativi.",
+        feedback_message: settings.welcome_message_feedback_body || "Condividi impressioni e suggerimenti con l’amministratore Seemax.",
+        primary_button: settings.welcome_message_button || "🚀 Inizia a esplorare"
       },
       patchNotes: {
-        enabled: "SI",
+        enabled: "NO",
         display_mode: "ONCE",
         publication_key: `patch-${config.version}`,
-        publication_revision: Math.max(1, Number(settings.patch_notes_revision || 1)),
+        publication_revision: 1,
         published_at: "",
         published_by: "",
         version: config.version,
-        label: `SEEMAX MANAGEMENT SUITE ${config.version}`,
+        label: "SEEMAX MANAGEMENT SUITE",
         title: "Aggiornamento",
-        intro: "Personalizza qui le novità mostrate dal Management Suite e dal Quotation Planner.",
+        intro: "",
         footer: "",
         items: []
       }
     };
   }
 
-  async function getAdminContent() {
+async function getAdminContent() {
     if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
     if (config.demoMode) return demoAdminContent();
     const response = await jsonp("management_admin_content", authParams(), 60000);

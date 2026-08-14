@@ -6,19 +6,14 @@
  */
 window.SEEMAX_APP_CONFIG = {
   appName: "Seemax Management Suite",
-  version: "2.14.3",
+  version: "2.14.4",
   demoMode: false,
   performanceDiagnostics: true,
   appsScriptUrl: "https://script.google.com/macros/s/AKfycbxNBdyg27CBYRu9M1FRFCw3Sm701hUZ5UQTyHPI3cE3AuoW8LaBRx_E6TLOoAxzHQCf/exec",
-  /*
-   * CAMPAGNA BETA TEMPORANEA
-   * Le impostazioni omonime del foglio IMPOSTAZIONI hanno la precedenza.
-   * Per terminare il test senza modificare il codice imposta:
-   * - beta_test_attiva = NO
-   * - beta_sblocca_trofei = NO
-   */
+  /* Fallback locale per i trofei della fase di test.
+     La visualizzazione del Benvenuto Beta è gestita esclusivamente
+     dall'editor ADMIN e dalle chiavi welcome_message_* del Foglio. */
   betaTest: {
-    enabled: true,
     unlockAllTrophies: true
   },
   company: {

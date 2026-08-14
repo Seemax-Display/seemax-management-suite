@@ -1753,38 +1753,26 @@
     // =============================
     // PATCH NOTES / NOVITA VERSIONE
     // =============================
-    // PATCH NOTES DI SICUREZZA INTERNE:
-    // Da questa versione il popup automatico usa le Patch Notes recuperate dal DATABASE SEEMAX.
-    // Questo blocco resta solo come struttura/fallback tecnico se il database non fornisce dati validi.
-    // La cache locale usa la stessa chiave della shell principale; quando l’agente è autenticato,
-    // la revisione vista viene registrata anche in AGENTI e vale su tutti i suoi dispositivi.
+    // PATCH_NOTES e PATCH_ITEMS del DATABASE SEEMAX sono l'unica sorgente.
+    // Non esiste più un contenuto locale di fallback che possa divergere
+    // dall'editor ADMIN o riapparire dopo un aggiornamento del codice.
     const MESSAGE_SEEN_STORAGE_PREFIX = 'SEEMAX_MESSAGE_SEEN_V1_';
     const PATCH_NOTES = {
-      enabled:true,
+      enabled:false,
       displayMode:'ONCE',
-      publicationKey:'patch-local-2026-07-02',
+      publicationKey:'',
       publicationRevision:1,
-      version:'2026-07-02-database-seemax-loader-tutorial-01',
-      label:'Aggiornamento · Database Seemax',
-      title:'Novità del Seemax Quotation Planner',
-      intro:'Questa versione usa le Patch Notes recuperate dal DATABASE SEEMAX. Il blocco interno resta solo come fallback tecnico.',
-      items:[
-        {emoji:'🌐', title:'DATABASE SEEMAX', text:'Il Planner prova a recuperare i dati amministrativi dal DATABASE SEEMAX all apertura.'},
-        {emoji:'🏷️', title:'Listino e promo online', text:'Prezzi Ledwall, prezzi promo agenti/clienti e prodotti attivi possono essere gestiti dal DATABASE SEEMAX.'},
-        {emoji:'🧪', title:'Versione test separata', text:'La versione stabile resta S.Q.P. Promo Ledwall: lo step-back rimane sempre possibile.'},
-        {emoji:'🔄', title:'Aggiorna dati online', text:'Dalla schermata Dati puoi forzare il caricamento del listino online con un pulsante dedicato.'},
-        {emoji:'🧪', title:'Ramo test', text:'Questa versione resta separata dalla stabile Promo Ledwall e possiamo fare step-back in qualsiasi momento.'}
-      ],
-      footer:'Le Patch Notes seguono la pubblicazione del DATABASE SEEMAX; per gli agenti autenticati la visualizzazione viene ricordata anche cambiando dispositivo.'
+      version:'',
+      label:'SEEMAX MANAGEMENT SUITE',
+      title:'Aggiornamento',
+      intro:'',
+      items:[],
+      footer:''
     };
 
-    let patchNotesSource = 'local';
+    let patchNotesSource = 'none';
     let databasePatchNotesReady = false;
-    // Chiave reale usata per forzare le Patch Notes del DATABASE SEEMAX.
-    // Include anche la versione_config del database, cosi basta cambiarla nel foglio
-    // per far riapparire le Patch Notes su tutti i dispositivi.
     let databasePatchNotesForceKey = '';
-
 
 
     // =============================
@@ -1970,10 +1958,10 @@
 
     function applyDatabasePatchNotes(patchNotes, configVersion=''){
       databasePatchNotesReady = false;
-      patchNotesSource = 'local';
+      patchNotesSource = 'none';
       databasePatchNotesForceKey = '';
       if(!patchNotes) return false;
-      const patchVersion = String(patchNotes.version || patchNotes.versione || patchNotes.versione_patch_notes || '').trim();
+      const patchVersion = String(patchNotes.version || '').trim();
       const cfgVersion = String(configVersion || '').trim();
       const publicationKey = String(patchNotes.publication_key || patchNotes.publicationKey || '').trim();
       const dbVersion = patchVersion || cfgVersion || publicationKey;
@@ -1981,14 +1969,14 @@
       const dbItems = Array.isArray(patchNotes.items)
         ? patchNotes.items.filter(item => String((item && (item.title || item.text)) || '').trim())
         : [];
-      PATCH_NOTES.enabled = patchNotesFlag(patchNotes.enabled, true);
+      PATCH_NOTES.enabled = patchNotesFlag(patchNotes.enabled, false);
       PATCH_NOTES.displayMode = normalizePatchNotesMode(patchNotes.display_mode || patchNotes.displayMode || 'ONCE');
       PATCH_NOTES.publicationKey = publicationKey || `database:${dbVersion}|config:${cfgVersion || dbVersion}`;
       PATCH_NOTES.publicationRevision = Math.max(1, Number(patchNotes.publication_revision || patchNotes.publicationRevision || 1));
       PATCH_NOTES.version = dbVersion;
       databasePatchNotesForceKey = PATCH_NOTES.publicationKey;
-      PATCH_NOTES.label = patchNotes.label || PATCH_NOTES.label;
-      PATCH_NOTES.title = patchNotes.title || PATCH_NOTES.title;
+      PATCH_NOTES.label = patchNotes.label || 'SEEMAX MANAGEMENT SUITE';
+      PATCH_NOTES.title = patchNotes.title || 'Aggiornamento';
       PATCH_NOTES.intro = patchNotes.intro || '';
       PATCH_NOTES.items = dbItems;
       PATCH_NOTES.footer = patchNotes.footer || '';
@@ -5745,9 +5733,8 @@
     }
 
     function showPatchNotes(force=false){
-      // Il popup automatico deve usare solo le Patch Notes recuperate dal DATABASE SEEMAX.
-      // Il blocco interno resta come fallback tecnico, ma non viene mostrato automaticamente.
-      if(!force && (!databasePatchNotesReady || patchNotesSource !== 'database')) return;
+      // Anche l'anteprima operativa usa solo i contenuti ricevuti dal database.
+      if(!databasePatchNotesReady || patchNotesSource !== 'database') return;
       if(!force && !PATCH_NOTES.enabled) return;
       if(!force && patchNotesWasSeen()) return;
       renderPatchNotes();
@@ -5763,7 +5750,7 @@
         const layer = $('patchNotesLayer');
         if(e.key === 'Escape' && layer && !layer.classList.contains('hidden')) closePatchNotes();
       });
-      // Nessuna apertura automatica locale: le Patch Notes vengono mostrate solo dopo il recupero dal DATABASE SEEMAX.
+      // Nessuna apertura locale: il popup viene mostrato soltanto dopo il recupero di PATCH_NOTES e PATCH_ITEMS dal database.
       // La cache locale e la revisione AGENTI impediscono la riapertura finché l’ADMIN non ripubblica.
     }
 
