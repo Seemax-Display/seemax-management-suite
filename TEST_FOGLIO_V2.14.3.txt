@@ -1,0 +1,23 @@
+TEST COMPATIBILITA FOGLIO SEEMAX 2.14.3
+
+AGENTI: intestazioni presenti 23, richieste 23, mancanti 0, extra compatibili 0
+PRODOTTI_LED: intestazioni presenti 42, richieste 42, mancanti 0, extra compatibili 0
+CLIENTI: intestazioni presenti 41, richieste 39, mancanti 0, extra compatibili 2
+  Colonne esistenti preservate: ha_pratiche_collegate, puo_modificare
+PRATICHE: intestazioni presenti 67, richieste 63, mancanti 0, extra compatibili 4
+  Colonne esistenti preservate: cliente_display, __notifications, nuova_pratica, agente_display
+DOCUMENTI: intestazioni presenti 19, richieste 19, mancanti 0, extra compatibili 0
+IMPOSTAZIONI: intestazioni presenti 3, richieste 3, mancanti 0, extra compatibili 0
+PATCH_NOTES: intestazioni presenti 2, richieste 2, mancanti 0, extra compatibili 0
+PATCH_ITEMS: intestazioni presenti 4, richieste 4, mancanti 0, extra compatibili 0
+ARCHIVIO_PREVENTIVI: intestazioni presenti 87, richieste 39, mancanti 0, extra compatibili 48
+  Colonne esistenti preservate: agente_nome, agente_email, agente_telefono, cliente_piva_cf, cliente_email, cliente_telefono, cliente_localita, note_preventivo, cabinet_principale, pixel_principale, bifacciale_principale, promo_principale, totale_costo_cina, totale_cliente_iva_inclusa, grenke_riscatto, ifis_primo_versamento, ifis_calcolato, ifis_riscatto_pct, grenke_importo, ifis_teg, ifis_canone_netto, ifis_istruttoria, ifis_anticipo_pct, ifis_tan, grenke_canone_60, ifis_canone_iva_inclusa, grenke_durata, grenke_modalita, ifis_gestione_bene, grenke_calcolato, grenke_canone_30, grenke_spese_istruttoria, grenke_canone_36, grenke_canoni_pdf, ifis_da_ricalcolare, ifis_anticipo_valore, ifis_durata, ifis_tae, ifis_spread, grenke_canone_selezionato, ifis_periodicita, ifis_importo_bene, grenke_assicurazione_annua, grenke_canone_24, grenke_canone_48, grenke_da_ricalcolare, ifis_riscatto_valore, agent_key
+MOVIMENTI_MAGAZZINO: intestazioni presenti 15, richieste 15, mancanti 0, extra compatibili 0
+NOTIFICHE: intestazioni presenti 13, richieste 13, mancanti 0, extra compatibili 0
+LOG: intestazioni presenti 7, richieste 7, mancanti 0, extra compatibili 0
+AGENTI: welcome_seen_revision presente in colonna 22
+AGENTI: patch_seen_revision presente in colonna 23
+Migrazione Benvenuto: frequenza legacy ALWAYS, revisione 2.0
+Migrazione Patch notes: frequenza legacy ONCE, revisione 2.0
+
+ESITO: STRUTTURA COMPATIBILE. Le intestazioni mancanti non operative vengono aggiunte in coda senza riordinare o cancellare quelle esistenti.

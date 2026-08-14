@@ -1,0 +1,98 @@
+✓ Code.gs: sintassi JavaScript valida
+✓ api.js: sintassi JavaScript valida
+✓ app.js: sintassi JavaScript valida
+✓ config.js: sintassi JavaScript valida
+✓ sw.js: sintassi JavaScript valida
+✓ planner-native.js: sintassi JavaScript valida
+✓ Quotation Planner: JavaScript inline valido
+✓ Code.gs: nessuna funzione top-level duplicata
+✓ api.js: nessuna funzione top-level duplicata
+✓ app.js: nessuna funzione top-level duplicata
+✓ planner-native.js: nessuna funzione top-level duplicata
+✓ Backend versione 2.14.3
+✓ Frontend versione 2.14.3
+✓ Cache PWA versione 2.14.3
+✓ Funzione upgradeSeemaxV2143 presente
+✓ Upgrade inizializza le sole chiavi di pubblicazione mancanti
+✓ IMPOSTAZIONI mantiene la struttura chiave/valore esistente
+✓ PATCH_NOTES mantiene la struttura chiave/valore esistente
+✓ PATCH_ITEMS non richiede nuove colonne
+✓ Le revisioni viste usano le colonne AGENTI già presenti nel Foglio allegato
+✓ Endpoint per registrare la visualizzazione per account presente
+✓ Bootstrap restituisce lo stato messaggi dell’account corrente
+✓ Navigazione a schede presente nelle Impostazioni Admin
+✓ Scheda Admin “Generali” presente
+✓ Scheda Admin “Pratiche” presente
+✓ Scheda Admin “Benvenuto” presente
+✓ Scheda Admin “Patch notes” presente
+✓ Scheda Admin “Sistema” presente
+✓ Benvenuto e patch notes hanno editor separati
+✓ Ogni editor offre modalità Solo una volta e Sempre
+✓ Comando Salva e ripubblica presente
+✓ Le due comunicazioni vengono salvate in modo indipendente
+✓ Memoria messaggi unica e versionata nel Management Suite
+✓ Memoria Solo una volta distinta per username
+✓ Modalità Sempre ignora la memoria di visualizzazione
+✓ Modalità Solo una volta usa la chiave di pubblicazione
+✓ Frontend confronta le revisioni viste salvate per account
+✓ API sincronizza la visualizzazione con il Foglio AGENTI
+✓ Patch notes caricate nella shell principale per tutti gli utenti
+✓ Coda iniziale gestisce benvenuto e patch notes separatamente
+✓ Backend salva modalità e pubblicazione del benvenuto
+✓ Backend salva modalità e pubblicazione delle patch notes
+✓ Backend supporta salvataggi parziali per sezione
+✓ Ripubblica genera una nuova chiave indipendente
+✓ Editor comunicazioni protetto da revisioni concorrenti
+✓ Scritture consolidate prima del rilascio del lock multiutente
+✓ Quotation Planner usa la stessa memoria del Management Suite
+✓ Quotation Planner distingue la visualizzazione per username
+✓ Quotation Planner rispetta Solo una volta/Sempre
+✓ Quotation Planner usa la chiave Ripubblica del database
+✓ Disattivazione patch notes rispettata dal Planner
+✓ Contesto Planner integrato riceve le patch notes correnti
+✓ Quotation Planner usa anche la revisione vista salvata nell’account
+✓ Stile responsive “admin-settings-shell” presente
+✓ Stile responsive “admin-settings-tab” presente
+✓ Stile responsive “message-policy-grid” presente
+✓ Stile responsive “message-mode-card” presente
+✓ Stile responsive “publication-status” presente
+✓ Stile responsive “message-editor-actions” presente
+✓ Stile responsive “suite-patch-message” presente
+✓ Schede Admin navigabili su smartphone
+✓ Conferma mutazioni anticipata a 700 ms conservata
+✓ Risposta iframe e conferma stato restano in competizione
+✓ Upsert principali restano POST idempotenti
+✓ Risposta iframe compatibile con GitHub Pages
+✓ Lookup puntuali su Google Fogli conservati
+✓ Contatori pratica ottimizzati conservati
+✓ Solo una volta: prima pubblicazione visibile
+✓ Solo una volta: messaggio già visto non riaperto
+✓ Ripubblica: nuova revisione rende nuovamente visibile il messaggio
+✓ Sempre: messaggio visibile anche dopo la memorizzazione
+✓ Messaggio disattivato non visualizzato
+✓ Solo una volta: memoria separata tra due agenti
+✓ Salvataggio Benvenuto incrementa la revisione e aggiorna il testo
+✓ Salva Benvenuto conserva la chiave se non si ripubblica
+✓ Salva Benvenuto non modifica le patch notes
+✓ Salvataggio Patch notes incrementa la revisione e aggiorna il contenuto
+✓ Salva Patch notes conserva la chiave se non si ripubblica
+✓ Salva Patch notes non modifica il Benvenuto
+✓ Ripubblica Patch notes genera una nuova chiave
+✓ Ripubblica Patch notes registra autore e data
+✓ Ripubblica Benvenuto genera una chiave indipendente
+✓ Modalità Sempre del Benvenuto salvata dal backend
+✓ Salvataggi Admin concorrenti vengono fermati come conflitto
+✓ Visualizzazione Benvenuto registrata nella riga AGENTI
+✓ Visualizzazione Benvenuto non modifica lo stato Patch notes
+✓ Una finestra vecchia non marca come vista una ripubblicazione nuova
+✓ Visualizzazione Patch notes registrata nella riga AGENTI
+✓ Registrazione visualizzazione idempotente
+✓ Migrazione Foglio: frequenza Benvenuto legacy convertita in ALWAYS
+✓ Migrazione Foglio: revisione Benvenuto 2 diventa chiave stabile
+✓ Migrazione Foglio: testo Benvenuto esistente preservato
+✓ Migrazione Foglio: Patch notes ONCE e revisione 2 preservate
+✓ Migrazione Foglio: chiave Patch notes derivata dalla revisione esistente
+✓ Migrazione Foglio: contenuto PATCH_NOTES esistente preservato
+✓ Migrazione Foglio: campi tecnici mancanti inizializzati
+
+Verifica statica e funzionale 2.14.3 completata senza errori.

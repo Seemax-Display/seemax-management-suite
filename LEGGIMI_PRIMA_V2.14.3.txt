@@ -1,0 +1,17 @@
+SEEMAX MANAGEMENT SUITE 2.14.3
+
+Questa release introduce:
+- cinque schede organizzative nelle Impostazioni ADMIN;
+- editor indipendenti per Benvenuto e Patch notes;
+- modalità Solo una volta oppure Sempre per ciascun messaggio;
+- memoria Solo una volta per account, valida anche cambiando dispositivo;
+- pulsante Salva che non disturba chi ha già letto;
+- pulsante Salva e ripubblica che crea una nuova revisione soltanto per il messaggio scelto;
+- anteprima senza effetti sugli utenti;
+- migrazione automatica delle configurazioni già presenti nel Foglio allegato;
+- consolidamento delle scritture Google Fogli prima del rilascio del lock.
+
+INSTALLAZIONE: aggiornare prima Apps Script, eseguire upgradeSeemaxV2143,
+pubblicare una nuova versione della Web App e solo dopo aggiornare GitHub.
+
+Non importare nuovamente il file Excel: serve soltanto come riferimento della struttura.

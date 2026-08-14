@@ -30,6 +30,9 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - cartelle documentali locali, trascinamento desktop e spostamento con pressione prolungata su smartphone;
 - attività, scadenze e appuntamenti;
 - gestione agenti e ruoli ADMIN/AGENTE;
+- Impostazioni ADMIN organizzate nelle schede Generali, Pratiche, Benvenuto, Patch notes e Sistema;
+- messaggi Benvenuto e Patch notes con modalità indipendenti Solo una volta o Sempre;
+- memoria delle comunicazioni per account, affiancata da cache locale e comando di ripubblicazione separato;
 - Quotation Planner montato nativamente nel gestionale, senza iframe;
 - sessione unica Management Suite/S.Q.P. senza un secondo accesso;
 - importazione dei clienti visibili nel Planner oppure compilazione manuale;
@@ -50,7 +53,7 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 
 ## Prova immediata
 
-Il progetto parte in modalità demo. Apri `index.html` oppure pubblicalo su GitHub Pages.
+Il pacchetto operativo è configurato con `demoMode: false`. Per una prova senza Google Sheets imposta temporaneamente `demoMode: true` in `assets/js/config.js`, quindi apri `index.html` oppure pubblicalo su GitHub Pages.
 
 - ADMIN: `admin.demo` / `DEMO-ADMIN`
 - AGENTE: `agente.demo` / `DEMO-AGENTE`
@@ -66,7 +69,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.14.2 segui [docs/AGGIORNAMENTO_V2.14.2.md](docs/AGGIORNAMENTO_V2.14.2.md). La diagnosi del trasporto e il ripristino delle comunicazioni amministrative sono descritti in [docs/RAPPORTO_TRASPORTO_E_COMUNICAZIONI_V2.14.2.md](docs/RAPPORTO_TRASPORTO_E_COMUNICAZIONI_V2.14.2.md). Consulta anche il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto tecnico 2.13](docs/RAPPORTO_TECNICO_V2.13.0.md).
+Per aggiornare un'installazione già operativa alla versione 2.14.3 segui [docs/AGGIORNAMENTO_V2.14.3.md](docs/AGGIORNAMENTO_V2.14.3.md). Il funzionamento delle revisioni, della memoria per account e della ripubblicazione è descritto in [docs/RAPPORTO_EDITOR_MESSAGGI_V2.14.3.md](docs/RAPPORTO_EDITOR_MESSAGGI_V2.14.3.md); la compatibilità con il Foglio fornito è riepilogata in [docs/ANALISI_FOGLIO_SEEMAX_V2.14.3.md](docs/ANALISI_FOGLIO_SEEMAX_V2.14.3.md). Consulta anche il [rapporto trasporto 2.14.2](docs/RAPPORTO_TRASPORTO_E_COMUNICAZIONI_V2.14.2.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 

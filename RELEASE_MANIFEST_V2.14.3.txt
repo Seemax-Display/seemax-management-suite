@@ -1,0 +1,74 @@
+SEEMAX MANAGEMENT SUITE 2.14.3 - RELEASE MANIFEST
+
+VERSIONI
+- Frontend: 2.14.3
+- Backend: seemax-management-suite-2.14.3
+- Cache PWA: seemax-management-v2-14-3
+- Funzione upgrade: upgradeSeemaxV2143
+
+FILE RUNTIME MODIFICATI
+- assets/js/app.js
+- assets/js/api.js
+- assets/js/config.js
+- assets/css/app.css
+- quotation-planner/index.html
+- apps-script/Code.gs
+- apps-script/appsscript.json
+- sw.js
+- README.md
+
+FUNZIONI PRINCIPALI
+- Impostazioni ADMIN divise in cinque schede.
+- Benvenuto e Patch notes con editor e pubblicazioni indipendenti.
+- Modalità ONCE/Solo una volta per account.
+- Modalità ALWAYS/Sempre a ogni apertura completa.
+- Salva senza nuova pubblicazione.
+- Salva e ripubblica con nuova chiave e nuova revisione.
+- Anteprima senza effetti sulla memoria degli utenti.
+- Memoria locale più stato durevole in AGENTI.
+- Compatibilità Quotation Planner autenticato e anonimo.
+- Migrazione delle chiavi legacy del Foglio fornito.
+- Protezione da salvataggi ADMIN concorrenti.
+- SpreadsheetApp.flush() prima del rilascio del lock.
+
+DATI UTILIZZATI
+- IMPOSTAZIONI: chiave/valore/note.
+- PATCH_NOTES: chiave/valore.
+- PATCH_ITEMS: emoji/title/text/attivo.
+- AGENTI: welcome_seen_revision e patch_seen_revision.
+
+NESSUNA MODIFICA STRUTTURALE OPERATIVA
+- CLIENTI: nessuna nuova colonna.
+- PRATICHE: nessuna nuova colonna.
+- PRODOTTI_LED: nessuna nuova colonna.
+- MOVIMENTI_MAGAZZINO: nessuna nuova colonna.
+
+DOCUMENTAZIONE
+- docs/AGGIORNAMENTO_V2.14.3.md
+- docs/RAPPORTO_EDITOR_MESSAGGI_V2.14.3.md
+- docs/ANALISI_FOGLIO_SEEMAX_V2.14.3.md
+- apps-script/INSTALLAZIONE_V2.14.3.txt
+- TEST_INTERFACCIA_V2.14.3.txt
+- TEST_FOGLIO_V2.14.3.txt
+- TEST_TRASPORTO_V2.14.3.txt
+- VERIFICA_V2.14.3.txt
+
+ANTEPRIME
+- docs/screenshots/v2.14.3/admin-welcome-desktop.png
+- docs/screenshots/v2.14.3/admin-patch-desktop.png
+- docs/screenshots/v2.14.3/admin-patch-mobile.png
+
+COLLAUDO
+- Verifica statica e funzionale Node: superata.
+- Test politiche ONCE/ALWAYS: superato.
+- Test ripubblicazione indipendente: superato.
+- Test memoria AGENTI e richiesta obsoleta: superato.
+- Test migrazione valori del Foglio allegato: superato.
+- Test trasporto post_message/post_message_late/status_poll_race: superato.
+- Verifica struttura Excel allegata: compatibile.
+- Rendering statico desktop/mobile: verificato.
+
+LIMITAZIONE
+Il pacchetto non è stato distribuito direttamente nel progetto Apps Script aziendale.
+Il collaudo finale deve essere eseguito dopo il deployment reale con almeno un ADMIN
+e due account AGENTE.

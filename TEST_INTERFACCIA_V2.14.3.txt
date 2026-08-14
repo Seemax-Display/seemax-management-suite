@@ -1,0 +1,21 @@
+TEST INTERFACCIA SEEMAX 2.14.3
+
+VERIFICHE STATICHE E RESPONSIVE ESEGUITE
+
+- Schede ADMIN: Generali, Pratiche, Benvenuto, Patch notes, Sistema.
+- Navigazione desktop laterale.
+- Navigazione mobile orizzontale e scorrevole.
+- Editor Benvenuto separato.
+- Editor Patch notes separato.
+- Selettori Solo una volta e Sempre.
+- Stato pubblicazione con data, autore, revisione e chiave.
+- Pulsanti Anteprima, Salva, Salva e ripubblica.
+- Massimo 12 voci Patch notes.
+- Voci disattivabili senza eliminarle.
+- Anteprima amministrativa senza registrazione della visualizzazione.
+
+LIMITAZIONE DEL COLLAUDO
+
+Il rendering statico è stato verificato con Chromium headless. L'ambiente di esecuzione
+non consente di navigare la Web App completa tramite file:// o server HTTP locale,
+quindi il flusso visuale end-to-end deve essere confermato dopo il deployment reale.
