@@ -41,7 +41,7 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - Planner alleggerito di oltre il 90% separando immagini e codice;
 - protezione multiutente con coda delle scritture, versioni record e prevenzione dei duplicati;
 - rilevamento dei conflitti senza sovrascritture silenziose;
-- salvataggi POST idempotenti per clienti, pratiche e movimenti, con risposta iframe diretta e recupero rapido dopo 2,6 secondi;
+- salvataggi POST idempotenti per clienti, pratiche e movimenti, con risposta iframe diretta, conferma parallela anticipata e recupero idempotente;
 - giacenze del Catalogo lette e verificate direttamente in `PRODOTTI_LED.giacenza_attuale`;
 - controllo ADMIN dell'avviso giacenza per ogni pratica Inserita, Sospesa o Completata;
 - contatore pratiche nelle Proprietà script, senza scansione completa a ogni creazione;
@@ -66,7 +66,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.14.1 segui [docs/AGGIORNAMENTO_V2.14.1.md](docs/AGGIORNAMENTO_V2.14.1.md). Il motivo tecnico della correzione è descritto in [docs/RAPPORTO_TRASPORTO_V2.14.1.md](docs/RAPPORTO_TRASPORTO_V2.14.1.md). Consulta anche il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto tecnico 2.13](docs/RAPPORTO_TECNICO_V2.13.0.md).
+Per aggiornare un'installazione già operativa alla versione 2.14.2 segui [docs/AGGIORNAMENTO_V2.14.2.md](docs/AGGIORNAMENTO_V2.14.2.md). La diagnosi del trasporto e il ripristino delle comunicazioni amministrative sono descritti in [docs/RAPPORTO_TRASPORTO_E_COMUNICAZIONI_V2.14.2.md](docs/RAPPORTO_TRASPORTO_E_COMUNICAZIONI_V2.14.2.md). Consulta anche il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto tecnico 2.13](docs/RAPPORTO_TECNICO_V2.13.0.md).
 
 ## Placeholder
 

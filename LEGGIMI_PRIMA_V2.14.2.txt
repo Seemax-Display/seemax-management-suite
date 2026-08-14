@@ -1,0 +1,23 @@
+SEEMAX MANAGEMENT SUITE 2.14.2
+
+Questa release:
+- anticipa la conferma alternativa dei salvataggi da 2.600 a 700 ms;
+- mette in competizione il messaggio iframe tardivo e lo stato server;
+- ripristina per gli ADMIN l'editor di benvenuto e patch notes;
+- preserva i contenuti già presenti nei fogli PATCH_NOTES e PATCH_ITEMS;
+- mantiene lookup puntuali, scritture di una sola riga e idempotenza della 2.14.
+
+ORDINE DI INSTALLAZIONE
+1. Backup del Foglio, Code.gs e repository.
+2. Aggiorna Apps Script.
+3. Esegui upgradeSeemaxV2142.
+4. Pubblica una nuova versione della Web App esistente.
+5. Aggiorna GitHub.
+6. Forza l'aggiornamento della PWA/browser.
+
+PANNELLO RIPRISTINATO
+Accedi come ADMIN e apri Impostazioni. In fondo alla pagina compare:
+Comunicazioni > Benvenuto e patch notes.
+
+Guida: docs/AGGIORNAMENTO_V2.14.2.md
+Rapporto: docs/RAPPORTO_TRASPORTO_E_COMUNICAZIONI_V2.14.2.md

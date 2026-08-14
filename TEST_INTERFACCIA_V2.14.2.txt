@@ -1,0 +1,25 @@
+SEEMAX MANAGEMENT SUITE 2.14.2 - TEST INTERFACCIA ADMIN
+
+Ambiente: browser Chromium locale, modalità demo controllata.
+
+Flusso verificato:
+1. accesso con ruolo ADMIN;
+2. apertura della sezione Impostazioni;
+3. presenza del pannello Comunicazioni;
+4. modifica titolo del benvenuto;
+5. modifica titolo patch notes;
+6. aggiunta di una voce patch;
+7. salvataggio del modulo;
+8. nuovo rendering e persistenza dei valori nell'API demo.
+
+RISULTATO
+{
+  "ok": true,
+  "version": "2.14.2",
+  "welcome_title": "Benvenuto QA 2.14.2",
+  "patch_title": "Patch QA 2.14.2",
+  "patch_items": 1,
+  "patch_item_title": "Voce QA"
+}
+
+Verificato anche il layout responsive dell'editor.

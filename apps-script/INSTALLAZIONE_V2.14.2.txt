@@ -1,0 +1,33 @@
+SEEMAX MANAGEMENT SUITE 2.14.2 - GOOGLE APPS SCRIPT
+
+1. Crea una copia di sicurezza del Foglio Google e del vecchio Code.gs.
+2. Apri Foglio Google > Estensioni > Apps Script.
+3. Sostituisci tutto il contenuto di Code.gs con il file della versione 2.14.2.
+4. Verifica o sostituisci appsscript.json.
+5. Salva il progetto.
+6. Seleziona la funzione upgradeSeemaxV2142.
+7. Premi Esegui e completa l'autorizzazione, se richiesta.
+8. Apri Esegui il deployment > Gestisci deployment.
+9. Modifica il deployment Web App esistente e scegli Nuova versione.
+10. Pubblica e conserva l'URL /exec.
+11. Aggiorna successivamente i file GitHub alla versione 2.14.2.
+12. Forza l'aggiornamento della PWA/browser.
+
+MESSAGGIO PREVISTO
+SEEMAX v2.14.2 configurato: personalizzazione benvenuto e patch notes ripristinata; conferma salvataggi anticipata attiva.
+
+SICUREZZA DATI
+- Non elimina clienti, pratiche, agenti, prodotti o documenti.
+- Non aggiunge colonne alle tabelle operative.
+- Aggiunge soltanto chiavi mancanti in IMPOSTAZIONI.
+- Non sovrascrive PATCH_NOTES o PATCH_ITEMS già popolati.
+
+FUNZIONE ADMIN RIPRISTINATA
+Dopo l'aggiornamento, accedi come ADMIN e apri:
+Impostazioni > Comunicazioni > Benvenuto e patch notes.
+
+DIAGNOSTICA
+Dopo un salvataggio apri la console del browser ed esegui:
+SeemaxApi.getLastPerformance()
+
+Consulta docs/AGGIORNAMENTO_V2.14.2.md per tutti i dettagli.

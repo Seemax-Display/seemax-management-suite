@@ -10,7 +10,7 @@
  * 5. Copia l'URL /exec in assets/js/config.js.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.14.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.14.2";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -214,6 +214,17 @@ function upgradeSeemaxV2141() {
   });
 }
 
+function upgradeSeemaxV2142() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    seedPatchNotes_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.2 · editor comunicazioni amministrative e conferma salvataggi anticipata.");
+    return "SEEMAX v2.14.2 configurato: personalizzazione benvenuto e patch notes ripristinata; conferma salvataggi anticipata attiva.";
+  });
+}
+
 /* ATTIVITA non viene piu usato come tabella condivisa: la sezione e locale
    sul dispositivo. Questa utility elimina soltanto un vecchio foglio vuoto,
    così nessun dato storico può essere cancellato per errore. */
@@ -321,6 +332,8 @@ function routeGet_(action, p) {
     case "management_remove": return managementRemove_(p);
     case "management_settings": return managementSettings_(p);
     case "management_save_settings": return managementSaveSettings_(p);
+    case "management_admin_content": return managementAdminContent_(p);
+    case "management_save_admin_content": return managementSaveAdminContent_(p);
     case "management_save_profile": return managementSaveProfile_(p);
     case "management_create_from_quote": return managementCreateFromQuote_(p);
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
@@ -390,6 +403,7 @@ function managementBootstrap_(p) {
   var notifications = listNotificationsForUser_(user);
   var movements = isAdmin_(user) ? rowsToObjects_(sheet_("MOVIMENTI_MAGAZZINO")).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 100) : [];
   var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, movements: movements, settings: settings, notifications: notifications };
+  if (isAdmin_(user)) data.adminContent = adminContent_();
   data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
   return {
     ok: true,
@@ -1019,9 +1033,23 @@ function managementMutationStatus_(p) {
   authenticate_(p.agent_username, p.agent_key);
   var requestId = String(p.requestId || "").slice(0, 180);
   if (!requestId) throw new Error("Identificativo salvataggio mancante.");
-  var raw = CacheService.getScriptCache().get(managementRequestCacheKey_(requestId));
+  var waitMs = Math.max(0, Math.min(3000, Number(p.wait_ms || 0)));
+  var started = new Date().getTime();
+  var raw = "";
+  var cache = CacheService.getScriptCache();
+  do {
+    raw = cache.get(managementRequestCacheKey_(requestId));
+    if (raw || !waitMs || new Date().getTime() - started >= waitMs) break;
+    Utilities.sleep(100);
+  } while (true);
   var result = raw ? parseJson_(raw, {}) : null;
-  return { ok: true, completed: !!raw && !(result && result.recover_by_token), result: result && !result.recover_by_token ? result : null, recover_by_token: !!(result && result.recover_by_token) };
+  return {
+    ok: true,
+    completed: !!raw && !(result && result.recover_by_token),
+    result: result && !result.recover_by_token ? result : null,
+    recover_by_token: !!(result && result.recover_by_token),
+    waited_ms: new Date().getTime() - started
+  };
 }
 
 function managementUploadStatus_(p) {
@@ -1885,6 +1913,116 @@ function managementSaveSettingsLocked_(p) {
   var settings = upsertSettingsBatch_(values, "Aggiornato da Management Suite");
   log_(user, "UPDATE", "settings", "IMPOSTAZIONI", "Impostazioni generali aggiornate");
   return { ok: true, settings: settings };
+}
+
+function managementAdminContent_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
+  return { ok: true, content: adminContent_() };
+}
+
+function managementSaveAdminContent_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
+  var payload = parseJson_(p.payload, {});
+  if (!payload || typeof payload !== "object") throw new Error("Contenuti amministrativi non validi.");
+  return withMutationLock_(function () { return managementSaveAdminContentLocked_(user, payload); });
+}
+
+function managementSaveAdminContentLocked_(user, payload) {
+  var settings = getSettings_(true);
+  var currentRevision = Number(settings.admin_content_revision || 0);
+  var expectedRevision = Number(payload.expected_revision || 0);
+  if (currentRevision > 0 && expectedRevision !== currentRevision) {
+    throw new Error("CONFLICT_RECORD: benvenuto o patch notes sono stati aggiornati da un altro amministratore.");
+  }
+
+  var welcome = payload.welcome && typeof payload.welcome === "object" ? payload.welcome : {};
+  var welcomeValues = {
+    welcome_enabled: String(welcome.enabled || "SI").toUpperCase() === "NO" ? "NO" : "SI",
+    welcome_kicker: String(welcome.kicker || "IL TUO NUOVO CENTRO OPERATIVO").trim().slice(0, 100),
+    welcome_title: String(welcome.title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!").trim().slice(0, 180),
+    welcome_message: String(welcome.message || defaultWelcomeMessage_()).trim().slice(0, 3500),
+    welcome_primary_button: String(welcome.primary_button || "Spiegami tutto").trim().slice(0, 70),
+    admin_content_revision: currentRevision + 1
+  };
+  upsertSettingsBatch_(welcomeValues, "Comunicazioni aggiornate da Management Suite");
+
+  var patch = payload.patchNotes && typeof payload.patchNotes === "object" ? payload.patchNotes : {};
+  var patchValues = {
+    version: String(patch.version || SEEMAX_VERSION).trim().slice(0, 120),
+    label: String(patch.label || "SEEMAX MANAGEMENT SUITE").trim().slice(0, 160),
+    title: String(patch.title || "Aggiornamento").trim().slice(0, 220),
+    intro: String(patch.intro || "").trim().slice(0, 1600),
+    footer: String(patch.footer || "").trim().slice(0, 1600)
+  };
+  var sourceItems = Array.isArray(patch.items) ? patch.items : [];
+  var items = sourceItems.slice(0, 12).map(function (item) {
+    item = item && typeof item === "object" ? item : {};
+    return {
+      emoji: String(item.emoji || "✨").trim().slice(0, 16),
+      title: String(item.title || "").trim().slice(0, 180),
+      text: String(item.text || "").trim().slice(0, 900),
+      attivo: String(item.attivo || item.active || "SI").toUpperCase() === "NO" ? "NO" : "SI"
+    };
+  }).filter(function (item) { return item.title || item.text; });
+  writePatchContentBatch_(patchValues, items);
+  log_(user, "UPDATE", "admin_content", "PATCH_NOTES", "Benvenuto e patch notes aggiornati");
+  return { ok: true, content: adminContent_() };
+}
+
+function adminContent_() {
+  var settings = getSettings_(true);
+  var notes = getKeyValueSheet_("PATCH_NOTES");
+  var items = rowsToObjects_(sheet_("PATCH_ITEMS")).map(function (row) {
+    return {
+      emoji: String(row.emoji || "✨"),
+      title: String(row.title || ""),
+      text: String(row.text || ""),
+      attivo: String(row.attivo || "SI").toUpperCase() === "NO" ? "NO" : "SI"
+    };
+  });
+  return {
+    revision: Number(settings.admin_content_revision || 0),
+    welcome: {
+      enabled: String(settings.welcome_enabled || "SI").toUpperCase() === "NO" ? "NO" : "SI",
+      kicker: String(settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO"),
+      title: String(settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!"),
+      message: String(settings.welcome_message || defaultWelcomeMessage_()),
+      primary_button: String(settings.welcome_primary_button || "Spiegami tutto")
+    },
+    patchNotes: {
+      version: String(notes.version || SEEMAX_VERSION),
+      label: String(notes.label || "SEEMAX MANAGEMENT SUITE"),
+      title: String(notes.title || "Aggiornamento"),
+      intro: String(notes.intro || ""),
+      footer: String(notes.footer || ""),
+      items: items
+    }
+  };
+}
+
+function defaultWelcomeMessage_() {
+  return "Seemax Management Suite raccoglie tutto ciò che conoscevi di Seemax For You e lo porta a un livello completamente nuovo. Niente più reindirizzamenti esterni, navigazioni eccessive o perdite di tempo: ora hai tutto a portata di click o di tocco.\n\nCrea preventivi, controlla le giacenze direttamente nel calcolatore, registra clienti e pratiche, gestisci i documenti e monitora il tuo lavoro da un unico ambiente.";
+}
+
+function writePatchContentBatch_(notes, items) {
+  var notesSheet = sheet_("PATCH_NOTES");
+  var noteRows = ["version", "label", "title", "intro", "footer"].map(function (key) { return [key, notes[key] || ""]; });
+  var noteLastRow = notesSheet.getLastRow();
+  if (noteLastRow > 1) notesSheet.getRange(2, 1, noteLastRow - 1, Math.max(2, notesSheet.getLastColumn())).clearContent();
+  if (noteRows.length) notesSheet.getRange(2, 1, noteRows.length, 2).setValues(noteRows);
+  invalidateTable_("PATCH_NOTES");
+
+  var itemsSheet = sheet_("PATCH_ITEMS");
+  var itemLastRow = itemsSheet.getLastRow();
+  if (itemLastRow > 1) itemsSheet.getRange(2, 1, itemLastRow - 1, Math.max(4, itemsSheet.getLastColumn())).clearContent();
+  if (items.length) {
+    itemsSheet.getRange(2, 1, items.length, 4).setValues(items.map(function (item) {
+      return [item.emoji, item.title, item.text, item.attivo];
+    }));
+  }
+  invalidateTable_("PATCH_ITEMS");
 }
 
 function listEntity_(entity, user) {
@@ -2912,6 +3050,12 @@ function seedSettings_() {
     obiettivo_fatturato: 500000,
     beta_test_attiva: "SI",
     beta_sblocca_trofei: "SI",
+    welcome_enabled: "SI",
+    welcome_kicker: "IL TUO NUOVO CENTRO OPERATIVO",
+    welcome_title: "BENVENUTO IN SEEMAX MANAGEMENT SUITE!",
+    welcome_message: defaultWelcomeMessage_(),
+    welcome_primary_button: "Spiegami tutto",
+    admin_content_revision: 0,
     req_acquisto_destinatario_ordine: "SI",
     req_acquisto_clientid: "SI",
     req_acquisto_valore: "SI",
@@ -2983,9 +3127,9 @@ function seedSettings_() {
 function seedPatchNotes_() {
   if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
   var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.14.1"], ["title", "Conferma salvataggi senza attese artificiali"],
-    ["intro", "La risposta POST attraversa correttamente l'iframe di Apps Script e raggiunge subito GitHub Pages."],
-    ["footer", "Se il browser blocca il messaggio diretto, il controllo di sicurezza parte dopo pochi secondi invece di attendere 22 secondi."]
+    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.14.2"], ["title", "Comunicazioni amministrative e conferma anticipata"],
+    ["intro", "L'amministratore può personalizzare benvenuto e patch notes dalla sezione Impostazioni."],
+    ["footer", "La conferma del salvataggio parte in parallelo alla risposta iframe per ridurre l'attesa residua."]
   ];
   sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
 }
@@ -3088,6 +3232,19 @@ function updatePatchNotesV2141_() {
     title: "Conferma salvataggi senza attese artificiali",
     intro: "La risposta delle mutazioni POST può attraversare l'iframe di Apps Script e raggiungere direttamente GitHub Pages.",
     footer: "Il fallback di conferma parte dopo 2,6 secondi e la diagnostica indica se il risultato è arrivato via postMessage o tramite controllo di stato."
+  };
+  Object.keys(notes).forEach(function (key) {
+    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
+  });
+}
+
+function updatePatchNotesV2142_() {
+  var notes = {
+    version: SEEMAX_VERSION,
+    label: "SEEMAX MANAGEMENT SUITE 2.14.2",
+    title: "Comunicazioni amministrative ripristinate",
+    intro: "L'amministratore può nuovamente personalizzare il messaggio di benvenuto e le patch notes dalla sezione Impostazioni.",
+    footer: "La conferma del salvataggio parte in parallelo alla risposta iframe e riduce ulteriormente l'attesa quando postMessage non è disponibile."
   };
   Object.keys(notes).forEach(function (key) {
     upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });

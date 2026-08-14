@@ -369,6 +369,165 @@
     return settingEnabled("beta_sblocca_trofei", !!(config.betaTest && config.betaTest.unlockAllTrophies));
   }
 
+
+  function welcomeContentSettings() {
+    const settings = (state.data && state.data.settings) || {};
+    const adminContent = (state.data && state.data.adminContent) || {};
+    const welcome = adminContent.welcome || {};
+    return {
+      enabled: String(welcome.enabled || settings.welcome_enabled || "SI").trim().toUpperCase() !== "NO",
+      kicker: String(welcome.kicker || settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO").trim(),
+      title: String(welcome.title || settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!").trim(),
+      message: String(welcome.message || settings.welcome_message || "Seemax Management Suite raccoglie clienti, pratiche, preventivi e documenti in un unico ambiente.").trim(),
+      primaryButton: String(welcome.primary_button || settings.welcome_primary_button || "Spiegami tutto").trim()
+    };
+  }
+
+  function welcomeMessageMarkup(message) {
+    const paragraphs = String(message || "").split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+    return (paragraphs.length ? paragraphs : [""]).map((paragraph) => `<p>${esc(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
+  }
+
+  function adminContentState() {
+    const settings = (state.data && state.data.settings) || {};
+    const source = (state.data && state.data.adminContent) || {};
+    const welcome = source.welcome || {};
+    const patch = source.patchNotes || {};
+    return {
+      revision: Number(source.revision || settings.admin_content_revision || 0),
+      welcome: {
+        enabled: String(welcome.enabled || settings.welcome_enabled || "SI").toUpperCase() === "NO" ? "NO" : "SI",
+        kicker: String(welcome.kicker || settings.welcome_kicker || "IL TUO NUOVO CENTRO OPERATIVO"),
+        title: String(welcome.title || settings.welcome_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE!"),
+        message: String(welcome.message || settings.welcome_message || ""),
+        primary_button: String(welcome.primary_button || settings.welcome_primary_button || "Spiegami tutto")
+      },
+      patchNotes: {
+        version: String(patch.version || config.version || ""),
+        label: String(patch.label || `SEEMAX MANAGEMENT SUITE ${config.version || ""}`),
+        title: String(patch.title || "Aggiornamento"),
+        intro: String(patch.intro || ""),
+        footer: String(patch.footer || ""),
+        items: Array.isArray(patch.items) ? patch.items : []
+      }
+    };
+  }
+
+  function patchItemEditorMarkup(item = {}, index = 0, token = "") {
+    const key = token || `patch-${index}-${Date.now().toString(36)}`;
+    const active = String(item.attivo || item.active || "SI").toUpperCase() !== "NO";
+    return `<article class="patch-item-editor" data-patch-item="${esc(key)}">
+      <header><div><span class="section-kicker">Voce patch notes</span><strong data-patch-number>Novità ${index + 1}</strong></div><button class="icon-btn danger" type="button" data-action="remove-patch-item" data-id="${esc(key)}" aria-label="Rimuovi voce">×</button></header>
+      <div class="patch-item-grid">
+        <label>Emoji<input data-patch-field="emoji" value="${esc(item.emoji || "✨")}" maxlength="16" inputmode="text"></label>
+        <label class="patch-active-control"><span>Visibile</span><input data-patch-field="attivo" type="checkbox" ${active ? "checked" : ""}></label>
+        <label class="full">Titolo<input data-patch-field="title" value="${esc(item.title || "")}" maxlength="180" placeholder="Titolo della novità"></label>
+        <label class="full">Descrizione<textarea data-patch-field="text" maxlength="900" rows="4" placeholder="Spiega cosa è cambiato">${esc(item.text || "")}</textarea></label>
+      </div>
+    </article>`;
+  }
+
+  function refreshPatchItemEditorState() {
+    const editor = $("patchItemsEditor");
+    if (!editor) return;
+    const cards = Array.from(editor.querySelectorAll("[data-patch-item]"));
+    cards.forEach((card, index) => {
+      const label = card.querySelector("[data-patch-number]");
+      if (label) label.textContent = `Novità ${index + 1}`;
+    });
+    const empty = editor.querySelector("[data-patch-empty]");
+    if (empty) empty.hidden = cards.length > 0;
+    const addButton = document.querySelector("#adminContentForm [data-action='add-patch-item']");
+    if (addButton) {
+      addButton.disabled = cards.length >= 12;
+      addButton.title = cards.length >= 12 ? "È possibile pubblicare al massimo 12 voci." : "";
+    }
+  }
+
+  function addPatchItemEditor() {
+    const editor = $("patchItemsEditor");
+    if (!editor) return;
+    const count = editor.querySelectorAll("[data-patch-item]").length;
+    if (count >= 12) { toast("Puoi pubblicare al massimo 12 voci nelle patch notes.", "danger"); return; }
+    const token = `patch-new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const empty = editor.querySelector("[data-patch-empty]");
+    if (empty) empty.insertAdjacentHTML("beforebegin", patchItemEditorMarkup({}, count, token));
+    else editor.insertAdjacentHTML("beforeend", patchItemEditorMarkup({}, count, token));
+    refreshPatchItemEditorState();
+    const added = Array.from(editor.querySelectorAll("[data-patch-item]")).find((card) => card.dataset.patchItem === token);
+    added?.querySelector("input")?.focus();
+  }
+
+  function removePatchItemEditor(id) {
+    const editor = $("patchItemsEditor");
+    if (!editor) return;
+    const target = Array.from(editor.querySelectorAll("[data-patch-item]")).find((card) => String(card.dataset.patchItem || "") === String(id || ""));
+    if (target) target.remove();
+    refreshPatchItemEditorState();
+  }
+
+  function collectAdminContentForm(form) {
+    const field = (name) => String((form.elements[name] && form.elements[name].value) || "").trim();
+    const items = Array.from(form.querySelectorAll("[data-patch-item]")).map((card) => {
+      const value = (name) => String((card.querySelector(`[data-patch-field="${name}"]`) || {}).value || "").trim();
+      const active = card.querySelector('[data-patch-field="attivo"]');
+      return { emoji: value("emoji") || "✨", title: value("title"), text: value("text"), attivo: active && active.checked ? "SI" : "NO" };
+    }).filter((item) => item.title || item.text);
+    return {
+      expected_revision: Number(form.dataset.revision || 0),
+      welcome: {
+        enabled: form.elements.welcome_enabled && form.elements.welcome_enabled.checked ? "SI" : "NO",
+        kicker: field("welcome_kicker"),
+        title: field("welcome_title"),
+        message: field("welcome_message"),
+        primary_button: field("welcome_primary_button")
+      },
+      patchNotes: {
+        version: field("patch_version"),
+        label: field("patch_label"),
+        title: field("patch_title"),
+        intro: field("patch_intro"),
+        footer: field("patch_footer"),
+        items
+      }
+    };
+  }
+
+  function renderAdminContentSettings() {
+    const content = adminContentState();
+    const welcome = content.welcome;
+    const patch = content.patchNotes;
+    const itemMarkup = patch.items.map((item, index) => patchItemEditorMarkup(item, index, `patch-${index}`)).join("");
+    const fastMode = api.isFastMode();
+    return `<form id="adminContentForm" data-revision="${esc(content.revision)}"><div class="settings-grid admin-content-settings-grid"><section class="panel span-2 admin-content-panel">
+      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Benvenuto e patch notes</h3><p>Personalizza il messaggio mostrato al primo accesso e le novità pubblicate nel Quotation Planner.</p></div>${badge(`REV. ${content.revision}`)}</div>
+      <div class="admin-content-grid">
+        <section class="admin-content-card">
+          <div class="admin-content-card-head"><div><span class="section-kicker">Primo accesso</span><h4>Messaggio di benvenuto</h4></div><label class="admin-enabled-toggle"><input name="welcome_enabled" type="checkbox" ${welcome.enabled !== "NO" ? "checked" : ""}><span>Attivo</span></label></div>
+          <div class="form-grid">
+            <label class="full">Sovratitolo<input name="welcome_kicker" value="${esc(welcome.kicker)}" maxlength="100" required></label>
+            <label class="full">Titolo<input name="welcome_title" value="${esc(welcome.title)}" maxlength="180" required></label>
+            <label class="full">Messaggio<textarea name="welcome_message" rows="8" maxlength="3500" required>${esc(welcome.message)}</textarea><small>Lascia una riga vuota per creare un nuovo paragrafo.</small></label>
+            <label class="full">Testo pulsante principale<input name="welcome_primary_button" value="${esc(welcome.primary_button)}" maxlength="70" required></label>
+          </div>
+        </section>
+        <section class="admin-content-card">
+          <div class="admin-content-card-head"><div><span class="section-kicker">Quotation Planner</span><h4>Intestazione patch notes</h4></div></div>
+          <div class="form-grid">
+            <label>Versione<input name="patch_version" value="${esc(patch.version)}" maxlength="120" required><small>Modificala per mostrare nuovamente l’avviso sui dispositivi.</small></label>
+            <label>Etichetta<input name="patch_label" value="${esc(patch.label)}" maxlength="160" required></label>
+            <label class="full">Titolo<input name="patch_title" value="${esc(patch.title)}" maxlength="220" required></label>
+            <label class="full">Introduzione<textarea name="patch_intro" rows="5" maxlength="1600">${esc(patch.intro)}</textarea></label>
+            <label class="full">Testo finale<textarea name="patch_footer" rows="4" maxlength="1600">${esc(patch.footer)}</textarea></label>
+          </div>
+        </section>
+      </div>
+      <div class="patch-items-toolbar"><div><span class="section-kicker">Contenuto</span><h4>Voci delle patch notes</h4><p>Le voci disattivate restano salvate ma non vengono mostrate nel Planner.</p></div><button class="btn soft" type="button" data-action="add-patch-item">+ Aggiungi voce</button></div>
+      <div id="patchItemsEditor" class="patch-items-editor">${itemMarkup}<p class="patch-items-empty" data-patch-empty ${patch.items.length ? "hidden" : ""}>Non ci sono voci. Puoi pubblicare soltanto titolo e introduzione oppure aggiungere fino a 12 novità.</p></div>
+      <div class="admin-content-save-row"><p>${fastMode ? "Passa alla Modalità Standard per salvare questi contenuti nel database condiviso." : "Il salvataggio aggiorna i fogli IMPOSTAZIONI, PATCH_NOTES e PATCH_ITEMS."}</p><button class="btn primary" type="submit" ${fastMode ? "disabled" : ""}>Salva benvenuto e patch notes</button></div>
+    </section></div></form>`;
+  }
+
   function tutorialSteps() {
     const steps = [
       { chapter: "Per iniziare", route: "dashboard", selector: ".topbar", title: "La barra principale", text: "Da qui puoi cercare informazioni, cambiare modalità di lavoro, creare una pratica, consultare le notifiche e aprire il tuo profilo." },
@@ -403,15 +562,17 @@
     if (api.isAdmin()) steps.push(
       { chapter: "Amministrazione", route: "users", selector: ".view-toolbar", title: "Agenti e accessi", text: "Crea e gestisci gli account, assegna i ruoli e attiva o disattiva l'accesso degli utenti." },
       { chapter: "Amministrazione", selector: ".panel", title: "Elenco degli account", text: "Consulta username, contatti, ruolo e stato di ogni agente. Le modifiche sono riservate agli amministratori." },
-      { chapter: "Amministrazione", route: "settings", selector: ".settings-grid", title: "Impostazioni generali", text: "Configura obiettivo di fatturato, parametri aziendali, collegamento e obbligatorietà dei campi delle diverse pratiche." }
+      { chapter: "Amministrazione", route: "settings", selector: ".settings-grid", title: "Impostazioni generali", text: "Configura parametri aziendali, obbligatorietà dei campi, messaggio di benvenuto e patch notes del Quotation Planner." }
     );
     steps.push({ chapter: "Hai concluso", route: "dashboard", selector: "#tutorialButton", title: "Il tutorial rimane sempre disponibile", text: "Puoi riaprire questa guida in qualsiasi momento tramite il piccolo pulsante Tutorial nella barra superiore. Buon lavoro con Seemax Management Suite!" });
     return steps;
   }
 
   function showTutorialWelcome() {
+    const welcome = welcomeContentSettings();
+    if (!welcome.enabled) return;
     if (api.consumeFirstAccess) api.consumeFirstAccess();
-    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>IL TUO NUOVO CENTRO OPERATIVO</span><h3>BENVENUTO IN SEEMAX MANAGEMENT SUITE!</h3><p>Seemax Management Suite raccoglie tutto ciò che conoscevi di Seemax For You e lo porta a un livello completamente nuovo. Niente più reindirizzamenti esterni, navigazioni eccessive o perdite di tempo: ora hai tutto a portata di click o di tocco.</p><p>Crea preventivi, controlla le giacenze direttamente nel calcolatore, registra clienti e pratiche, gestisci i documenti e monitora il tuo lavoro da un unico ambiente.</p><div class="form-actions"><button class="btn ghost" data-action="disable-tutorial">Disattiva tutorial</button><button class="btn primary" data-action="start-tutorial">Spiegami tutto</button></div></div>`;
+    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>${esc(welcome.kicker)}</span><h3>${esc(welcome.title)}</h3>${welcomeMessageMarkup(welcome.message)}<div class="form-actions"><button class="btn ghost" data-action="disable-tutorial">Disattiva tutorial</button><button class="btn primary" data-action="start-tutorial">${esc(welcome.primaryButton)}</button></div></div>`;
     openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
   }
 
@@ -456,7 +617,7 @@
   }
 
   function scheduleFirstAccessExperience() {
-    pendingFirstAccessTutorial = api.isFirstAccess ? api.isFirstAccess() : false;
+    pendingFirstAccessTutorial = (api.isFirstAccess ? api.isFirstAccess() : false) && welcomeContentSettings().enabled;
     pendingBetaWelcome = betaTestActive();
     setTimeout(() => {
       if (showMonthlyAwardIfNeeded()) return;
@@ -1232,7 +1393,8 @@
       const checked = String(s[settingKey] || "NO").toUpperCase() === "SI";
       return `<label><input type="hidden" name="${esc(settingKey)}" value="NO"><input type="checkbox" name="${esc(settingKey)}" value="SI" ${checked ? "checked" : ""}><span><strong>${esc(label)}</strong><small>${checked ? "Attualmente obbligatorio" : "Attualmente facoltativo"}</small></span></label>`;
     }).join("")}</div></fieldset>`).join("");
-    return `<form id="settingsForm"><div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono sempre memorizzate sul dispositivo e non rallentano il database. In Modalità Rapida le altre modifiche vengono accodate fino a “SALVA TUTTO”.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Le stesse impostazioni sono modificabili nella configurazione del database usando SI oppure NO.</p></div></div><div class="required-settings-grid">${requirements}</div><div class="form-actions"><button class="btn primary" type="submit">Salva tutte le impostazioni</button></div></section></div></form>`;
+    const generalSettings = `<form id="settingsForm"><div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono sempre memorizzate sul dispositivo e non rallentano il database. In Modalità Rapida le altre modifiche vengono accodate fino a “SALVA TUTTO”.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel span-2"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Le stesse impostazioni sono modificabili nella configurazione del database usando SI oppure NO.</p></div></div><div class="required-settings-grid">${requirements}</div><div class="form-actions"><button class="btn primary" type="submit">Salva tutte le impostazioni</button></div></section></div></form>`;
+    return `<div class="settings-page-stack">${generalSettings}${renderAdminContentSettings()}</div>`;
   }
 
   function filterRows(rows, fields) {
@@ -2556,6 +2718,8 @@
       },
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
+      "add-patch-item": addPatchItemEditor,
+      "remove-patch-item": () => removePatchItemEditor(id),
       "close-modal": closeModal,
       "toggle-login-password": toggleLoginPassword,
       "open-notifications": openNotifications,
@@ -2799,6 +2963,35 @@
       return;
     }
     if (event.target.matches(".entity-form")) { event.preventDefault(); await saveEntity(event.target); return; }
+    if (event.target.id === "adminContentForm") {
+      event.preventDefault();
+      const form = event.target;
+      const payload = collectAdminContentForm(form);
+      setLoading(true, "Salvataggio comunicazioni…");
+      try {
+        const saved = await api.saveAdminContent(payload);
+        state.data.adminContent = saved || payload;
+        const welcome = (saved && saved.welcome) || payload.welcome;
+        state.data.settings = {
+          ...(state.data.settings || {}),
+          welcome_enabled: welcome.enabled,
+          welcome_kicker: welcome.kicker,
+          welcome_title: welcome.title,
+          welcome_message: welcome.message,
+          welcome_primary_button: welcome.primary_button,
+          admin_content_revision: Number((saved && saved.revision) || payload.expected_revision + 1)
+        };
+        scheduleBootstrapCache();
+        renderRoute();
+        toast("Messaggio di benvenuto e patch notes salvati.");
+      } catch (error) {
+        if (String(error.message || "").includes("CONFLICT_RECORD")) {
+          toast("Le comunicazioni sono state modificate da un altro amministratore. Ricarico i dati aggiornati.", "danger");
+          try { await loadAll(false, { force: true }); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
+        } else toast(error.message, "danger");
+      } finally { setLoading(false); }
+      return;
+    }
     if (event.target.id === "settingsForm") {
       event.preventDefault();
       try {
