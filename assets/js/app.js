@@ -14,8 +14,10 @@
   let clientToolsPromise = null;
   const uploadState = { batches: new Map(), expanded: false };
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
-  let pendingWelcomeMessage = false;
-  let pendingPatchNotesMessage = false;
+  let pendingFirstAccessTutorial = false;
+  let pendingManagedWelcome = false;
+  let pendingManagedPatchNotes = false;
+  let activeAnnouncement = null;
   let profileBoardDraft = [];
 
   const NAV = [
@@ -361,421 +363,12 @@
     return !!fallback;
   }
 
+  function betaTestActive() {
+    return settingEnabled("beta_test_attiva", !!(config.betaTest && config.betaTest.enabled));
+  }
+
   function betaTrophiesUnlocked() {
     return settingEnabled("beta_sblocca_trofei", !!(config.betaTest && config.betaTest.unlockAllTrophies));
-  }
-
-
-  const MESSAGE_SEEN_STORAGE_PREFIX = "SEEMAX_MESSAGE_SEEN_V1_";
-  const BETA_WELCOME_DEFAULTS = Object.freeze({
-    modalTitle: "Benvenuto nella Beta",
-    modalSubtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova",
-    badge: "SEEMAX MANAGEMENT SUITE · VERSIONE BETA",
-    title: "BENVENUTO NELLA FASE DI TEST",
-    message: "Stai utilizzando Seemax Management Suite in modalità di prova. Il sistema entra ora nella sua fase di test operativo e resterà accessibile nei prossimi giorni per permetterti di conoscerlo e metterlo alla prova.",
-    featureOneTitle: "Esplora il tuo nuovo spazio di lavoro",
-    featureOneMessage: "Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.",
-    featureTwoTitle: "Personalizza profilo e bacheca",
-    featureTwoMessage: "Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.",
-    warningTitle: "Ambiente di prova",
-    warningMessage: "I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in Seemax For You verranno invece importati in Seemax Management Suite.",
-    feedbackMessage: "Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da PC sia da smartphone. Il tuo feedback ci aiuterà a plasmare la versione finale.",
-    primaryButton: "🚀 Inizia a esplorare"
-  });
-
-  function normalizeMessageDisplayMode(value) {
-    const mode = String(value || "ONCE").trim().toUpperCase().replace(/[\s-]+/g, "_");
-    return ["ALWAYS", "SEMPRE", "OGNI_APERTURA"].includes(mode) ? "ALWAYS" : "ONCE";
-  }
-
-  function messageEnabled(value, fallback = true) {
-    if (value === undefined || value === null || value === "") return !!fallback;
-    return String(value).trim().toUpperCase() !== "NO";
-  }
-
-  function contentText(source, property, settings, settingKey, fallback = "") {
-    if (source && source[property] !== undefined && source[property] !== null) return String(source[property]).trim();
-    if (settings && settings[settingKey] !== undefined && settings[settingKey] !== null) return String(settings[settingKey]).trim();
-    return String(fallback || "").trim();
-  }
-
-  function welcomeContentSettings() {
-    const settings = (state.data && state.data.settings) || {};
-    const adminContent = (state.data && state.data.adminContent) || {};
-    const welcome = adminContent.welcome || {};
-    return {
-      enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_message_enabled, true),
-      displayMode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_message_frequency || "ONCE"),
-      publicationKey: String(welcome.publication_key || settings.welcome_message_publication_key || `welcome-${config.version}`),
-      publicationRevision: Math.max(1, Number(welcome.publication_revision || settings.welcome_message_revision || 1)),
-      publishedAt: String(welcome.published_at || settings.welcome_message_published_at || ""),
-      publishedBy: String(welcome.published_by || settings.welcome_message_published_by || ""),
-      modalTitle: contentText(welcome, "modal_title", settings, "welcome_message_modal_title", BETA_WELCOME_DEFAULTS.modalTitle),
-      modalSubtitle: contentText(welcome, "modal_subtitle", settings, "welcome_message_modal_subtitle", BETA_WELCOME_DEFAULTS.modalSubtitle),
-      badge: contentText(welcome, "badge", settings, "welcome_message_badge", BETA_WELCOME_DEFAULTS.badge),
-      title: contentText(welcome, "title", settings, "welcome_message_title", BETA_WELCOME_DEFAULTS.title),
-      message: contentText(welcome, "message", settings, "welcome_message_body", BETA_WELCOME_DEFAULTS.message),
-      featureOneTitle: contentText(welcome, "feature_one_title", settings, "welcome_message_feature_1_title", BETA_WELCOME_DEFAULTS.featureOneTitle),
-      featureOneMessage: contentText(welcome, "feature_one_message", settings, "welcome_message_feature_1_body", BETA_WELCOME_DEFAULTS.featureOneMessage),
-      featureTwoTitle: contentText(welcome, "feature_two_title", settings, "welcome_message_feature_2_title", BETA_WELCOME_DEFAULTS.featureTwoTitle),
-      featureTwoMessage: contentText(welcome, "feature_two_message", settings, "welcome_message_feature_2_body", BETA_WELCOME_DEFAULTS.featureTwoMessage),
-      warningTitle: contentText(welcome, "warning_title", settings, "welcome_message_warning_title", BETA_WELCOME_DEFAULTS.warningTitle),
-      warningMessage: contentText(welcome, "warning_message", settings, "welcome_message_warning_body", BETA_WELCOME_DEFAULTS.warningMessage),
-      feedbackMessage: contentText(welcome, "feedback_message", settings, "welcome_message_feedback_body", BETA_WELCOME_DEFAULTS.feedbackMessage),
-      primaryButton: contentText(welcome, "primary_button", settings, "welcome_message_button", BETA_WELCOME_DEFAULTS.primaryButton)
-    };
-  }
-
-  function patchNotesContentSettings() {
-    const adminContent = (state.data && state.data.adminContent) || {};
-    const source = (state.data && state.data.patchNotes) || adminContent.patchNotes || {};
-    return {
-      enabled: messageEnabled(source.enabled, false),
-      displayMode: normalizeMessageDisplayMode(source.display_mode || "ONCE"),
-      publicationKey: String(source.publication_key || `patch-${source.version || config.version}`),
-      publicationRevision: Math.max(1, Number(source.publication_revision || 1)),
-      publishedAt: String(source.published_at || ""),
-      publishedBy: String(source.published_by || ""),
-      version: String(source.version || config.version || ""),
-      label: String(source.label || "SEEMAX MANAGEMENT SUITE"),
-      title: String(source.title || "Aggiornamento"),
-      intro: String(source.intro || ""),
-      footer: String(source.footer || ""),
-      items: Array.isArray(source.items) ? source.items : []
-    };
-  }
-
-  function messageSeenStorageKey(type) {
-    const user = api.getSession() || {};
-    return `${MESSAGE_SEEN_STORAGE_PREFIX}${String(type || "MESSAGE").toUpperCase()}_${encodeURIComponent(user.username || "anonymous")}`;
-  }
-
-  function messageSeenRevision(type) {
-    const normalized = String(type || "").toUpperCase();
-    const field = normalized === "WELCOME" ? "welcome_seen_revision" : "patch_seen_revision";
-    const dataState = (state.data && state.data.messageState) || {};
-    const user = api.getSession() || {};
-    return Number(dataState[field] !== undefined ? dataState[field] : user[field] || 0);
-  }
-
-  function messageShouldDisplay(type, content) {
-    if (!content || !content.enabled) return false;
-    if (normalizeMessageDisplayMode(content.displayMode) === "ALWAYS") return true;
-    const publicationRevision = Math.max(1, Number(content.publicationRevision || 1));
-    const serverSeenRevision = messageSeenRevision(type);
-    if (serverSeenRevision >= publicationRevision) return false;
-    try {
-      const locallySeen = localStorage.getItem(messageSeenStorageKey(type)) === String(content.publicationKey || "");
-      if (locallySeen) {
-        /* Se una precedente sincronizzazione era fallita, il refresh non
-           riapre il popup sul dispositivo ma ritenta la registrazione account. */
-        if (api.markMessageSeen) api.markMessageSeen(type, content).catch(() => {});
-        return false;
-      }
-      return true;
-    } catch (error) { return true; }
-  }
-
-  function markMessageSeen(type, content) {
-    if (!content || normalizeMessageDisplayMode(content.displayMode) === "ALWAYS") return;
-    const normalized = String(type || "").toUpperCase();
-    const field = normalized === "WELCOME" ? "welcome_seen_revision" : "patch_seen_revision";
-    const revision = Math.max(1, Number(content.publicationRevision || 1));
-    try { localStorage.setItem(messageSeenStorageKey(type), String(content.publicationKey || "")); }
-    catch (error) { /* cache locale facoltativa */ }
-    if (state.data) {
-      state.data.messageState = { ...(state.data.messageState || {}), [field]: Math.max(revision, Number((state.data.messageState || {})[field] || 0)) };
-    }
-    /* La cache locale rende immediata la chiusura; il Foglio AGENTI rende la
-       memoria valida per lo stesso account anche su altri dispositivi. */
-    if (api.markMessageSeen) api.markMessageSeen(normalized, content).catch(() => {});
-  }
-
-  function adminContentState() {
-    const settings = (state.data && state.data.settings) || {};
-    const source = (state.data && state.data.adminContent) || {};
-    const welcome = source.welcome || {};
-    const patch = source.patchNotes || (state.data && state.data.patchNotes) || {};
-    return {
-      revision: Number(source.revision || settings.admin_content_revision || 0),
-      welcome: {
-        enabled: messageEnabled(welcome.enabled !== undefined ? welcome.enabled : settings.welcome_message_enabled, true) ? "SI" : "NO",
-        display_mode: normalizeMessageDisplayMode(welcome.display_mode || settings.welcome_message_frequency || "ONCE"),
-        publication_key: String(welcome.publication_key || settings.welcome_message_publication_key || `welcome-${config.version}`),
-        publication_revision: Math.max(1, Number(welcome.publication_revision || settings.welcome_message_revision || 1)),
-        published_at: String(welcome.published_at || settings.welcome_message_published_at || ""),
-        published_by: String(welcome.published_by || settings.welcome_message_published_by || ""),
-        modal_title: contentText(welcome, "modal_title", settings, "welcome_message_modal_title", BETA_WELCOME_DEFAULTS.modalTitle),
-        modal_subtitle: contentText(welcome, "modal_subtitle", settings, "welcome_message_modal_subtitle", BETA_WELCOME_DEFAULTS.modalSubtitle),
-        badge: contentText(welcome, "badge", settings, "welcome_message_badge", BETA_WELCOME_DEFAULTS.badge),
-        title: contentText(welcome, "title", settings, "welcome_message_title", BETA_WELCOME_DEFAULTS.title),
-        message: contentText(welcome, "message", settings, "welcome_message_body", BETA_WELCOME_DEFAULTS.message),
-        feature_one_title: contentText(welcome, "feature_one_title", settings, "welcome_message_feature_1_title", BETA_WELCOME_DEFAULTS.featureOneTitle),
-        feature_one_message: contentText(welcome, "feature_one_message", settings, "welcome_message_feature_1_body", BETA_WELCOME_DEFAULTS.featureOneMessage),
-        feature_two_title: contentText(welcome, "feature_two_title", settings, "welcome_message_feature_2_title", BETA_WELCOME_DEFAULTS.featureTwoTitle),
-        feature_two_message: contentText(welcome, "feature_two_message", settings, "welcome_message_feature_2_body", BETA_WELCOME_DEFAULTS.featureTwoMessage),
-        warning_title: contentText(welcome, "warning_title", settings, "welcome_message_warning_title", BETA_WELCOME_DEFAULTS.warningTitle),
-        warning_message: contentText(welcome, "warning_message", settings, "welcome_message_warning_body", BETA_WELCOME_DEFAULTS.warningMessage),
-        feedback_message: contentText(welcome, "feedback_message", settings, "welcome_message_feedback_body", BETA_WELCOME_DEFAULTS.feedbackMessage),
-        primary_button: contentText(welcome, "primary_button", settings, "welcome_message_button", BETA_WELCOME_DEFAULTS.primaryButton)
-      },
-      patchNotes: {
-        enabled: messageEnabled(patch.enabled, false) ? "SI" : "NO",
-        display_mode: normalizeMessageDisplayMode(patch.display_mode || "ONCE"),
-        publication_key: String(patch.publication_key || `patch-${patch.version || config.version}`),
-        publication_revision: Math.max(1, Number(patch.publication_revision || 1)),
-        published_at: String(patch.published_at || ""),
-        published_by: String(patch.published_by || ""),
-        version: String(patch.version || config.version || ""),
-        label: String(patch.label || "SEEMAX MANAGEMENT SUITE"),
-        title: String(patch.title || "Aggiornamento"),
-        intro: String(patch.intro || ""),
-        footer: String(patch.footer || ""),
-        items: Array.isArray(patch.items) ? patch.items : []
-      }
-    };
-  }
-
-  function patchItemEditorMarkup(item = {}, index = 0, token = "") {
-    const key = token || `patch-${index}-${Date.now().toString(36)}`;
-    const active = String(item.attivo || item.active || "SI").toUpperCase() !== "NO";
-    return `<article class="patch-item-editor" data-patch-item="${esc(key)}">
-      <header><div><span class="section-kicker">Voce patch notes</span><strong data-patch-number>Novità ${index + 1}</strong></div><button class="icon-btn danger" type="button" data-action="remove-patch-item" data-id="${esc(key)}" aria-label="Rimuovi voce">×</button></header>
-      <div class="patch-item-grid">
-        <label>Emoji<input data-patch-field="emoji" value="${esc(item.emoji || "✨")}" maxlength="16" inputmode="text"></label>
-        <label class="patch-active-control"><span>Visibile</span><input data-patch-field="attivo" type="checkbox" ${active ? "checked" : ""}></label>
-        <label class="full">Titolo<input data-patch-field="title" value="${esc(item.title || "")}" maxlength="180" placeholder="Titolo della novità"></label>
-        <label class="full">Descrizione<textarea data-patch-field="text" maxlength="900" rows="4" placeholder="Spiega cosa è cambiato">${esc(item.text || "")}</textarea></label>
-      </div>
-    </article>`;
-  }
-
-  function refreshPatchItemEditorState() {
-    const editor = $("patchItemsEditor");
-    if (!editor) return;
-    const cards = Array.from(editor.querySelectorAll("[data-patch-item]"));
-    cards.forEach((card, index) => {
-      const label = card.querySelector("[data-patch-number]");
-      if (label) label.textContent = `Novità ${index + 1}`;
-    });
-    const empty = editor.querySelector("[data-patch-empty]");
-    if (empty) empty.hidden = cards.length > 0;
-    const addButton = document.querySelector("#patchNotesForm [data-action='add-patch-item']");
-    if (addButton) {
-      addButton.disabled = cards.length >= 12;
-      addButton.title = cards.length >= 12 ? "È possibile pubblicare al massimo 12 voci." : "";
-    }
-  }
-
-  function addPatchItemEditor() {
-    const editor = $("patchItemsEditor");
-    if (!editor) return;
-    const count = editor.querySelectorAll("[data-patch-item]").length;
-    if (count >= 12) { toast("Puoi pubblicare al massimo 12 voci nelle patch notes.", "danger"); return; }
-    const token = `patch-new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const empty = editor.querySelector("[data-patch-empty]");
-    if (empty) empty.insertAdjacentHTML("beforebegin", patchItemEditorMarkup({}, count, token));
-    else editor.insertAdjacentHTML("beforeend", patchItemEditorMarkup({}, count, token));
-    refreshPatchItemEditorState();
-    const added = Array.from(editor.querySelectorAll("[data-patch-item]")).find((card) => card.dataset.patchItem === token);
-    added?.querySelector("input")?.focus();
-  }
-
-  function removePatchItemEditor(id) {
-    const editor = $("patchItemsEditor");
-    if (!editor) return;
-    const target = Array.from(editor.querySelectorAll("[data-patch-item]")).find((card) => String(card.dataset.patchItem || "") === String(id || ""));
-    if (target) target.remove();
-    refreshPatchItemEditorState();
-  }
-
-  function collectWelcomeMessageForm(form) {
-    const field = (name) => String((form.elements[name] && form.elements[name].value) || "").trim();
-    return {
-      expected_revision: Number(form.dataset.revision || 0),
-      section: "WELCOME",
-      welcome: {
-        enabled: form.elements.welcome_enabled && form.elements.welcome_enabled.checked ? "SI" : "NO",
-        display_mode: field("welcome_display_mode") || "ONCE",
-        modal_title: field("welcome_modal_title"),
-        modal_subtitle: field("welcome_modal_subtitle"),
-        badge: field("welcome_badge"),
-        title: field("welcome_title"),
-        message: field("welcome_message"),
-        feature_one_title: field("welcome_feature_one_title"),
-        feature_one_message: field("welcome_feature_one_message"),
-        feature_two_title: field("welcome_feature_two_title"),
-        feature_two_message: field("welcome_feature_two_message"),
-        warning_title: field("welcome_warning_title"),
-        warning_message: field("welcome_warning_message"),
-        feedback_message: field("welcome_feedback_message"),
-        primary_button: field("welcome_primary_button")
-      }
-    };
-  }
-
-  function collectPatchNotesForm(form) {
-    const field = (name) => String((form.elements[name] && form.elements[name].value) || "").trim();
-    const items = Array.from(form.querySelectorAll("[data-patch-item]")).map((card) => {
-      const value = (name) => String((card.querySelector(`[data-patch-field="${name}"]`) || {}).value || "").trim();
-      const active = card.querySelector('[data-patch-field="attivo"]');
-      return { emoji: value("emoji") || "✨", title: value("title"), text: value("text"), attivo: active && active.checked ? "SI" : "NO" };
-    }).filter((item) => item.title || item.text);
-    return {
-      expected_revision: Number(form.dataset.revision || 0),
-      section: "PATCH_NOTES",
-      patchNotes: {
-        enabled: form.elements.patch_enabled && form.elements.patch_enabled.checked ? "SI" : "NO",
-        display_mode: field("patch_display_mode") || "ONCE",
-        version: field("patch_version"),
-        label: field("patch_label"),
-        title: field("patch_title"),
-        intro: field("patch_intro"),
-        footer: field("patch_footer"),
-        items
-      }
-    };
-  }
-
-  function messagePolicyMarkup(prefix, mode) {
-    const normalized = normalizeMessageDisplayMode(mode);
-    return `<fieldset class="message-policy-fieldset"><legend>Quando deve apparire?</legend><div class="message-policy-grid">
-      <label class="message-mode-card ${normalized === "ONCE" ? "selected" : ""}"><input type="radio" name="${esc(prefix)}_display_mode" value="ONCE" ${normalized === "ONCE" ? "checked" : ""}><span class="message-mode-icon">①</span><span><strong>Solo una volta</strong><small>Ogni account lo vede una sola volta, anche cambiando dispositivo. Ripubblica per mostrarlo nuovamente a tutti.</small></span></label>
-      <label class="message-mode-card ${normalized === "ALWAYS" ? "selected" : ""}"><input type="radio" name="${esc(prefix)}_display_mode" value="ALWAYS" ${normalized === "ALWAYS" ? "checked" : ""}><span class="message-mode-icon">↻</span><span><strong>Sempre</strong><small>Compare a ogni apertura o aggiornamento completo del sistema.</small></span></label>
-    </div></fieldset>`;
-  }
-
-  function publicationStatusMarkup(content) {
-    const date = content.published_at ? new Date(content.published_at) : null;
-    const validDate = date && !Number.isNaN(date.getTime());
-    const published = validDate ? date.toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" }) : "Non ancora ripubblicato";
-    const key = String(content.publication_key || "");
-    const revision = Math.max(1, Number(content.publication_revision || 1));
-    const author = content.published_by ? `da ${esc(content.published_by)}` : "La chiave viene creata al primo salvataggio.";
-    return `<div class="publication-status"><div><span class="publication-status-icon">📣</span><div><small>Pubblicazione corrente</small><strong>${esc(published)}</strong><span>${author} · revisione ${revision}</span></div></div><code title="Chiave di pubblicazione">${esc(key ? key.slice(-22) : "—")}</code></div>`;
-  }
-
-  function communicationActionsMarkup(type, fastMode) {
-    return `<div class="message-editor-actions"><p>${fastMode ? "Passa alla Modalità Standard per modificare le comunicazioni condivise." : "Salva modifica i contenuti senza disturbare chi li ha già letti. Salva e ripubblica crea una nuova pubblicazione visibile a tutti."}</p><div><button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn soft" type="submit" value="save" ${fastMode ? "disabled" : ""}>Salva</button><button class="btn primary" type="submit" value="republish" ${fastMode ? "disabled" : ""}>Salva e ripubblica</button></div></div>`;
-  }
-
-  function renderWelcomeSettingsTab() {
-    const content = adminContentState();
-    const welcome = content.welcome;
-    const fastMode = api.isFastMode();
-    return `<form id="welcomeMessageForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel beta-welcome-editor-panel">
-      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Benvenuto Beta</h3><p>Modifica la finestra grafica “Benvenuto nella Beta” mostrata all’apertura del Management Suite. Non viene più creato un secondo messaggio di benvenuto.</p></div><label class="admin-enabled-toggle"><input name="welcome_enabled" type="checkbox" ${welcome.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
-      ${messagePolicyMarkup("welcome", welcome.display_mode)}
-      ${publicationStatusMarkup(welcome)}
-      <div class="welcome-editor-sections">
-        <section class="welcome-editor-section"><header><span>1</span><div><h4>Testata della finestra</h4><p>Titolo e sottotitolo visualizzati sopra il riquadro blu.</p></div></header><div class="form-grid">
-          <label class="full">Titolo finestra<input name="welcome_modal_title" value="${esc(welcome.modal_title)}" maxlength="120" required></label>
-          <label class="full">Sottotitolo finestra<input name="welcome_modal_subtitle" value="${esc(welcome.modal_subtitle)}" maxlength="260"></label>
-        </div></section>
-        <section class="welcome-editor-section"><header><span>2</span><div><h4>Riquadro principale</h4><p>Contenuto del banner blu nella parte alta del messaggio.</p></div></header><div class="form-grid">
-          <label class="full">Etichetta Beta<input name="welcome_badge" value="${esc(welcome.badge)}" maxlength="160"></label>
-          <label class="full">Titolo principale<input name="welcome_title" value="${esc(welcome.title)}" maxlength="180" required></label>
-          <label class="full">Testo principale<textarea name="welcome_message" rows="6" maxlength="2400" required>${esc(welcome.message)}</textarea><small>Le interruzioni di riga vengono mantenute nell’anteprima.</small></label>
-        </div></section>
-        <section class="welcome-editor-section"><header><span>3</span><div><h4>Schede informative</h4><p>I due riquadri con le icone 🚀 e 🏆. Lascia titolo e testo vuoti per nascondere una scheda.</p></div></header><div class="welcome-editor-two-columns">
-          <div class="welcome-editor-card"><strong>🚀 Prima scheda</strong><label>Titolo<input name="welcome_feature_one_title" value="${esc(welcome.feature_one_title)}" maxlength="160"></label><label>Testo<textarea name="welcome_feature_one_message" rows="6" maxlength="1600">${esc(welcome.feature_one_message)}</textarea></label></div>
-          <div class="welcome-editor-card"><strong>🏆 Seconda scheda</strong><label>Titolo<input name="welcome_feature_two_title" value="${esc(welcome.feature_two_title)}" maxlength="160"></label><label>Testo<textarea name="welcome_feature_two_message" rows="6" maxlength="1600">${esc(welcome.feature_two_message)}</textarea></label></div>
-        </div></section>
-        <section class="welcome-editor-section"><header><span>4</span><div><h4>Avviso e richiesta feedback</h4><p>I riquadri giallo e azzurro visibili nella parte inferiore.</p></div></header><div class="form-grid">
-          <label class="full">Titolo avviso<input name="welcome_warning_title" value="${esc(welcome.warning_title)}" maxlength="120"></label>
-          <label class="full">Testo avviso<textarea name="welcome_warning_message" rows="5" maxlength="1800">${esc(welcome.warning_message)}</textarea></label>
-          <label class="full">Testo feedback<textarea name="welcome_feedback_message" rows="5" maxlength="1800">${esc(welcome.feedback_message)}</textarea></label>
-        </div></section>
-        <section class="welcome-editor-section"><header><span>5</span><div><h4>Pulsante finale</h4><p>Il pulsante chiude il messaggio e consente di iniziare a usare il sistema.</p></div></header><div class="form-grid">
-          <label class="full">Testo pulsante<input name="welcome_primary_button" value="${esc(welcome.primary_button)}" maxlength="70" required></label>
-        </div></section>
-      </div>
-      ${communicationActionsMarkup("welcome", fastMode)}
-    </section></form>`;
-  }
-
-  function renderPatchNotesSettingsTab() {
-    const content = adminContentState();
-    const patch = content.patchNotes;
-    const fastMode = api.isFastMode();
-    const itemMarkup = patch.items.map((item, index) => patchItemEditorMarkup(item, index, `patch-${index}`)).join("");
-    return `<form id="patchNotesForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel">
-      <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Patch notes</h3><p>Pubblica le novità nella schermata iniziale del Management Suite e nel Quotation Planner non integrato.</p></div><label class="admin-enabled-toggle"><input name="patch_enabled" type="checkbox" ${patch.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
-      ${messagePolicyMarkup("patch", patch.display_mode)}
-      ${publicationStatusMarkup(patch)}
-      <div class="admin-content-card patch-heading-card"><div class="form-grid">
-        <label>Versione<input name="patch_version" value="${esc(patch.version)}" maxlength="120" required><small>È descrittiva: la ripubblicazione è gestita dal pulsante dedicato.</small></label>
-        <label>Etichetta<input name="patch_label" value="${esc(patch.label)}" maxlength="160" required></label>
-        <label class="full">Titolo<input name="patch_title" value="${esc(patch.title)}" maxlength="220" required></label>
-        <label class="full">Introduzione<textarea name="patch_intro" rows="5" maxlength="1600">${esc(patch.intro)}</textarea></label>
-        <label class="full">Testo finale<textarea name="patch_footer" rows="4" maxlength="1600">${esc(patch.footer)}</textarea></label>
-      </div></div>
-      <div class="patch-items-toolbar"><div><span class="section-kicker">Contenuto</span><h4>Voci delle patch notes</h4><p>Le voci disattivate restano salvate nell'editor ma non vengono mostrate agli utenti.</p></div><button class="btn soft" type="button" data-action="add-patch-item">+ Aggiungi voce</button></div>
-      <div id="patchItemsEditor" class="patch-items-editor">${itemMarkup}<p class="patch-items-empty" data-patch-empty ${patch.items.length ? "hidden" : ""}>Non ci sono voci. Puoi pubblicare soltanto titolo e introduzione oppure aggiungere fino a 12 novità.</p></div>
-      ${communicationActionsMarkup("patch", fastMode)}
-    </section></form>`;
-  }
-
-  function patchNotesMessageMarkup(patch, options = {}) {
-    const items = (patch.items || []).filter((item) => String(item.attivo || "SI").toUpperCase() !== "NO" && (item.title || item.text));
-    return `<div class="suite-patch-message ${options.preview ? "preview" : ""}"><div class="suite-patch-hero"><span class="suite-patch-icon">🚀</span><div><small>${esc(patch.label || patch.version || "AGGIORNAMENTO")}</small><h3>${esc(patch.title || "Novità Seemax")}</h3>${patch.intro ? `<p>${esc(patch.intro).replace(/\n/g, "<br>")}</p>` : ""}</div></div>${items.length ? `<div class="suite-patch-list">${items.map((item) => `<article><span>${esc(item.emoji || "✨")}</span><div><strong>${esc(item.title || "Aggiornamento")}</strong><p>${esc(item.text || "").replace(/\n/g, "<br>")}</p></div></article>`).join("")}</div>` : ""}${patch.footer ? `<p class="suite-patch-footer">${esc(patch.footer).replace(/\n/g, "<br>")}</p>` : ""}<div class="form-actions"><button class="btn primary" data-action="close-modal">Ho capito</button></div></div>`;
-  }
-
-  function formatCommunicationText(value) {
-    return esc(String(value || "")).replace(/\n/g, "<br>");
-  }
-
-  function betaWelcomeMessageMarkup(welcome, options = {}) {
-    const featureOneVisible = !!(welcome.featureOneTitle || welcome.featureOneMessage);
-    const featureTwoVisible = !!(welcome.featureTwoTitle || welcome.featureTwoMessage);
-    const features = [
-      featureOneVisible ? `<article><span>🚀</span><div>${welcome.featureOneTitle ? `<h4>${esc(welcome.featureOneTitle)}</h4>` : ""}${welcome.featureOneMessage ? `<p>${formatCommunicationText(welcome.featureOneMessage)}</p>` : ""}</div></article>` : "",
-      featureTwoVisible ? `<article><span>🏆</span><div>${welcome.featureTwoTitle ? `<h4>${esc(welcome.featureTwoTitle)}</h4>` : ""}${welcome.featureTwoMessage ? `<p>${formatCommunicationText(welcome.featureTwoMessage)}</p>` : ""}</div></article>` : ""
-    ].filter(Boolean).join("");
-    return `<div class="beta-welcome ${options.preview ? "preview" : ""}">
-      <section class="beta-welcome-hero">
-        <div class="beta-welcome-icon" aria-hidden="true">🧪</div>
-        ${welcome.badge ? `<span class="beta-welcome-pill">${esc(welcome.badge)}</span>` : ""}
-        <h3>${esc(welcome.title || BETA_WELCOME_DEFAULTS.title)}</h3>
-        ${welcome.message ? `<p>${formatCommunicationText(welcome.message)}</p>` : ""}
-      </section>
-      ${features ? `<div class="beta-welcome-grid">${features}</div>` : ""}
-      ${(welcome.warningTitle || welcome.warningMessage) ? `<section class="beta-welcome-warning"><span aria-hidden="true">⚠️</span><div>${welcome.warningTitle ? `<strong>${esc(welcome.warningTitle)}</strong>` : ""}${welcome.warningMessage ? `<p>${formatCommunicationText(welcome.warningMessage)}</p>` : ""}</div></section>` : ""}
-      ${welcome.feedbackMessage ? `<section class="beta-welcome-feedback"><span aria-hidden="true">💬</span><p>${formatCommunicationText(welcome.feedbackMessage)}</p></section>` : ""}
-      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="close-modal">${esc(welcome.primaryButton || BETA_WELCOME_DEFAULTS.primaryButton)}</button></div>
-    </div>`;
-  }
-
-  function welcomePreviewContent(source) {
-    return {
-      modalTitle: String(source.modal_title || BETA_WELCOME_DEFAULTS.modalTitle),
-      modalSubtitle: String(source.modal_subtitle || ""),
-      badge: String(source.badge || ""),
-      title: String(source.title || BETA_WELCOME_DEFAULTS.title),
-      message: String(source.message || ""),
-      featureOneTitle: String(source.feature_one_title || ""),
-      featureOneMessage: String(source.feature_one_message || ""),
-      featureTwoTitle: String(source.feature_two_title || ""),
-      featureTwoMessage: String(source.feature_two_message || ""),
-      warningTitle: String(source.warning_title || ""),
-      warningMessage: String(source.warning_message || ""),
-      feedbackMessage: String(source.feedback_message || ""),
-      primaryButton: String(source.primary_button || BETA_WELCOME_DEFAULTS.primaryButton)
-    };
-  }
-
-  function previewWelcomeMessage() {
-    const form = $("welcomeMessageForm");
-    if (!form) return;
-    const welcome = welcomePreviewContent(collectWelcomeMessageForm(form).welcome);
-    openModal(welcome.modalTitle, betaWelcomeMessageMarkup(welcome, { preview: true }), { wide: true, kicker: "Seemax Management Suite", subtitle: welcome.modalSubtitle, panelClass: "beta-welcome-modal" });
-  }
-
-  function previewPatchNotesMessage() {
-    const form = $("patchNotesForm");
-    if (!form) return;
-    const source = collectPatchNotesForm(form).patchNotes;
-    openModal("Anteprima patch notes", patchNotesMessageMarkup(source, { preview: true }), { wide: true, kicker: "Anteprima amministratore" });
   }
 
   function tutorialSteps() {
@@ -812,47 +405,93 @@
     if (api.isAdmin()) steps.push(
       { chapter: "Amministrazione", route: "users", selector: ".view-toolbar", title: "Agenti e accessi", text: "Crea e gestisci gli account, assegna i ruoli e attiva o disattiva l'accesso degli utenti." },
       { chapter: "Amministrazione", selector: ".panel", title: "Elenco degli account", text: "Consulta username, contatti, ruolo e stato di ogni agente. Le modifiche sono riservate agli amministratori." },
-      { chapter: "Amministrazione", route: "settings", selector: ".admin-settings-tabs", title: "Impostazioni organizzate", text: "Le schede separano dati generali, campi obbligatori, Benvenuto Beta, patch notes e diagnostica del sistema." }
+      { chapter: "Amministrazione", route: "settings", selector: ".settings-grid", title: "Impostazioni generali", text: "Configura obiettivo di fatturato, parametri aziendali, collegamento e obbligatorietà dei campi delle diverse pratiche." }
     );
     steps.push({ chapter: "Hai concluso", route: "dashboard", selector: "#tutorialButton", title: "Il tutorial rimane sempre disponibile", text: "Puoi riaprire questa guida in qualsiasi momento tramite il piccolo pulsante Tutorial nella barra superiore. Buon lavoro con Seemax Management Suite!" });
     return steps;
   }
 
-  function showWelcomeMessage() {
-    const welcome = welcomeContentSettings();
-    if (!messageShouldDisplay("WELCOME", welcome)) return false;
-    openModal(welcome.modalTitle, betaWelcomeMessageMarkup(welcome), { wide: true, kicker: "Seemax Management Suite", subtitle: welcome.modalSubtitle, panelClass: "beta-welcome-modal" });
-    markMessageSeen("WELCOME", welcome);
-    return true;
+  function showTutorialWelcome() {
+    if (api.consumeFirstAccess) api.consumeFirstAccess();
+    const body = `<div class="tutorial-welcome"><div class="tutorial-welcome-icon">✨</div><span>IL TUO NUOVO CENTRO OPERATIVO</span><h3>BENVENUTO IN SEEMAX MANAGEMENT SUITE!</h3><p>Seemax Management Suite raccoglie tutto ciò che conoscevi di Seemax For You e lo porta a un livello completamente nuovo. Niente più reindirizzamenti esterni, navigazioni eccessive o perdite di tempo: ora hai tutto a portata di click o di tocco.</p><p>Crea preventivi, controlla le giacenze direttamente nel calcolatore, registra clienti e pratiche, gestisci i documenti e monitora il tuo lavoro da un unico ambiente.</p><div class="form-actions"><button class="btn ghost" data-action="disable-tutorial">Disattiva tutorial</button><button class="btn primary" data-action="start-tutorial">Spiegami tutto</button></div></div>`;
+    openModal("Benvenuto!", body, { wide: true, kicker: "Seemax Management Suite" });
   }
 
-  function showPatchNotesMessage() {
-    const patch = patchNotesContentSettings();
-    if (!messageShouldDisplay("PATCH_NOTES", patch)) return false;
-    openModal("Novità Seemax", patchNotesMessageMarkup(patch), { wide: true, kicker: patch.version || "Patch notes", panelClass: "suite-patch-modal" });
-    markMessageSeen("PATCH_NOTES", patch);
-    return true;
+  function managedAnnouncement(type) {
+    const settings = (state.data && state.data.settings) || {};
+    const session = api.getSession() || {};
+    const prefix = type === "welcome" ? "welcome_message" : "patch_notes";
+    const enabled = String(settings[`${prefix}_enabled`] || "NO").toUpperCase() === "SI";
+    const frequency = String(settings[`${prefix}_frequency`] || "ONCE").toUpperCase() === "ALWAYS" ? "ALWAYS" : "ONCE";
+    const revision = String(settings[`${prefix}_revision`] || "1");
+    const seen = String(session[type === "welcome" ? "welcome_seen_revision" : "patch_seen_revision"] || "");
+    return { type, prefix, enabled, frequency, revision, seen, shouldShow: enabled && (frequency === "ALWAYS" || seen !== revision) };
   }
 
-  function showNextStartupMessage() {
+  function showManagedWelcome() {
+    const settings = state.data.settings || {};
+    const message = managedAnnouncement("welcome");
+    activeAnnouncement = message;
+    const paragraphs = String(settings.welcome_message_body || "").split(/\n{2,}/).filter(Boolean).map((paragraph) => `<p>${esc(paragraph).replace(/\n/g, "<br>")}</p>`).join("");
+    const body = `<div class="beta-welcome">
+      <section class="beta-welcome-hero">
+        <div class="beta-welcome-icon" aria-hidden="true">📣</div>
+        <span class="beta-welcome-pill">COMUNICAZIONE SEEMAX</span>
+        <h3>${esc(settings.welcome_message_title || "BENVENUTO IN SEEMAX MANAGEMENT SUITE")}</h3>
+        ${paragraphs || "<p>Benvenuto nel tuo spazio di lavoro.</p>"}
+      </section>
+      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="acknowledge-announcement">${esc(settings.welcome_message_button || "Continua")}</button></div>
+    </div>`;
+    openModal(settings.welcome_message_title || "Benvenuto", body, { wide: true, kicker: "Seemax Management Suite", subtitle: message.frequency === "ALWAYS" ? "Messaggio mostrato ad ogni avvio" : "Comunicazione personale", panelClass: "beta-welcome-modal" });
+  }
+
+  function parseManagedPatchItems(value) {
+    return String(value || "").split(/\r?\n/).map((line) => { const parts = line.split("|"); return { emoji: parts.shift() || "✨", title: parts.shift() || "Aggiornamento", text: parts.join("|") }; }).filter((item) => item.title || item.text);
+  }
+
+  function showManagedPatchNotes() {
+    const settings = state.data.settings || {};
+    const message = managedAnnouncement("patch");
+    activeAnnouncement = message;
+    const items = parseManagedPatchItems(settings.patch_notes_items).map((item) => `<article><span>${esc(item.emoji)}</span><div><h4>${esc(item.title)}</h4><p>${esc(item.text)}</p></div></article>`).join("");
+    const body = `<div class="beta-welcome"><section class="beta-welcome-hero"><div class="beta-welcome-icon">✨</div><span class="beta-welcome-pill">${esc(settings.patch_notes_label || "NOVITÀ SEEMAX")}</span><h3>${esc(settings.patch_notes_title || "Aggiornamento")}</h3><p>${esc(settings.patch_notes_intro || "")}</p></section>${items ? `<div class="beta-welcome-grid">${items}</div>` : ""}${settings.patch_notes_footer ? `<section class="beta-welcome-feedback"><span>ℹ️</span><p>${esc(settings.patch_notes_footer)}</p></section>` : ""}<div class="form-actions"><button class="btn primary beta-welcome-start" data-action="acknowledge-announcement">Ho capito</button></div></div>`;
+    openModal(settings.patch_notes_title || "Novità", body, { wide: true, kicker: "Patch Notes", subtitle: message.frequency === "ALWAYS" ? "Mostrate ad ogni avvio" : `Revisione ${message.revision}`, panelClass: "beta-welcome-modal" });
+  }
+
+  function showNextWelcomeMessage() {
     if (tutorialState.active || $("modalRoot").children.length) return false;
-    if (pendingWelcomeMessage) {
-      pendingWelcomeMessage = false;
-      if (showWelcomeMessage()) return true;
+    /* Una nuova revisione delle Patch Notes non deve restare nascosta dietro
+       a un messaggio di benvenuto configurato per apparire a ogni avvio. */
+    if (pendingManagedPatchNotes && managedAnnouncement("welcome").frequency === "ALWAYS") {
+      pendingManagedPatchNotes = false;
+      showManagedPatchNotes();
+      return true;
     }
-    if (pendingPatchNotesMessage) {
-      pendingPatchNotesMessage = false;
-      if (showPatchNotesMessage()) return true;
+    if (pendingManagedWelcome) {
+      pendingManagedWelcome = false;
+      showManagedWelcome();
+      return true;
+    }
+    if (pendingManagedPatchNotes) {
+      pendingManagedPatchNotes = false;
+      showManagedPatchNotes();
+      return true;
+    }
+    if (pendingFirstAccessTutorial) {
+      pendingFirstAccessTutorial = false;
+      showTutorialWelcome();
+      return true;
     }
     return false;
   }
 
-  function scheduleStartupExperience() {
-    pendingWelcomeMessage = messageShouldDisplay("WELCOME", welcomeContentSettings());
-    pendingPatchNotesMessage = messageShouldDisplay("PATCH_NOTES", patchNotesContentSettings());
+  function scheduleFirstAccessExperience() {
+    pendingFirstAccessTutorial = api.isFirstAccess ? api.isFirstAccess() : false;
+    pendingManagedWelcome = managedAnnouncement("welcome").shouldShow;
+    pendingManagedPatchNotes = managedAnnouncement("patch").shouldShow;
     setTimeout(() => {
       if (showMonthlyAwardIfNeeded()) return;
-      showNextStartupMessage();
+      showNextWelcomeMessage();
     }, 350);
   }
 
@@ -872,8 +511,7 @@
     document.body.classList.remove("tutorial-active");
     $("sidebar").classList.remove("open");
     localStorage.setItem(tutorialStorageKey(), JSON.stringify({ status: completed ? "completed" : "interrupted", index: tutorialState.index }));
-    if (completed) { go("dashboard"); toast("Super Tutorial completato. Potrai riaprirlo quando vuoi."); }
-    setTimeout(() => { if (!showMonthlyAwardIfNeeded()) showNextStartupMessage(); }, 500);
+    if (completed) { go("dashboard"); toast("Super Tutorial completato. Potrai riaprirlo quando vuoi."); setTimeout(showMonthlyAwardIfNeeded, 500); }
   }
 
   function showTutorialStep() {
@@ -944,7 +582,7 @@
           toast("Dati locali disponibili. Il database verrà aggiornato al prossimo collegamento.", "warning");
         }
       }
-      scheduleStartupExperience();
+      scheduleFirstAccessExperience();
     } catch (error) {
       if (fallbackCached && String(error.code || "") !== "BACKEND_VERSION_MISMATCH") {
         state.data = fallbackCached;
@@ -954,7 +592,7 @@
         toast(`Database temporaneamente non raggiungibile. Stai visualizzando l'ultima copia locale: ${error.message}`, "warning");
       } else {
         toast(error.message, "danger");
-        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Pubblica Code.gs 2.14.0 come nuova versione del deployment Apps Script, quindi ricarica la pagina." : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
+        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? `Pubblica Code.gs ${config.version} come nuova versione del deployment Apps Script, quindi ricarica la pagina.` : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
       }
     }
   }
@@ -1007,7 +645,6 @@
         clients: state.data.clients || [],
         products: state.data.products || [],
         settings: state.data.settings || {},
-        patchNotes: state.data.patchNotes || {},
         version: config.version,
         fastMode: api.isFastMode()
       });
@@ -1106,7 +743,7 @@
     const award = data && data.award;
     if (!award) { openAgentMonthDetails(); return; }
     const top = award.topPractice || {};
-    const body = `<div class="agent-month-welcome"><div class="agent-month-trophy">🏆</div><span class="agent-month-label">AGENTE DEL MESE</span><h3>${esc(award.agent)}</h3><p class="agent-month-period">Risultato di ${esc(award.label)}</p><div class="agent-month-winning-practice"><small>PRATICA DI MAGGIOR VALORE</small><strong>${esc(top.id || "—")} · ${esc(top.client || "—")}</strong><span>${euros(top.value || 0)}</span></div><div class="agent-month-total"><span>Fatturato totale completato</span><strong>${euros(award.total)}</strong><small>${award.count} ${award.count === 1 ? "pratica completata" : "pratiche completate"}</small></div><div class="form-actions"><button class="btn ghost" data-action="close-modal">Continua</button><button class="btn primary" data-action="agent-month-details">Maggiori dettagli</button></div></div>`;
+    const body = `<div class="agent-month-welcome"><div class="agent-month-trophy">🏆</div><span class="agent-month-label">AGENTE DEL MESE</span><h3>${esc(award.agent)}</h3><p class="agent-month-period">Risultato di ${esc(award.label)}</p><div class="agent-month-winning-practice"><small>PRATICA DI MAGGIOR VALORE</small><strong>${esc(top.id || "—")} · ${esc(top.client || "—")}</strong><span>${euros(top.value || 0)}</span></div><div class="agent-month-total"><span>Fatturato totale completato</span><strong>${euros(award.total)}</strong><small>${award.count} ${award.count === 1 ? "pratica completata" : "pratiche completate"}</small></div><div class="form-actions"><button class="btn ghost" data-action="close-modal-next-welcome">Continua</button><button class="btn primary" data-action="agent-month-details">Maggiori dettagli</button></div></div>`;
     openModal("Benvenuto nel nuovo mese!", body, { wide: true, kicker: "Seemax celebra i risultati" });
   }
 
@@ -1613,57 +1250,27 @@
     return `${viewToolbar("Nuovo agente", "new-user", `<p class="toolbar-note">${rows.filter((u) => u.stato === "ATTIVO").length} account attivi</p>`)}<section class="panel"><div class="table-wrap"><table><thead><tr><th>Agente</th><th>Username</th><th>Contatti</th><th>Ruolo</th><th>Stato</th><th></th></tr></thead><tbody>${rows.map((u) => `<tr><td><div class="agent-cell"><span class="avatar small">${initials(u.nome_visualizzato)}</span><strong>${esc(u.nome_visualizzato)}</strong></div></td><td>${esc(u.username)}</td><td>${esc(u.email || "—")}<small>${esc(u.telefono || "")}</small></td><td>${badge(String(u.ruolo).toUpperCase())}</td><td>${badge(u.stato)}</td><td><button class="table-action" data-action="edit-user" data-id="${esc(u.id || u.username)}">Modifica</button></td></tr>`).join("")}</tbody></table></div></section>`;
   }
 
-  function settingsTabsMarkup() {
-    const tabs = [
-      ["general", "🏢", "Generali", "Azienda e parametri"],
-      ["practices", "📋", "Pratiche", "Campi obbligatori"],
-      ["welcome", "👋", "Benvenuto Beta", "Finestra iniziale"],
-      ["patch", "🚀", "Patch notes", "Novità e release"],
-      ["system", "⚙️", "Sistema", "Database e diagnostica"]
-    ];
-    return `<nav class="admin-settings-tabs" role="tablist" aria-label="Sezioni impostazioni amministrative">${tabs.map(([id, icon, label, sub]) => `<button type="button" role="tab" aria-selected="${state.settingsTab === id ? "true" : "false"}" class="admin-settings-tab ${state.settingsTab === id ? "active" : ""}" data-action="settings-tab" data-id="${id}"><span>${icon}</span><div><strong>${label}</strong><small>${sub}</small></div></button>`).join("")}</nav>`;
-  }
-
-  function renderGeneralSettingsTab() {
+  function renderSettings() {
     const s = state.data ? state.data.settings : {};
-    return `<form id="settingsForm"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3><p>Parametri commerciali condivisi dal Management Suite e dal Quotation Planner.</p></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"><small>Usato dalle barre di avanzamento nella Dashboard.</small></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div><div class="form-actions"><button class="btn primary" type="submit">Salva dati generali</button></div></section></form>`;
-  }
-
-  function practiceRequirementGroups() {
-    return {
+    const status = api.status();
+    const groups = {
       ACQUISTO: [["destinatario_ordine", "Destinatario ordine"], ["clientid", "Cliente (se Per Cliente)"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["installazione_regione", "Regione installazione"], ["installazione_provincia", "Provincia installazione"], ["installazione_comune", "Comune installazione"], ["installazione_cap", "CAP installazione"], ["installazione_localita", "Località installazione"], ["installazione_indirizzo", "Indirizzo installazione"], ["installazione_civico", "Civico installazione"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ["note", "Note installazione"]],
       NOLEGGIO: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.NOLEGGIO],
       LEASING: [["clientid", "Cliente"], ["valore", "Valore pratica"], ["valore_provvigione", "Valore provvigione"], ["numero_rate", "Numero rate"], ["periodicita_pagamento", "Mensilità"], ["indirizzo_installazione_tipo", "Scelta indirizzo installazione"], ["installazione_regione", "Regione alternativa"], ["installazione_provincia", "Provincia alternativa"], ["installazione_comune", "Comune alternativo"], ["installazione_cap", "CAP alternativo"], ["installazione_localita", "Località alternativa"], ["installazione_indirizzo", "Indirizzo alternativo"], ["installazione_civico", "Civico alternativo"], ["gestione_ledwall", "Gestione Ledwall"], ["sim_richiesta", "SIM per traffico rete"], ["predisposizione_elettrica", "Predisposizione elettrica"], ["cloud_username", "Username Cloud"], ["cloud_password", "Password Cloud"], ...PRACTICE_DOCUMENTS.LEASING]
     };
-  }
-
-  function renderPracticeSettingsTab() {
-    const s = state.data ? state.data.settings : {};
-    const requirements = Object.entries(practiceRequirementGroups()).map(([type, fields]) => `<fieldset class="required-settings-group"><legend>${type}</legend><div class="required-settings-list">${fields.map(([key, label]) => {
+    const requirements = Object.entries(groups).map(([type, fields]) => `<fieldset class="required-settings-group"><legend>${type}</legend><div class="required-settings-list">${fields.map(([key, label]) => {
       const settingKey = `req_${type.toLowerCase()}_${key}`;
       const checked = String(s[settingKey] || "NO").toUpperCase() === "SI";
       return `<label><input type="hidden" name="${esc(settingKey)}" value="NO"><input type="checkbox" name="${esc(settingKey)}" value="SI" ${checked ? "checked" : ""}><span><strong>${esc(label)}</strong><small>${checked ? "Attualmente obbligatorio" : "Attualmente facoltativo"}</small></span></label>`;
     }).join("")}</div></fieldset>`).join("");
-    return `<form id="settingsForm"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Definisci separatamente i dati richiesti per Acquisto, Noleggio e Leasing.</p></div></div><div class="required-settings-grid">${requirements}</div><div class="form-actions"><button class="btn primary" type="submit">Salva campi obbligatori</button></div></section></form>`;
-  }
-
-  function renderSystemSettingsTab() {
-    const status = api.status();
-    const meta = (state.data && state.data.database_meta) || {};
-    return `<div class="settings-grid"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione frontend</dt><dd>${esc(config.version)}</dd></div><div><dt>Fonte magazzino</dt><dd>${esc(meta.inventory_source || "PRODOTTI_LED")}</dd></div></dl><p>Le Attività restano locali. Le altre sezioni comunicano con Google Apps Script e con il Foglio condiviso.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Diagnostica</span><h3>Stato tecnico</h3></div></div><div class="config-summary"><dl><div><dt>Prodotti caricati</dt><dd>${Number(meta.products_count || (state.data.products || []).length)}</dd></div><div><dt>Ultimo caricamento</dt><dd>${meta.loaded_at ? esc(new Date(meta.loaded_at).toLocaleString("it-IT")) : "—"}</dd></div><div><dt>Comunicazioni</dt><dd>Revisioni per account</dd></div></dl><p>La modalità “Solo una volta” viene registrata nella riga dell’agente e affiancata da una cache locale: lo stesso account non rivede il messaggio neppure cambiando dispositivo. “Ripubblica” crea una nuova revisione per tutti.</p></div></section></div>`;
-  }
-
-  function renderSettings() {
-    const allowed = ["general", "practices", "welcome", "patch", "system"];
-    if (!allowed.includes(state.settingsTab)) state.settingsTab = "general";
-    const content = {
-      general: renderGeneralSettingsTab,
-      practices: renderPracticeSettingsTab,
-      welcome: renderWelcomeSettingsTab,
-      patch: renderPatchNotesSettingsTab,
-      system: renderSystemSettingsTab
-    }[state.settingsTab]();
-    return `<div class="admin-settings-shell">${settingsTabsMarkup()}<section class="admin-settings-content" role="tabpanel">${content}</section></div>`;
+    const tab = state.settingsTab || "general";
+    const checked = (key) => String(s[key] || "NO").toUpperCase() === "SI" ? "checked" : "";
+    const frequencyOptions = (value) => `<option value="ONCE" ${String(value || "ONCE").toUpperCase() === "ONCE" ? "selected" : ""}>Mostra una volta</option><option value="ALWAYS" ${String(value || "").toUpperCase() === "ALWAYS" ? "selected" : ""}>Mostra ad ogni avvio</option>`;
+    const tabs = `<nav class="admin-settings-tabs"><button type="button" data-action="settings-tab" data-tab="general" class="${tab === "general" ? "active" : ""}">⚙️ Generale</button><button type="button" data-action="settings-tab" data-tab="communications" class="${tab === "communications" ? "active" : ""}">📣 Comunicazioni</button><button type="button" data-action="settings-tab" data-tab="practices" class="${tab === "practices" ? "active" : ""}">📋 Pratiche</button></nav>`;
+    const general = `<div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Azienda</span><h3>Dati generali</h3></div></div><div class="form-grid"><label>Ragione sociale<input name="legalName" value="${esc(config.company.legalName)}" disabled></label><label>Brand<input name="brand" value="${esc(config.company.brand)}" disabled></label><label class="full">Obiettivo fatturato aziendale (€)<input name="obiettivo_fatturato" type="number" min="0" step="1000" value="${esc(s.obiettivo_fatturato || 500000)}"></label><label>Telefono commerciale<input name="telefono_commerciale" value="${esc(s.telefono_commerciale || "")}"></label><label>IVA (%)<input name="iva_percentuale" type="number" value="${esc(s.iva_percentuale || 22)}"></label><label>Acconto predefinito (%)<input name="acconto_percentuale" type="number" value="${esc(s.acconto_percentuale || 30)}"></label><label>Validità preventivo (giorni)<input name="validita_preventivo_giorni" type="number" value="${esc(s.validita_preventivo_giorni || 15)}"></label></div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione</dt><dd>${esc(config.version)}</dd></div></dl><p>Le Attività sono memorizzate sul dispositivo. In Modalità Rapida le altre modifiche vengono accodate fino a SALVA TUTTO.</p><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></section></div>`;
+    const communications = `<div class="communication-settings-grid"><section class="panel communication-editor"><div class="panel-head"><div><span class="section-kicker">Messaggio iniziale</span><h3>Messaggio di benvenuto</h3><p>Modifica la comunicazione attualmente usata per la fase di test.</p></div><label class="visibility-switch"><input type="hidden" name="welcome_message_enabled" value="NO"><input type="checkbox" name="welcome_message_enabled" value="SI" ${checked("welcome_message_enabled")}><span>Mostra messaggio</span></label></div><div class="form-grid"><label class="full">Titolo<input name="welcome_message_title" maxlength="120" value="${esc(s.welcome_message_title || "")}"></label><label class="full">Testo<textarea name="welcome_message_body" rows="9">${esc(s.welcome_message_body || "")}</textarea><small>Lascia una riga vuota per separare i paragrafi.</small></label><label>Frequenza<select name="welcome_message_frequency">${frequencyOptions(s.welcome_message_frequency)}</select></label><label>Pulsante<input name="welcome_message_button" maxlength="50" value="${esc(s.welcome_message_button || "Continua")}"></label><label class="full rearm-option"><input type="hidden" name="welcome_message_rearm" value="NO"><input type="checkbox" name="welcome_message_rearm" value="SI"><span><strong>Ripubblica questa revisione</strong><small>Aumenta la revisione e la mostra nuovamente anche a chi l’aveva già accettata.</small></span></label></div><small class="revision-label">Revisione attuale: ${esc(s.welcome_message_revision || 1)}</small></section><section class="panel communication-editor"><div class="panel-head"><div><span class="section-kicker">Aggiornamenti</span><h3>Patch Notes</h3><p>Gestisci le novità mostrate nella shell e nel Quotation Planner.</p></div><label class="visibility-switch"><input type="hidden" name="patch_notes_enabled" value="NO"><input type="checkbox" name="patch_notes_enabled" value="SI" ${checked("patch_notes_enabled")}><span>Mostra Patch Notes</span></label></div><div class="form-grid"><label>Etichetta<input name="patch_notes_label" value="${esc(s.patch_notes_label || "")}"></label><label>Titolo<input name="patch_notes_title" value="${esc(s.patch_notes_title || "")}"></label><label class="full">Introduzione<textarea name="patch_notes_intro" rows="3">${esc(s.patch_notes_intro || "")}</textarea></label><label class="full">Elementi<textarea name="patch_notes_items" rows="7">${esc(s.patch_notes_items || "")}</textarea><small>Una novità per riga nel formato: emoji | titolo | descrizione.</small></label><label class="full">Nota finale<textarea name="patch_notes_footer" rows="3">${esc(s.patch_notes_footer || "")}</textarea></label><label>Frequenza<select name="patch_notes_frequency">${frequencyOptions(s.patch_notes_frequency)}</select></label><label class="rearm-option"><input type="hidden" name="patch_notes_rearm" value="NO"><input type="checkbox" name="patch_notes_rearm" value="SI"><span><strong>Ripubblica</strong><small>Mostra nuovamente questa revisione.</small></span></label></div><small class="revision-label">Revisione attuale: ${esc(s.patch_notes_revision || 1)}</small></section></div>`;
+    const practices = `<section class="panel"><div class="panel-head"><div><span class="section-kicker">Configurazione pratiche</span><h3>Campi obbligatori</h3><p>Le impostazioni vengono applicate a tutti gli agenti.</p></div></div><div class="required-settings-grid">${requirements}</div></section>`;
+    return `<form id="settingsForm">${tabs}<div class="admin-settings-page">${tab === "communications" ? communications : tab === "practices" ? practices : general}</div><div class="settings-save-bar"><span>Le modifiche vengono condivise con tutti gli utenti.</span><button class="btn primary" type="submit">Salva impostazioni</button></div></form>`;
   }
 
   function filterRows(rows, fields) {
@@ -1679,10 +1286,13 @@
     setTimeout(() => $("modalRoot").querySelector("input,select,textarea,button")?.focus(), 30);
   }
 
-  function closeModal() {
+  function closeModal(options = {}) {
     $("modalRoot").innerHTML = "";
     document.body.classList.remove("modal-open");
-    if (pendingWelcomeMessage || pendingPatchNotesMessage) setTimeout(showNextStartupMessage, 280);
+    activeAnnouncement = null;
+    if (options.resumeAnnouncements !== false && (pendingManagedWelcome || pendingManagedPatchNotes || pendingFirstAccessTutorial)) {
+      setTimeout(showNextWelcomeMessage, 280);
+    }
   }
 
   function field(label, name, value = "", options = {}) {
@@ -2723,7 +2333,20 @@
           return;
         }
       }
-      if (saved.__notifications) { state.data.notifications = saved.__notifications; delete saved.__notifications; updateNotificationBell(); }
+      if (saved.__notifications) {
+        state.data.notifications = saved.__notifications;
+        delete saved.__notifications;
+        updateNotificationBell();
+      } else if (saved.__notification) {
+        const notification = saved.__notification;
+        delete saved.__notification;
+        const notifications = state.data.notifications || (state.data.notifications = []);
+        const index = notifications.findIndex((item) => String(item.id || "") === String(notification.id || ""));
+        if (index >= 0) notifications[index] = notification;
+        else notifications.unshift(notification);
+        state.data.notifications = notifications.slice(0, 50);
+        updateNotificationBell();
+      }
       if (entity === "documents" && !form.dataset.id) {
         const library = documentLibrary();
         if (pendingDocumentFolderId) library.placements[saved.id] = pendingDocumentFolderId;
@@ -2987,12 +2610,19 @@
       },
       "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
-      "settings-tab": () => { state.settingsTab = ["general", "practices", "welcome", "patch", "system"].includes(id) ? id : "general"; renderRoute(); },
-      "preview-welcome-message": previewWelcomeMessage,
-      "preview-patch-message": previewPatchNotesMessage,
-      "add-patch-item": addPatchItemEditor,
-      "remove-patch-item": () => removePatchItemEditor(id),
       "close-modal": closeModal,
+      "close-modal-next-welcome": () => { closeModal(); setTimeout(showNextWelcomeMessage, 180); },
+      "acknowledge-announcement": async () => {
+        const current = activeAnnouncement;
+        activeAnnouncement = null;
+        closeModal({ resumeAnnouncements: false });
+        if (current && current.frequency === "ONCE") {
+          try { await api.acknowledgeAnnouncement(current.type, current.revision); }
+          catch (error) { toast("La conferma del messaggio verrà riprovata al prossimo accesso.", "warning"); }
+        }
+        setTimeout(showNextWelcomeMessage, 180);
+      },
+      "settings-tab": () => { state.settingsTab = data.tab || "general"; renderRoute(); },
       "toggle-login-password": toggleLoginPassword,
       "open-notifications": openNotifications,
       "agent-month-details": openAgentMonthDetails,
@@ -3157,29 +2787,6 @@
     if (documentId) moveDocumentLocal(documentId, folderId);
   });
 
-  async function saveAdminCommunicationForm(form, section, republish) {
-    const payload = section === "WELCOME" ? collectWelcomeMessageForm(form) : collectPatchNotesForm(form);
-    payload.republish = republish ? "SI" : "NO";
-    setLoading(true, republish ? "Salvataggio e ripubblicazione…" : "Salvataggio comunicazione…");
-    try {
-      const saved = await api.saveAdminContent(payload);
-      state.data.adminContent = saved || state.data.adminContent || {};
-      if (saved && saved.patchNotes) state.data.patchNotes = { ...saved.patchNotes, items: (saved.patchNotes.items || []).filter((item) => String(item.attivo || "SI").toUpperCase() !== "NO") };
-      if (saved) {
-        state.data.settings = { ...(state.data.settings || {}), admin_content_revision: Number(saved.revision || payload.expected_revision + 1) };
-      }
-      scheduleBootstrapCache();
-      renderRoute();
-      const label = section === "WELCOME" ? "Benvenuto Beta" : "Patch notes";
-      toast(republish ? `${label} salvato e ripubblicato.` : `${label} salvato senza nuova pubblicazione.`);
-    } catch (error) {
-      if (String(error.message || "").includes("CONFLICT_RECORD")) {
-        toast("Le comunicazioni sono state modificate da un altro amministratore. Ricarico i dati aggiornati.", "danger");
-        try { await loadAll(false, { force: true }); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
-      } else toast(error.message, "danger");
-    } finally { setLoading(false); }
-  }
-
   document.addEventListener("submit", async (event) => {
     if (event.target.id === "loginForm") {
       event.preventDefault();
@@ -3258,29 +2865,25 @@
       return;
     }
     if (event.target.matches(".entity-form")) { event.preventDefault(); await saveEntity(event.target); return; }
-    if (event.target.id === "welcomeMessageForm") {
-      event.preventDefault();
-      await saveAdminCommunicationForm(event.target, "WELCOME", String(event.submitter && event.submitter.value || "save") === "republish");
-      return;
-    }
-    if (event.target.id === "patchNotesForm") {
-      event.preventDefault();
-      await saveAdminCommunicationForm(event.target, "PATCH_NOTES", String(event.submitter && event.submitter.value || "save") === "republish");
-      return;
-    }
     if (event.target.id === "settingsForm") {
       event.preventDefault();
       try {
+        const previousSettings = { ...(state.data.settings || {}) };
         const values = serializeForm(event.target);
         values.expected_settings_revision = Number((state.data.settings || {}).settings_revision || 0);
         const savedSettings = await api.saveSettings(values);
         delete values.expected_settings_revision;
         state.data.settings = { ...(state.data.settings || {}), ...values, ...(savedSettings || {}) };
+        const welcomeRepublished = String(previousSettings.welcome_message_revision || "") !== String(state.data.settings.welcome_message_revision || "");
+        const patchRepublished = String(previousSettings.patch_notes_revision || "") !== String(state.data.settings.patch_notes_revision || "");
+        if (welcomeRepublished) pendingManagedWelcome = managedAnnouncement("welcome").enabled;
+        if (patchRepublished) pendingManagedPatchNotes = managedAnnouncement("patch").enabled;
         updateLocalDashboard();
         scheduleBootstrapCache();
         renderRoute();
         setConnectionState();
-        toast(api.isFastMode() ? "Impostazioni salvate localmente. Usa SALVA TUTTO." : "Impostazioni salvate.");
+        toast(api.isFastMode() ? "Impostazioni salvate localmente. Usa SALVA TUTTO." : (welcomeRepublished || patchRepublished) ? "Comunicazioni pubblicate: nuova revisione attiva." : "Impostazioni salvate.");
+        if (!api.isFastMode() && (welcomeRepublished || patchRepublished)) setTimeout(showNextWelcomeMessage, 380);
       }
       catch (error) {
         if (String(error.message || "").includes("CONFLICT_RECORD")) {
