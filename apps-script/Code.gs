@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2151().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2152().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.15.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.15.2";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -22,6 +22,7 @@ var SEEMAX_FRONTEND_ORIGINS_ = [
 ];
 var SEEMAX_BRIDGE_ACTIONS_ = {
   nextquote: true,
+  savequote: true,
   management_upsert: true,
   management_remove: true,
   management_save_settings: true,
@@ -97,7 +98,7 @@ function setupSeemaxDatabase() {
   backfillExistingIds_();
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
-  return "DATABASE SEEMAX 2.15.1 configurato: comunicazioni, ponte nativo e coda email asincrona attivi.";
+  return "DATABASE SEEMAX 2.15.2 configurato: comunicazioni, preventivi e documenti in background attivi.";
 }
 
 
@@ -248,6 +249,10 @@ function upgradeSeemaxV2144() {
 }
 
 function upgradeSeemaxV2151() {
+  return upgradeSeemaxV2152();
+}
+
+function upgradeSeemaxV2152() {
   return withMutationLock_(function () {
     var ss = db_();
     Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
@@ -255,9 +260,9 @@ function upgradeSeemaxV2151() {
     prepareCommunicationsV2144_();
     ensureEmailQueueTriggerV2151_();
     rebuildQuoteCountersV2151_();
-    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.15.1 · ponte nativo, sincronizzazione immediata, attività secondarie asincrone e contatori preventivo.");
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.15.2 · preventivi e documenti in background con conferma nativa.");
     styleSheets_();
-    return "SEEMAX v2.15.1 configurato: ponte nativo con fallback, salvataggi reattivi, coda email asincrona e contatori preventivo attivi.";
+    return "SEEMAX v2.15.2 configurato: salvataggio preventivi confermato e upload documenti non bloccante attivi.";
   });
 }
 
@@ -2593,31 +2598,38 @@ function rebuildQuoteCountersV2151() {
 }
 
 function saveQuotation_(p) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    var savedByLogin = String(p.saved_by_login || "").toUpperCase() === "SI";
-    var user = null;
-    if (savedByLogin) user = authenticate_(p.agent_username, p.agent_key);
-    var id = String(p.id_preventivo || p.id_preventivo_visibile || "");
-    if (!id) throw new Error("Codice preventivo mancante.");
-    var existing = findRowObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", id);
-    if (existing && p.save_request_token && existing.save_request_token && String(existing.save_request_token) !== String(p.save_request_token)) {
-      rememberQuoteCounter_(p.quote_scope, existing.numero_preventivo || existing.id_preventivo || id);
-      var next = nextQuote_({ quote_scope: p.quote_scope });
-      return { ok: false, error: "Numero preventivo già utilizzato.", error_code: "QUOTE_NUMBER_CHANGED", next_num: next.next_num, next_id: next.next_id };
-    }
-    var record = {};
-    Object.keys(p).forEach(function (key) { if (["action", "requestId"].indexOf(key) < 0) record[key] = p[key]; });
-    record.id_preventivo = id;
-    record.data_salvataggio = new Date().toISOString();
-    record.agent_username = record.agent_username || (user ? user.username : "");
-    record.agent_display_name = record.agent_display_name || (user ? user.nome_visualizzato : record.agente || "");
-    upsertObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", id, record);
-    rememberQuoteCounter_(record.quote_scope, record.numero_preventivo || id);
-    log_(user || { username: "ACCESSO_CON_CHIAVE", ruolo: "ESTERNO" }, "SAVE", "ARCHIVIO_PREVENTIVI", id, "Salvataggio preventivo S.Q.P.");
-    return { ok: true, id_preventivo: id, save_request_token: record.save_request_token || "" };
-  } finally { lock.releaseLock(); }
+  return withMutationLock_(function () { return saveQuotationLocked_(p); });
+}
+
+function saveQuotationLocked_(p) {
+  var savedByLogin = String(p.saved_by_login || "").toUpperCase() === "SI";
+  var user = null;
+  if (savedByLogin) user = authenticate_(p.agent_username, p.agent_key);
+  var id = String(p.id_preventivo || p.id_preventivo_visibile || "");
+  if (!id) throw new Error("Codice preventivo mancante.");
+  var requestToken = String(p.save_request_token || "").trim();
+  var existing = findRowObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", id);
+  /* Un retry del medesimo comando deve restituire il record già confermato,
+     senza riscriverlo, incrementare contatori o duplicare il log. */
+  if (existing && requestToken && String(existing.save_request_token || "") === requestToken) {
+    rememberQuoteCounter_(p.quote_scope, existing.numero_preventivo || existing.id_preventivo || id);
+    return { ok: true, id_preventivo: id, save_request_token: requestToken, duplicate: true };
+  }
+  if (existing && requestToken && existing.save_request_token && String(existing.save_request_token) !== requestToken) {
+    rememberQuoteCounter_(p.quote_scope, existing.numero_preventivo || existing.id_preventivo || id);
+    var next = nextQuote_({ quote_scope: p.quote_scope });
+    return { ok: false, error: "Numero preventivo già utilizzato.", error_code: "QUOTE_NUMBER_CHANGED", next_num: next.next_num, next_id: next.next_id };
+  }
+  var record = {};
+  Object.keys(p).forEach(function (key) { if (["action", "requestId"].indexOf(key) < 0) record[key] = p[key]; });
+  record.id_preventivo = id;
+  record.data_salvataggio = new Date().toISOString();
+  record.agent_username = record.agent_username || (user ? user.username : "");
+  record.agent_display_name = record.agent_display_name || (user ? user.nome_visualizzato : record.agente || "");
+  upsertObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", id, record);
+  rememberQuoteCounter_(record.quote_scope, record.numero_preventivo || id);
+  log_(user || { username: "ACCESSO_CON_CHIAVE", ruolo: "ESTERNO" }, "SAVE", "ARCHIVIO_PREVENTIVI", id, "Salvataggio preventivo S.Q.P.");
+  return { ok: true, id_preventivo: id, save_request_token: record.save_request_token || "" };
 }
 
 function listQuotes_(p) {

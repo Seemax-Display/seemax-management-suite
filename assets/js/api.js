@@ -102,8 +102,11 @@
     managementBridge.pending.delete(String(data.id || ""));
     clearTimeout(entry.timer);
     const payload = data.payload && typeof data.payload === "object" ? data.payload : { ok: true, value: data.payload };
-    if (payload.ok === false) entry.reject(bridgeFailure(payload.error || "Operazione non riuscita.", "BRIDGE_SERVER_ERROR", true));
-    else entry.resolve(payload);
+    if (payload.ok === false) {
+      const failure = bridgeFailure(payload.error || "Operazione non riuscita.", "BRIDGE_SERVER_ERROR", true);
+      failure.payload = payload;
+      entry.reject(failure);
+    } else entry.resolve(payload);
   }
 
   window.addEventListener("message", handleManagementBridgeMessage);
@@ -466,22 +469,25 @@
     }
     if (config.demoMode) return demo.upsert(entity, value);
     if (typeof options.onPending === "function") options.onPending({ ...value, __sync_state: "PENDING", __sync_started_at: new Date().toISOString() });
-    return remoteUpsert(entity, value);
+    return remoteUpsert(entity, value, options);
   }
 
-  async function remoteUpsert(entity, record) {
+  async function remoteUpsert(entity, record, options = {}) {
     if (config.demoMode) return demo.upsert(entity, record);
     let value = { ...record };
     if (entity === "documents" && value.file_base64) {
+      if (typeof options.onProgress === "function") options.onProgress("Trasferimento del file a Google Drive…");
       const upload = await postForm("management_upload_document", {
         filename: value.file_name || value.nome || "documento",
         mimeType: value.file_type || "application/octet-stream",
         fileBase64: value.file_base64
       });
+      if (typeof options.onProgress === "function") options.onProgress(upload.pending ? "Verifica del file su Google Drive…" : "File ricevuto da Google Drive…");
       const confirmedUpload = upload.pending ? await waitForUpload(upload.requestId) : upload;
       value.url = confirmedUpload.url;
       value.file_id = confirmedUpload.file_id;
       delete value.file_base64;
+      if (typeof options.onProgress === "function") options.onProgress("Registrazione del documento nel database…");
     }
     const response = await postMutation("management_upsert", { entity, payload: JSON.stringify(value) }, {
       entity,
@@ -1099,6 +1105,23 @@ async function getAdminContent() {
     }
   }
 
+  async function saveQuotation(fields) {
+    const value = { ...(fields || {}) };
+    const requestToken = String(value.save_request_token || uid("quote-save"));
+    value.save_request_token = requestToken;
+    if (config.demoMode) return {
+      ok: true,
+      id_preventivo: value.id_preventivo || value.id_preventivo_visibile || "",
+      save_request_token: requestToken,
+      demo: true
+    };
+    return postMutation("savequote", value, {
+      entity: "quotes",
+      requestToken,
+      maxWait: 150000
+    });
+  }
+
   async function setPracticeStockWarning(practice, visible) {
     if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
     const requestToken = uid("stock-warning");
@@ -1205,5 +1228,5 @@ async function getAdminContent() {
     };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

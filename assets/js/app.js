@@ -211,6 +211,38 @@
         successPhase: "Giacenza confermata dal database"
       };
     }
+    if (kind === "quotation") {
+      const quoteId = String(value.id_preventivo || value.numero || value.id || "Nuovo preventivo").trim();
+      const client = String(value.cliente || value.cliente_visibile || value.cliente_azienda || "").trim();
+      return {
+        itemLabel: "Preventivo",
+        name: client ? `${quoteId} · ${client}` : quoteId,
+        activeTitle: "Sto salvando il preventivo…",
+        completeTitle: "Preventivo salvato",
+        initialPhase: "Preparazione del salvataggio…",
+        successPhase: "Preventivo confermato dal database"
+      };
+    }
+    if (kind === "upload") {
+      return {
+        itemLabel: "Documento",
+        name: String(value.nome || value.file_name || "Nuovo documento").trim(),
+        activeTitle: "Sto caricando il documento…",
+        completeTitle: "Documento caricato",
+        initialPhase: "Preparazione locale del file…",
+        successPhase: "Documento confermato nel database"
+      };
+    }
+    if (entity === "documents") {
+      return {
+        itemLabel: "Documento",
+        name: String(value.nome || value.file_name || "Documento").trim(),
+        activeTitle: "Sto salvando il documento…",
+        completeTitle: "Documento salvato",
+        initialPhase: "Preparazione del salvataggio…",
+        successPhase: "Documento confermato dal database"
+      };
+    }
     const practice = entity === "practices";
     return {
       itemLabel: practice ? "Pratica" : "Cliente",
@@ -235,6 +267,18 @@
       if (progress < 82) return "Attesa della conferma…";
       return "Verifica finale del magazzino…";
     }
+    if (item.kind === "quotation") {
+      if (progress < 34) return "Invio protetto del preventivo…";
+      if (progress < 62) return "Registrazione nell’archivio…";
+      if (progress < 82) return "Attesa della conferma…";
+      return "Verifica finale del preventivo…";
+    }
+    if (item.kind === "upload") {
+      if (progress < 34) return "Trasferimento del file a Google Drive…";
+      if (progress < 62) return "Verifica del file caricato…";
+      if (progress < 82) return "Registrazione del documento…";
+      return "Attesa della conferma finale…";
+    }
     if (progress < 34) return "Invio dei dati al database…";
     if (progress < 62) return "Elaborazione del salvataggio…";
     if (progress < 82) return "Attesa della conferma…";
@@ -248,7 +292,7 @@
       id,
       kind,
       entity,
-      recordId: String((record || {}).id || (record || {}).username || ""),
+      recordId: String((record || {}).id || (record || {}).id_preventivo || (record || {}).username || ""),
       ...descriptor,
       progress: 9,
       phase: descriptor.initialPhase,
@@ -280,6 +324,14 @@
       ...(payload || {}),
       product_name: (product || {}).nome || (product || {}).sku || (payload || {}).product_id || "Prodotto selezionato"
     });
+  }
+
+  function startQuotationProgress(record) {
+    return startBackgroundProgress("quotation", "quotes", record);
+  }
+
+  function startDocumentUploadProgress(record) {
+    return startBackgroundProgress("upload", "documents", record);
   }
 
   function hasActiveBackgroundProgress(kind, entity, recordId) {
@@ -337,6 +389,13 @@
     const message = String(error && error.message || error || "Operazione non riuscita.");
     settleBackgroundProgress(id, "failed", record, message);
   }
+
+  window.SeemaxBackgroundOperations = {
+    startQuotation: (record) => startQuotationProgress(record || {}),
+    update: (id, phase) => updateSaveProgress(id, phase),
+    complete: (id, record) => completeBackgroundProgress(id, record || {}),
+    fail: (id, record, error) => failBackgroundProgress(id, record || {}, error)
+  };
 
   function renderSaveProgressCenter() {
     const center = $("saveProgressCenter");
@@ -407,6 +466,10 @@
     return Array.from(uploadState.batches.values()).some((batch) => batch.status === "active");
   }
 
+  function hasActiveDatabaseOperations() {
+    return Array.from(saveProgressState.items.values()).some((item) => item.status === "active");
+  }
+
   function startUploadBatch(practice, attachments) {
     Array.from(uploadState.batches.entries()).forEach(([batchId, batch]) => { if (batch.status !== "active") uploadState.batches.delete(batchId); });
     const id = `upload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -467,7 +530,7 @@
   }
 
   window.addEventListener("beforeunload", (event) => {
-    if (!hasActiveUploads()) return;
+    if (!hasActiveUploads() && !hasActiveDatabaseOperations()) return;
     event.preventDefault();
     event.returnValue = "";
   });
@@ -1795,7 +1858,10 @@
       return `<article class="document-folder ${heldDocumentId ? "awaiting-drop" : ""}" data-action="open-document-folder" data-folder-id="${esc(folder.id)}" data-document-folder="${esc(folder.id)}"><span>📁</span><div><strong>${esc(folder.name)}</strong><small>${count} ${count === 1 ? "elemento" : "elementi"}</small></div><button class="folder-delete" data-action="delete-document-folder" data-folder-id="${esc(folder.id)}" aria-label="Elimina cartella">×</button></article>`;
     }).join("")}${library.folders.length ? "" : `<div class="folder-empty"><span>📂</span><p>Crea cartelle per organizzare visivamente i documenti.</p></div>`}</div>` : "";
     const rootDrop = currentFolder ? `<div class="current-folder-head"><button class="btn ghost" data-action="document-root">← Archivio principale</button><div><span>📁</span><strong>${esc(currentFolder.name)}</strong><small>Trascina qui file esterni oppure documenti già caricati.</small></div></div>` : "";
-    const list = rows.length ? rows.map((d) => `<article class="document-row document-draggable ${heldDocumentId === d.id ? "picked-up" : ""}" draggable="true" data-document-drag="${esc(d.id)}"><span class="file-icon document-emoji">${documentEmoji(d)}</span><div><strong>${esc(d.nome)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${d.url ? `<a class="btn soft" href="${esc(d.url)}" target="_blank" rel="noopener">Apri file ↗</a>` : `<span class="placeholder-pill">File non disponibile</span>`}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}">Modifica</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}">×</button></div></article>`).join("") : emptyState("Cartella vuota", api.isFastMode() ? "Nessun documento presente." : "Carica o trascina qui il primo file.", api.isFastMode() ? "" : "Carica documento", "new-document");
+    const list = rows.length ? rows.map((d) => {
+      const syncing = !!d.__sync_state;
+      return `<article class="document-row document-draggable ${heldDocumentId === d.id ? "picked-up" : ""} ${syncing ? "record-sync-pending" : ""}" draggable="${syncing ? "false" : "true"}" data-document-drag="${esc(d.id)}"><span class="file-icon document-emoji">${documentEmoji(d)}</span><div><strong>${esc(d.nome)} ${recordSyncBadge(d)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${d.url && !syncing ? `<a class="btn soft" href="${esc(d.url)}" target="_blank" rel="noopener">Apri file ↗</a>` : `<span class="placeholder-pill">${syncing ? "Caricamento in corso" : "File non disponibile"}</span>`}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi" : "Modifica"}</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>×</button></div></article>`;
+    }).join("") : emptyState("Cartella vuota", api.isFastMode() ? "Nessun documento presente." : "Carica o trascina qui il primo file.", api.isFastMode() ? "" : "Carica documento", "new-document");
     return `${toolbar}${breadcrumb}${folders}<section class="panel document-drop-zone" data-document-folder="${esc(state.documentFolderId)}">${rootDrop}<div class="document-list">${list}</div></section>`;
   }
 
@@ -2729,6 +2795,8 @@
     const entity = form.dataset.entity;
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const isNewRecord = !current.id || current.__sync_new_record === true;
+    const documentFolderAtSave = entity === "documents" ? pendingDocumentFolderId : "";
+    const pendingDocumentFileAtSave = entity === "documents" ? pendingDocumentFile : null;
     if (entity === "practices" && isCompletedPractice(current)) {
       toast("La pratica è completata e può essere soltanto consultata nell’archivio.", "danger");
       closeModal();
@@ -2822,6 +2890,8 @@
       }
     }
     const record = { ...current, ...serializeForm(form) };
+    let backgroundSaveNotice = false;
+    let saveProgressId = "";
     record.expected_record_version = Number(form.dataset.recordVersion || 0);
     record.request_token = form.dataset.requestToken || newRequestToken();
     Object.keys(record).filter((key) => key.startsWith("practice_file_")).forEach((key) => delete record[key]);
@@ -2884,21 +2954,40 @@
       if (file) {
         if (api.isFastMode()) { toast("Il caricamento dei file è disponibile soltanto in Modalità Standard.", "danger"); return; }
         if (file.size > (file.type.startsWith("image/") ? 20 : 8) * 1024 * 1024) { toast("Il file supera il limite consentito.", "danger"); return; }
-        const preparedFile = await prepareFileForUpload(file);
-        if (preparedFile.size > 8 * 1024 * 1024) { toast("Non è stato possibile ridurre il file sotto il limite di 8 MB.", "danger"); return; }
+        backgroundSaveNotice = true;
+        saveProgressId = startDocumentUploadProgress({ ...record, nome: record.nome || file.name, file_name: file.name });
+        closeModal();
+        let preparedFile;
+        try {
+          updateSaveProgress(saveProgressId, file.type.startsWith("image/") ? "Ottimizzazione locale del file…" : "Preparazione locale del file…");
+          preparedFile = await prepareFileForUpload(file);
+        } catch (error) {
+          failSaveProgress(saveProgressId, record, error);
+          toast(error.message || "Impossibile preparare il documento.", "danger");
+          return;
+        }
+        if (preparedFile.size > 8 * 1024 * 1024) {
+          const error = new Error("Non è stato possibile ridurre il file sotto il limite di 8 MB.");
+          failSaveProgress(saveProgressId, record, error);
+          toast(error.message, "danger");
+          return;
+        }
         record.file_base64 = preparedFile.dataUrl;
         record.file_name = preparedFile.name;
         record.file_type = preparedFile.type;
         record.file_size = preparedFile.size;
         if (!record.nome) record.nome = file.name;
+        updateSaveProgress(saveProgressId, "File pronto: avvio del trasferimento…");
       }
     }
     if (entity === "users") {
       record.id = record.id || record.username;
       if (!record.chiave_id_agente) delete record.chiave_id_agente;
     }
-    const backgroundSaveNotice = ["clients", "practices"].includes(entity) && !api.isFastMode();
-    const saveProgressId = backgroundSaveNotice ? startSaveProgress(entity, record) : "";
+    if (!backgroundSaveNotice) {
+      backgroundSaveNotice = ["clients", "practices", "documents"].includes(entity) && !api.isFastMode();
+      saveProgressId = backgroundSaveNotice ? startSaveProgress(entity, record) : "";
+    }
     if (!backgroundSaveNotice) setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
     let activeUploadBatchId = "";
     let celebrationShown = false;
@@ -2913,14 +3002,17 @@
         : Promise.resolve([]);
       let saved = await api.upsert(entity, record, {
         onPending: (pending) => {
-          if (!["clients", "practices"].includes(entity)) return;
-          optimisticRow = { ...pending, __sync_new_record: isNewRecord };
+          if (!["clients", "practices", "documents"].includes(entity)) return;
+          const visiblePending = { ...pending };
+          delete visiblePending.file_base64;
+          optimisticRow = { ...visiblePending, __sync_new_record: isNewRecord };
           optimisticVisible = true;
           replaceLocalEntity(entity, optimisticRow);
           closeModal();
           renderRoute();
-          updateSaveProgress(saveProgressId, "Salvataggio in background…");
-        }
+          updateSaveProgress(saveProgressId, entity === "documents" ? "Caricamento in background…" : "Salvataggio in background…");
+        },
+        onProgress: (phase) => updateSaveProgress(saveProgressId, phase)
       });
       completeSaveProgress(saveProgressId, saved);
       if (entity === "practices" && practiceAttachments.length) {
@@ -2986,10 +3078,10 @@
       if (saved.__notifications) { state.data.notifications = saved.__notifications; delete saved.__notifications; updateNotificationBell(); }
       if (entity === "documents" && !form.dataset.id) {
         const library = documentLibrary();
-        if (pendingDocumentFolderId) library.placements[saved.id] = pendingDocumentFolderId;
+        if (documentFolderAtSave) library.placements[saved.id] = documentFolderAtSave;
         saveDocumentLibrary(library);
-        pendingDocumentFolderId = "";
-        pendingDocumentFile = null;
+        if (pendingDocumentFolderId === documentFolderAtSave) pendingDocumentFolderId = "";
+        if (pendingDocumentFile === pendingDocumentFileAtSave) pendingDocumentFile = null;
       }
       replaceLocalEntity(entity, saved);
       setConnectionState();
@@ -3575,7 +3667,7 @@
   });
 
   $("logoutButton").addEventListener("click", () => {
-    if (hasActiveUploads()) { toast("Attendi il completamento dei documenti prima di uscire.", "danger"); uploadState.expanded = true; renderUploadCenter(); return; }
+    if (hasActiveUploads() || hasActiveDatabaseOperations()) { toast("Attendi la conferma delle operazioni in corso prima di uscire.", "danger"); uploadState.expanded = true; renderUploadCenter(); renderSaveProgressCenter(); return; }
     api.logout(); state.data = null; state.practiceLayout = ""; showLogin();
   });
   $("quickAddButton").addEventListener("click", () => openPracticeTypeChooser());

@@ -1,0 +1,40 @@
+SEEMAX MANAGEMENT SUITE 2.15.2 - GOOGLE APPS SCRIPT
+
+ORDINE CONSIGLIATO
+
+1. Crea una copia di sicurezza del Foglio Google e del precedente Code.gs.
+2. Apri Foglio Google > Estensioni > Apps Script.
+3. Sostituisci tutto il contenuto di Code.gs con il file 2.15.2.
+4. Salva.
+5. Seleziona ed esegui upgradeSeemaxV2152.
+6. Autorizza lo script se Google lo richiede.
+7. Verifica il messaggio:
+
+   SEEMAX v2.15.2 configurato: salvataggio preventivi confermato e upload
+   documenti non bloccante attivi.
+
+8. Apri Esegui il deployment > Gestisci deployment.
+9. Modifica il deployment Web App esistente e seleziona Nuova versione.
+10. Pubblica mantenendo lo stesso URL /exec.
+11. Controlla che l'URL coincida con assets/js/config.js.
+12. Aggiorna GitHub con tutto il pacchetto 2.15.2.
+13. Esegui Ctrl+F5 oppure chiudi e riapri completamente la PWA.
+
+CONTROLLO VERSIONI
+
+- frontend: 2.15.2
+- backend: seemax-management-suite-2.15.2
+- cache PWA: seemax-management-v2-15-2-background-quotes-documents
+- funzione upgrade: upgradeSeemaxV2152
+- worker email conservato: processEmailQueueV2151
+
+COLLAUDO RAPIDO
+
+1. Salva un preventivo dal Planner integrato e verifica il pannello non bloccante.
+2. Controlla che ARCHIVIO_PREVENTIVI contenga una sola riga per il codice.
+3. Carica manualmente un documento e verifica tutte le fasi fino alla conferma.
+4. Avvia due upload consecutivi in cartelle diverse e controlla le destinazioni.
+5. Esporta il PDF e controlla numero-anno, data, cliente, P, misura e faccia.
+6. Ripeti un salvataggio con due account per verificare numerazione e lock.
+
+Consulta docs/AGGIORNAMENTO_V2.15.2.md per la procedura completa.

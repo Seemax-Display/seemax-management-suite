@@ -2094,7 +2094,7 @@
     // =============================
     const ONLINE_ARCHIVE = {
       enabled:true,
-      version:'database-archive-unificato-v5.1-print-restore',
+      version:'database-archive-unificato-v5.2-background-confirmed',
       minPasswordLength:4
     };
 
@@ -2487,6 +2487,52 @@
       });
     }
 
+    function nativeQuotationApi(){
+      return window.SEEMAX_NATIVE_API && typeof window.SEEMAX_NATIVE_API === 'object' ? window.SEEMAX_NATIVE_API : null;
+    }
+
+    function startQuotationBackgroundProgress(record){
+      const nativeApi = nativeQuotationApi();
+      if(!nativeApi || typeof nativeApi.startQuotationProgress !== 'function') return '';
+      try{ return nativeApi.startQuotationProgress(record || {}) || ''; }
+      catch(error){ return ''; }
+    }
+
+    function updateQuotationBackgroundProgress(id, phase){
+      const nativeApi = nativeQuotationApi();
+      if(!id || !nativeApi || typeof nativeApi.updateQuotationProgress !== 'function') return;
+      nativeApi.updateQuotationProgress(id, phase);
+    }
+
+    function completeQuotationBackgroundProgress(id, record){
+      const nativeApi = nativeQuotationApi();
+      if(!id || !nativeApi || typeof nativeApi.completeQuotationProgress !== 'function') return;
+      nativeApi.completeQuotationProgress(id, record || {});
+    }
+
+    function failQuotationBackgroundProgress(id, record, error){
+      const nativeApi = nativeQuotationApi();
+      if(!id || !nativeApi || typeof nativeApi.failQuotationProgress !== 'function') return;
+      nativeApi.failQuotationProgress(id, record || {}, error && error.message ? error.message : String(error || 'Salvataggio non riuscito.'));
+    }
+
+    async function saveQuotationWithConfirmation(fields, id, expectedToken, agentMode){
+      const nativeApi = nativeQuotationApi();
+      if(nativeApi && typeof nativeApi.saveQuotation === 'function'){
+        const response = await nativeApi.saveQuotation(fields);
+        if(!response || response.ok === false){
+          const error = new Error((response && response.error) || 'Salvataggio preventivo non confermato.');
+          error.payload = response || null;
+          throw error;
+        }
+        return response;
+      }
+      await postDatabaseForm('savequote', fields, 1500);
+      return agentMode
+        ? waitForAgentOnlineArchiveRecord(id, expectedToken, 15000)
+        : waitForOnlineArchiveRecord(id, expectedToken, 15000);
+    }
+
     function archiveSleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 
     function setActionButtonBusy(button, busy, busyText){
@@ -2553,6 +2599,8 @@
       if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il salvataggio dei preventivi online è disabilitato in Modalità Rapida.', {title:'Salvataggio non disponibile', theme:'lite'}); return; }
       const valid = validateArchiveFields(true);
       if(!valid) return;
+      let progressId = '';
+      let progressRecord = {id_preventivo:valid.id, cliente:archiveClientLabel()};
       showPersistentCalcLoading('Comando ricevuto', 'Preparazione del salvataggio nel DATABASE SEEMAX...');
       try{
         await archiveSleep(30);
@@ -2566,8 +2614,7 @@
         payload.onlineId = valid.id;
         const encrypted = await encryptArchivePayload(JSON.stringify(payload), valid.password);
         const saveRequestToken = 'sqp_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
-        setCalcLoadingText('Registrazione preventivo', 'Invio dei dati al DATABASE SEEMAX...');
-        await postDatabaseForm('savequote', {
+        const fields = {
           id_preventivo:valid.id,
           agente:val('agentName'),
           cliente_visibile:($('onlineArchiveClient') ? $('onlineArchiveClient').value : archiveClientLabel()),
@@ -2583,14 +2630,23 @@
           save_request_token:saveRequestToken,
           quote_scope:currentQuoteScope(),
           ...buildArchiveDatabaseFields(payload, valid.password, valid.id)
-        }, 1500);
-        await waitForOnlineArchiveRecord(valid.id, saveRequestToken, 15000);
+        };
+        progressRecord = {id_preventivo:valid.id, cliente:fields.cliente_visibile};
+        progressId = startQuotationBackgroundProgress(progressRecord);
+        if(progressId){
+          updateQuotationBackgroundProgress(progressId, 'Invio protetto del preventivo…');
+          closeOnlineArchiveModal();
+          hideCalcLoading();
+        }else setCalcLoadingText('Registrazione preventivo', 'Invio dei dati al DATABASE SEEMAX...');
+        const saved = await saveQuotationWithConfirmation(fields, valid.id, saveRequestToken, false);
+        completeQuotationBackgroundProgress(progressId, progressRecord);
         hideCalcLoading();
         closeOnlineArchiveModal();
-        await loadNextQuoteNumber({silent:true, force:true});
+        loadNextQuoteNumber({silent:true, force:true}).catch(() => {});
         showDraftToast('✅ SALVATAGGIO COMPLETATO NEL DATABASE · Codice ' + valid.id + '.');
       }catch(err){
         hideCalcLoading();
+        failQuotationBackgroundProgress(progressId, progressRecord, err);
         const response = err && err.payload ? err.payload : null;
         if(response && response.error_code === 'QUOTE_NUMBER_CHANGED'){
           if($('quoteNumber') && response.next_num) $('quoteNumber').value = String(response.next_num);
@@ -2876,6 +2932,8 @@
         items:[{emoji:admin ? '🛡️' : '👤', title:'Profilo collegato', text:(agentSession.displayName || agentSession.username) + ' · ' + roleLabel},{emoji:'🔐', title:'Nessuna chiave manuale', text:'Il preventivo verrà protetto usando il tuo accesso S.Q.P.'}]
       });
       if(!ok) return;
+      let progressId = '';
+      let progressRecord = {id_preventivo:id, cliente:archiveClientLabel()};
       showPersistentCalcLoading('Comando ricevuto', 'Preparazione del salvataggio nel DATABASE SEEMAX...');
       try{
         setCalcLoadingText('Verifica numero preventivo', 'Controllo della sequenza ' + roleLabel + '...');
@@ -2892,8 +2950,7 @@
         payload.userRole = roleLabel;
         const encrypted = await encryptArchivePayload(JSON.stringify(payload), agentSession.key);
         const saveRequestToken = 'sqp_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
-        setCalcLoadingText('Registrazione preventivo', 'Invio dei dati al DATABASE SEEMAX...');
-        await postDatabaseForm('savequote', {
+        const fields = {
           id_preventivo:id,
           agente:agentSession.displayName || agentSession.username,
           cliente_visibile:archiveClientLabel(),
@@ -2912,13 +2969,21 @@
           save_request_token:saveRequestToken,
           quote_scope:currentQuoteScope(),
           ...buildArchiveDatabaseFields(payload, 'ACCESSO_' + roleLabel, id)
-        }, 1500);
-        await waitForAgentOnlineArchiveRecord(id, saveRequestToken, 15000);
+        };
+        progressRecord = {id_preventivo:id, cliente:fields.cliente_visibile};
+        progressId = startQuotationBackgroundProgress(progressRecord);
+        if(progressId){
+          updateQuotationBackgroundProgress(progressId, 'Invio protetto del preventivo…');
+          hideCalcLoading();
+        }else setCalcLoadingText('Registrazione preventivo', 'Invio dei dati al DATABASE SEEMAX...');
+        await saveQuotationWithConfirmation(fields, id, saveRequestToken, true);
+        completeQuotationBackgroundProgress(progressId, progressRecord);
         hideCalcLoading();
-        await loadNextQuoteNumber({silent:true, force:true});
+        loadNextQuoteNumber({silent:true, force:true}).catch(() => {});
         showDraftToast('✅ PREVENTIVO SALVATO NELL’ARCHIVIO ' + roleLabel + ' · Codice ' + id + '.');
       }catch(err){
         hideCalcLoading();
+        failQuotationBackgroundProgress(progressId, progressRecord, err);
         const response = err && err.payload ? err.payload : null;
         if(response && response.error_code === 'QUOTE_NUMBER_CHANGED'){
           if($('quoteNumber') && response.next_num) $('quoteNumber').value = String(response.next_num);
@@ -4815,11 +4880,11 @@
     function suggestedPrintFileName(){
       const items = selectedLedQuotes();
       const item = items && items.length ? items[0] : null;
-      const client = val('clientCompany') || val('clientName') || 'Cliente';
+      const clientHeading = val('clientCompany') || val('clientName') || 'Cliente';
       const ledName = item ? ledDisplayNameForDocs(item) : 'Ledwall Display';
       const measure = item ? ledMeasureLabel(item) : '';
-      const face = item ? ledFaceLabel(item) : '';
-      const parts = ['Prev. n. ' + quoteNumberLabel(), 'del ' + quoteDateFile(), client, ledName, measure, face].filter(Boolean);
+      const face = item ? ledFaceLabel(item).toUpperCase() : '';
+      const parts = ['Prev. n. ' + quoteNumberLabel(), 'del ' + quoteDateFile(), clientHeading, ledName, measure, face].filter(Boolean);
       return parts.join(' - ').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
     }
     function printFinanceProvider(){

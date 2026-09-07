@@ -133,10 +133,16 @@
       const listeners = [];
       window.SEEMAX_NATIVE_CONTEXT = context;
       /* Il Planner nativo usa lo stesso trasporto affidabile del gestionale
-         per creare la pratica: niente payload estesi in una URL JSONP. */
+         per pratiche e preventivi: niente payload estesi in una URL JSONP e
+         nessun ciclo di rilettura dopo il salvataggio. */
       window.SEEMAX_NATIVE_API = {
         createPracticeFromQuote: (payload) => window.SeemaxApi.createPracticeFromQuote(payload),
-        nextQuoteNumber: (scope) => window.SeemaxApi.nextQuoteNumber(scope)
+        nextQuoteNumber: (scope) => window.SeemaxApi.nextQuoteNumber(scope),
+        saveQuotation: (fields) => window.SeemaxApi.saveQuotation(fields),
+        startQuotationProgress: (record) => window.SeemaxBackgroundOperations && window.SeemaxBackgroundOperations.startQuotation(record),
+        updateQuotationProgress: (id, phase) => window.SeemaxBackgroundOperations && window.SeemaxBackgroundOperations.update(id, phase),
+        completeQuotationProgress: (id, record) => window.SeemaxBackgroundOperations && window.SeemaxBackgroundOperations.complete(id, record),
+        failQuotationProgress: (id, record, error) => window.SeemaxBackgroundOperations && window.SeemaxBackgroundOperations.fail(id, record, error)
       };
       const execute = new Function("document", "window", "location", "history", applicationScript);
       execute(scopedDocument, windowProxy(scopedDocument, locationState, listeners, container), locationState, scopedHistory);
