@@ -1,0 +1,11 @@
+BACKEND OPTIMIZATION TEST SEEMAX 2.15.1 - OK: 19 controlli.
+
+Data verifica: 2026-09-07
+Script: scripts/test-backend-optimizations-v2.15.1.js
+
+Verificati:
+- whitelist e inoltro requestId del ponte;
+- controllo origine e protezione del JavaScript inline;
+- persistenza delle email in EMAIL_CODA;
+- worker MailApp separato dalla mutazione;
+- scrittura mirata della sola cella ultimo_accesso.

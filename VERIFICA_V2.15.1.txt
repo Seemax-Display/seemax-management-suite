@@ -1,0 +1,5 @@
+Verifica statica e funzionale 2.15.1 completata senza errori: 188 controlli.
+
+Comprende versioni, sintassi, editor comunicazioni, Patch notes, sicurezza
+rendering, ponte persistente, fallback POST, idempotenza, lock, coda email,
+letture mirate, stato sincronizzazione UI e migrazioni delle comunicazioni.

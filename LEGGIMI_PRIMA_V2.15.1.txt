@@ -1,0 +1,20 @@
+SEEMAX MANAGEMENT SUITE 2.15.1
+
+Questa release:
+- riusa un unico ponte Apps Script per le scritture successive al login;
+- conserva il trasporto POST precedente come fallback automatico;
+- mostra subito clienti e pratiche con stato SINCRONIZZAZIONE;
+- sostituisce il dato provvisorio soltanto con la risposta autorevole del server;
+- mantiene lock, record_version, request_token e controlli di magazzino;
+- sposta l'invio email fuori dal salvataggio mediante EMAIL_CODA;
+- aggiorna in modo mirato ultimo accesso, notifiche e controlli duplicati;
+- mantiene le correzioni del Benvenuto Beta e delle Patch notes.
+
+INSTALLAZIONE: aggiornare prima Apps Script, eseguire upgradeSeemaxV2151,
+pubblicare una nuova versione della Web App e solo dopo aggiornare GitHub.
+
+IMPORTANTE: l'upgrade crea un trigger eseguito ogni minuto. Autorizzare la
+creazione del trigger e l'invio email quando Google lo richiede.
+
+Il collaudo finale deve essere eseguito sul deployment e sul Foglio privato.
+Consulta docs/AGGIORNAMENTO_V2.15.1.md.

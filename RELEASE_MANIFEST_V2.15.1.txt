@@ -1,0 +1,70 @@
+SEEMAX MANAGEMENT SUITE 2.15.1 - RELEASE MANIFEST
+
+VERSIONI
+- Frontend: 2.15.1
+- Backend: seemax-management-suite-2.15.1
+- Cache PWA: seemax-management-v2-15-1
+- Funzione upgrade: upgradeSeemaxV2151
+- Worker email: processEmailQueueV2151
+
+OTTIMIZZAZIONE PRINCIPALE
+- Ponte HtmlService/google.script.run riutilizzato per le mutazioni.
+- Warm-up del ponte in background dopo il login.
+- Fallback automatico al POST idempotente e al controllo stato precedente.
+- Visualizzazione immediata di clienti e pratiche in sincronizzazione.
+- Riconciliazione del record provvisorio tramite request_token.
+- Coda EMAIL_CODA elaborata fuori dal salvataggio dell'agente.
+
+PROTEZIONI CONSERVATE
+- ScriptLock e flush prima del rilascio.
+- record_version e conflitti multiutente.
+- request_token/requestId idempotenti.
+- numerazione pratica sotto lock.
+- verifica giacenza nel lock.
+- autorizzazioni backend.
+- recupero da timeout o risposta tardiva.
+
+CORREZIONI E LETTURE MIRATE
+- Scrittura ultimo_accesso senza attesa del lock globale.
+- Duplicati movimento cercati sulla colonna request_token.
+- Collegamenti cliente/pratica cercati sulla colonna clientId.
+- Notifiche lette aggiornate con TextFinder e RangeList.
+- Attesa best-effort del LOG ridotta a 40 ms.
+- Benvenuto Beta e Patch notes 2.14.4 conservati e verificati.
+
+FILE RUNTIME PRINCIPALI
+- assets/js/app.js
+- assets/js/api.js
+- assets/js/config.js
+- assets/js/seed.js
+- assets/css/app.css
+- quotation-planner/index.html
+- apps-script/Code.gs
+- apps-script/appsscript.json
+- sw.js
+
+DOCUMENTAZIONE E TEST
+- docs/AGGIORNAMENTO_V2.15.1.md
+- apps-script/INSTALLAZIONE_V2.15.1.txt
+- scripts/test-transport-v2.15.1.js
+- scripts/test-backend-optimizations-v2.15.1.js
+- scripts/verify-v2.15.1.js
+- TEST_BACKEND_V2.15.1.txt
+- TEST_TRASPORTO_V2.15.1.txt
+- VERIFICA_V2.15.1.txt
+- FILE_CHECKSUMS_V2.15.1.txt
+
+RISULTATI LOCALI
+- Sintassi backend/frontend/Service Worker: OK.
+- Ponte persistente simulato: OK.
+- Fallback POST diretto: OK.
+- Risposta POST tardiva: OK.
+- Recupero tramite stato mutazione: OK.
+- Verifica statica e funzionale: 188 controlli superati.
+- Verifica funzionale backend ottimizzato: 19 controlli superati.
+- Integrità archivio ZIP: OK (`unzip -t`, nessun errore).
+
+LIMITAZIONE
+Il pacchetto non è stato distribuito direttamente nel progetto Apps Script
+aziendale. Cold start, autorizzazioni, trigger, latenza reale del Foglio e
+concorrenza con account effettivi devono essere collaudati dopo il deployment.

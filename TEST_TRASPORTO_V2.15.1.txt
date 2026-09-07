@@ -1,0 +1,17 @@
+TRANSPORT TEST SEEMAX 2.15.1 - OK
+
+Data verifica: 2026-09-07
+Script: scripts/test-transport-v2.15.1.js
+
+Scenari superati:
+- native_bridge: risposta tramite ponte persistente senza fallback;
+- post_message: fallback con risposta POST diretta;
+- post_message_late: risposta tardiva riconciliata;
+- status_poll_race: esito recuperato dal registro della mutazione.
+
+Per ogni scenario sono stati verificati:
+- record restituito;
+- modalità trasporto attesa;
+- diagnostica bridge/fallback;
+- token della stessa operazione conservato;
+- tempi frontend/backend registrati.

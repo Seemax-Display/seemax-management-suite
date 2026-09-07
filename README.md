@@ -30,6 +30,10 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - cartelle documentali locali, trascinamento desktop e spostamento con pressione prolungata su smartphone;
 - attività, scadenze e appuntamenti;
 - gestione agenti e ruoli ADMIN/AGENTE;
+- Impostazioni ADMIN organizzate nelle schede Generali, Pratiche, Benvenuto Beta, Patch notes e Sistema;
+- editor collegato direttamente al popup grafico originario “Benvenuto nella Beta”, senza un secondo messaggio duplicato;
+- Benvenuto Beta e Patch notes con modalità indipendenti Solo una volta o Sempre;
+- memoria delle comunicazioni per account, affiancata da cache locale e comando di ripubblicazione separato;
 - Quotation Planner montato nativamente nel gestionale, senza iframe;
 - sessione unica Management Suite/S.Q.P. senza un secondo accesso;
 - importazione dei clienti visibili nel Planner oppure compilazione manuale;
@@ -37,20 +41,23 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - PWA installabile da browser;
 - backend Apps Script già predisposto;
 - avvio accelerato con cache locale per utente e aggiornamento del database in background;
-- backend ottimizzato con letture per richiesta e salvataggi aggregati;
+- backend ottimizzato con lookup puntuali, scrittura della sola riga interessata e cache breve delle impostazioni;
 - Planner alleggerito di oltre il 90% separando immagini e codice;
 - protezione multiutente con coda delle scritture, versioni record e prevenzione dei duplicati;
 - rilevamento dei conflitti senza sovrascritture silenziose;
-- salvataggi POST idempotenti per clienti, pratiche e movimenti, con recupero automatico dopo timeout;
-- scritture mirate sulle sole colonne e righe interessate, senza scansioni complete durante i salvataggi ordinari;
-- contatori atomici per gli identificativi pratica e registro persistente `OPERAZIONI` per recuperare gli esiti oltre la cache temporanea;
+- salvataggi POST idempotenti per clienti, pratiche e movimenti, con risposta iframe diretta, conferma parallela anticipata e recupero idempotente;
+- canale Apps Script persistente dopo il login, con riuso della connessione e fallback automatico al trasporto POST precedente;
+- conferma visiva immediata per nuovi clienti e pratiche, riconciliata con la risposta autorevole del server;
+- coda email asincrona: le notifiche non trattengono più il lock delle operazioni principali;
 - giacenze del Catalogo lette e verificate direttamente in `PRODOTTI_LED.giacenza_attuale`;
 - controllo ADMIN dell'avviso giacenza per ogni pratica Inserita, Sospesa o Completata;
+- contatore pratiche nelle Proprietà script, senza scansione completa a ogni creazione;
+- diagnostica dei tempi di salvataggio consultabile dalla console del browser;
 - refresh manuale con nuova lettura del database e fallback locale dichiarato in caso di disservizio.
 
 ## Prova immediata
 
-Il progetto parte in modalità demo. Apri `index.html` oppure pubblicalo su GitHub Pages.
+Il pacchetto operativo è configurato con `demoMode: false`. Per una prova senza Google Sheets imposta temporaneamente `demoMode: true` in `assets/js/config.js`, quindi apri `index.html` oppure pubblicalo su GitHub Pages.
 
 - ADMIN: `admin.demo` / `DEMO-ADMIN`
 - AGENTE: `agente.demo` / `DEMO-AGENTE`
@@ -66,7 +73,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.15.0 segui [docs/AGGIORNAMENTO_V2.15.0.md](docs/AGGIORNAMENTO_V2.15.0.md). Il rapporto tecnico della base resiliente rimane disponibile in [docs/RAPPORTO_TECNICO_V2.13.0.md](docs/RAPPORTO_TECNICO_V2.13.0.md), insieme a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md).
+Per aggiornare un'installazione già operativa alla versione 2.15.1 segui [docs/AGGIORNAMENTO_V2.15.1.md](docs/AGGIORNAMENTO_V2.15.1.md). La guida comprende il ponte persistente, la coda email asincrona, il comportamento degli indicatori di sincronizzazione e la procedura di collaudo. Restano disponibili il [rapporto dell'editor 2.14.4](docs/RAPPORTO_EDITOR_UNIFICATO_V2.14.4.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 
