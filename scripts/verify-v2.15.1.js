@@ -10,6 +10,7 @@ const files = {
   config: read('assets/js/config.js'),
   seed: read('assets/js/seed.js'),
   css: read('assets/css/app.css'),
+  html: read('index.html'),
   backend: read('apps-script/Code.gs'),
   planner: read('quotation-planner/index.html'),
   sw: read('sw.js'),
@@ -126,6 +127,50 @@ check(/record_version/.test(files.backend) && /request_token/.test(files.backend
 check(/MUTATION_POST_GRACE_MS\s*=\s*700/.test(files.api), 'race trasporto 700 ms conservata');
 check(/status_poll_race/.test(files.api) && /post_message_late/.test(files.api), 'diagnostica trasporto conservata');
 check(/management_mutation_status/.test(files.api), 'conferma stato mutazione conservata');
+
+// Feedback puramente visivo dei salvataggi asincroni.
+check(/id=["']saveProgressCenter["']/.test(files.html), 'centro avanzamento salvataggi presente');
+check(/role=["']progressbar["'][^>]*aria-valuenow=["']0["']/.test(files.html), 'barra di progresso accessibile presente');
+check(/function\s+startSaveProgress\s*\(/.test(files.app), 'avvio progresso salvataggio presente');
+check(/function\s+settleSaveProgress\s*\(/.test(files.app), 'conclusione progresso salvataggio presente');
+check(/Math\.min\(92,/.test(files.app), 'progresso estetico non anticipa la conferma');
+check(/status === ["']complete["'] \? 100/.test(files.app), 'barra raggiunge 100 solo alla conferma');
+check(/backgroundSaveNotice = \[["']clients["'], ["']practices["']\]/.test(files.app), 'feedback non bloccante limitato a clienti e pratiche');
+check(/completeSaveProgress\(saveProgressId, saved\)/.test(files.app), 'conferma backend conclude la barra');
+check(/failSaveProgress\(saveProgressId, record, error\)/.test(files.app), 'errore backend aggiorna la barra');
+check(/save-progress-center/.test(files.css) && /save-progress-track/.test(files.css), 'stili progresso desktop e mobile presenti');
+check(!/function\s+startSaveProgress[\s\S]{0,2200}(?:api\.|fetch\(|XMLHttpRequest)/.test(files.app), 'animazione non introduce comunicazioni di rete');
+
+// Feedback non bloccante per eliminazioni e magazzino.
+check(/function\s+startDeleteProgress\s*\(/.test(files.app), 'progresso eliminazione presente');
+check(/function\s+startInventoryProgress\s*\(/.test(files.app), 'progresso magazzino presente');
+check(/backgroundDeleteNotice = \[["']clients["'], ["']practices["'], ["']documents["']\]/.test(files.app), 'eliminazioni condivise non bloccanti');
+check(/completeBackgroundProgress\(deleteProgressId/.test(files.app) && /failBackgroundProgress\(deleteProgressId/.test(files.app), 'eliminazione conclusa solo dalla risposta backend');
+check(/startInventoryProgress\(payload, product\)/.test(files.app), 'movimento magazzino avvia il pannello');
+check(/completeBackgroundProgress\(inventoryProgressId/.test(files.app) && /failBackgroundProgress\(inventoryProgressId/.test(files.app), 'magazzino gestisce conferma ed errore');
+check(/hasActiveBackgroundProgress\(["']delete["']/.test(files.app), 'doppio comando di eliminazione impedito');
+const removeEntityBody = (files.app.match(/async function\s+removeEntity\s*\([\s\S]*?\n  \}/) || [''])[0];
+check(removeEntityBody.indexOf('await api.remove') >= 0 && removeEntityBody.indexOf('await api.remove') < removeEntityBody.indexOf('state.data[entity] ='), 'record rimosso localmente soltanto dopo conferma');
+const inventoryApiBody = (files.api.match(/async function\s+adjustInventory\s*\([\s\S]*?\n  \}/) || [''])[0];
+check(!/await\s+list\(["']products["']\)/.test(inventoryApiBody), 'rilettura completa prodotti rimossa dal movimento');
+check(/return \{ product: response\.product, movement: response\.movement/.test(inventoryApiBody), 'movimento usa la riga verificata dal backend');
+const inventoryHandler = files.app.slice(files.app.indexOf('if (event.target.id === "inventoryAdjustmentForm")'), files.app.indexOf('if (event.target.id === "profileForm")'));
+check(inventoryHandler.indexOf('await api.adjustInventory') >= 0 && inventoryHandler.indexOf('await api.adjustInventory') < inventoryHandler.indexOf('replaceLocalEntity("products"'), 'giacenza locale aggiornata soltanto dopo conferma');
+check(/incomingVersion < currentVersion/.test(files.app), 'risposte concorrenti obsolete ignorate tramite record_version');
+
+// Numero preventivo: ponte nativo e contatore persistente.
+check(/async function\s+nextQuoteNumber\s*\(/.test(files.api), 'API numero preventivo condivisa presente');
+check(/nextQuoteNumber:\s*\(scope\)\s*=>\s*window\.SeemaxApi\.nextQuoteNumber/.test(read('assets/js/planner-native.js')), 'Planner nativo usa API della suite per il numero');
+check(/nativeNumberLoader[\s\S]*nextQuoteNumber/.test(files.planner), 'Planner preferisce il collegamento nativo');
+check(/jsonpRequest\(["']nextquote["'],\s*30000/.test(files.planner), 'fallback standalone con timeout esteso');
+check(/nextquote:\s*true/.test(files.backend), 'nextquote consentito sul ponte nativo');
+check(/function\s+quoteCounterPropertyKey_\s*\(/.test(files.backend), 'contatore preventivi persistente presente');
+check(/function\s+rebuildQuoteCountersV2151_\s*\(/.test(files.backend), 'ricostruzione contatori preventivi presente');
+check(/rebuildQuoteCountersV2151_\(\);/.test(files.backend.slice(files.backend.indexOf('function upgradeSeemaxV2151'), files.backend.indexOf('function removeEmptyLegacyActivitySheetV2130'))), 'upgrade inizializza contatori preventivi');
+const nextQuoteBody = (files.backend.match(/function\s+nextQuote_\s*\([\s\S]*?\n\}/) || [''])[0];
+check(/PropertiesService\.getScriptProperties\(\)/.test(nextQuoteBody), 'numero preventivo letto dal contatore');
+check(!/rowsToObjects_\(sheet_\(["']ARCHIVIO_PREVENTIVI["']\)\)/.test(nextQuoteBody), 'nextquote non scansiona più tutto archivio');
+check(/rememberQuoteCounter_\(record\.quote_scope/.test(files.backend), 'salvataggio preventivo aggiorna il contatore sotto lock');
 
 // Ottimizzazioni 2.15.1: connessione riusabile, risposta immediata e lavoro secondario asincrono.
 check(/MANAGEMENT_BRIDGE_CHANNEL\s*=\s*["']seemax-management-rpc-v1["']/.test(files.api), 'canale persistente frontend presente');

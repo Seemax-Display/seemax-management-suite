@@ -1,4 +1,4 @@
-BACKEND OPTIMIZATION TEST SEEMAX 2.15.1 - OK: 19 controlli.
+BACKEND OPTIMIZATION TEST SEEMAX 2.15.1 - OK: 26 controlli.
 
 Data verifica: 2026-09-07
 Script: scripts/test-backend-optimizations-v2.15.1.js
@@ -9,3 +9,7 @@ Verificati:
 - persistenza delle email in EMAIL_CODA;
 - worker MailApp separato dalla mutazione;
 - scrittura mirata della sola cella ultimo_accesso.
+- ricostruzione dei contatori preventivo per ADMIN e AGENTE;
+- lettura iniziale delle sole colonne necessarie dell'archivio;
+- recupero ordinario del numero tramite PropertiesService;
+- aggiornamento monotono del contatore dopo il salvataggio.

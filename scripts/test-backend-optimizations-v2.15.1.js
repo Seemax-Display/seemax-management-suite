@@ -27,6 +27,8 @@ let response = sandbox.managementBridgeRpc({
 check(response.ok === true && response.row.id === "cli-test", "risposta RPC serializzata");
 check(executed.action === "management_upsert", "azione consentita inoltrata");
 check(executed.requestId === "mutation-save-test" && executed.params.requestId === "mutation-save-test", "requestId conservato");
+response = sandbox.managementBridgeRpc({ action: "nextquote", requestId: "next-quote-test", params: { quote_scope: "ADMIN" } });
+check(response.ok === true && executed.action === "nextquote", "numero preventivo ammesso sul ponte nativo");
 response = sandbox.managementBridgeRpc({ action: "management_bootstrap", params: {} });
 check(response.ok === false && /non consentita/i.test(response.error), "lettura non prevista rifiutata dal ponte");
 check(sandbox.allowedFrontendOrigin_("https://seemax-display.github.io/") === "https://seemax-display.github.io", "origine produzione ammessa");
@@ -90,5 +92,44 @@ sandbox.sheet_ = () => ({
 sandbox.invalidateTable_ = () => {};
 check(sandbox.touchLoginBestEffort_("agente.test") === true, "ultimo accesso aggiornato");
 check(loginWrite && loginWrite.row === 4 && loginWrite.column === 2, "scritta soltanto la cella ultimo_accesso");
+
+// Il numero preventivo scansiona solo il sottoinsieme iniziale una volta,
+// poi usa PropertiesService senza rileggere ARCHIVIO_PREVENTIVI.
+const quoteHeaders = sandbox.SHEET_SCHEMAS.ARCHIVIO_PREVENTIVI.slice();
+const quoteRows = [
+  ["120-26", "", "ADMIN", "", "", 120],
+  ["45-26", "", "AGENTE", "", "", 45],
+  ["150-25", "", "ADMIN", "", "", 150]
+];
+let quoteRangeReads = 0;
+sandbox.sheetHeaders_ = () => quoteHeaders;
+sandbox.sheet_ = (name) => {
+  check(name === "ARCHIVIO_PREVENTIVI", "foglio contatore preventivi corretto");
+  return {
+    getLastRow: () => quoteRows.length + 1,
+    getRange(row, column, rowCount, columnCount) {
+      quoteRangeReads += 1;
+      check(row === 2 && column === 1 && rowCount === 3 && columnCount === 6, "lettura iniziale limitata alle colonne necessarie");
+      return { getValues: () => quoteRows.map((values) => values.slice()) };
+    }
+  };
+};
+const quoteProperties = new Map();
+sandbox.PropertiesService = {
+  getScriptProperties: () => ({
+    getProperty: (key) => quoteProperties.has(key) ? quoteProperties.get(key) : null,
+    setProperty: (key, value) => { quoteProperties.set(key, String(value)); }
+  })
+};
+const rebuilt = sandbox.rebuildQuoteCountersV2151_();
+check(rebuilt.ADMIN === 150 && rebuilt.AGENTE === 45, "massimi preventivo ricostruiti per profilo");
+check(quoteRangeReads === 1, "archivio preventivi letto una sola volta durante la migrazione");
+sandbox.getSettings_ = () => ({ numero_preventivo_admin_iniziale: 100, numero_preventivo_agenti_iniziale: 1 });
+sandbox.sheet_ = () => { throw new Error("ARCHIVIO_PREVENTIVI non deve essere riletto"); };
+const nextAdmin = sandbox.nextQuote_({ quote_scope: "ADMIN" });
+const nextAgent = sandbox.nextQuote_({ quote_scope: "AGENTE" });
+check(nextAdmin.next_num === "151" && nextAgent.next_num === "46", "numero successivo letto dai contatori persistenti");
+sandbox.rememberQuoteCounter_("ADMIN", "160-26");
+check(sandbox.nextQuote_({ quote_scope: "ADMIN" }).next_num === "161", "salvataggio aggiorna il contatore successivo");
 
 console.log(`Backend optimization test 2.15.1 OK: ${checks} controlli.`);

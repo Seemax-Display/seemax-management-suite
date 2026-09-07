@@ -11,11 +11,15 @@ Questa release:
 - mantiene le correzioni del Benvenuto Beta e delle Patch notes.
 - mostra una barra di avanzamento non bloccante mentre clienti e pratiche
   vengono confermati dal database, senza aggiungere richieste al Foglio.
+- usa lo stesso pannello per eliminare clienti, pratiche e documenti e per
+  registrare carichi/scarichi senza bloccare il resto dell'interfaccia;
+- evita la rilettura completa del catalogo dopo un movimento di magazzino;
+- corregge il prossimo numero preventivo con ponte nativo e contatore persistente.
 
-PATCH INTERFACCIA PROGRESSO
-Se Apps Script 2.15.1 è già pubblicato, per questa sola patch è sufficiente
-aggiornare i file del sito GitHub. Non occorre modificare Code.gs né eseguire
-nuovamente upgradeSeemaxV2151.
+PATCH OPERAZIONI E PLANNER
+Il pacchetto più recente modifica anche Code.gs. Sostituire il backend,
+eseguire nuovamente upgradeSeemaxV2151 e pubblicare una nuova versione della
+Web App prima di aggiornare GitHub.
 
 INSTALLAZIONE: aggiornare prima Apps Script, eseguire upgradeSeemaxV2151,
 pubblicare una nuova versione della Web App e solo dopo aggiornare GitHub.

@@ -1,0 +1,23 @@
+TEST PROGRESSO UI SEEMAX 2.15.1
+
+Esito: SUPERATO.
+
+Controlli eseguiti:
+- comparsa del pannello per un cliente;
+- avanzamento estetico limitato al 92% prima della conferma;
+- valore accessibile della barra allineato a quello visibile;
+- gestione contemporanea di cliente e pratica;
+- eliminazione in background di clienti, pratiche e file;
+- blocco del doppio comando sullo stesso record;
+- carico e scarico merce nello stesso pannello;
+- quantità e prodotto mostrati nel movimento;
+- conservazione della giacenza visibile in caso di errore;
+- permanenza dell'operazione ancora attiva dopo la conferma dell'altra;
+- passaggio al 100% dopo la conferma backend;
+- protezione da errori tardivi successivi a una conferma valida;
+- stato visivo di errore;
+- escaping dei nomi inseriti dall'utente;
+- assenza di nuove chiamate di rete nella logica del pannello.
+
+Comando:
+node scripts/test-save-progress-v2.15.1.js

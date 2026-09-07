@@ -48,6 +48,9 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - salvataggi POST idempotenti per clienti, pratiche e movimenti, con risposta iframe diretta, conferma parallela anticipata e recupero idempotente;
 - canale Apps Script persistente dopo il login, con riuso della connessione e fallback automatico al trasporto POST precedente;
 - conferma visiva immediata per nuovi clienti e pratiche, riconciliata con la risposta autorevole del server;
+- pannello non bloccante per eliminazioni di clienti, pratiche e documenti e per movimenti manuali di magazzino;
+- aggiornamento del magazzino dalla riga già verificata dal backend, senza rilettura completa del catalogo;
+- numero preventivo del Planner tramite ponte nativo e contatori persistenti distinti per ADMIN e agenti;
 - coda email asincrona: le notifiche non trattengono più il lock delle operazioni principali;
 - giacenze del Catalogo lette e verificate direttamente in `PRODOTTI_LED.giacenza_attuale`;
 - controllo ADMIN dell'avviso giacenza per ogni pratica Inserita, Sospesa o Completata;
@@ -73,7 +76,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.15.1 segui [docs/AGGIORNAMENTO_V2.15.1.md](docs/AGGIORNAMENTO_V2.15.1.md). La guida comprende il ponte persistente, la coda email asincrona, il comportamento degli indicatori di sincronizzazione e la procedura di collaudo. Restano disponibili il [rapporto dell'editor 2.14.4](docs/RAPPORTO_EDITOR_UNIFICATO_V2.14.4.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+Per aggiornare un'installazione già operativa alla versione 2.15.1 segui [docs/AGGIORNAMENTO_V2.15.1.md](docs/AGGIORNAMENTO_V2.15.1.md) e la [patch operazioni in background](docs/HOTFIX_OPERAZIONI_BACKGROUND_V2.15.1.md). Le guide comprendono il ponte persistente, la coda email asincrona, gli indicatori di sincronizzazione, il contatore preventivi e la procedura di collaudo. Restano disponibili il [rapporto dell'editor 2.14.4](docs/RAPPORTO_EDITOR_UNIFICATO_V2.14.4.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 

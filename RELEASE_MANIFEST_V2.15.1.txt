@@ -3,7 +3,7 @@ SEEMAX MANAGEMENT SUITE 2.15.1 - RELEASE MANIFEST
 VERSIONI
 - Frontend: 2.15.1
 - Backend: seemax-management-suite-2.15.1
-- Cache PWA: seemax-management-v2-15-1
+- Cache PWA: seemax-management-v2-15-1-background-operations-ui
 - Funzione upgrade: upgradeSeemaxV2151
 - Worker email: processEmailQueueV2151
 
@@ -14,6 +14,13 @@ OTTIMIZZAZIONE PRINCIPALE
 - Visualizzazione immediata di clienti e pratiche in sincronizzazione.
 - Riconciliazione del record provvisorio tramite request_token.
 - Coda EMAIL_CODA elaborata fuori dal salvataggio dell'agente.
+- Barra non bloccante per clienti e pratiche durante la conferma in background.
+- Avanzamento estetico fermo sotto il 100% fino alla risposta autorevole del backend.
+- Gestione visiva di più salvataggi contemporanei senza nuove letture del Foglio.
+- Eliminazioni e movimenti magazzino non bloccanti nello stesso pannello.
+- Nessuna rimozione locale o variazione giacenza prima della conferma backend.
+- Seconda lettura completa di PRODOTTI_LED rimossa dal carico/scarico.
+- Numero preventivo tramite ponte nativo e contatori PropertiesService.
 
 PROTEZIONI CONSERVATE
 - ScriptLock e flush prima del rilascio.
@@ -45,12 +52,16 @@ FILE RUNTIME PRINCIPALI
 
 DOCUMENTAZIONE E TEST
 - docs/AGGIORNAMENTO_V2.15.1.md
+- docs/HOTFIX_PROGRESSO_SALVATAGGI_V2.15.1.md
+- docs/HOTFIX_OPERAZIONI_BACKGROUND_V2.15.1.md
 - apps-script/INSTALLAZIONE_V2.15.1.txt
 - scripts/test-transport-v2.15.1.js
 - scripts/test-backend-optimizations-v2.15.1.js
+- scripts/test-save-progress-v2.15.1.js
 - scripts/verify-v2.15.1.js
 - TEST_BACKEND_V2.15.1.txt
 - TEST_TRASPORTO_V2.15.1.txt
+- TEST_PROGRESSO_UI_V2.15.1.txt
 - VERIFICA_V2.15.1.txt
 - FILE_CHECKSUMS_V2.15.1.txt
 
@@ -60,11 +71,15 @@ RISULTATI LOCALI
 - Fallback POST diretto: OK.
 - Risposta POST tardiva: OK.
 - Recupero tramite stato mutazione: OK.
-- Verifica statica e funzionale: 188 controlli superati.
-- Verifica funzionale backend ottimizzato: 19 controlli superati.
+- Verifica statica e funzionale: 222 controlli superati.
+- Verifica funzionale backend ottimizzato: 26 controlli superati.
 - Integrità archivio ZIP: OK (`unzip -t`, nessun errore).
 
 LIMITAZIONE
 Il pacchetto non è stato distribuito direttamente nel progetto Apps Script
 aziendale. Cold start, autorizzazioni, trigger, latenza reale del Foglio e
 concorrenza con account effettivi devono essere collaudati dopo il deployment.
+
+NOTA PATCH OPERATIVA
+Il backend 2.15.1 include ora il contatore dei preventivi e l'azione nextquote
+nel ponte nativo. Eseguire upgradeSeemaxV2151 e pubblicare un nuovo deployment.
