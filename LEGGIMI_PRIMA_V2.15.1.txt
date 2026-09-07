@@ -9,6 +9,13 @@ Questa release:
 - sposta l'invio email fuori dal salvataggio mediante EMAIL_CODA;
 - aggiorna in modo mirato ultimo accesso, notifiche e controlli duplicati;
 - mantiene le correzioni del Benvenuto Beta e delle Patch notes.
+- mostra una barra di avanzamento non bloccante mentre clienti e pratiche
+  vengono confermati dal database, senza aggiungere richieste al Foglio.
+
+PATCH INTERFACCIA PROGRESSO
+Se Apps Script 2.15.1 è già pubblicato, per questa sola patch è sufficiente
+aggiornare i file del sito GitHub. Non occorre modificare Code.gs né eseguire
+nuovamente upgradeSeemaxV2151.
 
 INSTALLAZIONE: aggiornare prima Apps Script, eseguire upgradeSeemaxV2151,
 pubblicare una nuova versione della Web App e solo dopo aggiornare GitHub.

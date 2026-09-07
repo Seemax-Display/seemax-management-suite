@@ -93,6 +93,15 @@
   <div id="tutorialRoot"></div>
   <div id="celebrationRoot" class="celebration-root" aria-live="polite"></div>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+  <aside id="saveProgressCenter" class="save-progress-center is-hidden" aria-live="polite">
+    <div class="save-progress-head">
+      <span id="saveProgressIcon" class="save-progress-icon">↻</span>
+      <div><strong id="saveProgressTitle">Sto caricando…</strong><small id="saveProgressSubtitle">Invio dei dati al database</small></div>
+      <em id="saveProgressPercent">0%</em>
+    </div>
+    <i id="saveProgressTrack" class="save-progress-track" role="progressbar" aria-label="Avanzamento salvataggio" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><b id="saveProgressBar"></b></i>
+    <div id="saveProgressItems" class="save-progress-items"></div>
+  </aside>
   <aside id="uploadCenter" class="upload-center is-hidden" aria-live="polite">
     <button id="uploadCenterSummary" class="upload-center-summary" type="button" data-action="toggle-upload-center" aria-expanded="false">
       <span id="uploadCenterIcon">⬆️</span><div><strong id="uploadCenterTitle">Caricamento documenti</strong><small id="uploadCenterSubtitle">Preparazione…</small></div><em id="uploadCenterPercent">0%</em>

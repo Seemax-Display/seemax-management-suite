@@ -13,6 +13,7 @@
   let pendingDocumentFile = null;
   let clientToolsPromise = null;
   const uploadState = { batches: new Map(), expanded: false };
+  const saveProgressState = { items: new Map() };
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
   let pendingWelcomeMessage = false;
   let pendingPatchNotesMessage = false;
@@ -173,6 +174,112 @@
     $("toastRoot").appendChild(item);
     setTimeout(() => item.classList.add("show"), 20);
     setTimeout(() => { item.classList.remove("show"); setTimeout(() => item.remove(), 250); }, 3500);
+  }
+
+  function saveProgressEntityName(entity) {
+    return entity === "practices" ? "pratica" : "cliente";
+  }
+
+  function saveProgressRecordName(entity, record) {
+    if (entity === "practices") return String((record || {}).numero || (record || {}).cliente || "Nuova pratica").trim();
+    return String((record || {}).ragioneSociale || "Nuovo cliente").trim();
+  }
+
+  function saveProgressPhase(progress) {
+    if (progress < 34) return "Invio dei dati al database…";
+    if (progress < 62) return "Elaborazione del salvataggio…";
+    if (progress < 82) return "Attesa della conferma…";
+    return "Verifica finale del salvataggio…";
+  }
+
+  function startSaveProgress(entity, record) {
+    const id = `save-progress-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const item = {
+      id,
+      entity,
+      name: saveProgressRecordName(entity, record),
+      progress: 9,
+      phase: "Preparazione del salvataggio…",
+      status: "active",
+      startedAt: Date.now(),
+      timer: 0
+    };
+    item.timer = window.setInterval(() => {
+      if (item.status !== "active") return;
+      item.progress = Math.min(92, item.progress + Math.max(0.7, (92 - item.progress) * 0.085));
+      item.phase = saveProgressPhase(item.progress);
+      renderSaveProgressCenter();
+    }, 360);
+    saveProgressState.items.set(id, item);
+    renderSaveProgressCenter();
+    return id;
+  }
+
+  function updateSaveProgress(id, phase) {
+    const item = saveProgressState.items.get(id);
+    if (!item || item.status !== "active") return;
+    item.phase = phase || item.phase;
+    item.progress = Math.max(item.progress, 18);
+    renderSaveProgressCenter();
+  }
+
+  function settleSaveProgress(id, status, record, errorMessage = "") {
+    const item = saveProgressState.items.get(id);
+    if (!item || item.status !== "active") return;
+    window.clearInterval(item.timer);
+    item.timer = 0;
+    item.status = status;
+    item.name = saveProgressRecordName(item.entity, record) || item.name;
+    item.progress = status === "complete" ? 100 : Math.max(12, Math.min(100, item.progress));
+    item.phase = status === "complete" ? "Salvataggio confermato dal database" : (errorMessage || "Salvataggio non confermato");
+    renderSaveProgressCenter();
+    window.setTimeout(() => {
+      const current = saveProgressState.items.get(id);
+      if (!current || current.status === "active") return;
+      saveProgressState.items.delete(id);
+      renderSaveProgressCenter();
+    }, status === "complete" ? 2600 : 7000);
+  }
+
+  function completeSaveProgress(id, record) {
+    if (id) settleSaveProgress(id, "complete", record);
+  }
+
+  function failSaveProgress(id, record, error) {
+    if (!id) return;
+    const message = String(error && error.message || error || "Salvataggio non riuscito.");
+    settleSaveProgress(id, "failed", record, message);
+  }
+
+  function renderSaveProgressCenter() {
+    const center = $("saveProgressCenter");
+    if (!center) return;
+    const items = Array.from(saveProgressState.items.values());
+    center.classList.toggle("is-hidden", !items.length);
+    if (!items.length) return;
+    const active = items.filter((item) => item.status === "active");
+    const failed = items.filter((item) => item.status === "failed");
+    const primary = active[active.length - 1] || failed[failed.length - 1] || items[items.length - 1];
+    const progressItems = active.length ? active : items;
+    const progress = Math.round(progressItems.reduce((total, item) => total + Number(item.progress || 0), 0) / Math.max(1, progressItems.length));
+    const entityName = saveProgressEntityName(primary.entity);
+    center.classList.toggle("multiple", items.length > 1);
+    center.classList.toggle("complete", !active.length && !failed.length);
+    center.classList.toggle("failed", !active.length && failed.length > 0);
+    $("saveProgressIcon").textContent = active.length ? "↻" : failed.length ? "!" : "✓";
+    $("saveProgressTitle").textContent = active.length > 1
+      ? `${active.length} salvataggi in corso…`
+      : active.length ? `Sto caricando ${entityName === "pratica" ? "la" : "il"} ${entityName}…`
+        : failed.length ? "Salvataggio da verificare" : "Salvataggio completato";
+    $("saveProgressSubtitle").textContent = `${primary.name} · ${primary.phase}`;
+    $("saveProgressPercent").textContent = `${progress}%`;
+    $("saveProgressBar").style.width = `${progress}%`;
+    $("saveProgressTrack").setAttribute("aria-valuenow", String(progress));
+    $("saveProgressItems").innerHTML = items.map((item) => {
+      const icon = item.status === "active" ? "↻" : item.status === "failed" ? "!" : "✓";
+      const status = item.status === "active" ? `${Math.round(item.progress)}%` : item.status === "failed" ? "Da verificare" : "Completato";
+      return `<div class="save-progress-item ${esc(item.status)}"><span>${icon}</span><div><strong>${esc(saveProgressEntityName(item.entity))}</strong><small title="${esc(item.name)}">${esc(item.name)}</small></div><em>${esc(status)}</em></div>`;
+    }).join("");
   }
 
   function haptic(type = "tap") {
@@ -2699,7 +2806,9 @@
       record.id = record.id || record.username;
       if (!record.chiave_id_agente) delete record.chiave_id_agente;
     }
-    setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
+    const backgroundSaveNotice = ["clients", "practices"].includes(entity) && !api.isFastMode();
+    const saveProgressId = backgroundSaveNotice ? startSaveProgress(entity, record) : "";
+    if (!backgroundSaveNotice) setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
     let activeUploadBatchId = "";
     let celebrationShown = false;
     let optimisticRow = null;
@@ -2719,17 +2828,17 @@
           replaceLocalEntity(entity, optimisticRow);
           closeModal();
           renderRoute();
-          setLoading(false);
-          toast(`${ENTITY_LABELS[entity] || "Elemento"} in sincronizzazione con il database…`, "info");
+          updateSaveProgress(saveProgressId, "Salvataggio in background…");
         }
       });
+      completeSaveProgress(saveProgressId, saved);
       if (entity === "practices" && practiceAttachments.length) {
         const uploadBatchId = startUploadBatch(saved, practiceAttachments);
         activeUploadBatchId = uploadBatchId;
         replaceLocalEntity(entity, saved);
         closeModal();
         renderRoute();
-        setLoading(false);
+        if (!backgroundSaveNotice) setLoading(false);
         celebrationShown = celebrateSavedEntity(entity, saved, current);
         toast(`Pratica salvata. Caricamento di ${practiceAttachments.length} documenti in background: non chiudere la pagina.`, "info");
         const preparedAttachments = await preparedAttachmentsPromise;
@@ -2795,10 +2904,11 @@
       setConnectionState();
       closeModal();
       renderRoute();
-      setLoading(false);
+      if (!backgroundSaveNotice) setLoading(false);
       if (!celebrationShown) celebrationShown = celebrateSavedEntity(entity, saved, current);
       if (!celebrationShown) toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
     } catch (error) {
+      failSaveProgress(saveProgressId, record, error);
       if (activeUploadBatchId) {
         const failedBatch = uploadState.batches.get(activeUploadBatchId);
         if (failedBatch) failedBatch.files.forEach((file) => { if (!["done", "failed"].includes(file.status)) { file.status = "failed"; file.detail = "Trasferimento interrotto"; } });
@@ -2814,7 +2924,7 @@
         toast(`${error.message} I dati inseriti sono conservati: riapri l'elemento “Da verificare” per correggerli.`, "danger");
       } else toast(error.message, "danger");
     }
-    finally { setLoading(false); }
+    finally { if (!backgroundSaveNotice) setLoading(false); }
   }
 
   function readFileAsDataUrl(file) {
