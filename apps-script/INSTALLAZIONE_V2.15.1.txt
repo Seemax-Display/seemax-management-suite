@@ -1,0 +1,46 @@
+SEEMAX MANAGEMENT SUITE 2.15.1 - GOOGLE APPS SCRIPT
+
+ORDINE CONSIGLIATO
+
+1. Crea una copia di sicurezza del Foglio Google e del precedente Code.gs.
+2. Apri Foglio Google > Estensioni > Apps Script.
+3. Sostituisci tutto il contenuto di Code.gs con il file 2.15.1.
+4. Salva.
+5. Seleziona la funzione upgradeSeemaxV2151.
+6. Premi Esegui e autorizza lo script, se richiesto.
+7. Verifica il messaggio:
+
+   SEEMAX v2.15.1 configurato: ponte nativo con fallback, salvataggi
+   reattivi e coda email asincrona attivi.
+
+8. Verifica che il Foglio contenga EMAIL_CODA.
+9. In Apps Script > Trigger verifica processEmailQueueV2151 ogni minuto.
+10. Apri Esegui il deployment > Gestisci deployment.
+11. Modifica il deployment Web App esistente.
+12. Seleziona Nuova versione e pubblica.
+13. Controlla che l'URL /exec coincida con assets/js/config.js.
+14. Aggiorna GitHub con tutto il pacchetto 2.15.1.
+15. Esegui Ctrl+F5 oppure chiudi e riapri completamente la PWA.
+
+CONTROLLO RAPIDO
+
+- config frontend: 2.15.1
+- backend: seemax-management-suite-2.15.1
+- cache PWA: seemax-management-v2-15-1
+- funzione upgrade: upgradeSeemaxV2151
+- worker email: processEmailQueueV2151
+
+DOPO L'INSTALLAZIONE
+
+1. Crea un cliente e una pratica: devono apparire subito come
+   SINCRONIZZAZIONE e poi perdere il badge dopo la conferma.
+2. Controlla in console SeemaxApi.getLastPerformance(): il percorso nuovo
+   riporta transport_mode = native_bridge.
+3. Cambia lo stato di una pratica e verifica la riga in EMAIL_CODA.
+4. Pubblica nuove Patch notes e prova ONCE e ALWAYS.
+5. Esegui una prova con due utenti contemporanei.
+
+L'email può essere inviata fino a circa un minuto dopo la variazione di stato.
+La notifica interna viene registrata subito.
+
+Consulta docs/AGGIORNAMENTO_V2.15.1.md per la procedura completa.

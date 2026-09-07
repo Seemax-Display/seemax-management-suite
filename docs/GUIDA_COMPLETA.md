@@ -67,8 +67,6 @@ Lo script crea o completa automaticamente:
 - `PATCH_ITEMS`;
 - `ARCHIVIO_PREVENTIVI`;
 - `MOVIMENTI_MAGAZZINO`;
-- `CONTATORI`;
-- `OPERAZIONI`;
 - `NOTIFICHE`;
 - `LOG`.
 
@@ -158,7 +156,15 @@ L’amministratore vede e modifica agenti, catalogo e impostazioni. L’agente u
 
 ## 9. Documenti e allegati
 
-In Modalità Standard i documenti possono essere selezionati direttamente dal dispositivo. La webapp invia il file ad Apps Script, che lo archivia nella cartella Drive `SEEMAX MANAGEMENT DOCUMENTI` e registra nel Foglio soltanto metadati, ID e URL. Non chiudere la pagina finché l'indicatore degli upload in background non segnala il completamento.
+La versione iniziale registra collegamenti a Google Drive:
+
+1. carica il PDF o il documento su Drive;
+2. copia il link di condivisione;
+3. nel gestionale apri **Documenti > Nuovo documento**;
+4. collega il documento alla pratica;
+5. incolla il link.
+
+Il caricamento diretto dei file nella webapp è lasciato come estensione futura perché GitHub Pages non può ricevere file sul proprio server.
 
 ## 10. Aggiornare il gestionale
 
@@ -169,8 +175,6 @@ Per modificare testi, colori o funzioni:
 3. GitHub Pages pubblicherà automaticamente la nuova versione.
 
 Se il browser mostra ancora la versione precedente, aggiorna la costante `CACHE` dentro `sw.js`, ad esempio da `seemax-management-v1` a `seemax-management-v2`.
-
-Per passare alla versione 2.15.0 sostituisci anche `Code.gs`, esegui una volta `upgradeSeemaxV2150()` e pubblica una nuova versione del deployment Apps Script. I dettagli e il collaudo sono in `docs/AGGIORNAMENTO_V2.15.0.md`.
 
 ## 11. Installazione su smartphone o computer
 

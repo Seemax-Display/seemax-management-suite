@@ -48,14 +48,6 @@ Registra le principali operazioni effettuate dagli utenti: salvataggi, modifiche
 
 È un foglio **attivo e necessario**: conserva le variazioni di stato destinate all'agente responsabile e lo stato letto/non letto mostrato dalla campanella. Non deve essere eliminato.
 
-### CONTATORI
-
-Foglio tecnico introdotto nella versione 2.15. Ogni riga conserva la sequenza già prenotata per le iniziali di un agente (`PRATICA_GL`, `PRATICA_SM` e così via). L'incremento avviene dentro il lock globale prima della creazione della pratica: due utenti simultanei non possono quindi ricevere lo stesso identificativo. Una sequenza prenotata può lasciare un salto se un errore successivo impedisce il completamento della pratica; il salto è intenzionale e preferibile a un duplicato. La funzione amministrativa `rebuildPracticeCountersV2150()` riallinea i contatori agli ID già presenti senza ridurre valori precedentemente prenotati.
-
-### OPERAZIONI
-
-Registro tecnico degli esiti delle mutazioni della versione 2.15. Conserva un identificativo derivato da utente e `requestId`, il `request_token`, l'azione, il record interessato e la risposta conclusiva. Se il browser perde il messaggio di risposta o la cache scade, `management_mutation_status` consulta questo foglio e restituisce l'esito senza ripetere la scrittura. Il registro non è esposto come entità modificabile dal frontend. Per manutenzione si può eseguire manualmente `cleanupOperationsV2150(90)`, che elimina soltanto gli esiti più vecchi del periodo indicato.
-
 ## Fogli condivisi con il Quotation Planner
 
 ### AGENTI
@@ -72,11 +64,9 @@ Registro immutabile dei carichi, scarichi e storni. I movimenti manuali riportan
 
 Il valore letterale `0000` è una deroga riservata agli ADMIN per i dati temporaneamente sconosciuti di clienti e pratiche. Non equivale a un dato verificato e deve essere sostituito appena disponibile; il backend rifiuta questa deroga se inviata da un agente.
 
-## Affidabilità e percorso rapido dalla versione 2.15
+## Affidabilità delle scritture dalla versione 2.13
 
 Clienti, pratiche, righe documento, movimenti di magazzino e creazione pratica dal Quotation Planner vengono inviati tramite `POST`, evitando il limite di lunghezza delle URL JSONP. Ogni salvataggio porta un `request_token` stabile e ogni richiesta un `requestId`: se la risposta tarda, il browser controlla l'esito e può riprendere la stessa richiesta senza creare duplicati. Le modifiche condivise continuano a passare dal lock globale e da `record_version`, per impedire sovrascritture silenziose tra agenti.
-
-Le operazioni puntuali non chiamano più `getDataRange()` sui fogli applicativi: leggono l'intestazione, cercano il valore nella sola colonna chiave e recuperano esclusivamente la riga interessata. Anche gli aggiornamenti scrivono una sola riga. Le letture complete restano intenzionalmente disponibili per dashboard, bootstrap, catalogo completo, report e migrazioni, dove l'intero insieme dei dati è realmente necessario.
 
 Un refresh manuale prova sempre una nuova lettura del Foglio. Se Apps Script è temporaneamente indisponibile, l'ultima copia locale resta visibile con un avviso esplicito; non viene presentata come dato aggiornato.
 

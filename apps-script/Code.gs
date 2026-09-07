@@ -5,19 +5,43 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Esegui una volta setupSeemaxDatabase() e autorizza lo script.
- * 4. Distribuisci come Applicazione Web: esegui come "Me", accesso "Chiunque".
- * 5. Copia l'URL /exec in assets/js/config.js.
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2151().
+ * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
+ * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.15.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.15.1";
+var SEEMAX_PERFORMANCE_OPTIONS_ = {
+  diagnostics: true,
+  routineUpsertLogs: false,
+  settingsCacheSeconds: 90,
+  logLockWaitMs: 40
+};
+var SEEMAX_FRONTEND_ORIGINS_ = [
+  "https://seemax-display.github.io"
+];
+var SEEMAX_BRIDGE_ACTIONS_ = {
+  management_upsert: true,
+  management_remove: true,
+  management_save_settings: true,
+  management_save_admin_content: true,
+  management_mark_message_seen: true,
+  management_save_profile: true,
+  management_create_from_quote: true,
+  management_mark_notifications_read: true,
+  management_update_practice_documents: true,
+  management_inventory_adjust: true,
+  management_set_practice_stock_warning: true
+};
 var RUNTIME_DB_CACHE_ = null;
 var RUNTIME_SHEET_CACHE_ = {};
 var RUNTIME_TABLE_CACHE_ = {};
-var RUNTIME_ROW_CACHE_ = {};
+var RUNTIME_HEADER_CACHE_ = {};
+var RUNTIME_ROW_LOOKUP_CACHE_ = {};
 var RUNTIME_DEFERRED_EMAILS_ = [];
 var RUNTIME_DEFERRED_LOGS_ = [];
 var RUNTIME_MUTATION_LOCK_HELD_ = false;
+var RUNTIME_PERFORMANCE_ = null;
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
   clients: "CLIENTI",
@@ -38,9 +62,8 @@ var SHEET_SCHEMAS = {
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
   ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
   MOVIMENTI_MAGAZZINO: ["id", "data", "practiceId", "numero_pratica", "cliente", "product_id", "sku", "prodotto", "quantita", "tipo_movimento", "giacenza_prima", "giacenza_dopo", "username", "note", "request_token"],
-  OPERAZIONI: ["request_id", "request_token", "azione", "entita", "username", "stato", "record_id", "result_json", "payload_hash", "errore", "created_at", "completed_at", "updated_at"],
-  CONTATORI: ["chiave", "valore", "aggiornato_il", "aggiornato_da"],
   NOTIFICHE: ["id", "data", "recipient_username", "recipient_name", "practiceId", "numero_pratica", "stato_precedente", "nuovo_stato", "titolo", "messaggio", "letta", "letta_il", "actor_username"],
+  EMAIL_CODA: ["id", "created_at", "status", "attempts", "next_attempt_at", "to", "subject", "sender_name", "body", "html_body", "notification_id", "actor_username", "last_error", "sent_at"],
   LOG: ["data", "username", "ruolo", "azione", "entita", "record_id", "dettaglio"]
 };
 
@@ -57,8 +80,9 @@ function setupSeemaxDatabase() {
   PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", ss.getId());
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
+  prepareCommunicationsV2144_();
+  ensureEmailQueueTriggerV2151_();
   migrateRevenueTargetV151_();
-  seedPatchNotes_();
   seedProducts_();
   initializeInventoryV11_();
   backfillPracticeInventoryV12_();
@@ -70,12 +94,11 @@ function setupSeemaxDatabase() {
   managementDocumentsFolder_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
-  initializePracticeCountersV2150_();
   normalizeAdminUnknownPlaceholdersV2121_();
-  setSetting_("versione_config", SEEMAX_VERSION, "Versione backend corrente.");
   styleSheets_();
-  return "DATABASE SEEMAX configurato correttamente.";
+  return "DATABASE SEEMAX 2.15.1 configurato: comunicazioni, ponte nativo e coda email asincrona attivi.";
 }
+
 
 function upgradeSeemaxV11() {
   var ss = db_();
@@ -131,7 +154,6 @@ function upgradeSeemaxV2100() {
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
   backfillPracticeStockWarningsV2100_();
-  updatePatchNotesV2100_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.10.0 · Deroga ADMIN 0000, avvisi giacenza, movimenti manuali e organizzazione pratiche.");
   styleSheets_();
   return "SEEMAX v2.10.0 configurato: deroga ADMIN, avvisi giacenza e carico/scarico magazzino attivi.";
@@ -141,7 +163,6 @@ function upgradeSeemaxV2110() {
   var ss = db_();
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
-  updatePatchNotesV2110_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.11.0 · Paginazione a 6 elementi, ordinamento cronologico e assegnazione clienti agli agenti.");
   styleSheets_();
   return "SEEMAX v2.11.0 configurato: elenchi paginati e assegnazione clienti ADMIN attivi.";
@@ -152,7 +173,6 @@ function upgradeSeemaxV2120() {
   Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
   seedSettings_();
   backfillLedwallConfigurationsV2120_();
-  updatePatchNotesV2120_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.12.0 · Pratiche multi-Ledwall e gestione non bloccante delle giacenze insufficienti.");
   styleSheets_();
   return "SEEMAX v2.12.0 configurato: pratiche multi-Ledwall e impegni magazzino in attesa attivi.";
@@ -164,7 +184,6 @@ function upgradeSeemaxV2121() {
   seedSettings_();
   backfillExistingIds_();
   normalizeAdminUnknownPlaceholdersV2121_();
-  updatePatchNotesV2121_();
   setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.12.1 · Placeholder ADMIN 0000 preservati negli indirizzi e durante l'inserimento delle pratiche.");
   styleSheets_();
   return "SEEMAX v2.12.1 configurato: placeholder 0000 normalizzati e indirizzi con dati sconosciuti compatibili con le pratiche.";
@@ -179,7 +198,6 @@ function upgradeSeemaxV2130() {
        presenti nel foglio. PRODOTTI_LED resta l'unica fonte delle giacenze. */
     initializeInventoryV11_();
     backfillPracticeStockWarningsV2100_();
-    updatePatchNotesV2130_();
     setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.13.0 · connessione resiliente, giacenze PRODOTTI_LED e controllo avvisi per ADMIN.");
     styleSheets_();
     return "SEEMAX v2.13.0 configurato: sincronizzazione affidabile e controllo amministrativo degli avvisi giacenza attivi.";
@@ -191,26 +209,57 @@ function upgradeSeemaxV2140() {
     var ss = db_();
     Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
     seedSettings_();
-    seedPatchNotes_();
-    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.0 · comunicazioni ADMIN configurabili e ricevute per utente.");
+    rebuildPracticeCountersV2140_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.0 · salvataggi diretti, letture mirate e diagnostica prestazioni.");
     styleSheets_();
-    return "SEEMAX v2.14.0 configurato: messaggio di benvenuto e Patch Notes gestibili dall'ADMIN.";
+    return "SEEMAX v2.14.0 configurato: percorso rapido per clienti e pratiche, contatori pratica e diagnostica tempi attivi.";
   });
 }
 
-function upgradeSeemaxV2150() {
+function upgradeSeemaxV2141() {
   return withMutationLock_(function () {
     var ss = db_();
     Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
     seedSettings_();
-    initializePracticeCountersV2150_();
-    updatePatchNotesV2150_();
-    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.15.0 · contatori atomici, registro operazioni e letture mirate.");
-    setSetting_("patch_notes_revision", Number(getSettings_().patch_notes_revision || 1) + 1, "Nuova revisione Management Suite v2.15.0.");
-    styleSheets_();
-    return "SEEMAX v2.15.0 configurato: percorso di scrittura rapido e protezioni multiutente attive.";
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.1 · risposta POST diretta, iframe compatibile e fallback rapido.");
+    return "SEEMAX v2.14.1 configurato: risposta immediata del salvataggio e conferma rapida di sicurezza attive.";
   });
 }
+
+function upgradeSeemaxV2142() {
+  return upgradeSeemaxV2144();
+}
+
+
+function upgradeSeemaxV2143() {
+  return upgradeSeemaxV2144();
+}
+function upgradeSeemaxV2144() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.14.4 · editor unificato del Benvenuto Beta e sorgenti comunicazioni ripulite.");
+    styleSheets_();
+    return "SEEMAX v2.14.4 configurato: unico Benvenuto Beta editabile, patch notes centralizzate e chiavi obsolete rimosse.";
+  });
+}
+
+function upgradeSeemaxV2151() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.15.1 · ponte nativo, sincronizzazione immediata e attività secondarie asincrone.");
+    styleSheets_();
+    return "SEEMAX v2.15.1 configurato: ponte nativo con fallback, salvataggi reattivi e coda email asincrona attivi.";
+  });
+}
+
+
 
 /* ATTIVITA non viene piu usato come tabella condivisa: la sezione e locale
    sul dispositivo. Questa utility elimina soltanto un vecchio foglio vuoto,
@@ -232,6 +281,7 @@ function removeEmptyLegacyActivitySheetV2130() {
 function doGet(e) {
   resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
+  if (String(p.action || "") === "management_bridge") return managementBridgeOutput_(p);
   var callback = sanitizeCallback_(p.callback);
   try {
     var result = routeGet_(String(p.action || "ping"), p);
@@ -245,29 +295,114 @@ function doGet(e) {
 function doPost(e) {
   resetRuntimeCaches_();
   var p = (e && e.parameter) || {};
+  var action = String(p.action || "");
   var requestId = String(p.requestId || "").slice(0, 180);
+  var result = executeManagementRequest_(action, p, requestId);
+  return postResponseOutput_(requestId, result, p.response_origin);
+}
+
+function executeManagementRequest_(action, p, requestId) {
+  performanceStart_(action || "post");
   var result;
   try {
     /* Se il browser riprende un POST che sembrava interrotto, lo stesso
        requestId restituisce l'esito precedente senza eseguire di nuovo la
        mutazione. */
+    var cacheStarted = new Date().getTime();
     var cachedResult = requestId ? CacheService.getScriptCache().get(managementRequestCacheKey_(requestId)) : "";
+    performanceEvent_("cache", "management_request", new Date().getTime() - cacheStarted, { hit: !!cachedResult });
     var cachedPayload = cachedResult ? parseJson_(cachedResult, {}) : null;
     /* Una risposta molto grande viene rappresentata in cache da un marker.
        La mutazione viene quindi richiamata: il request_token scritto nel
        record la rende idempotente e consente di ricostruire la risposta
        completa senza superare il limite di CacheService. */
     if (cachedPayload && !cachedPayload.recover_by_token) result = cachedPayload;
-    else if (String(p.action || "") === "savequote") result = saveQuotation_(p);
-    else result = routeGet_(String(p.action || ""), p);
+    else if (action === "savequote") result = saveQuotation_(p);
+    else result = routeGet_(action, p);
     if (result.ok === undefined) result.ok = true;
   } catch (error) {
     result = { ok: false, error: String(error && error.message ? error.message : error) };
   }
+  if (SEEMAX_PERFORMANCE_OPTIONS_.diagnostics && result && typeof result === "object") {
+    result.performance = performanceSnapshot_();
+  }
   cacheManagementRequestResult_(requestId, result);
-  var message = JSON.stringify({ requestId: requestId, payload: result }).replace(/</g, "\\u003c");
-  return HtmlService.createHtmlOutput("<!doctype html><meta charset='utf-8'><script>parent.postMessage(" + message + ", '*');</script>");
+  return result;
 }
+
+function managementBridgeRpc(request) {
+  resetRuntimeCaches_();
+  var envelope = request && typeof request === "object" ? request : {};
+  var action = String(envelope.action || "");
+  if (!SEEMAX_BRIDGE_ACTIONS_[action]) return { ok: false, error: "Azione non consentita dal ponte nativo." };
+  var p = envelope.params && typeof envelope.params === "object" ? envelope.params : {};
+  var requestId = String(envelope.requestId || p.requestId || "").slice(0, 180);
+  p.requestId = requestId;
+  /* google.script.run non serializza Date annidate. Il passaggio JSON rende
+     la risposta equivalente a quella del percorso HTTP/JSONP. */
+  return parseJson_(JSON.stringify(executeManagementRequest_(action, p, requestId)), { ok: false, error: "Risposta non serializzabile." });
+}
+
+function allowedFrontendOrigin_(value) {
+  var origin = String(value || "").trim().replace(/\/$/, "");
+  if (SEEMAX_FRONTEND_ORIGINS_.indexOf(origin) >= 0) return origin;
+  if (/^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)) return origin;
+  return "";
+}
+
+function managementBridgeOutput_(p) {
+  var parentOrigin = allowedFrontendOrigin_(p.parent_origin);
+  var nonce = String(p.bridge_nonce || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 180);
+  if (!parentOrigin || nonce.length < 20) {
+    return HtmlService.createHtmlOutput("<!doctype html><meta charset='utf-8'><title>Ponte non disponibile</title>")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  var originJson = inlineJsonForScript_(parentOrigin);
+  var nonceJson = inlineJsonForScript_(nonce);
+  var versionJson = inlineJsonForScript_(SEEMAX_VERSION);
+  var html = "<!doctype html><html><head><meta charset='utf-8'><title>Seemax Bridge</title></head><body><script>" +
+    "(function(){'use strict';var C='seemax-management-rpc-v1',O=" + originJson + ",N=" + nonceJson + ",V=" + versionJson + ";" +
+    "function send(m){try{window.parent.postMessage(Object.assign({channel:C,nonce:N},m),O);}catch(e){}}" +
+    "window.addEventListener('message',function(e){var d=e.data||{};if(e.source!==window.parent||e.origin!==O||d.channel!==C||d.nonce!==N||d.type!=='request')return;" +
+    "var id=String(d.id||''),r=d.request||{};google.script.run.withSuccessHandler(function(x){send({type:'response',id:id,payload:x||{ok:true}});}).withFailureHandler(function(err){send({type:'response',id:id,payload:{ok:false,error:String(err&&err.message||err||'Errore ponte nativo.')}});}).managementBridgeRpc(r);});" +
+    "send({type:'ready',version:V});setTimeout(function(){send({type:'ready',version:V});},250);" +
+    "})();</script></body></html>";
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function inlineJsonForScript_(value) {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+function sanitizeResponseOrigin_(value) {
+  var origin = String(value || "").trim();
+  if (/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(origin)) return origin;
+  if (/^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)) return origin;
+  return "*";
+}
+
+function postResponseOutput_(requestId, result, requestedOrigin) {
+  var message = inlineJsonForScript_({ requestId: requestId, payload: result });
+  var targetOrigin = inlineJsonForScript_(sanitizeResponseOrigin_(requestedOrigin));
+  /* HtmlService applica per impostazione predefinita protezioni che possono
+     impedire a una risposta POST di essere eseguita dentro l'iframe nascosto
+     di GitHub Pages. Questa pagina non contiene interfaccia o comandi: serve
+     soltanto a recapitare l'esito autenticato al chiamante. */
+  var html = "<!doctype html><html><head><meta charset='utf-8'></head><body><script>" +
+    "(function(){var m=" + message + ",o=" + targetOrigin + ";" +
+    "function s(w){try{if(w&&w.postMessage)w.postMessage(m,o);}catch(e){}}" +
+    "s(window.parent);s(window.top);" +
+    "setTimeout(function(){s(window.parent);s(window.top);},60);" +
+    "setTimeout(function(){s(window.parent);s(window.top);},240);" +
+    "})();</script></body></html>";
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
 
 function routeGet_(action, p) {
   switch (action) {
@@ -280,6 +415,9 @@ function routeGet_(action, p) {
     case "management_remove": return managementRemove_(p);
     case "management_settings": return managementSettings_(p);
     case "management_save_settings": return managementSaveSettings_(p);
+    case "management_admin_content": return managementAdminContent_(p);
+    case "management_save_admin_content": return managementSaveAdminContent_(p);
+    case "management_mark_message_seen": return managementMarkMessageSeen_(p);
     case "management_save_profile": return managementSaveProfile_(p);
     case "management_create_from_quote": return managementCreateFromQuote_(p);
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
@@ -290,7 +428,6 @@ function routeGet_(action, p) {
     case "management_verify_vat": return managementVerifyVat_(p);
     case "management_inventory_adjust": return managementInventoryAdjust_(p);
     case "management_set_practice_stock_warning": return managementSetPracticeStockWarning_(p);
-    case "management_acknowledge_announcement": return managementAcknowledgeAnnouncement_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
     case "agentlogin": return plannerAgentLogin_(p);
@@ -334,6 +471,10 @@ function managementBootstrap_(p) {
   var allPractices = rowsToObjects_(sheet_("PRATICHE"));
   var allClients = rowsToObjects_(sheet_("CLIENTI"));
   var allUsers = rowsToObjects_(sheet_("AGENTI"));
+  /* authenticate_ puo usare una cache breve. Per le revisioni dei messaggi
+     usiamo invece la riga appena letta dal Foglio, cosi la visualizzazione
+     rimane coerente anche passando da un dispositivo a un altro. */
+  var currentUserRow = allUsers.filter(function (row) { return String(row.username || "") === String(user.username || ""); })[0] || user;
   var linkedClientIds = {};
   allPractices.forEach(function (practice) { if (practice.clientId) linkedClientIds[String(practice.clientId)] = true; });
   var clients = allClients.filter(function (row) { return canAccessClient_(row, user); }).map(function (row) {
@@ -345,16 +486,22 @@ function managementBootstrap_(p) {
   var allDocuments = rowsToObjects_(sheet_("DOCUMENTI"));
   var documents = isAdmin_(user) ? allDocuments : allDocuments.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
   var activities = [];
-  var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(user)];
-  var settings = getSettings_();
+  var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(currentUserRow)];
+  var settings = getSettings_(true);
   var notifications = listNotificationsForUser_(user);
   var movements = isAdmin_(user) ? rowsToObjects_(sheet_("MOVIMENTI_MAGAZZINO")).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 100) : [];
   var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, movements: movements, settings: settings, notifications: notifications };
+  /* Le patch notes pubbliche vengono caricate anche nella shell principale,
+     così la regola Una volta/Sempre vale all'apertura dell'intero sistema e
+     non soltanto quando si entra nel Quotation Planner. */
+  data.patchNotes = patchNotesContent_(false);
+  data.messageState = messageStateForUser_(currentUserRow, settings, data.patchNotes);
+  if (isAdmin_(user)) data.adminContent = adminContent_(settings);
   data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
   return {
     ok: true,
     data: data,
-    user: publicUser_(user),
+    user: publicUser_(currentUserRow),
     version: SEEMAX_VERSION,
     database_meta: {
       loaded_at: new Date().toISOString(),
@@ -362,31 +509,6 @@ function managementBootstrap_(p) {
       products_count: products.length
     }
   };
-}
-
-function managementAcknowledgeAnnouncement_(p) {
-  return withTrackedMutation_("management_acknowledge_announcement", p, function () {
-    var user = authenticate_(p.agent_username, p.agent_key);
-    var type = String(p.announcement_type || "").toLowerCase();
-    if (["welcome", "patch"].indexOf(type) < 0) throw new Error("Comunicazione non riconosciuta.");
-    var settings = getSettings_();
-    var revisionKey = type === "welcome" ? "welcome_message_revision" : "patch_notes_revision";
-    var seenKey = type === "welcome" ? "welcome_seen_revision" : "patch_seen_revision";
-    var currentRevision = String(settings[revisionKey] || "1");
-    var requestedRevision = String(p.revision || currentRevision);
-    if (requestedRevision !== currentRevision) return { ok: true, stale: true, revision: currentRevision };
-    var row = findRowObject_("AGENTI", "username", user.username);
-    if (!row) throw new Error("Utente non trovato.");
-    row[seenKey] = currentRevision;
-    row.aggiornatoIl = new Date().toISOString();
-    row.aggiornato_da = user.username;
-    row.expected_record_version = Number(row.record_version || 0);
-    row.request_token = mutationRequestToken_(p) || "announcement-" + user.username + "-" + new Date().getTime();
-    var version = prepareVersionedRecord_("AGENTI", "username", user.username, row, user);
-    if (version.duplicate) row = version.duplicate;
-    else row = upsertObject_("AGENTI", "username", user.username, row);
-    return { ok: true, type: type, revision: currentRevision, user: publicUser_(row) };
-  });
 }
 
 function managementHealth_(p) {
@@ -423,18 +545,26 @@ function managementList_(p) {
 }
 
 function managementUpsert_(p) {
-  return withTrackedMutation_("management_upsert", p, function () { return managementUpsertLocked_(p); });
-}
-
-function managementUpsertLocked_(p) {
+  /* Autenticazione e parsing avvengono prima del lock globale. In questo modo
+     gli altri agenti restano in attesa soltanto durante la parte che legge o
+     modifica dati condivisi. */
   var user = authenticate_(p.agent_username, p.agent_key);
   var entity = String(p.entity || "");
   assertWritePermission_(entity, user);
   var payload = parseJson_(p.payload, {});
   if (!payload || typeof payload !== "object") throw new Error("Dati non validi.");
+  return withMutationLock_(function () { return managementUpsertLocked_(p, user, entity, payload); });
+}
+
+function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayload) {
+  var user = preparedUser || authenticate_(p.agent_username, p.agent_key);
+  var entity = preparedEntity || String(p.entity || "");
+  assertWritePermission_(entity, user);
+  var payload = preparedPayload || parseJson_(p.payload, {});
+  if (!payload || typeof payload !== "object") throw new Error("Dati non validi.");
   var earlyRequestToken = String(payload.request_token || "").trim();
   if (earlyRequestToken && ENTITY_SHEETS[entity]) {
-    var earlyDuplicate = findRowObjectsByValue_(ENTITY_SHEETS[entity], "request_token", earlyRequestToken, 1)[0];
+    var earlyDuplicate = findRowObject_(ENTITY_SHEETS[entity], "request_token", earlyRequestToken);
     if (earlyDuplicate) {
       if (entity === "practices" && !isAdmin_(user) && String(earlyDuplicate.agent_username || "") !== String(user.username)) throw new Error("Record non autorizzato.");
       if (entity === "clients" && !canEditClient_(earlyDuplicate, user)) throw new Error("Record non autorizzato.");
@@ -481,10 +611,16 @@ function managementUpsertLocked_(p) {
     completeClientFromPractice_(payload, user);
     validatePracticeRequiredFields_(payload);
     var practiceRow = upsertPracticeWithInventory_(payload, user, assignedUser);
-    var createdNotification = null;
-    if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) createdNotification = createPracticeStatusNotification_(previousPractice, practiceRow, user);
-    log_(user, "UPSERT", entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
-    return { ok: true, row: practiceRow, notification: createdNotification };
+    if (previousPractice && String(previousPractice.stato || "") !== String(practiceRow.stato || "")) {
+      createPracticeStatusNotification_(previousPractice, practiceRow, user);
+      log_(user, "STATUS_CHANGE", entity, practiceRow.id || "", String(previousPractice.stato || "") + " -> " + String(practiceRow.stato || ""));
+    } else {
+      logRoutineUpsert_(user, entity, practiceRow.id || "", "Pratica aggiornata con controllo magazzino");
+    }
+    /* Le notifiche non vengono rilette dopo ogni salvataggio: il bootstrap e
+       la campanella restano le fonti dedicate. Questo elimina una lettura
+       completa di NOTIFICHE dal percorso critico della pratica. */
+    return { ok: true, row: practiceRow };
   }
   if (entity === "clients") {
     var existingClient = payload.id ? findRowObject_("CLIENTI", "id", payload.id) : null;
@@ -500,7 +636,11 @@ function managementUpsertLocked_(p) {
       };
     } else if (isAdmin_(user)) {
       var requestedOwnerUsername = String(payload.client_owner_username || payload.creato_da_username || user.username).trim();
-      var requestedOwner = findRowObject_("AGENTI", "username", requestedOwnerUsername);
+      /* L'utente autenticato è già disponibile: evitiamo una seconda ricerca
+         AGENTI quando l'ADMIN assegna il nuovo cliente a sé stesso. */
+      var requestedOwner = String(requestedOwnerUsername) === String(user.username)
+        ? user
+        : findRowObject_("AGENTI", "username", requestedOwnerUsername);
       if (!requestedOwner || String(requestedOwner.stato || "ATTIVO").toUpperCase() !== "ATTIVO") throw new Error("L’utente scelto per il cliente non è disponibile o non è attivo.");
       if (isAdmin_(requestedOwner) && String(requestedOwner.username) !== String(user.username)) throw new Error("Il cliente può essere associato a un agente oppure al tuo profilo amministratore.");
       clientOwner = requestedOwner;
@@ -522,12 +662,99 @@ function managementUpsertLocked_(p) {
     }
   }
   var row = upsertEntity_(entity, payload, user);
-  log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
+  if (entity === "clients") logRoutineUpsert_(user, entity, row.id || "", "Salvataggio da Management Suite");
+  else log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
   return { ok: true, row: entity === "users" ? publicUser_(row) : row };
 }
 
+
+function messagePublicationState_(messageType, settingsOverride, patchOverride) {
+  var type = String(messageType || "").trim().toUpperCase();
+  var settings = settingsOverride || getSettings_(true);
+  if (["WELCOME", "BENVENUTO"].indexOf(type) >= 0) {
+    var welcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1));
+    return {
+      type: "WELCOME",
+      seen_field: "welcome_seen_revision",
+      revision: welcomeRevision,
+      publication_key: String(settings.welcome_message_publication_key || publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION))
+    };
+  }
+  if (["PATCH", "PATCH_NOTES", "PATCHNOTES"].indexOf(type) >= 0) {
+    /* PATCH_NOTES è l'unica sorgente runtime delle patch notes. */
+    var patch = patchOverride || getKeyValueSheet_("PATCH_NOTES");
+    var patchRevision = Math.max(1, Number(patch.publication_revision || 1));
+    return {
+      type: "PATCH_NOTES",
+      seen_field: "patch_seen_revision",
+      revision: patchRevision,
+      publication_key: String(patch.publication_key || publicationKeyFromRevisionV2144_("patch", patchRevision, patch.version || SEEMAX_VERSION))
+    };
+  }
+  throw new Error("Tipo di messaggio non riconosciuto.");
+}
+
+
+function messageStateForUser_(user, settingsOverride, patchOverride) {
+  var settings = settingsOverride || getSettings_(true);
+  var welcome = messagePublicationState_("WELCOME", settings, patchOverride);
+  var patch = messagePublicationState_("PATCH_NOTES", settings, patchOverride);
+  return {
+    welcome_seen_revision: Number(user && user.welcome_seen_revision || 0),
+    patch_seen_revision: Number(user && user.patch_seen_revision || 0),
+    welcome_publication_revision: welcome.revision,
+    patch_publication_revision: patch.revision
+  };
+}
+
+function managementMarkMessageSeen_(p) {
+  var authenticatedUser = authenticate_(p.agent_username, p.agent_key);
+  return withMutationLock_(function () {
+    return managementMarkMessageSeenLocked_(authenticatedUser, p);
+  });
+}
+
+function managementMarkMessageSeenLocked_(authenticatedUser, p) {
+  var user = findRowObject_("AGENTI", "username", authenticatedUser.username);
+  if (!user) throw new Error("Utente non trovato.");
+  var settings = getSettings_(true);
+  var patch = getKeyValueSheet_("PATCH_NOTES");
+  var publication = messagePublicationState_(p.message_type || p.type, settings, patch);
+  var requestedKey = String(p.publication_key || "").trim();
+  var requestedRevision = Number(p.publication_revision || 0);
+
+  /* Un popup aperto mentre l'ADMIN ripubblica non deve marcare come vista la
+     nuova edizione. In tal caso la richiesta vecchia viene ignorata. */
+  if ((requestedKey && requestedKey !== publication.publication_key) ||
+      (requestedRevision > 0 && requestedRevision !== publication.revision)) {
+    return {
+      ok: true,
+      stale: true,
+      message_type: publication.type,
+      publication_revision: publication.revision,
+      message_state: messageStateForUser_(user, settings, patch),
+      user: publicUser_(user)
+    };
+  }
+
+  var alreadySeen = Number(user[publication.seen_field] || 0);
+  if (alreadySeen < publication.revision) {
+    var update = { username: user.username };
+    update[publication.seen_field] = publication.revision;
+    user = upsertObject_("AGENTI", "username", user.username, update);
+  }
+  return {
+    ok: true,
+    stale: false,
+    message_type: publication.type,
+    publication_revision: publication.revision,
+    message_state: messageStateForUser_(user, settings, patch),
+    user: publicUser_(user)
+  };
+}
+
 function managementSaveProfile_(p) {
-  return withTrackedMutation_("management_save_profile", p, function () {
+  return withMutationLock_(function () {
     var user = authenticate_(p.agent_username, p.agent_key);
     var payload = parseJson_(p.payload, {});
     var current = findRowObject_("AGENTI", "username", user.username);
@@ -710,8 +937,8 @@ function validateClientFiscalData_(payload, user) {
   if (vat && !vatUnknown && !validItalianVat_(vat)) throw new Error("Partita IVA formalmente non valida.");
   if (iban && !ibanUnknown && !validIban_(iban)) throw new Error("IBAN formalmente non valido.");
   if (vat && !vatUnknown) {
-    var duplicate = findRowObjectsByValue_("CLIENTI", "piva", vat).filter(function (row) {
-      return canAccessClient_(row, user) && String(row.id || "") !== String(payload.id || "") && String(row.piva || "").replace(/\D/g, "") === vat;
+    var duplicate = findRowObjectsByNormalizedDigits_("CLIENTI", "piva", vat, 25).filter(function (row) {
+      return canAccessClient_(row, user) && String(row.id || "") !== String(payload.id || "");
     })[0];
     if (duplicate) throw new Error("Partita IVA già associata al cliente " + (duplicate.ragioneSociale || duplicate.id) + ".");
   }
@@ -982,25 +1209,25 @@ function cacheManagementRequestResult_(requestId, result) {
 }
 
 function managementMutationStatus_(p) {
-  var statusUser = authenticate_(p.agent_username, p.agent_key);
+  authenticate_(p.agent_username, p.agent_key);
   var requestId = String(p.requestId || "").slice(0, 180);
   if (!requestId) throw new Error("Identificativo salvataggio mancante.");
-  var raw = CacheService.getScriptCache().get(managementRequestCacheKey_(requestId));
+  var waitMs = Math.max(0, Math.min(3000, Number(p.wait_ms || 0)));
+  var started = new Date().getTime();
+  var raw = "";
+  var cache = CacheService.getScriptCache();
+  do {
+    raw = cache.get(managementRequestCacheKey_(requestId));
+    if (raw || !waitMs || new Date().getTime() - started >= waitMs) break;
+    Utilities.sleep(100);
+  } while (true);
   var result = raw ? parseJson_(raw, {}) : null;
-  if (raw && result && !result.recover_by_token) {
-    return { ok: true, completed: true, result: result, recover_by_token: false, source: "CACHE" };
-  }
-  ensureTechnicalSheet_("OPERAZIONI");
-  var operation = findRowObject_("OPERAZIONI", "request_id", operationStorageId_(p, ""));
-  if (operation && String(operation.username || "") !== String(statusUser.username || "")) operation = null;
-  var persisted = operation && String(operation.stato || "").toUpperCase() === "COMPLETATA"
-    ? parseJson_(operation.result_json, null) : null;
   return {
     ok: true,
-    completed: !!persisted && !persisted.recover_by_token,
-    result: persisted && !persisted.recover_by_token ? persisted : null,
-    recover_by_token: !!(persisted && persisted.recover_by_token) || !!(result && result.recover_by_token),
-    source: persisted ? "OPERAZIONI" : (raw ? "CACHE_MARKER" : "PENDING")
+    completed: !!raw && !(result && result.recover_by_token),
+    result: result && !result.recover_by_token ? result : null,
+    recover_by_token: !!(result && result.recover_by_token),
+    waited_ms: new Date().getTime() - started
   };
 }
 
@@ -1013,7 +1240,7 @@ function managementUploadStatus_(p) {
 }
 
 function managementUpdatePracticeDocuments_(p) {
-  return withTrackedMutation_("management_update_practice_documents", p, function () { return managementUpdatePracticeDocumentsLocked_(p); });
+  return withMutationLock_(function () { return managementUpdatePracticeDocumentsLocked_(p); });
 }
 
 function managementUpdatePracticeDocumentsLocked_(p) {
@@ -1035,7 +1262,7 @@ function managementUpdatePracticeDocumentsLocked_(p) {
 }
 
 function managementSetPracticeStockWarning_(p) {
-  return withTrackedMutation_("management_set_practice_stock_warning", p, function () { return managementSetPracticeStockWarningLocked_(p); });
+  return withMutationLock_(function () { return managementSetPracticeStockWarningLocked_(p); });
 }
 
 function managementSetPracticeStockWarningLocked_(p) {
@@ -1065,12 +1292,14 @@ function managementSetPracticeStockWarningLocked_(p) {
 }
 
 function managementCreateFromQuote_(p) {
-  return withTrackedMutation_("management_create_from_quote", p, function () { return managementCreateFromQuoteLocked_(p); });
-}
-
-function managementCreateFromQuoteLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var payload = parseJson_(p.payload, {});
+  return withMutationLock_(function () { return managementCreateFromQuoteLocked_(p, user, payload); });
+}
+
+function managementCreateFromQuoteLocked_(p, preparedUser, preparedPayload) {
+  var user = preparedUser || authenticate_(p.agent_username, p.agent_key);
+  var payload = preparedPayload || parseJson_(p.payload, {});
   var requestToken = String(payload.request_token || "").trim() || Utilities.getUuid();
   payload.request_token = requestToken;
   var type = String(payload.tipo_pratica || "").toUpperCase();
@@ -1080,13 +1309,13 @@ function managementCreateFromQuoteLocked_(p) {
   var items = Array.isArray(payload.righe) ? payload.righe : [];
   if (!items.length) throw new Error("Il preventivo non contiene Ledwall selezionati.");
   var quoteId = String(payload.preventivo_id || "").trim();
-  var tokenPractice = findRowObjectsByValue_("PRATICHE", "request_token", requestToken, 1)[0];
+  var tokenPractice = findRowObject_("PRATICHE", "request_token", requestToken);
   if (tokenPractice) {
     return { ok: true, existing: true, duplicate: true, practice: tokenPractice, client: findRowObject_("CLIENTI", "id", tokenPractice.clientId) || {} };
   }
   if (quoteId) {
-    var existingPractice = findRowObjectsByValue_("PRATICHE", "preventivo_id", quoteId).filter(function (row) {
-      return String(row.preventivo_id || "") === quoteId && String(row.agent_username || "") === String(user.username);
+    var existingPractice = findRowObjectsByField_("PRATICHE", "preventivo_id", quoteId, 25).filter(function (row) {
+      return String(row.agent_username || "") === String(user.username);
     })[0];
     if (existingPractice) return { ok: true, existing: true, practice: existingPractice, client: findRowObject_("CLIENTI", "id", existingPractice.clientId) || {} };
   }
@@ -1144,7 +1373,7 @@ function managementCreateFromQuoteLocked_(p) {
   var version = prepareVersionedRecord_("PRATICHE", "id", practice.id, practice, user);
   if (version.duplicate) practice = version.duplicate;
   else practice = upsertObject_("PRATICHE", "id", practice.id, practice);
-  log_(user, "CREATE_FROM_QUOTE", "practices", practice.id, "Pratica " + type + " creata dal S.Q.P. preventivo " + practice.preventivo_id);
+  logRoutineAction_(user, "CREATE_FROM_QUOTE", "practices", practice.id, "Pratica " + type + " creata dal S.Q.P. preventivo " + practice.preventivo_id);
   return { ok: true, practice: practice, client: client };
 }
 
@@ -1166,17 +1395,13 @@ function findClientForQuote_(payload, user) {
   var vat = normalizeKey_(payload.cliente_piva_cf);
   var email = normalizeKey_(payload.cliente_email);
   var company = normalizeKey_(payload.cliente_azienda || payload.cliente_referente);
-  var candidates = [];
-  if (!selected && vat) candidates = candidates.concat(findRowObjectsByValue_("CLIENTI", "piva", String(payload.cliente_piva_cf || "")));
-  if (!selected && email) candidates = candidates.concat(findRowObjectsByValue_("CLIENTI", "email", String(payload.cliente_email || "")));
-  if (!selected && company) candidates = candidates.concat(findRowObjectsByValue_("CLIENTI", "ragioneSociale", String(payload.cliente_azienda || payload.cliente_referente || "")));
-  var found = selected || candidates.filter(function (row, index) {
-    if (!row || !canAccessClient_(row, user)) return false;
-    if (candidates.slice(0, index).some(function (previous) { return String(previous.id || "") === String(row.id || ""); })) return false;
-    if (vat && normalizeKey_(row.piva) === vat) return true;
-    if (email && normalizeKey_(row.email) === email) return true;
-    return company && normalizeKey_(row.ragioneSociale) === company;
-  })[0];
+  var accessibleFirst = function (rows) {
+    return (rows || []).filter(function (row) { return canAccessClient_(row, user); })[0] || null;
+  };
+  var found = selected;
+  if (!found && vat) found = accessibleFirst(findRowObjectsByNormalizedText_("CLIENTI", "piva", vat, 25));
+  if (!found && email) found = accessibleFirst(findRowObjectsByNormalizedText_("CLIENTI", "email", email, 25));
+  if (!found && company) found = accessibleFirst(findRowObjectsByNormalizedText_("CLIENTI", "ragioneSociale", company, 25));
   var record = found || {
     id: uid_("cli"), creatoIl: new Date().toISOString(), condiviso: "NO",
     creato_da_username: user.username, creato_da_nome: userDisplayName_(user)
@@ -1195,10 +1420,24 @@ function findClientForQuote_(payload, user) {
   return upsertObject_("CLIENTI", "id", record.id, record);
 }
 
+function practiceNumberValues_() {
+  var cached = RUNTIME_TABLE_CACHE_.PRATICHE;
+  if (cached) return cached.objects.map(function (row) { return String(row.numero || ""); });
+  var sheet = sheet_("PRATICHE");
+  var headers = sheetHeaders_(sheet);
+  var numberIndex = headers.indexOf("numero");
+  var lastRow = sheet.getLastRow();
+  if (numberIndex < 0 || lastRow < 2) return [];
+  var started = new Date().getTime();
+  var values = sheet.getRange(2, numberIndex + 1, lastRow - 1, 1).getDisplayValues().map(function (row) { return String(row[0] || ""); });
+  performanceEvent_("read", "PRATICHE.numero", new Date().getTime() - started, { rows: values.length, columns: 1 });
+  return values;
+}
+
 function nextPracticeNumber_() {
   var year = String(new Date().getFullYear()).slice(-2);
-  var nums = rowsToObjects_(sheet_("PRATICHE")).map(function (row) {
-    return parseInt(String(row.numero || "0").split("-")[0], 10) || 0;
+  var nums = practiceNumberValues_().map(function (value) {
+    return parseInt(String(value || "0").split("-")[0], 10) || 0;
   });
   var next = (nums.length ? Math.max.apply(null, nums) : 0) + 1;
   return String(next).padStart(3, "0") + "-" + year;
@@ -1211,71 +1450,56 @@ function practiceInitials_(user) {
   return String(initials || "SM").toUpperCase();
 }
 
-function practiceCounterKey_(prefix) { return "PRATICA_" + String(prefix || "SM").toUpperCase(); }
+function practiceCounterPropertyKey_(prefix) {
+  return "SEEMAX_PRACTICE_COUNTER_V2140_" + String(prefix || "SM").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+}
 
-function maxPracticeSequenceForPrefix_(prefix) {
-  var sheet = sheet_("PRATICHE");
-  var headers = sheetHeaders_(sheet);
-  var numberColumn = headers.indexOf("numero") + 1;
-  if (!numberColumn || sheet.getLastRow() < 2) return 0;
-  var pattern = new RegExp("^" + String(prefix || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(\\d{4})$", "i");
-  return sheet.getRange(2, numberColumn, sheet.getLastRow() - 1, 1).getDisplayValues().reduce(function (current, row) {
-    var match = String(row[0] || "").trim().match(pattern);
+function discoverPracticeCounter_(prefix, values) {
+  var pattern = new RegExp("^" + String(prefix || "") + "(\\d{4})$", "i");
+  return (values || practiceNumberValues_()).reduce(function (current, value) {
+    var match = String(value || "").match(pattern);
     return match ? Math.max(current, Number(match[1]) || 0) : current;
   }, 0);
 }
 
-function initializePracticeCountersV2150_() {
-  ensureTechnicalSheet_("CONTATORI");
-  var practices = rowsToObjects_(sheet_("PRATICHE"));
-  var maximums = {};
-  practices.forEach(function (practice) {
-    var match = String(practice.numero || "").trim().toUpperCase().match(/^(.+?)(\d{4})$/);
-    if (!match) return;
-    maximums[match[1]] = Math.max(Number(maximums[match[1]] || 0), Number(match[2]) || 0);
-  });
-  Object.keys(maximums).forEach(function (prefix) {
-    var key = practiceCounterKey_(prefix);
-    var existing = findRowObject_("CONTATORI", "chiave", key);
-    var value = Math.max(Number(existing && existing.valore || 0), Number(maximums[prefix] || 0));
-    upsertObject_("CONTATORI", "chiave", key, {
-      chiave: key,
-      valore: value,
-      aggiornato_il: new Date().toISOString(),
-      aggiornato_da: "upgrade-v2.15.0"
-    });
-  });
-  return maximums;
-}
-
-function rebuildPracticeCountersV2150() {
-  return withMutationLock_(function () {
-    initializePracticeCountersV2150_();
-    return "Contatori pratiche verificati e riallineati senza ridurre le sequenze già prenotate.";
-  });
-}
-
 function nextPracticeIdentifier_(user) {
   var prefix = practiceInitials_(user);
-  ensureTechnicalSheet_("CONTATORI");
-  var key = practiceCounterKey_(prefix);
-  var counter = findRowObject_("CONTATORI", "chiave", key);
-  var current = counter ? Number(counter.valore || 0) : maxPracticeSequenceForPrefix_(prefix);
-  var next = current + 1;
-  var identifier = prefix + String(next).padStart(4, "0");
-  /* Protezione supplementare per righe eventualmente inserite a mano nel
-     Foglio dopo l'ultimo riallineamento del contatore. */
-  while (findRowObject_("PRATICHE", "numero", identifier)) {
+  var properties = PropertiesService.getScriptProperties();
+  var propertyKey = practiceCounterPropertyKey_(prefix);
+  var counterReadStarted = new Date().getTime();
+  var stored = properties.getProperty(propertyKey);
+  performanceEvent_("service", "PropertiesService.practice_counter.get", new Date().getTime() - counterReadStarted, { hit: stored !== null && stored !== "" });
+  var current = stored === null || stored === "" ? discoverPracticeCounter_(prefix) : Number(stored || 0);
+  var next = Math.max(0, current) + 1;
+  var candidate = prefix + String(next).padStart(4, "0");
+  /* Se una pratica e stata inserita manualmente nel Foglio, il controllo
+     puntuale evita collisioni senza rileggere tutte le colonne di PRATICHE. */
+  while (findRowObject_("PRATICHE", "numero", candidate)) {
     next += 1;
-    identifier = prefix + String(next).padStart(4, "0");
+    candidate = prefix + String(next).padStart(4, "0");
   }
-  upsertObject_("CONTATORI", "chiave", key, {
-    chiave: key,
-    valore: next,
-    aggiornato_il: new Date().toISOString(),
-    aggiornato_da: String(user && user.username || "system")
+  var counterWriteStarted = new Date().getTime();
+  properties.setProperty(propertyKey, String(next));
+  performanceEvent_("service", "PropertiesService.practice_counter.set", new Date().getTime() - counterWriteStarted, {});
+  return candidate;
+}
+
+function rebuildPracticeCountersV2140_() {
+  var counters = {};
+  practiceNumberValues_().forEach(function (value) {
+    var match = String(value || "").toUpperCase().match(/^([A-Z0-9]{1,2})(\d{4})$/);
+    if (!match) return;
+    counters[match[1]] = Math.max(Number(counters[match[1]] || 0), Number(match[2]) || 0);
   });
-  return identifier;
+  var properties = PropertiesService.getScriptProperties();
+  Object.keys(counters).forEach(function (prefix) {
+    properties.setProperty(practiceCounterPropertyKey_(prefix), String(counters[prefix]));
+  });
+  return counters;
+}
+
+function rebuildPracticeCountersV2140() {
+  return withMutationLock_(function () { return rebuildPracticeCountersV2140_(); });
 }
 
 function upsertPracticeWithInventory_(payload, user, identifierUser) {
@@ -1374,39 +1598,42 @@ function migratePracticeStatusesV13_() {
 }
 
 function listNotificationsForUser_(user) {
-  return findRowObjectsByValue_("NOTIFICHE", "recipient_username", String(user.username || "")).sort(function (a, b) {
-    return String(b.data || "").localeCompare(String(a.data || ""));
-  }).slice(0, 50);
+  return rowsToObjects_(sheet_("NOTIFICHE")).filter(function (row) {
+    return String(row.recipient_username || "") === String(user.username || "");
+  }).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 50);
 }
 
 function managementMarkNotificationsRead_(p) {
-  return withTrackedMutation_("management_mark_notifications_read", p, function () { return managementMarkNotificationsReadLocked_(p); });
+  return withMutationLock_(function () { return managementMarkNotificationsReadLocked_(p); });
 }
 
 function managementMarkNotificationsReadLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var sheet = sheet_("NOTIFICHE");
   var headers = sheetHeaders_(sheet);
-  var recipientIndex = headers.indexOf("recipient_username");
-  var readIndex = headers.indexOf("letta"), readAtIndex = headers.indexOf("letta_il");
-  if (recipientIndex < 0 || readIndex < 0 || sheet.getLastRow() < 2) return { ok: true, notifications: [] };
-  var matches = sheet.getRange(2, recipientIndex + 1, sheet.getLastRow() - 1, 1)
-    .createTextFinder(String(user.username || "")).matchEntireCell(true).findAll();
+  var recipientIndex = headers.indexOf("recipient_username"), readIndex = headers.indexOf("letta"), readAtIndex = headers.indexOf("letta_il");
+  var lastRow = sheet.getLastRow();
   var now = new Date().toISOString();
-  var unreadRows = matches.map(function (match) { return match.getRow(); }).filter(function (rowNumber) {
-    return String(sheet.getRange(rowNumber, readIndex + 1).getValue() || "NO").toUpperCase() !== "SI";
-  });
-  if (unreadRows.length) {
-    sheet.getRangeList(unreadRows.map(function (rowNumber) { return sheet.getRange(rowNumber, readIndex + 1).getA1Notation(); })).setValue("SI");
-    if (readAtIndex >= 0) sheet.getRangeList(unreadRows.map(function (rowNumber) { return sheet.getRange(rowNumber, readAtIndex + 1).getA1Notation(); })).setValue(now);
-    invalidateTable_("NOTIFICHE");
+  if (lastRow > 1 && recipientIndex >= 0 && readIndex >= 0) {
+    var found = sheet.getRange(2, recipientIndex + 1, lastRow - 1, 1)
+      .createTextFinder(String(user.username || ""))
+      .matchCase(true).matchEntireCell(true).useRegularExpression(false).findAll();
+    var readValues = sheet.getRange(2, readIndex + 1, lastRow - 1, 1).getValues();
+    var unreadRows = found.map(function (range) { return range.getRow(); }).filter(function (rowIndex) {
+      return String(readValues[rowIndex - 2][0] || "NO").toUpperCase() !== "SI";
+    });
+    if (unreadRows.length) {
+      sheet.getRangeList(unreadRows.map(function (rowIndex) { return sheet.getRange(rowIndex, readIndex + 1).getA1Notation(); })).setValue("SI");
+      if (readAtIndex >= 0) sheet.getRangeList(unreadRows.map(function (rowIndex) { return sheet.getRange(rowIndex, readAtIndex + 1).getA1Notation(); })).setValue(now);
+      invalidateTable_("NOTIFICHE");
+    }
   }
   return { ok: true, notifications: listNotificationsForUser_(user) };
 }
 
 function createPracticeStatusNotification_(before, after, actor) {
   var recipientUsername = String(after.agent_username || before.agent_username || "");
-  if (!recipientUsername) return null;
+  if (!recipientUsername) return;
   var recipient = findRowObject_("AGENTI", "username", recipientUsername) || {};
   var title = "Pratica " + String(after.numero || after.id || "") + ": " + String(after.stato || "");
   var message = "La pratica " + String(after.numero || after.id || "") + " di " + String(after.cliente || "cliente") + " è passata da " + String(before.stato || "—") + " a " + String(after.stato || "—") + ".";
@@ -1414,7 +1641,7 @@ function createPracticeStatusNotification_(before, after, actor) {
   var outcomeState = String(after.stato || "");
   var shouldPrepareEmail = !!recipientEmail && ["Accettata", "Completata", "Bocciata", "Sospesa"].indexOf(outcomeState) >= 0;
   var id = uid_("not");
-  var savedNotification = upsertObject_("NOTIFICHE", "id", id, {
+  upsertObject_("NOTIFICHE", "id", id, {
     id: id, data: new Date().toISOString(), recipient_username: recipientUsername,
     recipient_name: recipient.nome_visualizzato || recipientUsername, practiceId: after.id,
     numero_pratica: after.numero || "", stato_precedente: before.stato || "", nuovo_stato: after.stato || "",
@@ -1447,7 +1674,6 @@ function createPracticeStatusNotification_(before, after, actor) {
       }
     } catch (error) { log_(actor, "EMAIL_NOTIFICATION_ERROR", "notifications", id, String(error && error.message || error)); }
   }
-  return savedNotification;
 }
 
 function escapeHtml_(value) {
@@ -1525,7 +1751,7 @@ function practiceInventoryAssessment_(practice, alreadyApplied) {
 }
 
 function managementInventoryAdjust_(p) {
-  return withTrackedMutation_("management_inventory_adjust", p, function () { return managementInventoryAdjustLocked_(p); });
+  return withMutationLock_(function () { return managementInventoryAdjustLocked_(p); });
 }
 
 function managementInventoryAdjustLocked_(p) {
@@ -1533,7 +1759,7 @@ function managementInventoryAdjustLocked_(p) {
   if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
   var payload = parseJson_(p.payload, {});
   var requestToken = String(payload.request_token || "").trim() || uid_("stock-req");
-  var previousMovement = findRowObjectsByValue_("MOVIMENTI_MAGAZZINO", "request_token", requestToken, 1)[0];
+  var previousMovement = findRowObject_("MOVIMENTI_MAGAZZINO", "request_token", requestToken);
   if (previousMovement) {
     return {
       ok: true,
@@ -1620,12 +1846,6 @@ function inventorySignature_(practice) {
 
 function findInventoryProduct_(productId) {
   var canonicalId = canonicalProductId_(productId || "") || String(productId || "");
-  /* Nella struttura corrente ogni prodotto operativo possiede un ID
-     canonico univoco. La ricerca ordinaria legge quindi una sola riga; il
-     merge completo resta soltanto come compatibilità per vecchi database
-     non ancora consolidati. */
-  var canonicalRow = findRowObject_("PRODOTTI_LED", "id", canonicalId);
-  if (canonicalRow) return canonicalRow;
   return inventoryProductsForRead_().filter(function (row) {
     return String(row.id || "") === canonicalId;
   })[0] || null;
@@ -1817,7 +2037,7 @@ function canonicalProductId_(value, cabX, cabY) {
 function normalizeKey_(value) { return String(value || "").trim().toLowerCase().replace(/\s+/g, " "); }
 
 function managementRemove_(p) {
-  return withTrackedMutation_("management_remove", p, function () { return managementRemoveLocked_(p); });
+  return withMutationLock_(function () { return managementRemoveLocked_(p); });
 }
 
 function managementRemoveLocked_(p) {
@@ -1841,7 +2061,7 @@ function managementRemoveLocked_(p) {
   if (entity === "clients") {
     var clientToRemove = findRowObject_("CLIENTI", "id", id);
     if (clientToRemove && !canEditClient_(clientToRemove, user)) throw new Error("Questo cliente può essere eliminato soltanto dal creatore o da un amministratore.");
-    var linkedPractice = findRowObjectsByValue_("PRATICHE", "clientId", id, 1)[0];
+    var linkedPractice = findRowObject_("PRATICHE", "clientId", id);
     if (linkedPractice) throw new Error("Il cliente è collegato a una pratica e non può essere eliminato dal Management Suite.");
   }
   var removed = removeEntity_(entity, id, user);
@@ -1851,59 +2071,266 @@ function managementRemoveLocked_(p) {
 
 function managementSettings_(p) {
   authenticate_(p.agent_username, p.agent_key);
-  return { ok: true, settings: getSettings_() };
+  return { ok: true, settings: getSettings_(true) };
 }
 
 function managementSaveSettings_(p) {
-  return withTrackedMutation_("management_save_settings", p, function () { return managementSaveSettingsLocked_(p); });
+  return withMutationLock_(function () { return managementSaveSettingsLocked_(p); });
 }
 
 function managementSaveSettingsLocked_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
   var values = parseJson_(p.payload, {});
-  var currentSettings = getSettings_();
-  var requestToken = mutationRequestToken_(p);
-  if (requestToken && String(currentSettings.last_settings_request_token || "") === requestToken) {
-    return { ok: true, settings: currentSettings, duplicate: true };
-  }
+  var currentSettings = getSettings_(true);
   var currentRevision = Number(currentSettings.settings_revision || 0);
   var expectedRevision = Number(values.expected_settings_revision || 0);
   if (currentRevision > 0 && expectedRevision !== currentRevision) throw new Error("CONFLICT_RECORD: le impostazioni sono state aggiornate da un altro amministratore.");
   delete values.expected_settings_revision;
-  delete values.request_token;
-  values = normalizeAnnouncementSettings_(values, currentSettings);
   values.settings_revision = currentRevision + 1;
-  if (requestToken) values.last_settings_request_token = requestToken;
   var settings = upsertSettingsBatch_(values, "Aggiornato da Management Suite");
   log_(user, "UPDATE", "settings", "IMPOSTAZIONI", "Impostazioni generali aggiornate");
   return { ok: true, settings: settings };
 }
 
-function normalizeAnnouncementSettings_(values, currentSettings) {
-  var result = {};
-  Object.keys(values || {}).forEach(function (key) { result[key] = values[key]; });
-  ["welcome_message", "patch_notes"].forEach(function (prefix) {
-    var enabledKey = prefix + "_enabled";
-    var frequencyKey = prefix + "_frequency";
-    var revisionKey = prefix + "_revision";
-    if (Object.prototype.hasOwnProperty.call(result, enabledKey)) result[enabledKey] = String(result[enabledKey] || "NO").toUpperCase() === "SI" ? "SI" : "NO";
-    if (Object.prototype.hasOwnProperty.call(result, frequencyKey)) result[frequencyKey] = String(result[frequencyKey] || "ONCE").toUpperCase() === "ALWAYS" ? "ALWAYS" : "ONCE";
-    var contentKeys = prefix === "welcome_message"
-      ? ["welcome_message_title", "welcome_message_body", "welcome_message_button"]
-      : ["patch_notes_label", "patch_notes_title", "patch_notes_intro", "patch_notes_items", "patch_notes_footer"];
-    var changed = contentKeys.some(function (key) {
-      return Object.prototype.hasOwnProperty.call(result, key) && String(result[key] || "") !== String(currentSettings[key] || "");
-    });
-    var rearmed = String(result[prefix + "_rearm"] || "NO").toUpperCase() === "SI";
-    var republished = Object.prototype.hasOwnProperty.call(result, enabledKey)
-      && String(currentSettings[enabledKey] || "NO").toUpperCase() !== "SI"
-      && result[enabledKey] === "SI";
-    if (changed || rearmed || republished) result[revisionKey] = Number(currentSettings[revisionKey] || 1) + 1;
-    else delete result[revisionKey];
-    delete result[prefix + "_rearm"];
-  });
-  return result;
+function managementAdminContent_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
+  return { ok: true, content: adminContent_() };
+}
+
+function managementSaveAdminContent_(p) {
+  var user = authenticate_(p.agent_username, p.agent_key);
+  if (!isAdmin_(user)) throw new Error("Funzione riservata all'amministratore.");
+  var payload = parseJson_(p.payload, {});
+  if (!payload || typeof payload !== "object") throw new Error("Contenuti amministrativi non validi.");
+  return withMutationLock_(function () { return managementSaveAdminContentLocked_(user, payload); });
+}
+
+function managementSaveAdminContentLocked_(user, payload) {
+  var settings = getSettings_(true);
+  var currentRevision = Number(settings.admin_content_revision || 0);
+  var expectedRevision = Number(payload.expected_revision || 0);
+  if (currentRevision > 0 && expectedRevision !== currentRevision) {
+    throw new Error("CONFLICT_RECORD: benvenuto o patch notes sono stati aggiornati da un altro amministratore.");
+  }
+
+  var section = String(payload.section || "ALL").trim().toUpperCase();
+  var updateWelcome = ["ALL", "WELCOME", "BENVENUTO"].indexOf(section) >= 0;
+  var updatePatch = ["ALL", "PATCH", "PATCHNOTES", "PATCH_NOTES"].indexOf(section) >= 0;
+  if (!updateWelcome && !updatePatch) throw new Error("Sezione comunicazioni non riconosciuta.");
+  var republish = payload.republish === true || String(payload.republish || "NO").toUpperCase() === "SI";
+  var nextRevision = currentRevision + 1;
+  var now = new Date().toISOString();
+  var logParts = [];
+  var settingsValues = { admin_content_revision: nextRevision };
+
+  if (updateWelcome) {
+    var welcome = payload.welcome && typeof payload.welcome === "object" ? payload.welcome : {};
+    var defaults = defaultBetaWelcomeContent_();
+    var existingWelcomeKey = String(settings.welcome_message_publication_key || "").trim();
+    var currentWelcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1));
+    var welcomePublicationRevision = republish ? currentWelcomeRevision + 1 : currentWelcomeRevision;
+    var welcomePublicationKey = republish || !existingWelcomeKey ? uid_("welcome-pub") : existingWelcomeKey;
+    var publishWelcomeNow = republish || !existingWelcomeKey;
+    var take = function (field, fallback, limit) {
+      var value = Object.prototype.hasOwnProperty.call(welcome, field) ? welcome[field] : fallback;
+      return String(value === undefined || value === null ? "" : value).trim().slice(0, limit);
+    };
+
+    settingsValues.welcome_message_enabled = normalizeYesNo_(welcome.enabled, settings.welcome_message_enabled || "SI");
+    settingsValues.welcome_message_frequency = normalizeMessageDisplayMode_(welcome.display_mode || settings.welcome_message_frequency || "ONCE");
+    settingsValues.welcome_message_publication_key = welcomePublicationKey;
+    settingsValues.welcome_message_revision = welcomePublicationRevision;
+    settingsValues.welcome_message_published_at = publishWelcomeNow ? now : String(settings.welcome_message_published_at || "");
+    settingsValues.welcome_message_published_by = publishWelcomeNow ? String(user.username || "") : String(settings.welcome_message_published_by || "");
+    settingsValues.welcome_message_modal_title = take("modal_title", settings.welcome_message_modal_title || defaults.modal_title, 120);
+    settingsValues.welcome_message_modal_subtitle = take("modal_subtitle", settings.welcome_message_modal_subtitle || defaults.modal_subtitle, 260);
+    settingsValues.welcome_message_badge = take("badge", settings.welcome_message_badge || defaults.badge, 160);
+    settingsValues.welcome_message_title = take("title", settings.welcome_message_title || defaults.title, 180);
+    settingsValues.welcome_message_body = take("message", settings.welcome_message_body || defaults.message, 2400);
+    settingsValues.welcome_message_feature_1_title = take("feature_one_title", settings.welcome_message_feature_1_title !== undefined ? settings.welcome_message_feature_1_title : defaults.feature_one_title, 160);
+    settingsValues.welcome_message_feature_1_body = take("feature_one_message", settings.welcome_message_feature_1_body !== undefined ? settings.welcome_message_feature_1_body : defaults.feature_one_message, 1600);
+    settingsValues.welcome_message_feature_2_title = take("feature_two_title", settings.welcome_message_feature_2_title !== undefined ? settings.welcome_message_feature_2_title : defaults.feature_two_title, 160);
+    settingsValues.welcome_message_feature_2_body = take("feature_two_message", settings.welcome_message_feature_2_body !== undefined ? settings.welcome_message_feature_2_body : defaults.feature_two_message, 1600);
+    settingsValues.welcome_message_warning_title = take("warning_title", settings.welcome_message_warning_title !== undefined ? settings.welcome_message_warning_title : defaults.warning_title, 120);
+    settingsValues.welcome_message_warning_body = take("warning_message", settings.welcome_message_warning_body !== undefined ? settings.welcome_message_warning_body : defaults.warning_message, 1800);
+    settingsValues.welcome_message_feedback_body = take("feedback_message", settings.welcome_message_feedback_body !== undefined ? settings.welcome_message_feedback_body : defaults.feedback_message, 1800);
+    settingsValues.welcome_message_button = take("primary_button", settings.welcome_message_button || defaults.primary_button, 70);
+    logParts.push("Benvenuto Beta" + (republish ? " ripubblicato" : " aggiornato"));
+  }
+
+  if (updatePatch) {
+    var currentNotes = getKeyValueSheet_("PATCH_NOTES");
+    var patch = payload.patchNotes && typeof payload.patchNotes === "object" ? payload.patchNotes : {};
+    var existingPatchKey = String(currentNotes.publication_key || "").trim();
+    var currentPatchRevision = Math.max(1, Number(currentNotes.publication_revision || 1));
+    var patchPublicationRevision = republish ? currentPatchRevision + 1 : currentPatchRevision;
+    var patchPublicationKey = republish || !existingPatchKey ? uid_("patch-pub") : existingPatchKey;
+    var publishPatchNow = republish || !existingPatchKey;
+    var patchValues = {
+      enabled: normalizeYesNo_(patch.enabled, currentNotes.enabled || "NO"),
+      publication_revision: patchPublicationRevision,
+      display_mode: normalizeMessageDisplayMode_(patch.display_mode || currentNotes.display_mode || "ONCE"),
+      publication_key: patchPublicationKey,
+      published_at: publishPatchNow ? now : String(currentNotes.published_at || ""),
+      published_by: publishPatchNow ? String(user.username || "") : String(currentNotes.published_by || ""),
+      version: String(patch.version !== undefined ? patch.version : currentNotes.version || SEEMAX_VERSION).trim().slice(0, 120),
+      label: String(patch.label !== undefined ? patch.label : currentNotes.label || "SEEMAX MANAGEMENT SUITE").trim().slice(0, 160),
+      title: String(patch.title !== undefined ? patch.title : currentNotes.title || "Aggiornamento").trim().slice(0, 220),
+      intro: String(patch.intro !== undefined ? patch.intro : currentNotes.intro || "").trim().slice(0, 1600),
+      footer: String(patch.footer !== undefined ? patch.footer : currentNotes.footer || "").trim().slice(0, 1600)
+    };
+    var sourceItems = Array.isArray(patch.items) ? patch.items : rowsToObjects_(sheet_("PATCH_ITEMS"));
+    var items = sourceItems.slice(0, 12).map(function (item) {
+      item = item && typeof item === "object" ? item : {};
+      return {
+        emoji: String(item.emoji || "✨").trim().slice(0, 16),
+        title: String(item.title || "").trim().slice(0, 180),
+        text: String(item.text || "").trim().slice(0, 900),
+        attivo: normalizeYesNo_(item.attivo !== undefined ? item.attivo : item.active, "SI")
+      };
+    }).filter(function (item) { return item.title || item.text; });
+    writePatchContentBatch_(patchValues, items);
+    logParts.push("patch notes" + (republish ? " ripubblicate" : " aggiornate"));
+  }
+
+  upsertSettingsBatch_(settingsValues, "Comunicazioni aggiornate da Management Suite");
+  log_(user, "UPDATE", "admin_content", section, logParts.join(" e "));
+  return { ok: true, content: adminContent_() };
+}
+
+
+function normalizeYesNo_(value, fallback) {
+  var source = value === undefined || value === null || value === "" ? fallback : value;
+  if (source === true) return "SI";
+  if (source === false) return "NO";
+  var normalized = String(source === undefined || source === null ? "NO" : source).trim().toUpperCase();
+  return ["NO", "N", "FALSE", "0", "OFF", "DISATTIVO", "DISABILITATO"].indexOf(normalized) >= 0 ? "NO" : "SI";
+}
+
+function normalizeMessageDisplayMode_(value) {
+  var mode = String(value || "ONCE").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return ["ALWAYS", "SEMPRE", "OGNI_APERTURA"].indexOf(mode) >= 0 ? "ALWAYS" : "ONCE";
+}
+
+function publicationKeyFromRevisionV2144_(prefix, revision, fallback) {
+  var normalized = String(revision === undefined || revision === null ? "" : revision).trim().replace(/[^0-9A-Za-z._-]+/g, "-");
+  return prefix + "-legacy-" + (normalized || String(fallback || SEEMAX_VERSION).replace(/[^0-9A-Za-z._-]+/g, "-"));
+}
+
+function parseLegacyPatchItemsForMigrationV2144_(value) {
+  return String(value || "").split(/\r?\n/).map(function (line) {
+    var parts = String(line || "").split("|");
+    if (parts.length < 2) return null;
+    return {
+      emoji: String(parts.shift() || "✨").trim().slice(0, 16),
+      title: String(parts.shift() || "").trim().slice(0, 180),
+      text: String(parts.join("|") || "").trim().slice(0, 900),
+      attivo: "SI"
+    };
+  }).filter(function (item) { return item && (item.title || item.text); }).slice(0, 12);
+}
+
+
+function adminContent_(settingsOverride) {
+  var settings = settingsOverride || getSettings_(true);
+  var defaults = defaultBetaWelcomeContent_();
+  var welcomeRevision = Math.max(1, Number(settings.welcome_message_revision || 1));
+  return {
+    revision: Number(settings.admin_content_revision || settings.settings_revision || 0),
+    welcome: {
+      enabled: normalizeYesNo_(settings.welcome_message_enabled, "SI"),
+      display_mode: normalizeMessageDisplayMode_(settings.welcome_message_frequency || "ONCE"),
+      publication_key: String(settings.welcome_message_publication_key || publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION)),
+      publication_revision: welcomeRevision,
+      published_at: String(settings.welcome_message_published_at || ""),
+      published_by: String(settings.welcome_message_published_by || ""),
+      modal_title: String(settings.welcome_message_modal_title !== undefined ? settings.welcome_message_modal_title : defaults.modal_title),
+      modal_subtitle: String(settings.welcome_message_modal_subtitle !== undefined ? settings.welcome_message_modal_subtitle : defaults.modal_subtitle),
+      badge: String(settings.welcome_message_badge !== undefined ? settings.welcome_message_badge : defaults.badge),
+      title: String(settings.welcome_message_title !== undefined ? settings.welcome_message_title : defaults.title),
+      message: String(settings.welcome_message_body !== undefined ? settings.welcome_message_body : defaults.message),
+      feature_one_title: String(settings.welcome_message_feature_1_title !== undefined ? settings.welcome_message_feature_1_title : defaults.feature_one_title),
+      feature_one_message: String(settings.welcome_message_feature_1_body !== undefined ? settings.welcome_message_feature_1_body : defaults.feature_one_message),
+      feature_two_title: String(settings.welcome_message_feature_2_title !== undefined ? settings.welcome_message_feature_2_title : defaults.feature_two_title),
+      feature_two_message: String(settings.welcome_message_feature_2_body !== undefined ? settings.welcome_message_feature_2_body : defaults.feature_two_message),
+      warning_title: String(settings.welcome_message_warning_title !== undefined ? settings.welcome_message_warning_title : defaults.warning_title),
+      warning_message: String(settings.welcome_message_warning_body !== undefined ? settings.welcome_message_warning_body : defaults.warning_message),
+      feedback_message: String(settings.welcome_message_feedback_body !== undefined ? settings.welcome_message_feedback_body : defaults.feedback_message),
+      primary_button: String(settings.welcome_message_button !== undefined ? settings.welcome_message_button : defaults.primary_button)
+    },
+    patchNotes: patchNotesContent_(true)
+  };
+}
+
+
+function patchNotesContent_(includeInactive) {
+  var notes = getKeyValueSheet_("PATCH_NOTES");
+  var items = rowsToObjects_(sheet_("PATCH_ITEMS")).map(function (row) {
+    return {
+      emoji: String(row.emoji || "✨"),
+      title: String(row.title || ""),
+      text: String(row.text || ""),
+      attivo: normalizeYesNo_(row.attivo, "SI")
+    };
+  }).filter(function (item) { return item.title || item.text; });
+  if (!includeInactive) items = items.filter(function (item) { return item.attivo !== "NO"; });
+  var noteVersion = String(notes.version || SEEMAX_VERSION);
+  var revision = Math.max(1, Number(notes.publication_revision || 1));
+  return {
+    enabled: normalizeYesNo_(notes.enabled, "NO"),
+    display_mode: normalizeMessageDisplayMode_(notes.display_mode || "ONCE"),
+    publication_key: String(notes.publication_key || publicationKeyFromRevisionV2144_("patch", revision, noteVersion)),
+    publication_revision: revision,
+    published_at: String(notes.published_at || ""),
+    published_by: String(notes.published_by || ""),
+    version: noteVersion,
+    label: String(notes.label || "SEEMAX MANAGEMENT SUITE"),
+    title: String(notes.title || "Aggiornamento"),
+    intro: String(notes.intro || ""),
+    footer: String(notes.footer || ""),
+    items: items
+  };
+}
+
+
+function defaultBetaWelcomeContent_() {
+  return {
+    modal_title: "Benvenuto nella Beta",
+    modal_subtitle: "La nuova esperienza di lavoro entra ufficialmente nella fase di prova",
+    badge: "SEEMAX MANAGEMENT SUITE · VERSIONE BETA",
+    title: "BENVENUTO NELLA FASE DI TEST",
+    message: "Stai utilizzando Seemax Management Suite in modalità di prova. Il sistema entra ora nella sua fase di test operativo e resterà accessibile nei prossimi giorni per permetterti di conoscerlo e metterlo alla prova.",
+    feature_one_title: "Esplora il tuo nuovo spazio di lavoro",
+    feature_one_message: "Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.",
+    feature_two_title: "Personalizza profilo e bacheca",
+    feature_two_message: "Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.",
+    warning_title: "Ambiente di prova",
+    warning_message: "I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in Seemax For You verranno invece importati in Seemax Management Suite.",
+    feedback_message: "Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da PC sia da smartphone. Il tuo feedback ci aiuterà a plasmare la versione finale.",
+    primary_button: "🚀 Inizia a esplorare"
+  };
+}
+
+
+function writePatchContentBatch_(notes, items) {
+  var notesSheet = sheet_("PATCH_NOTES");
+  var noteRows = ["enabled", "display_mode", "publication_key", "publication_revision", "published_at", "published_by", "version", "label", "title", "intro", "footer"].map(function (key) { return [key, notes[key] || ""]; });
+  var noteLastRow = notesSheet.getLastRow();
+  if (noteLastRow > 1) notesSheet.getRange(2, 1, noteLastRow - 1, Math.max(2, notesSheet.getLastColumn())).clearContent();
+  if (noteRows.length) notesSheet.getRange(2, 1, noteRows.length, 2).setValues(noteRows);
+  invalidateTable_("PATCH_NOTES");
+
+  var itemsSheet = sheet_("PATCH_ITEMS");
+  var itemLastRow = itemsSheet.getLastRow();
+  if (itemLastRow > 1) itemsSheet.getRange(2, 1, itemLastRow - 1, Math.max(4, itemsSheet.getLastColumn())).clearContent();
+  if (items.length) {
+    itemsSheet.getRange(2, 1, items.length, 4).setValues(items.map(function (item) {
+      return [item.emoji, item.title, item.text, item.attivo];
+    }));
+  }
+  invalidateTable_("PATCH_ITEMS");
 }
 
 function listEntity_(entity, user) {
@@ -1940,17 +2367,11 @@ function upsertEntity_(entity, record, user) {
 function removeEntity_(entity, id, user) {
   var sheetName = ENTITY_SHEETS[entity];
   var idField = entity === "users" ? "username" : "id";
-  var sheet = sheet_(sheetName);
-  var headers = sheetHeaders_(sheet);
-  if (!headers.length) return false;
-  var idIndex = headers.indexOf(idField);
-  if (idIndex < 0) return false;
-  var rowIndex = findSheetRowByValue_(sheet, idIndex + 1, id);
-  if (rowIndex < 2) return false;
-  var agentIndex = headers.indexOf("agent_username");
-  var current = rowObjectAt_(sheet, rowIndex, headers) || {};
-  if (!isAdmin_(user) && agentIndex >= 0 && current.agent_username && String(current.agent_username) !== String(user.username)) throw new Error("Record non autorizzato.");
-  sheet.deleteRow(rowIndex);
+  var record = findRowRecord_(sheetName, idField, id);
+  if (!record) return false;
+  var stored = record.object || {};
+  if (!isAdmin_(user) && stored.agent_username && String(stored.agent_username) !== String(user.username)) throw new Error("Record non autorizzato.");
+  sheet_(sheetName).deleteRow(record.rowIndex);
   invalidateTable_(sheetName);
   return true;
 }
@@ -2084,38 +2505,20 @@ function agentOfMonth_(practices, clients, currentUser, userRows) {
 
 function plannerConfig_() {
   var settings = getSettings_();
-  var notes = getKeyValueSheet_("PATCH_NOTES");
-  var items = rowsToObjects_(sheet_("PATCH_ITEMS")).filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; });
-  var managedItems = parseManagedPatchItems_(settings.patch_notes_items);
   return {
     ok: true,
     version: String(settings.versione_config || SEEMAX_VERSION),
     impostazioni: settings,
     prodotti: inventoryProductsForRead_().filter(function (row) { return String(row.attivo || "SI").toUpperCase() !== "NO"; }),
-    patchNotes: {
-      version: String(settings.patch_notes_revision || notes.version || SEEMAX_VERSION),
-      enabled: String(settings.patch_notes_enabled || "SI").toUpperCase() === "SI",
-      frequency: String(settings.patch_notes_frequency || "ONCE").toUpperCase(),
-      label: settings.patch_notes_label || notes.label || "SEEMAX QUOTATION PLANNER",
-      title: settings.patch_notes_title || notes.title || "Aggiornamento",
-      intro: settings.patch_notes_intro || notes.intro || "",
-      footer: settings.patch_notes_footer || notes.footer || "",
-      items: managedItems.length ? managedItems : items
-    }
+    patchNotes: patchNotesContent_(false)
   };
 }
 
-function parseManagedPatchItems_(value) {
-  return String(value || "").split(/\r?\n/).map(function (line) {
-    var parts = line.split("|");
-    return { emoji: String(parts.shift() || "✨").trim(), title: String(parts.shift() || "Aggiornamento").trim(), text: parts.join("|").trim() };
-  }).filter(function (item) { return item.title || item.text; });
-}
-
 function plannerAgentLogin_(p) {
-  var user = authenticate_(p.agent_username, p.agent_key);
-  touchLogin_(user.username);
-  return { ok: true, username: user.username, displayName: user.nome_visualizzato, nome_visualizzato: user.nome_visualizzato, email: user.email || "", telefono: user.telefono || "", ruolo: String(user.ruolo || "AGENTE").toUpperCase() };
+  var authenticatedUser = authenticate_(p.agent_username, p.agent_key);
+  var user = findRowObject_("AGENTI", "username", authenticatedUser.username) || authenticatedUser;
+  touchLoginBestEffort_(user.username);
+  return { ok: true, username: user.username, displayName: user.nome_visualizzato, nome_visualizzato: user.nome_visualizzato, email: user.email || "", telefono: user.telefono || "", ruolo: String(user.ruolo || "AGENTE").toUpperCase(), welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0) };
 }
 
 function nextQuote_(p) {
@@ -2198,213 +2601,134 @@ function deleteQuoteAgentLocked_(p) {
 
 function db_() {
   if (RUNTIME_DB_CACHE_) return RUNTIME_DB_CACHE_;
-  var id = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
-  if (id) { RUNTIME_DB_CACHE_ = SpreadsheetApp.openById(id); return RUNTIME_DB_CACHE_; }
+  var propertyStarted = new Date().getTime();
+  var properties = PropertiesService.getScriptProperties();
+  var id = properties.getProperty("SPREADSHEET_ID");
+  performanceEvent_("service", "PropertiesService.SPREADSHEET_ID", new Date().getTime() - propertyStarted, { hit: !!id });
+  if (id) {
+    var openStarted = new Date().getTime();
+    RUNTIME_DB_CACHE_ = SpreadsheetApp.openById(id);
+    performanceEvent_("service", "SpreadsheetApp.openById", new Date().getTime() - openStarted, {});
+    return RUNTIME_DB_CACHE_;
+  }
+  var activeStarted = new Date().getTime();
   var active = SpreadsheetApp.getActiveSpreadsheet();
+  performanceEvent_("service", "SpreadsheetApp.getActiveSpreadsheet", new Date().getTime() - activeStarted, { found: !!active });
   if (!active) throw new Error("Database non inizializzato. Esegui setupSeemaxDatabase().");
-  PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", active.getId());
+  properties.setProperty("SPREADSHEET_ID", active.getId());
   RUNTIME_DB_CACHE_ = active;
   return RUNTIME_DB_CACHE_;
+}
+
+function performanceStart_(action) {
+  RUNTIME_PERFORMANCE_ = {
+    action: String(action || ""),
+    startedAt: new Date().getTime(),
+    metrics: {},
+    events: []
+  };
+}
+
+function performanceEvent_(kind, name, elapsedMs, detail) {
+  if (!RUNTIME_PERFORMANCE_ || !SEEMAX_PERFORMANCE_OPTIONS_.diagnostics) return;
+  var event = {
+    kind: String(kind || "step"),
+    name: String(name || ""),
+    elapsed_ms: Math.max(0, Number(elapsedMs || 0))
+  };
+  Object.keys(detail || {}).forEach(function (key) {
+    var value = detail[key];
+    if (["string", "number", "boolean"].indexOf(typeof value) >= 0) event[key] = value;
+  });
+  RUNTIME_PERFORMANCE_.events.push(event);
+}
+
+function performanceMetric_(name, value) {
+  if (!RUNTIME_PERFORMANCE_ || !SEEMAX_PERFORMANCE_OPTIONS_.diagnostics) return;
+  RUNTIME_PERFORMANCE_.metrics[String(name || "metric")] = Math.max(0, Number(value || 0));
+}
+
+function performanceSnapshot_() {
+  if (!RUNTIME_PERFORMANCE_) return null;
+  var totals = {};
+  RUNTIME_PERFORMANCE_.events.forEach(function (event) {
+    totals[event.kind] = Number(totals[event.kind] || 0) + Number(event.elapsed_ms || 0);
+  });
+  return {
+    version: SEEMAX_VERSION,
+    action: RUNTIME_PERFORMANCE_.action,
+    total_ms: Math.max(0, new Date().getTime() - RUNTIME_PERFORMANCE_.startedAt),
+    lock_wait_ms: Number(RUNTIME_PERFORMANCE_.metrics.lock_wait_ms || 0),
+    lock_hold_ms: Number(RUNTIME_PERFORMANCE_.metrics.lock_hold_ms || 0),
+    totals_ms: totals,
+    events: RUNTIME_PERFORMANCE_.events.slice(0, 80)
+  };
+}
+
+function resetRequestDataCaches_() {
+  RUNTIME_TABLE_CACHE_ = {};
+  RUNTIME_ROW_LOOKUP_CACHE_ = {};
 }
 
 function resetRuntimeCaches_() {
   RUNTIME_DB_CACHE_ = null;
   RUNTIME_SHEET_CACHE_ = {};
-  RUNTIME_TABLE_CACHE_ = {};
-  RUNTIME_ROW_CACHE_ = {};
+  RUNTIME_HEADER_CACHE_ = {};
+  resetRequestDataCaches_();
   RUNTIME_DEFERRED_EMAILS_ = [];
   RUNTIME_DEFERRED_LOGS_ = [];
   RUNTIME_MUTATION_LOCK_HELD_ = false;
+  RUNTIME_PERFORMANCE_ = null;
 }
 
 function withMutationLock_(callback) {
   var lock = LockService.getScriptLock();
+  var waitStarted = new Date().getTime();
   lock.waitLock(45000);
+  performanceMetric_("lock_wait_ms", new Date().getTime() - waitStarted);
+  var holdStarted = new Date().getTime();
   var result;
   var failure = null;
   try {
     RUNTIME_MUTATION_LOCK_HELD_ = true;
-    /* Una richiesta può avere letto dati prima di ottenere il lock: tutte le
-       tabelle vengono quindi rilette dentro la sezione critica. */
-    RUNTIME_TABLE_CACHE_ = {};
-    RUNTIME_ROW_CACHE_ = {};
+    /* Le letture eseguite prima del lock, per esempio l'autenticazione, non
+       possono diventare lo snapshot usato dalla mutazione. */
+    resetRequestDataCaches_();
     result = callback();
+    /* Le email vengono registrate in modo durevole mentre il lock e gia
+       posseduto. L'invio effettivo avviene tramite trigger e non ritarda la
+       risposta dell'agente. */
+    queueDeferredEmailsLocked_();
+    /* Conferma le scritture pendenti prima di cedere il lock globale. In
+       questo modo un secondo agente rilegge sempre lo stato già consolidato. */
+    var flushStarted = new Date().getTime();
+    SpreadsheetApp.flush();
+    performanceEvent_("write", "SpreadsheetApp.flush", new Date().getTime() - flushStarted, { synchronized: true });
   } catch (error) {
     failure = error;
   } finally {
     RUNTIME_MUTATION_LOCK_HELD_ = false;
+    performanceMetric_("lock_hold_ms", new Date().getTime() - holdStarted);
     lock.releaseLock();
   }
   if (failure) throw failure;
   flushDeferredLogs_();
-  flushDeferredEmails_();
   return result;
-}
-
-/* Registro persistente delle mutazioni concluse. Il lock globale impedisce
-   che due agenti eseguano contemporaneamente la stessa sezione critica;
-   OPERAZIONI consente inoltre di recuperare l'esito anche dopo la scadenza
-   della cache o la perdita del postMessage del browser. Scriviamo una sola
-   volta, a operazione conclusa: se Apps Script si interrompe prima, i
-   request_token presenti nei record applicativi rendono sicuro il retry. */
-function ensureTechnicalSheet_(name) {
-  var ss = db_();
-  return ss.getSheetByName(name) || ensureSheet_(ss, name, SHEET_SCHEMAS[name] || []);
-}
-
-function mutationRequestToken_(p) {
-  var direct = String(p && p.request_token || "").trim();
-  if (direct) return direct;
-  var payload = parseJson_(p && p.payload, {});
-  return String(payload && payload.request_token || "").trim();
-}
-
-function operationStorageId_(p, action) {
-  var username = String(p && p.agent_username || "").trim().toLowerCase();
-  var requestId = String(p && p.requestId || "").trim().slice(0, 180);
-  var source = requestId ? username + "|" + requestId : username + "|" + String(action || "") + "|" + mutationRequestToken_(p);
-  if (!requestId && !mutationRequestToken_(p)) return "";
-  return hashedCacheKey_("operation_", source);
-}
-
-function operationPayloadHash_(action, p) {
-  var payload = parseJson_(p && p.payload, null);
-  if (payload && typeof payload === "object") {
-    delete payload.expected_settings_revision;
-    delete payload.expected_record_version;
-  }
-  var safe = {
-    action: String(action || ""),
-    entity: String(p && p.entity || ""),
-    id: String(p && (p.id || p.practice_id) || ""),
-    request_token: mutationRequestToken_(p),
-    payload: payload && typeof payload === "object" ? JSON.stringify(payload) : String(p && p.payload || ""),
-    visible: String(p && (p.visible || p.avviso_giacenza) || ""),
-    announcement_type: String(p && p.announcement_type || ""),
-    revision: String(p && p.revision || ""),
-    documents_json: String(p && p.documenti_caricati_json || "")
-  };
-  return hashedCacheKey_("payload_", JSON.stringify(safe));
-}
-
-function operationResultForStorage_(result) {
-  var serialized = JSON.stringify(result || { ok: true });
-  if (serialized.length <= 40000) return serialized;
-  return JSON.stringify({ ok: true, recover_by_token: true });
-}
-
-function withTrackedMutation_(action, p, callback) {
-  var operationId = operationStorageId_(p, action);
-  if (!operationId) return withMutationLock_(callback);
-  return withMutationLock_(function () {
-    /* Il registro non deve mai diventare una scorciatoia che evita
-       l'autenticazione: anche il recupero di un esito già concluso richiede
-       credenziali valide dell'utente che lo ha generato. */
-    var operationUser = authenticate_(p.agent_username, p.agent_key);
-    ensureTechnicalSheet_("OPERAZIONI");
-    var previous = findRowObject_("OPERAZIONI", "request_id", operationId);
-    if (previous && String(previous.stato || "").toUpperCase() === "COMPLETATA") {
-      if (String(previous.username || "") !== String(operationUser.username || "")) throw new Error("Operazione non autorizzata.");
-      var currentPayloadHash = operationPayloadHash_(action, p);
-      if ((previous.azione && String(previous.azione) !== String(action || ""))
-        || (previous.payload_hash && String(previous.payload_hash) !== String(currentPayloadHash))) {
-        throw new Error("Identificativo operazione già utilizzato con dati differenti.");
-      }
-      var recovered = parseJson_(previous.result_json, null);
-      if (recovered) return recovered;
-    }
-    var startedAt = new Date().toISOString();
-    var startedMs = new Date().getTime();
-    var result = callback();
-    if (result && typeof result === "object") {
-      result.performance = {
-        elapsed_ms: new Date().getTime() - startedMs,
-        write_path: "TARGETED_V2150"
-      };
-    }
-    var recordId = result && (result.row && (result.row.id || result.row.username)
-      || result.practice && result.practice.id
-      || result.product && result.product.id
-      || result.id) || "";
-    var completedAt = new Date().toISOString();
-    try {
-      upsertObject_("OPERAZIONI", "request_id", operationId, {
-        request_id: operationId,
-        request_token: mutationRequestToken_(p),
-        azione: String(action || ""),
-        entita: String(p && p.entity || ""),
-        username: String(operationUser.username || ""),
-        stato: "COMPLETATA",
-        record_id: String(recordId || ""),
-        result_json: operationResultForStorage_(result),
-        payload_hash: operationPayloadHash_(action, p),
-        errore: "",
-        created_at: previous && previous.created_at || startedAt,
-        completed_at: completedAt,
-        updated_at: completedAt
-      });
-    } catch (registryError) {
-      /* Il registro è una seconda protezione: non deve trasformarsi in un
-         nuovo punto di errore dopo che il dato principale è stato salvato. */
-      log_({ username: String(p && p.agent_username || "system"), ruolo: "SYSTEM" }, "OPERATION_REGISTRY_WARNING", "operations", operationId, String(registryError && registryError.message || registryError));
-    }
-    return result;
-  });
-}
-
-function cleanupOperationsV2150(daysToKeep) {
-  var keepDays = Math.max(7, Number(daysToKeep || 90));
-  return withMutationLock_(function () {
-    ensureTechnicalSheet_("OPERAZIONI");
-    var sheet = sheet_("OPERAZIONI");
-    var table = tableData_(sheet);
-    var updatedIndex = table.headers.indexOf("updated_at");
-    var cutoff = new Date().getTime() - keepDays * 86400000;
-    var removed = 0;
-    for (var index = table.values.length - 1; index >= 1; index--) {
-      var timestamp = Date.parse(String(table.values[index][updatedIndex] || ""));
-      if (timestamp && timestamp < cutoff) { sheet.deleteRow(index + 1); removed += 1; }
-    }
-    invalidateTable_("OPERAZIONI");
-    return "Operazioni rimosse: " + removed + ". Conservati gli ultimi " + keepDays + " giorni.";
-  });
-}
-
-function performanceMetricsV2150(daysToInclude) {
-  ensureTechnicalSheet_("OPERAZIONI");
-  var keepDays = Math.max(1, Number(daysToInclude || 30));
-  var cutoff = new Date().getTime() - keepDays * 86400000;
-  var groups = {};
-  rowsToObjects_(sheet_("OPERAZIONI")).forEach(function (operation) {
-    var completedAt = Date.parse(String(operation.completed_at || operation.updated_at || ""));
-    if (!completedAt || completedAt < cutoff || String(operation.stato || "").toUpperCase() !== "COMPLETATA") return;
-    var result = parseJson_(operation.result_json, {});
-    var elapsed = Number(result && result.performance && result.performance.elapsed_ms || 0);
-    if (!elapsed) return;
-    var action = String(operation.azione || "ALTRO");
-    if (!groups[action]) groups[action] = [];
-    groups[action].push(elapsed);
-  });
-  return Object.keys(groups).sort().map(function (action) {
-    var values = groups[action].sort(function (a, b) { return a - b; });
-    var total = values.reduce(function (sum, value) { return sum + value; }, 0);
-    return {
-      azione: action,
-      campioni: values.length,
-      media_ms: Math.round(total / values.length),
-      mediana_ms: values[Math.floor((values.length - 1) / 2)],
-      massimo_ms: values[values.length - 1]
-    };
-  });
 }
 
 function writeLogRows_(rows) {
   if (!rows || !rows.length) return;
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(2500)) return;
+  var waitStarted = new Date().getTime();
+  if (!lock.tryLock(Number(SEEMAX_PERFORMANCE_OPTIONS_.logLockWaitMs || 1))) {
+    performanceEvent_("log", "LOG skipped: lock busy", new Date().getTime() - waitStarted, { rows: rows.length });
+    return;
+  }
   try {
     var logSheet = sheet_("LOG");
+    var writeStarted = new Date().getTime();
     logSheet.getRange(logSheet.getLastRow() + 1, 1, rows.length, 7).setValues(rows);
+    performanceEvent_("write", "LOG", new Date().getTime() - writeStarted, { rows: rows.length, columns: 7 });
     invalidateTable_("LOG");
   } catch (error) { /* il log non deve bloccare l'operazione principale */ }
   finally { lock.releaseLock(); }
@@ -2415,20 +2739,123 @@ function flushDeferredLogs_() {
   writeLogRows_(queue);
 }
 
-function flushDeferredEmails_() {
+function queueDeferredEmailsLocked_() {
   var queue = RUNTIME_DEFERRED_EMAILS_.splice(0);
-  queue.forEach(function (item) {
-    try { MailApp.sendEmail(item.message); }
-    catch (error) { log_(item.actor, "EMAIL_NOTIFICATION_ERROR", "notifications", item.notificationId, String(error && error.message || error)); }
+  if (!queue.length) return;
+  try {
+    var emailSheet = sheet_("EMAIL_CODA");
+    var headers = sheetHeaders_(emailSheet);
+    var createdAt = new Date().toISOString();
+    var rows = queue.map(function (item) {
+      var message = item.message || {};
+      var object = {
+        id: uid_("mail"), created_at: createdAt, status: "PENDING", attempts: 0, next_attempt_at: createdAt,
+        to: message.to || "", subject: message.subject || "", sender_name: message.name || "Seemax Management Suite",
+        body: message.body || "", html_body: message.htmlBody || "", notification_id: item.notificationId || "",
+        actor_username: item.actor && item.actor.username || "", last_error: "", sent_at: ""
+      };
+      return headers.map(function (header) { return object[header] === undefined ? "" : object[header]; });
+    });
+    var started = new Date().getTime();
+    emailSheet.getRange(Math.max(2, emailSheet.getLastRow() + 1), 1, rows.length, headers.length).setValues(rows);
+    performanceEvent_("write", "EMAIL_CODA", new Date().getTime() - started, { rows: rows.length, columns: headers.length });
+    invalidateTable_("EMAIL_CODA");
+  } catch (error) {
+    performanceEvent_("email", "EMAIL_CODA enqueue", 0, { ok: false, error: String(error && error.message || error) });
+  }
+}
+
+function ensureEmailQueueTriggerV2151_() {
+  var exists = ScriptApp.getProjectTriggers().some(function (trigger) {
+    return trigger.getHandlerFunction() === "processEmailQueueV2151";
   });
+  if (!exists) ScriptApp.newTrigger("processEmailQueueV2151").timeBased().everyMinutes(1).create();
+}
+
+function claimNextEmailV2151_() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return null;
+  try {
+    resetRequestDataCaches_();
+    var sheet = sheet_("EMAIL_CODA");
+    var table = tableData_(sheet);
+    var headers = table.headers;
+    var statusIndex = headers.indexOf("status");
+    var attemptsIndex = headers.indexOf("attempts");
+    var nextIndex = headers.indexOf("next_attempt_at");
+    var now = new Date();
+    for (var index = 1; index < table.values.length; index++) {
+      var row = table.values[index];
+      var status = String(row[statusIndex] || "PENDING").toUpperCase();
+      var due = row[nextIndex] ? new Date(row[nextIndex]) : new Date(0);
+      var attempts = Number(row[attemptsIndex] || 0);
+      if (["PENDING", "IN_CORSO"].indexOf(status) < 0 || attempts >= 5 || (due && !isNaN(due.getTime()) && due > now)) continue;
+      var record = objectFromValues_(headers, row);
+      record.status = "IN_CORSO";
+      record.attempts = attempts + 1;
+      record.next_attempt_at = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+      var saved = upsertObject_("EMAIL_CODA", "id", record.id, record);
+      SpreadsheetApp.flush();
+      return saved;
+    }
+    return null;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function finishEmailQueueItemV2151_(item, error) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    resetRequestDataCaches_();
+    var current = findRowObject_("EMAIL_CODA", "id", item.id);
+    if (!current) return;
+    if (!error) {
+      current.status = "COMPLETATA";
+      current.sent_at = new Date().toISOString();
+      current.last_error = "";
+      current.next_attempt_at = "";
+    } else {
+      var attempts = Number(current.attempts || item.attempts || 1);
+      current.status = attempts >= 5 ? "ERRORE" : "PENDING";
+      current.last_error = String(error && error.message || error).slice(0, 1000);
+      current.next_attempt_at = attempts >= 5 ? "" : new Date(new Date().getTime() + attempts * attempts * 5 * 60 * 1000).toISOString();
+    }
+    upsertObject_("EMAIL_CODA", "id", current.id, current);
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function processEmailQueueV2151() {
+  resetRuntimeCaches_();
+  var processed = 0;
+  while (processed < 10) {
+    var item = claimNextEmailV2151_();
+    if (!item) break;
+    var failure = null;
+    try {
+      MailApp.sendEmail({
+        to: String(item.to || ""), subject: String(item.subject || ""), name: String(item.sender_name || "Seemax Management Suite"),
+        body: String(item.body || ""), htmlBody: String(item.html_body || "")
+      });
+    } catch (error) { failure = error; }
+    finishEmailQueueItemV2151_(item, failure);
+    processed += 1;
+  }
+  return { processed: processed };
 }
 
 function prepareVersionedRecord_(sheetName, keyField, keyValue, record, user) {
-  invalidateTable_(sheetName);
+  /* withMutationLock_ azzera gli snapshot appena acquisisce il lock. Non
+     invalidiamo nuovamente la tabella: la stessa richiesta puo quindi
+     riutilizzare il record gia letto per token, permessi e controllo versione. */
   var existing = findRowObject_(sheetName, keyField, keyValue);
   var requestToken = String(record.request_token || "");
   if (!existing && requestToken) {
-    var duplicate = findRowObjectsByValue_(sheetName, "request_token", requestToken, 1)[0];
+    var duplicate = findRowObject_(sheetName, "request_token", requestToken);
     if (duplicate) return { duplicate: duplicate, existing: duplicate };
   }
   var currentVersion = Number(existing && existing.record_version || 0);
@@ -2475,6 +2902,7 @@ function ensureSheet_(ss, name, schema) {
     sheet.getRange(1, 1, 1, headers.length).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold").setWrap(true);
     enforceAdminUnknownTextColumns_(sheet, name, headers);
   }
+  RUNTIME_HEADER_CACHE_[name] = headers.slice();
   return sheet;
 }
 
@@ -2487,16 +2915,238 @@ function enforceAdminUnknownTextColumns_(sheet, name, headers) {
   });
 }
 
+function cloneObject_(source) {
+  var copy = {};
+  Object.keys(source || {}).forEach(function (key) { copy[key] = source[key]; });
+  return copy;
+}
+
+function objectFromValues_(headers, values) {
+  var object = {};
+  (headers || []).forEach(function (header, index) {
+    if (header) object[header] = serializable_((values || [])[index]);
+  });
+  return object;
+}
+
+function rowLookupCacheKey_(field, value) {
+  return String(field || "") + "\u001f" + String(value === null || value === undefined ? "" : value);
+}
+
+function rowLookupBucket_(sheetName) {
+  if (!RUNTIME_ROW_LOOKUP_CACHE_[sheetName]) RUNTIME_ROW_LOOKUP_CACHE_[sheetName] = {};
+  return RUNTIME_ROW_LOOKUP_CACHE_[sheetName];
+}
+
+function cloneRowRecord_(record) {
+  if (!record) return null;
+  return { rowIndex: record.rowIndex, values: record.values.slice(), object: cloneObject_(record.object) };
+}
+
+function cacheRowRecord_(sheetName, field, value, record) {
+  var bucket = rowLookupBucket_(sheetName);
+  bucket[rowLookupCacheKey_(field, value)] = record ? {
+    rowIndex: record.rowIndex,
+    values: record.values.slice(),
+    object: cloneObject_(record.object)
+  } : false;
+}
+
+function cacheRowRecordAliases_(sheetName, headers, record) {
+  ["id", "username", "request_token", "numero", "chiave", "id_preventivo"].forEach(function (field) {
+    if ((headers || []).indexOf(field) >= 0 && record.object[field] !== undefined && String(record.object[field]) !== "") {
+      cacheRowRecord_(sheetName, field, record.object[field], record);
+    }
+  });
+}
+
+function sheetHeaders_(sheetOrName) {
+  var sheet = typeof sheetOrName === "string" ? sheet_(sheetOrName) : sheetOrName;
+  var name = sheet.getName();
+  if (RUNTIME_TABLE_CACHE_[name]) return RUNTIME_TABLE_CACHE_[name].headers.slice();
+  if (RUNTIME_HEADER_CACHE_[name]) return RUNTIME_HEADER_CACHE_[name].slice();
+  var lastColumn = sheet.getLastColumn();
+  if (!lastColumn) return [];
+  var started = new Date().getTime();
+  var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String);
+  performanceEvent_("read", name + ".headers", new Date().getTime() - started, { rows: 1, columns: lastColumn });
+  RUNTIME_HEADER_CACHE_[name] = headers.slice();
+  return headers;
+}
+
+function findRowRecord_(sheetName, keyField, keyValue) {
+  if (keyValue === null || keyValue === undefined || String(keyValue) === "") return null;
+  var sheet = sheet_(sheetName);
+  var cachedTable = RUNTIME_TABLE_CACHE_[sheetName];
+  if (cachedTable) {
+    var cachedIndex = cachedTable.headers.indexOf(keyField);
+    if (cachedIndex < 0) return null;
+    for (var tableIndex = 1; tableIndex < cachedTable.values.length; tableIndex++) {
+      if (String(cachedTable.values[tableIndex][cachedIndex]) === String(keyValue)) {
+        var tableRecord = {
+          rowIndex: tableIndex + 1,
+          values: cachedTable.values[tableIndex].slice(),
+          object: objectFromValues_(cachedTable.headers, cachedTable.values[tableIndex])
+        };
+        cacheRowRecord_(sheetName, keyField, keyValue, tableRecord);
+        return cloneRowRecord_(tableRecord);
+      }
+    }
+    return null;
+  }
+  var bucket = rowLookupBucket_(sheetName);
+  var lookupKey = rowLookupCacheKey_(keyField, keyValue);
+  if (Object.prototype.hasOwnProperty.call(bucket, lookupKey)) {
+    return bucket[lookupKey] ? cloneRowRecord_(bucket[lookupKey]) : null;
+  }
+  var headers = sheetHeaders_(sheet);
+  var columnIndex = headers.indexOf(keyField);
+  var lastRow = sheet.getLastRow();
+  if (columnIndex < 0 || lastRow < 2) {
+    bucket[lookupKey] = false;
+    return null;
+  }
+  var lookupStarted = new Date().getTime();
+  var found = sheet.getRange(2, columnIndex + 1, lastRow - 1, 1)
+    .createTextFinder(String(keyValue))
+    .matchCase(true)
+    .matchEntireCell(true)
+    .useRegularExpression(false)
+    .findNext();
+  performanceEvent_("lookup", sheetName + "." + keyField, new Date().getTime() - lookupStarted, { found: !!found, rows: lastRow - 1 });
+  if (!found) {
+    bucket[lookupKey] = false;
+    return null;
+  }
+  var rowIndex = found.getRow();
+  var readStarted = new Date().getTime();
+  var values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  performanceEvent_("read", sheetName + ".row", new Date().getTime() - readStarted, { rows: 1, columns: headers.length });
+  var record = { rowIndex: rowIndex, values: values.slice(), object: objectFromValues_(headers, values) };
+  cacheRowRecord_(sheetName, keyField, keyValue, record);
+  return cloneRowRecord_(record);
+}
+
+function findRowObject_(sheetName, keyField, keyValue) {
+  var record = findRowRecord_(sheetName, keyField, keyValue);
+  return record ? cloneObject_(record.object) : null;
+}
+
+function findRowObjectsByField_(sheetName, keyField, keyValue, limit) {
+  var maximum = Math.max(1, Number(limit || 25));
+  var cachedTable = RUNTIME_TABLE_CACHE_[sheetName];
+  if (cachedTable) {
+    return cachedTable.objects.filter(function (row) { return String(row[keyField]) === String(keyValue); }).slice(0, maximum).map(cloneObject_);
+  }
+  var sheet = sheet_(sheetName);
+  var headers = sheetHeaders_(sheet);
+  var columnIndex = headers.indexOf(keyField);
+  var lastRow = sheet.getLastRow();
+  if (columnIndex < 0 || lastRow < 2) return [];
+  var started = new Date().getTime();
+  var found = sheet.getRange(2, columnIndex + 1, lastRow - 1, 1)
+    .createTextFinder(String(keyValue))
+    .matchCase(true)
+    .matchEntireCell(true)
+    .useRegularExpression(false)
+    .findAll();
+  performanceEvent_("lookup", sheetName + "." + keyField + ".all", new Date().getTime() - started, { found: found.length, rows: lastRow - 1 });
+  var records = found.slice(0, maximum).map(function (range) {
+    var rowIndex = range.getRow();
+    var readStarted = new Date().getTime();
+    var values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+    performanceEvent_("read", sheetName + ".row", new Date().getTime() - readStarted, { rows: 1, columns: headers.length });
+    var record = { rowIndex: rowIndex, values: values.slice(), object: objectFromValues_(headers, values) };
+    cacheRowRecordAliases_(sheetName, headers, record);
+    return record;
+  });
+  /* Il campo cercato puo non essere univoco (per esempio preventivo_id tra
+     agenti diversi): lo memorizziamo come lookup singolo solo quando esiste
+     esattamente una corrispondenza, evitando che la cache punti all'ultima. */
+  if (records.length === 1 && found.length === 1) cacheRowRecord_(sheetName, keyField, keyValue, records[0]);
+  return records.map(function (record) { return cloneObject_(record.object); });
+}
+
+function findRowObjectsByNormalizedDigits_(sheetName, keyField, digits, limit) {
+  var normalized = String(digits || "").replace(/\D/g, "");
+  if (!normalized) return [];
+  var maximum = Math.max(1, Number(limit || 25));
+  var cachedTable = RUNTIME_TABLE_CACHE_[sheetName];
+  if (cachedTable) {
+    return cachedTable.objects.filter(function (row) {
+      return String(row[keyField] || "").replace(/\D/g, "") === normalized;
+    }).slice(0, maximum).map(cloneObject_);
+  }
+  var sheet = sheet_(sheetName);
+  var headers = sheetHeaders_(sheet);
+  var columnIndex = headers.indexOf(keyField);
+  var lastRow = sheet.getLastRow();
+  if (columnIndex < 0 || lastRow < 2) return [];
+  var columnStarted = new Date().getTime();
+  var columnValues = sheet.getRange(2, columnIndex + 1, lastRow - 1, 1).getDisplayValues();
+  performanceEvent_("read", sheetName + "." + keyField, new Date().getTime() - columnStarted, { rows: columnValues.length, columns: 1 });
+  var rowIndexes = [];
+  for (var index = 0; index < columnValues.length && rowIndexes.length < maximum; index++) {
+    if (String(columnValues[index][0] || "").replace(/\D/g, "") === normalized) rowIndexes.push(index + 2);
+  }
+  return rowIndexes.map(function (rowIndex) {
+    var readStarted = new Date().getTime();
+    var values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+    performanceEvent_("read", sheetName + ".row", new Date().getTime() - readStarted, { rows: 1, columns: headers.length });
+    var record = { rowIndex: rowIndex, values: values.slice(), object: objectFromValues_(headers, values) };
+    cacheRowRecordAliases_(sheetName, headers, record);
+    return cloneObject_(record.object);
+  });
+}
+
+function findRowObjectsByNormalizedText_(sheetName, keyField, value, limit) {
+  var normalized = normalizeKey_(value);
+  if (!normalized) return [];
+  var maximum = Math.max(1, Number(limit || 25));
+  var cachedTable = RUNTIME_TABLE_CACHE_[sheetName];
+  if (cachedTable) {
+    return cachedTable.objects.filter(function (row) {
+      return normalizeKey_(row[keyField]) === normalized;
+    }).slice(0, maximum).map(cloneObject_);
+  }
+  var sheet = sheet_(sheetName);
+  var headers = sheetHeaders_(sheet);
+  var columnIndex = headers.indexOf(keyField);
+  var lastRow = sheet.getLastRow();
+  if (columnIndex < 0 || lastRow < 2) return [];
+  var columnStarted = new Date().getTime();
+  var columnValues = sheet.getRange(2, columnIndex + 1, lastRow - 1, 1).getDisplayValues();
+  performanceEvent_("read", sheetName + "." + keyField + ".normalized", new Date().getTime() - columnStarted, { rows: columnValues.length, columns: 1 });
+  var rowIndexes = [];
+  for (var index = 0; index < columnValues.length && rowIndexes.length < maximum; index++) {
+    if (normalizeKey_(columnValues[index][0]) === normalized) rowIndexes.push(index + 2);
+  }
+  return rowIndexes.map(function (rowIndex) {
+    var readStarted = new Date().getTime();
+    var values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+    performanceEvent_("read", sheetName + ".row", new Date().getTime() - readStarted, { rows: 1, columns: headers.length });
+    var record = { rowIndex: rowIndex, values: values.slice(), object: objectFromValues_(headers, values) };
+    cacheRowRecordAliases_(sheetName, headers, record);
+    return cloneObject_(record.object);
+  });
+}
+
 function tableData_(sheet) {
   var name = sheet.getName();
   if (RUNTIME_TABLE_CACHE_[name]) return RUNTIME_TABLE_CACHE_[name];
-  var values = sheet.getDataRange().getValues();
+  var lastRow = sheet.getLastRow();
+  var lastColumn = sheet.getLastColumn();
+  var values = [];
+  if (lastRow > 0 && lastColumn > 0) {
+    var started = new Date().getTime();
+    values = sheet.getRange(1, 1, lastRow, lastColumn).getValues();
+    performanceEvent_("read", name + ".table", new Date().getTime() - started, { rows: lastRow, columns: lastColumn });
+  }
   var headers = values.length ? values[0].map(String) : [];
   var objects = values.length < 2 ? [] : values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
-    var obj = {};
-    headers.forEach(function (header, index) { if (header) obj[header] = serializable_(row[index]); });
-    return obj;
+    return objectFromValues_(headers, row);
   });
+  RUNTIME_HEADER_CACHE_[name] = headers.slice();
   RUNTIME_TABLE_CACHE_[name] = { values: values, headers: headers, objects: objects };
   return RUNTIME_TABLE_CACHE_[name];
 }
@@ -2504,47 +3154,22 @@ function tableData_(sheet) {
 function refreshTableObjects_(table) {
   var headers = table.headers;
   table.objects = table.values.slice(1).filter(function (row) { return row.some(function (cell) { return cell !== "" && cell !== null; }); }).map(function (row) {
-    var object = {}; headers.forEach(function (header, index) { if (header) object[header] = serializable_(row[index]); }); return object;
+    return objectFromValues_(headers, row);
   });
   return table;
 }
 
+function invalidateLookupCache_(sheetName) { delete RUNTIME_ROW_LOOKUP_CACHE_[sheetName]; }
+
 function invalidateTable_(sheetName) {
   delete RUNTIME_TABLE_CACHE_[sheetName];
-  Object.keys(RUNTIME_ROW_CACHE_).forEach(function (key) {
-    if (key.indexOf(sheetName + "|") === 0) delete RUNTIME_ROW_CACHE_[key];
-  });
+  invalidateLookupCache_(sheetName);
 }
 
 function rowsToObjects_(sheet) {
   var table = tableData_(sheet);
   if (table.values.length < 2) return [];
-  /* La copia evita che modifiche temporanee contaminino la cache della richiesta. */
-  return table.objects.map(function (row) { var copy = {}; Object.keys(row).forEach(function (key) { copy[key] = row[key]; }); return copy; });
-}
-
-/* Percorso mirato per le operazioni puntuali. Legge la sola intestazione,
-   cerca il valore esclusivamente nella colonna chiave e recupera una sola
-   riga completa. Le viste e i report continuano invece a usare tableData_. */
-function sheetHeaders_(sheet) {
-  var lastColumn = sheet.getLastColumn();
-  return lastColumn ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String) : [];
-}
-
-function findSheetRowByValue_(sheet, columnIndex, value) {
-  if (columnIndex < 1 || sheet.getLastRow() < 2) return -1;
-  var match = sheet.getRange(2, columnIndex, sheet.getLastRow() - 1, 1)
-    .createTextFinder(String(value)).matchEntireCell(true).findNext();
-  return match ? match.getRow() : -1;
-}
-
-function rowObjectAt_(sheet, rowIndex, headers) {
-  if (rowIndex < 2) return null;
-  headers = headers || sheetHeaders_(sheet);
-  var values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
-  var object = {};
-  headers.forEach(function (header, index) { if (header) object[header] = serializable_(values[index]); });
-  return object;
+  return table.objects.map(cloneObject_);
 }
 
 function serializable_(value) {
@@ -2552,102 +3177,49 @@ function serializable_(value) {
   return value;
 }
 
-function findRowObject_(sheetName, keyField, keyValue) {
-  if (keyValue === "" || keyValue === null || keyValue === undefined) return null;
-  var sheet = sheet_(sheetName);
-  var rowCacheKey = sheetName + "|" + keyField + "|" + String(keyValue);
-  if (Object.prototype.hasOwnProperty.call(RUNTIME_ROW_CACHE_, rowCacheKey)) {
-    var cachedRow = RUNTIME_ROW_CACHE_[rowCacheKey];
-    if (!cachedRow) return null;
-    var cachedCopy = {}; Object.keys(cachedRow).forEach(function (key) { cachedCopy[key] = cachedRow[key]; }); return cachedCopy;
-  }
-  var cached = RUNTIME_TABLE_CACHE_[sheetName];
-  if (cached) {
-    for (var i = 0; i < cached.objects.length; i++) if (String(cached.objects[i][keyField]) === String(keyValue)) {
-      var copy = {}; Object.keys(cached.objects[i]).forEach(function (key) { copy[key] = cached.objects[i][key]; }); RUNTIME_ROW_CACHE_[rowCacheKey] = copy; return copy;
-    }
-    RUNTIME_ROW_CACHE_[rowCacheKey] = null; return null;
-  }
-  var headers = sheetHeaders_(sheet);
-  var columnIndex = headers.indexOf(keyField) + 1;
-  if (!columnIndex) return null;
-  var found = rowObjectAt_(sheet, findSheetRowByValue_(sheet, columnIndex, keyValue), headers);
-  RUNTIME_ROW_CACHE_[rowCacheKey] = found;
-  if (!found) return null;
-  var foundCopy = {}; Object.keys(found).forEach(function (key) { foundCopy[key] = found[key]; }); return foundCopy;
-}
-
-function findRowObjectsByValue_(sheetName, keyField, keyValue, limit) {
-  var sheet = sheet_(sheetName);
-  var headers = sheetHeaders_(sheet);
-  var columnIndex = headers.indexOf(keyField) + 1;
-  if (!columnIndex || sheet.getLastRow() < 2) return [];
-  var matches = sheet.getRange(2, columnIndex, sheet.getLastRow() - 1, 1)
-    .createTextFinder(String(keyValue)).matchEntireCell(true).findAll();
-  if (limit) matches = matches.slice(0, Number(limit));
-  return matches.map(function (match) { return rowObjectAt_(sheet, match.getRow(), headers); }).filter(Boolean);
+function updateTableCacheAfterWrite_(sheetName, rowIndex, headers, values) {
+  var table = RUNTIME_TABLE_CACHE_[sheetName];
+  if (!table) return;
+  table.headers = headers.slice();
+  while (table.values.length < rowIndex - 1) table.values.push(headers.map(function () { return ""; }));
+  if (table.values.length >= rowIndex) table.values[rowIndex - 1] = values.slice();
+  else table.values.push(values.slice());
+  refreshTableObjects_(table);
 }
 
 function upsertObject_(sheetName, keyField, keyValue, record) {
   var sheet = sheet_(sheetName);
-  /* Se la tabella non è già stata caricata per un report, evita
-     getDataRange(): localizza la riga tramite la sola colonna chiave. */
-  if (!RUNTIME_TABLE_CACHE_[sheetName]) return upsertObjectTargeted_(sheetName, keyField, keyValue, record);
-  var table = tableData_(sheet);
-  var headers = table.headers.slice();
-  var newHeaders = Object.keys(record).filter(function (key) { return headers.indexOf(key) < 0; });
-  if (newHeaders.length) {
-    var startColumn = headers.length + 1;
-    headers = headers.concat(newHeaders);
-    sheet.getRange(1, startColumn, 1, newHeaders.length).setValues([newHeaders]).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold");
-    table.values.forEach(function (row) { while (row.length < headers.length) row.push(""); });
-  }
-  var data = table.values;
-  var keyIndex = headers.indexOf(keyField);
-  var rowIndex = -1;
-  for (var i = 1; i < data.length; i++) if (String(data[i][keyIndex]) === String(keyValue)) { rowIndex = i + 1; break; }
-  var existing = rowIndex > 0 ? data[rowIndex - 1] : [];
-  var values = headers.map(function (header, index) {
-    if (record[header] !== undefined) return record[header];
-    return existing[index] !== undefined ? existing[index] : "";
-  });
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
-    table.values[rowIndex - 1] = values.slice();
-  } else {
-    rowIndex = Math.max(2, table.values.length + 1);
-    sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
-    table.values.push(values.slice());
-  }
-  var result = {};
-  headers.forEach(function (header, index) { result[header] = serializable_(values[index]); });
-  table.headers = headers;
-  refreshTableObjects_(table);
-  return result;
-}
-
-function upsertObjectTargeted_(sheetName, keyField, keyValue, record) {
-  var sheet = sheet_(sheetName);
   var headers = sheetHeaders_(sheet);
   var newHeaders = Object.keys(record).filter(function (key) { return headers.indexOf(key) < 0; });
   if (newHeaders.length) {
     var startColumn = headers.length + 1;
-    sheet.getRange(1, startColumn, 1, newHeaders.length).setValues([newHeaders]).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold");
     headers = headers.concat(newHeaders);
+    var headerStarted = new Date().getTime();
+    sheet.getRange(1, startColumn, 1, newHeaders.length).setValues([newHeaders]).setBackground("#0A3570").setFontColor("#FFFFFF").setFontWeight("bold");
+    performanceEvent_("write", sheetName + ".headers", new Date().getTime() - headerStarted, { rows: 1, columns: newHeaders.length });
+    RUNTIME_HEADER_CACHE_[sheetName] = headers.slice();
+    var table = RUNTIME_TABLE_CACHE_[sheetName];
+    if (table) table.values.forEach(function (row) { while (row.length < headers.length) row.push(""); });
+    invalidateLookupCache_(sheetName);
   }
-  var keyIndex = headers.indexOf(keyField);
-  if (keyIndex < 0) throw new Error("Colonna chiave non trovata: " + keyField);
-  var rowIndex = findSheetRowByValue_(sheet, keyIndex + 1, keyValue);
-  var existing = rowIndex > 0 ? rowObjectAt_(sheet, rowIndex, headers) : {};
-  var values = headers.map(function (header) {
-    return record[header] !== undefined ? record[header] : (existing && existing[header] !== undefined ? existing[header] : "");
+  var existingRecord = findRowRecord_(sheetName, keyField, keyValue);
+  var existingValues = existingRecord ? existingRecord.values : [];
+  while (existingValues.length < headers.length) existingValues.push("");
+  var values = headers.map(function (header, index) {
+    if (record[header] !== undefined) return record[header];
+    return existingValues[index] !== undefined ? existingValues[index] : "";
   });
-  if (rowIndex < 2) rowIndex = Math.max(2, sheet.getLastRow() + 1);
+  var rowIndex = existingRecord ? existingRecord.rowIndex : Math.max(2, sheet.getLastRow() + 1);
+  var writeStarted = new Date().getTime();
   sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
-  invalidateTable_(sheetName);
-  var result = {};
-  headers.forEach(function (header, index) { result[header] = serializable_(values[index]); });
-  return result;
+  performanceEvent_("write", sheetName + ".row", new Date().getTime() - writeStarted, { rows: 1, columns: headers.length, insert: !existingRecord });
+  var result = objectFromValues_(headers, values);
+  updateTableCacheAfterWrite_(sheetName, rowIndex, headers, values);
+  invalidateLookupCache_(sheetName);
+  var rowRecord = { rowIndex: rowIndex, values: values.slice(), object: result };
+  cacheRowRecord_(sheetName, keyField, keyValue, rowRecord);
+  cacheRowRecordAliases_(sheetName, headers, rowRecord);
+  return cloneObject_(result);
 }
 
 function authenticate_(username, key) {
@@ -2656,7 +3228,9 @@ function authenticate_(username, key) {
   if (!username || !key) throw new Error("Credenziali mancanti.");
   var digest = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, username + "|" + key)).replace(/=+$/g, "");
   var cacheKey = "auth_" + digest;
+  var authCacheStarted = new Date().getTime();
   var cached = CacheService.getScriptCache().get(cacheKey);
+  performanceEvent_("cache", "authentication", new Date().getTime() - authCacheStarted, { hit: !!cached });
   if (cached) {
     var cachedUser = parseJson_(cached, null);
     if (cachedUser && String(cachedUser.stato || "ATTIVO").toUpperCase() === "ATTIVO") {
@@ -2673,7 +3247,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", welcome_seen_revision: String(user.welcome_seen_revision || ""), patch_seen_revision: String(user.patch_seen_revision || ""), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
@@ -2729,20 +3303,46 @@ function touchLogin_(username) {
 }
 
 function touchLoginBestEffort_(username) {
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(2500)) return false;
   try {
-    RUNTIME_TABLE_CACHE_ = {};
-    touchLogin_(username);
+    /* ultimo_accesso e una singola cella non critica: una scrittura mirata
+       evita che il login aspetti il lock globale o sovrascriva altri campi. */
+    var record = findRowRecord_("AGENTI", "username", username);
+    if (!record) return false;
+    var headers = sheetHeaders_("AGENTI");
+    var columnIndex = headers.indexOf("ultimo_accesso");
+    if (columnIndex < 0) return false;
+    sheet_("AGENTI").getRange(record.rowIndex, columnIndex + 1).setValue(new Date().toISOString());
+    invalidateTable_("AGENTI");
     return true;
   } catch (error) {
     return false;
-  } finally {
-    lock.releaseLock();
   }
 }
 
-function getSettings_() { return getKeyValueSheet_("IMPOSTAZIONI"); }
+function settingsCacheKey_() { return "SEEMAX_SETTINGS_V2151"; }
+
+function invalidateSettingsCache_() {
+  try { CacheService.getScriptCache().remove(settingsCacheKey_()); } catch (error) { /* cache opzionale */ }
+}
+
+function getSettings_(forceFresh) {
+  var cache = CacheService.getScriptCache();
+  if (!forceFresh) {
+    var cacheStarted = new Date().getTime();
+    var cached = cache.get(settingsCacheKey_());
+    performanceEvent_("cache", "IMPOSTAZIONI", new Date().getTime() - cacheStarted, { hit: !!cached });
+    if (cached) {
+      var parsed = parseJson_(cached, null);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+  }
+  var settings = getKeyValueSheet_("IMPOSTAZIONI");
+  var ttl = Math.max(0, Number(SEEMAX_PERFORMANCE_OPTIONS_.settingsCacheSeconds || 0));
+  if (ttl) {
+    try { cache.put(settingsCacheKey_(), JSON.stringify(settings), ttl); } catch (error) { /* cache opzionale */ }
+  }
+  return settings;
+}
 
 function getKeyValueSheet_(sheetName) {
   var rows = rowsToObjects_(sheet_(sheetName));
@@ -2751,7 +3351,11 @@ function getKeyValueSheet_(sheetName) {
   return out;
 }
 
-function setSetting_(key, value, note) { return upsertObject_("IMPOSTAZIONI", "chiave", key, { chiave: key, valore: value, note: note || "" }); }
+function setSetting_(key, value, note) {
+  var result = upsertObject_("IMPOSTAZIONI", "chiave", key, { chiave: key, valore: value, note: note || "" });
+  invalidateSettingsCache_();
+  return result;
+}
 
 function upsertSettingsBatch_(values, note) {
   var sheet = sheet_("IMPOSTAZIONI");
@@ -2774,6 +3378,7 @@ function upsertSettingsBatch_(values, note) {
   refreshTableObjects_(table);
   var result = {};
   table.objects.forEach(function (row) { if (row.chiave) result[row.chiave] = row.valore; });
+  invalidateSettingsCache_();
   return result;
 }
 
@@ -2820,6 +3425,17 @@ function log_(user, action, entity, id, detail) {
   else writeLogRows_([row]);
 }
 
+function logRoutineAction_(user, action, entity, id, detail) {
+  /* I log di normale salvataggio sono facoltativi: disattivarli elimina una
+     seconda scrittura Google Sheets dal percorso percepito dall'utente. Gli
+     eventi sensibili (stato, cancellazioni, errori, magazzino) restano loggati. */
+  if (SEEMAX_PERFORMANCE_OPTIONS_.routineUpsertLogs) log_(user, action, entity, id, detail);
+}
+
+function logRoutineUpsert_(user, entity, id, detail) {
+  logRoutineAction_(user, "UPSERT", entity, id, detail);
+}
+
 function uid_(prefix) { return prefix + "-" + new Date().getTime().toString(36) + "-" + Math.random().toString(36).substring(2, 8); }
 function parseJson_(value, fallback) { try { return JSON.parse(String(value || "")); } catch (error) { return fallback; } }
 function sanitizeCallback_(value) { var callback = String(value || ""); return /^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(callback) ? callback : ""; }
@@ -2842,22 +3458,7 @@ function seedSettings_() {
     numero_preventivo_admin_iniziale: 1,
     numero_preventivo_agenti_iniziale: 1,
     obiettivo_fatturato: 500000,
-    beta_test_attiva: "SI",
     beta_sblocca_trofei: "SI",
-    welcome_message_enabled: "SI",
-    welcome_message_frequency: "ALWAYS",
-    welcome_message_revision: 1,
-    welcome_message_title: "BENVENUTO NELLA FASE DI TEST",
-    welcome_message_body: "Stai utilizzando Seemax Management Suite in modalità di prova. Esplora il sistema, crea clienti e pratiche, utilizza il calcolatore e consulta catalogo e giacenze. Personalizza inoltre il tuo profilo e la tua bacheca.\n\nATTENZIONE: i dati inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico. Ricorda di lasciare un feedback all’amministratore Seemax sulla tua esperienza da PC e smartphone.",
-    welcome_message_button: "🚀 Inizia a esplorare",
-    patch_notes_enabled: "SI",
-    patch_notes_frequency: "ONCE",
-    patch_notes_revision: 1,
-    patch_notes_label: "SEEMAX MANAGEMENT SUITE 2.15.0",
-    patch_notes_title: "Operazioni più rapide e sicure",
-    patch_notes_intro: "I salvataggi ordinari leggono ora soltanto le colonne e le righe necessarie, anche quando clienti e pratiche aumentano.",
-    patch_notes_items: "⚡|Percorso mirato|Clienti, pratiche e giacenze non richiedono più una scansione completa durante il salvataggio.\n🔢|Identificativi atomici|I numeri pratica vengono assegnati da contatori protetti per il lavoro simultaneo.\n🛡️|Esito persistente|Le operazioni concluse restano recuperabili anche se la risposta del browser va in timeout.",
-    patch_notes_footer: "Le viste complete continuano a leggere tutti i dati quando necessario; le scritture quotidiane seguono invece il nuovo percorso rapido.",
     req_acquisto_destinatario_ordine: "SI",
     req_acquisto_clientid: "SI",
     req_acquisto_valore: "SI",
@@ -2922,110 +3523,132 @@ function seedSettings_() {
     req_leasing_visura: "SI",
     req_leasing_altra_documentazione: "NO"
   };
-  var current = getSettings_();
+  var current = getSettings_(true);
   Object.keys(defaults).forEach(function (key) { if (current[key] === undefined || current[key] === "") setSetting_(key, defaults[key], "Valore iniziale Seemax Management Suite"); });
 }
 
-function seedPatchNotes_() {
-  if (rowsToObjects_(sheet_("PATCH_NOTES")).length) return;
-  var rows = [
-    ["version", SEEMAX_VERSION], ["label", "SEEMAX MANAGEMENT SUITE 2.13.0"], ["title", "Database resiliente e magazzino sincronizzato"],
-    ["intro", "Clienti e pratiche usano richieste POST idempotenti; il Catalogo legge le giacenze direttamente da PRODOTTI_LED."],
-    ["footer", "Il refresh manuale ricarica il database e gli ADMIN possono mostrare o nascondere l'avviso di giacenza nelle singole pratiche."]
+
+function firstDefinedValueV2144_(source, keys, fallback) {
+  var object = source && typeof source === "object" ? source : {};
+  for (var i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(object, keys[i])) return object[keys[i]];
+  }
+  return fallback;
+}
+
+function deleteSettingKeysV2144_(keys) {
+  var remove = {};
+  (keys || []).forEach(function (key) { remove[String(key)] = true; });
+  var settingsSheet = sheet_("IMPOSTAZIONI");
+  var lastRow = settingsSheet.getLastRow();
+  var lastColumn = Math.max(3, settingsSheet.getLastColumn());
+  if (lastRow < 2) return [];
+  var range = settingsSheet.getRange(2, 1, lastRow - 1, lastColumn);
+  var values = range.getValues();
+  var kept = [];
+  var removed = [];
+  values.forEach(function (row) {
+    var key = String(row[0] || "");
+    if (remove[key]) removed.push(key);
+    else if (row.some(function (value) { return value !== "" && value !== null; })) kept.push(row);
+  });
+  if (!removed.length) return [];
+  range.clearContent();
+  if (kept.length) settingsSheet.getRange(2, 1, kept.length, lastColumn).setValues(kept);
+  invalidateTable_("IMPOSTAZIONI");
+  invalidateSettingsCache_();
+  return removed;
+}
+
+function prepareCommunicationsV2144_() {
+  var settings = getSettings_(true);
+  var defaults = defaultBetaWelcomeContent_();
+  var welcomeRevision = Math.max(1, Number(firstDefinedValueV2144_(settings, ["welcome_message_revision"], 1)));
+  var welcomePublicationKey = String(firstDefinedValueV2144_(settings, ["welcome_message_publication_key", "welcome_publication_key"], publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION)) || "");
+  var welcomeValues = {
+    welcome_message_enabled: normalizeYesNo_(firstDefinedValueV2144_(settings, ["welcome_message_enabled", "welcome_enabled"], "SI"), "SI"),
+    welcome_message_frequency: normalizeMessageDisplayMode_(firstDefinedValueV2144_(settings, ["welcome_message_frequency", "welcome_display_mode"], "ONCE")),
+    welcome_message_publication_key: welcomePublicationKey || publicationKeyFromRevisionV2144_("welcome", welcomeRevision, SEEMAX_VERSION),
+    welcome_message_revision: welcomeRevision,
+    welcome_message_published_at: String(firstDefinedValueV2144_(settings, ["welcome_message_published_at", "welcome_published_at"], "") || ""),
+    welcome_message_published_by: String(firstDefinedValueV2144_(settings, ["welcome_message_published_by", "welcome_published_by"], "") || ""),
+    welcome_message_modal_title: String(firstDefinedValueV2144_(settings, ["welcome_message_modal_title"], defaults.modal_title)),
+    welcome_message_modal_subtitle: String(firstDefinedValueV2144_(settings, ["welcome_message_modal_subtitle"], defaults.modal_subtitle)),
+    welcome_message_badge: String(firstDefinedValueV2144_(settings, ["welcome_message_badge"], defaults.badge)),
+    /* Le vecchie chiavi welcome_title/welcome_message appartenevano al
+       secondo popup introdotto per errore. Vengono usate solo come ripiego
+       quando il messaggio Beta originario non possiede ancora i propri dati. */
+    welcome_message_title: String(firstDefinedValueV2144_(settings, ["welcome_message_title", "welcome_title"], defaults.title)),
+    welcome_message_body: String(firstDefinedValueV2144_(settings, ["welcome_message_body", "welcome_message"], defaults.message)),
+    welcome_message_feature_1_title: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_1_title"], defaults.feature_one_title)),
+    welcome_message_feature_1_body: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_1_body"], defaults.feature_one_message)),
+    welcome_message_feature_2_title: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_2_title"], defaults.feature_two_title)),
+    welcome_message_feature_2_body: String(firstDefinedValueV2144_(settings, ["welcome_message_feature_2_body"], defaults.feature_two_message)),
+    welcome_message_warning_title: String(firstDefinedValueV2144_(settings, ["welcome_message_warning_title"], defaults.warning_title)),
+    welcome_message_warning_body: String(firstDefinedValueV2144_(settings, ["welcome_message_warning_body"], defaults.warning_message)),
+    welcome_message_feedback_body: String(firstDefinedValueV2144_(settings, ["welcome_message_feedback_body"], defaults.feedback_message)),
+    welcome_message_button: String(firstDefinedValueV2144_(settings, ["welcome_message_button", "welcome_primary_button"], defaults.primary_button)),
+    admin_content_revision: Math.max(0, Number(settings.admin_content_revision || 0))
+  };
+  upsertSettingsBatch_(welcomeValues, "Comunicazioni canoniche v2.14.4");
+
+  /* PATCH_NOTES e PATCH_ITEMS diventano le sole sorgenti delle patch notes.
+     Le vecchie chiavi IMPOSTAZIONI vengono lette solo in questa migrazione. */
+  var notes = getKeyValueSheet_("PATCH_NOTES");
+  var patchRevision = Math.max(1, Number(firstDefinedValueV2144_(notes, ["publication_revision"], firstDefinedValueV2144_(settings, ["patch_notes_revision"], 1))));
+  var patchVersion = String(firstDefinedValueV2144_(notes, ["version"], SEEMAX_VERSION));
+  var patchValues = {
+    enabled: normalizeYesNo_(firstDefinedValueV2144_(notes, ["enabled"], firstDefinedValueV2144_(settings, ["patch_notes_enabled"], "NO")), "NO"),
+    display_mode: normalizeMessageDisplayMode_(firstDefinedValueV2144_(notes, ["display_mode"], firstDefinedValueV2144_(settings, ["patch_notes_frequency"], "ONCE"))),
+    publication_key: String(firstDefinedValueV2144_(notes, ["publication_key"], publicationKeyFromRevisionV2144_("patch", patchRevision, patchVersion))),
+    publication_revision: patchRevision,
+    published_at: String(firstDefinedValueV2144_(notes, ["published_at"], "") || ""),
+    published_by: String(firstDefinedValueV2144_(notes, ["published_by"], "") || ""),
+    version: patchVersion,
+    label: String(firstDefinedValueV2144_(notes, ["label"], firstDefinedValueV2144_(settings, ["patch_notes_label"], "SEEMAX MANAGEMENT SUITE"))),
+    title: String(firstDefinedValueV2144_(notes, ["title"], firstDefinedValueV2144_(settings, ["patch_notes_title"], "Aggiornamento"))),
+    intro: String(firstDefinedValueV2144_(notes, ["intro"], firstDefinedValueV2144_(settings, ["patch_notes_intro"], ""))),
+    footer: String(firstDefinedValueV2144_(notes, ["footer"], firstDefinedValueV2144_(settings, ["patch_notes_footer"], "")))
+  };
+  var currentItems = rowsToObjects_(sheet_("PATCH_ITEMS")).map(function (item) {
+    return {
+      emoji: String(item.emoji || "✨").trim().slice(0, 16),
+      title: String(item.title || "").trim().slice(0, 180),
+      text: String(item.text || "").trim().slice(0, 900),
+      attivo: normalizeYesNo_(item.attivo, "SI")
+    };
+  }).filter(function (item) { return item.title || item.text; }).slice(0, 12);
+  if (!currentItems.length) currentItems = parseLegacyPatchItemsForMigrationV2144_(settings.patch_notes_items);
+  writePatchContentBatch_(patchValues, currentItems);
+
+  var obsoleteKeys = [
+    "beta_test_attiva",
+    "welcome_enabled", "welcome_display_mode", "welcome_publication_key", "welcome_published_at", "welcome_published_by",
+    "welcome_kicker", "welcome_title", "welcome_message", "welcome_primary_button",
+    "patch_notes_enabled", "patch_notes_frequency", "patch_notes_revision", "patch_notes_label", "patch_notes_title",
+    "patch_notes_intro", "patch_notes_items", "patch_notes_footer", "versione_patch_notes"
   ];
-  sheet_("PATCH_NOTES").getRange(2, 1, rows.length, 2).setValues(rows);
+  var removed = deleteSettingKeysV2144_(obsoleteKeys);
+  resetRequestDataCaches_();
+  return { removed_settings: removed, welcome_revision: welcomeRevision, patch_revision: patchRevision };
 }
 
-function updatePatchNotesV290_() {
-  var notes = {
+function auditCommunicationsV2144() {
+  var settings = getSettings_(true);
+  var obsolete = [
+    "beta_test_attiva", "welcome_enabled", "welcome_display_mode", "welcome_publication_key", "welcome_published_at", "welcome_published_by",
+    "welcome_kicker", "welcome_title", "welcome_message", "welcome_primary_button",
+    "patch_notes_enabled", "patch_notes_frequency", "patch_notes_revision", "patch_notes_label", "patch_notes_title", "patch_notes_intro", "patch_notes_items", "patch_notes_footer", "versione_patch_notes"
+  ].filter(function (key) { return Object.prototype.hasOwnProperty.call(settings, key); });
+  return {
     version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.9",
-    title: "Pratiche protette e assegnazione commerciale",
-    intro: "Le pratiche concluse diventano archivi professionali in sola lettura e gli ADMIN possono scegliere l’agente responsabile durante la creazione.",
-    footer: "Le importazioni dal Quotation Planner sono evidenziate come pratiche da completare."
+    welcome: adminContent_(settings).welcome,
+    patch_notes: patchNotesContent_(true),
+    obsolete_settings_still_present: obsolete
   };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
 }
 
-function updatePatchNotesV2100_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.10",
-    title: "Magazzino amministrativo e pratiche più flessibili",
-    intro: "Gli ADMIN possono registrare dati temporaneamente sconosciuti con 0000 e gestire carichi o scarichi di magazzino con uno storico completo.",
-    footer: "Le pratiche restano inseribili anche senza giacenza e possono essere organizzate per tipologia sul singolo dispositivo."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
 
-function updatePatchNotesV2110_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.11",
-    title: "Elenchi più ordinati e assegnazione clienti",
-    intro: "Clienti e pratiche mostrano sei elementi per pagina. Gli amministratori vedono per primi i record più recenti.",
-    footer: "Durante la creazione di un cliente, un ADMIN può associarlo direttamente all’agente responsabile."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2120_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.12",
-    title: "Una pratica, più Ledwall",
-    intro: "Ogni pratica può comprendere più Ledwall, anche installati presso indirizzi differenti.",
-    footer: "Una giacenza insufficiente viene segnalata senza bloccare il salvataggio: lo scarico resta in attesa e il magazzino non scende mai sotto zero."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2121_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.12.1",
-    title: "Dati sconosciuti, pratiche sempre operative",
-    intro: "Il placeholder amministrativo 0000 resta riconoscibile anche negli indirizzi memorizzati su Google Fogli.",
-    footer: "I clienti con informazioni parziali possono essere importati nelle pratiche senza che il valore 0000 venga confuso con un campo vuoto."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2130_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.13.0",
-    title: "Database resiliente e magazzino sincronizzato",
-    intro: "Clienti e pratiche vengono salvati con richieste POST idempotenti; il Catalogo legge le giacenze direttamente da PRODOTTI_LED.",
-    footer: "Il refresh manuale ricarica il database, i carichi/scarichi aggiornano giacenza_attuale e l'ADMIN puo mostrare o nascondere l'avviso di giacenza nelle singole pratiche."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
-
-function updatePatchNotesV2150_() {
-  var notes = {
-    version: SEEMAX_VERSION,
-    label: "SEEMAX MANAGEMENT SUITE 2.15.0",
-    title: "Operazioni più rapide e sicure",
-    intro: "Clienti, pratiche e giacenze vengono salvati attraverso ricerche mirate, senza rileggere inutilmente interi fogli.",
-    footer: "Contatori atomici e registro persistente proteggono il lavoro simultaneo e consentono di recuperare gli esiti anche dopo un timeout del browser."
-  };
-  Object.keys(notes).forEach(function (key) {
-    upsertObject_("PATCH_NOTES", "chiave", key, { chiave: key, valore: notes[key] });
-  });
-}
 
 /* Utility amministrativa: mostra le righe prodotto effettivamente restituite
    al Catalogo e la sorgente della quantità. È utile per un collaudo rapido
@@ -3059,21 +3682,6 @@ function selfTestInventoryMergeV2130() {
     operational_stock: 60,
     merged_stock: 60,
     message: "Test merge giacenza superato: P2.5 operativo 60 prevale sul seed 0."
-  };
-}
-
-function selfTestPerformancePrimitivesV2150() {
-  var agent = { username: "mario.rossi", nome_visualizzato: "Mario Rossi" };
-  var request = { agent_username: agent.username, requestId: "mutation-save-123", payload: JSON.stringify({ request_token: "save-123" }) };
-  if (practiceInitials_(agent) !== "MR") throw new Error("Test iniziali pratica non superato.");
-  if (practiceCounterKey_("MR") !== "PRATICA_MR") throw new Error("Test chiave contatore non superato.");
-  if (mutationRequestToken_(request) !== "save-123") throw new Error("Test request token non superato.");
-  return {
-    ok: true,
-    practice_prefix: "MR",
-    counter_key: "PRATICA_MR",
-    request_token: "save-123",
-    write_path: "TARGETED_V2150"
   };
 }
 
