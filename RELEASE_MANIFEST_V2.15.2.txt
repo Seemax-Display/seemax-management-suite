@@ -1,0 +1,70 @@
+SEEMAX MANAGEMENT SUITE 2.15.2 - RELEASE MANIFEST
+
+VERSIONI
+- Frontend: 2.15.2
+- Backend: seemax-management-suite-2.15.2
+- Cache PWA: seemax-management-v2-15-2-background-quotes-documents
+- Funzione upgrade: upgradeSeemaxV2152
+- Worker email conservato: processEmailQueueV2151
+
+PREVENTIVI IN BACKGROUND
+- savequote incluso nella whitelist del ponte nativo.
+- Metodo SeemaxApi.saveQuotation con mutazione confermata.
+- Nessun polling di ARCHIVIO_PREVENTIVI nel Planner integrato.
+- Pannello globale non bloccante con esito reale.
+- Retry dello stesso token senza seconda scrittura.
+- Collisioni tra agenti restituite con nuovo numero.
+- Scrittura nel medesimo ScriptLock delle altre mutazioni.
+
+DOCUMENTI IN BACKGROUND
+- Preparazione locale visibile.
+- Fasi reali di trasferimento e verifica Drive.
+- Registrazione metadati separata e confermata.
+- Record ottimistico senza Base64 nella cache.
+- Stato SINCRONIZZAZIONE e comandi disabilitati fino alla conferma.
+- Cartella e file isolati per upload concorrenti.
+- Protezione dall'uscita durante un'operazione attiva.
+
+ESPORTAZIONE PREVENTIVO
+- Nome automatico nel formato richiesto.
+- Suffisso anno dinamico.
+- Data GG-MM-AAAA.
+- Intestazione cliente, P prodotto, base x altezza e faccia maiuscola.
+
+PROTEZIONI CONSERVATE
+- ScriptLock e SpreadsheetApp.flush.
+- record_version, request_token e requestId.
+- autorizzazioni backend.
+- contatori preventivo persistenti per profilo.
+- fallback POST/status idempotente.
+- controlli magazzino dentro il lock.
+
+FILE RUNTIME PRINCIPALI
+- assets/js/app.js
+- assets/js/api.js
+- assets/js/config.js
+- assets/js/planner-native.js
+- quotation-planner/index.html
+- apps-script/Code.gs
+- sw.js
+
+DOCUMENTAZIONE E TEST
+- docs/AGGIORNAMENTO_V2.15.2.md
+- apps-script/INSTALLAZIONE_V2.15.2.txt
+- scripts/test-save-progress-v2.15.2.js
+- scripts/test-transport-v2.15.2.js
+- scripts/test-backend-optimizations-v2.15.2.js
+- scripts/test-quotation-background-v2.15.2.js
+- scripts/verify-v2.15.2.js
+
+RISULTATI LOCALI
+- Sintassi backend/frontend/Planner/Service Worker: OK.
+- Test UI: OK.
+- Test trasporto: OK.
+- Test backend: 32 controlli.
+- Test preventivi: 9 controlli.
+- Verifica statica e funzionale: 238 controlli.
+
+LIMITAZIONE
+Autorizzazioni, cold start, quote e latenza del Foglio Google privato devono
+essere collaudati dopo la pubblicazione del deployment reale.

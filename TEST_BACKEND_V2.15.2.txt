@@ -1,0 +1,17 @@
+BACKEND OPTIMIZATION TEST SEEMAX 2.15.2 - OK: 32 controlli.
+
+Data verifica: 2026-09-07
+Script: scripts/test-backend-optimizations-v2.15.2.js
+
+Verificati:
+- whitelist e inoltro requestId del ponte;
+- azione savequote sul ponte nativo;
+- persistenza e worker della coda email;
+- scrittura mirata dell'ultimo accesso;
+- contatori preventivo ADMIN e AGENTE;
+- lettura iniziale delle sole colonne necessarie;
+- recupero ordinario tramite PropertiesService;
+- aggiornamento monotono del contatore;
+- salvataggio preventivo sotto lock globale;
+- retry dello stesso save_request_token senza seconda scrittura o log;
+- collisione dello stesso numero con token differente.

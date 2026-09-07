@@ -1,0 +1,14 @@
+TRANSPORT TEST SEEMAX 2.15.2 - OK
+
+Data verifica: 2026-09-07
+Script: scripts/test-transport-v2.15.2.js
+
+Scenari superati:
+- native_bridge;
+- post_message;
+- post_message_late;
+- status_poll_race;
+- savequote tramite ponte nativo con token conservato.
+
+Per ogni percorso sono stati verificati record, modalità di trasporto,
+fallback, diagnostica e tempi frontend/backend.

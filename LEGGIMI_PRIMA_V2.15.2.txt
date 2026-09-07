@@ -1,0 +1,29 @@
+SEEMAX MANAGEMENT SUITE 2.15.2
+
+NOVITA PRINCIPALI
+- salvataggio preventivi tramite il ponte nativo della suite;
+- pannello non bloccante durante la registrazione del preventivo;
+- eliminazione del polling ripetuto di ARCHIVIO_PREVENTIVI nel percorso integrato;
+- retry idempotente: lo stesso comando non genera una seconda riga;
+- upload manuale documenti in background con fasi Drive/database;
+- riga documento immediata in stato SINCRONIZZAZIONE;
+- protezione da modifica, trascinamento o eliminazione durante l'upload;
+- nome PDF automatico con numero-anno, data, cliente, prodotto, misura e faccia.
+
+PROTEZIONI CONSERVATE
+- ScriptLock condiviso e flush prima del rilascio;
+- requestId e save_request_token;
+- record_version sulle entità gestionali;
+- controllo collisioni della numerazione preventivi;
+- fallback POST per il Planner autonomo e in caso di indisponibilità del ponte;
+- conferma autorevole prima del 100% della barra.
+
+INSTALLAZIONE
+1. Aggiorna prima apps-script/Code.gs.
+2. Esegui upgradeSeemaxV2152.
+3. Pubblica una nuova versione della Web App.
+4. Aggiorna GitHub con tutto il pacchetto.
+5. Esegui Ctrl+F5 o riavvia la PWA.
+
+Consulta docs/AGGIORNAMENTO_V2.15.2.md.
+Il collaudo finale deve essere eseguito sul deployment e sul Foglio privato.

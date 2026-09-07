@@ -1,0 +1,8 @@
+Verifica statica e funzionale 2.15.2 completata senza errori: 238 controlli.
+
+Comprende versioni, sintassi, comunicazioni, sicurezza rendering, ponte
+persistente, fallback POST, idempotenza, lock, coda email, letture mirate,
+stati di sincronizzazione, preventivi in background, upload manuale,
+magazzino, eliminazioni, migrazioni e nomenclatura PDF.
+
+Test dedicati UI, trasporto, backend e preventivi: SUPERATI.

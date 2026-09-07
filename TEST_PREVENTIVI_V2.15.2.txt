@@ -1,0 +1,14 @@
+TEST PREVENTIVI SEEMAX 2.15.2 - OK: 9 controlli.
+
+Script: scripts/test-quotation-background-v2.15.2.js
+
+Verificati:
+- avvio del pannello dal salvataggio agente;
+- rimozione del livello bloccante prima dell'attesa server;
+- assenza del POST cieco e del polling nel percorso integrato;
+- uso della mutazione savequote e del ponte Planner;
+- distinzione grafica tra preventivo e upload;
+- nome PDF completo.
+
+Esempio validato:
+Prev. n. 151-26 - del 07-09-2026 - Azienda Test Srl - Ledwall Display P2.5 - 2,00x1,50 - BIFACCIALE

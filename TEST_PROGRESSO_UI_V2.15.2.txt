@@ -1,0 +1,13 @@
+TEST PROGRESSO UI SEEMAX 2.15.2 - SUPERATO
+
+Script: scripts/test-save-progress-v2.15.2.js
+
+Controlli inclusi:
+- clienti e pratiche;
+- eliminazioni e magazzino;
+- preventivi e numero visualizzato;
+- upload manuale e nome file visualizzato;
+- operazioni contemporanee;
+- avanzamento limitato al 92% prima della conferma;
+- 100% soltanto dopo risposta backend;
+- errore Da verificare ed escaping dei testi.
