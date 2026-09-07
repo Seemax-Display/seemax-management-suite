@@ -21,6 +21,7 @@ var SEEMAX_FRONTEND_ORIGINS_ = [
   "https://seemax-display.github.io"
 ];
 var SEEMAX_BRIDGE_ACTIONS_ = {
+  nextquote: true,
   management_upsert: true,
   management_remove: true,
   management_save_settings: true,
@@ -253,9 +254,10 @@ function upgradeSeemaxV2151() {
     seedSettings_();
     prepareCommunicationsV2144_();
     ensureEmailQueueTriggerV2151_();
-    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.15.1 · ponte nativo, sincronizzazione immediata e attività secondarie asincrone.");
+    rebuildQuoteCountersV2151_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.15.1 · ponte nativo, sincronizzazione immediata, attività secondarie asincrone e contatori preventivo.");
     styleSheets_();
-    return "SEEMAX v2.15.1 configurato: ponte nativo con fallback, salvataggi reattivi e coda email asincrona attivi.";
+    return "SEEMAX v2.15.1 configurato: ponte nativo con fallback, salvataggi reattivi, coda email asincrona e contatori preventivo attivi.";
   });
 }
 
@@ -2523,13 +2525,71 @@ function plannerAgentLogin_(p) {
 
 function nextQuote_(p) {
   var scope = String(p.quote_scope || "AGENTE").toUpperCase();
+  if (scope !== "ADMIN") scope = "AGENTE";
   var settings = getSettings_();
   var start = Number(scope === "ADMIN" ? settings.numero_preventivo_admin_iniziale : settings.numero_preventivo_agenti_iniziale) || 1;
-  var rows = rowsToObjects_(sheet_("ARCHIVIO_PREVENTIVI"));
-  var nums = rows.filter(function (row) { return String(row.quote_scope || "AGENTE").toUpperCase() === scope && !row.deleted_at; }).map(function (row) { return parseInt(String(row.numero_preventivo || row.id_preventivo || "0").split("-")[0], 10) || 0; });
-  var next = Math.max(start - 1, nums.length ? Math.max.apply(null, nums) : 0) + 1;
+  var properties = PropertiesService.getScriptProperties();
+  var key = quoteCounterPropertyKey_(scope);
+  var stored = properties.getProperty(key);
+  var current = stored === null || stored === "" ? discoverQuoteCounter_(scope) : Number(stored || 0);
+  if (stored === null || stored === "") properties.setProperty(key, String(current));
+  var next = Math.max(start - 1, current) + 1;
   var year = String(new Date().getFullYear()).slice(-2);
   return { ok: true, next_num: String(next), next_id: String(next) + "-" + year, quote_scope: scope };
+}
+
+function quoteCounterPropertyKey_(scope) {
+  return "SEEMAX_QUOTE_COUNTER_V2151_" + (String(scope || "AGENTE").toUpperCase() === "ADMIN" ? "ADMIN" : "AGENTE");
+}
+
+function quoteCounterNumber_(value) {
+  return parseInt(String(value || "0").split("-")[0], 10) || 0;
+}
+
+function discoverQuoteCounters_() {
+  var quoteSheet = sheet_("ARCHIVIO_PREVENTIVI");
+  var headers = sheetHeaders_(quoteSheet);
+  var fields = ["id_preventivo", "quote_scope", "numero_preventivo"];
+  var indexes = fields.map(function (field) { return headers.indexOf(field); });
+  var counters = { ADMIN: 0, AGENTE: 0 };
+  if (indexes.some(function (index) { return index < 0; }) || quoteSheet.getLastRow() < 2) return counters;
+  var firstColumn = Math.min.apply(null, indexes);
+  var lastColumn = Math.max.apply(null, indexes);
+  var values = quoteSheet.getRange(2, firstColumn + 1, quoteSheet.getLastRow() - 1, lastColumn - firstColumn + 1).getValues();
+  values.forEach(function (row) {
+    var scope = String(row[indexes[1] - firstColumn] || "AGENTE").toUpperCase() === "ADMIN" ? "ADMIN" : "AGENTE";
+    var number = quoteCounterNumber_(row[indexes[2] - firstColumn] || row[indexes[0] - firstColumn]);
+    counters[scope] = Math.max(counters[scope], number);
+  });
+  return counters;
+}
+
+function discoverQuoteCounter_(scope) {
+  var normalized = String(scope || "AGENTE").toUpperCase() === "ADMIN" ? "ADMIN" : "AGENTE";
+  return Number(discoverQuoteCounters_()[normalized] || 0);
+}
+
+function rememberQuoteCounter_(scope, value) {
+  var normalized = String(scope || "AGENTE").toUpperCase() === "ADMIN" ? "ADMIN" : "AGENTE";
+  var properties = PropertiesService.getScriptProperties();
+  var key = quoteCounterPropertyKey_(normalized);
+  var stored = properties.getProperty(key);
+  var current = stored === null || stored === "" ? discoverQuoteCounter_(normalized) : Number(stored || 0);
+  var next = Math.max(current, quoteCounterNumber_(value));
+  properties.setProperty(key, String(next));
+  return next;
+}
+
+function rebuildQuoteCountersV2151_() {
+  var counters = discoverQuoteCounters_();
+  var properties = PropertiesService.getScriptProperties();
+  properties.setProperty(quoteCounterPropertyKey_("ADMIN"), String(counters.ADMIN || 0));
+  properties.setProperty(quoteCounterPropertyKey_("AGENTE"), String(counters.AGENTE || 0));
+  return counters;
+}
+
+function rebuildQuoteCountersV2151() {
+  return withMutationLock_(function () { return rebuildQuoteCountersV2151_(); });
 }
 
 function saveQuotation_(p) {
@@ -2543,6 +2603,7 @@ function saveQuotation_(p) {
     if (!id) throw new Error("Codice preventivo mancante.");
     var existing = findRowObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", id);
     if (existing && p.save_request_token && existing.save_request_token && String(existing.save_request_token) !== String(p.save_request_token)) {
+      rememberQuoteCounter_(p.quote_scope, existing.numero_preventivo || existing.id_preventivo || id);
       var next = nextQuote_({ quote_scope: p.quote_scope });
       return { ok: false, error: "Numero preventivo già utilizzato.", error_code: "QUOTE_NUMBER_CHANGED", next_num: next.next_num, next_id: next.next_id };
     }
@@ -2553,6 +2614,7 @@ function saveQuotation_(p) {
     record.agent_username = record.agent_username || (user ? user.username : "");
     record.agent_display_name = record.agent_display_name || (user ? user.nome_visualizzato : record.agente || "");
     upsertObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", id, record);
+    rememberQuoteCounter_(record.quote_scope, record.numero_preventivo || id);
     log_(user || { username: "ACCESSO_CON_CHIAVE", ruolo: "ESTERNO" }, "SAVE", "ARCHIVIO_PREVENTIVI", id, "Salvataggio preventivo S.Q.P.");
     return { ok: true, id_preventivo: id, save_request_token: record.save_request_token || "" };
   } finally { lock.releaseLock(); }

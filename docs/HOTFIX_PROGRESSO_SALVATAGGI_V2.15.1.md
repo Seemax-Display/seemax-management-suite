@@ -2,6 +2,8 @@
 
 Questa patch mantiene invariato il percorso di salvataggio della versione 2.15.1 e aggiunge esclusivamente un riscontro visivo non bloccante per clienti e pratiche.
 
+Il pannello è stato successivamente esteso a eliminazioni e magazzino. Per la revisione completa e per la correzione del numero preventivo consulta `HOTFIX_OPERAZIONI_BACKGROUND_V2.15.1.md`.
+
 ## Comportamento
 
 - Il cliente o la pratica appare subito nell'elenco con lo stato di sincronizzazione già previsto.
@@ -27,6 +29,6 @@ L'avanzamento intermedio è intenzionalmente indicativo. Non dichiara il complet
 
 ## Installazione
 
-Con Apps Script 2.15.1 già pubblicato, caricare su GitHub i file del pacchetto aggiornato. Non è necessario sostituire `Code.gs`, creare un nuovo deployment Apps Script o rieseguire `upgradeSeemaxV2151()`.
+Queste istruzioni valgono soltanto per la prima patch grafica. Il pacchetto più recente include anche il contatore del Quotation Planner e richiede la procedura descritta in `HOTFIX_OPERAZIONI_BACKGROUND_V2.15.1.md`.
 
 Il nome della cache del Service Worker è stato modificato per distribuire subito i nuovi file dell'interfaccia.

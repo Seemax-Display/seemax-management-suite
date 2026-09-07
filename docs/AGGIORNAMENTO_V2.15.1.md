@@ -1,5 +1,7 @@
 # Aggiornamento Seemax Management Suite 2.15.1
 
+> Patch operativa: il pannello non bloccante comprende ora salvataggi, eliminazioni di clienti/pratiche/documenti e carico/scarico magazzino. È stata rimossa la rilettura completa del catalogo successiva a ogni movimento ed è stato corretto il numero preventivo con collegamento nativo e contatore persistente. Vedi `HOTFIX_OPERAZIONI_BACKGROUND_V2.15.1.md`.
+
 La versione 2.15.1 riduce soprattutto il tempo percepito e il costo di trasporto delle scritture, senza eliminare i controlli multiutente. È costruita sulla baseline operativa 2.14.4 e comprende tutte le correzioni precedenti relative a Benvenuto Beta e Patch notes.
 
 ## Risultato dell'intervento
@@ -12,6 +14,9 @@ La versione 2.15.1 riduce soprattutto il tempo percepito e il costo di trasporto
 | Richiesta duplicata | Token e stato mutazione | Stesse protezioni, riutilizzate anche dopo un timeout del ponte |
 | E-mail di stato | Preparata nel salvataggio | Registrata in `EMAIL_CODA` e inviata dal trigger |
 | Accesso e notifiche | Alcune operazioni estese | Scritture mirate delle sole celle coinvolte |
+| Eliminazioni e magazzino | Schermata bloccata fino alla risposta | Pannello non bloccante, aggiornamento locale dopo conferma |
+| Movimento manuale | Seconda lettura completa del catalogo | Uso diretto della riga già verificata sotto lock |
+| Numero preventivo | JSONP breve e scansione ordinaria dell'archivio | Ponte nativo, fallback esteso e contatore persistente |
 
 Il salvataggio effettivo resta completato soltanto quando il backend restituisce il record scritto nel Foglio. L'elemento provvisorio nell'interfaccia non viene mai presentato come confermato.
 
@@ -25,7 +30,7 @@ Il ponte applica:
 - nonce casuale per ogni sessione della pagina;
 - controllo della finestra mittente;
 - controllo versione frontend/backend;
-- whitelist delle sole azioni di scrittura previste;
+- whitelist delle azioni previste, incluso il recupero mirato del numero preventivo;
 - autenticazione applicativa già utilizzata dal gestionale.
 
 Se il ponte non parte, è obsoleto o smette di rispondere, il gestionale usa automaticamente il trasporto POST precedente. Se una richiesta potrebbe essere già arrivata al server, controlla prima lo stesso `requestId`; il POST di ripiego conserva inoltre lo stesso token idempotente.
@@ -103,7 +108,7 @@ Frontend, backend e cache devono riportare rispettivamente:
 ```text
 2.15.1
 seemax-management-suite-2.15.1
-seemax-management-v2-15-1
+seemax-management-v2-15-1-background-operations-ui
 ```
 
 ## Collaudo dopo il deployment
@@ -119,6 +124,9 @@ Esegui in ordine:
 7. verifica che la pratica sia confermata subito e l'e-mail venga completata dalla coda;
 8. pubblicazione di nuove Patch notes in modalità `ONCE` e `ALWAYS`;
 9. prova con due agenti contemporanei su numerazione e magazzino.
+10. elimina un cliente, una pratica e un documento verificando che restino visibili fino alla conferma;
+11. registra un carico e uno scarico verificando il pannello e la giacenza restituita;
+12. apri il Quotation Planner come ADMIN e come agente e verifica il caricamento del prossimo numero.
 
 Dalla console del browser puoi esaminare:
 

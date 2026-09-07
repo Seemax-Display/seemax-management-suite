@@ -2726,7 +2726,12 @@
       if(input){ input.readOnly = true; input.setAttribute('aria-readonly','true'); }
       if(!SQP_DATABASE.endpoint) return null;
       try{
-        const res = await jsonpRequest('nextquote', 12000, {quote_scope: currentQuoteScope()});
+        const nativeNumberLoader = window.SEEMAX_NATIVE_API && typeof window.SEEMAX_NATIVE_API.nextQuoteNumber === 'function'
+          ? window.SEEMAX_NATIVE_API.nextQuoteNumber
+          : null;
+        const res = nativeNumberLoader
+          ? await nativeNumberLoader(currentQuoteScope())
+          : await jsonpRequest('nextquote', 30000, {quote_scope: currentQuoteScope()});
         if(res && res.ok && res.next_num){
           const current = input ? String(input.value || '').trim() : '';
           const nextNum = String(res.next_num || '').trim();
@@ -5768,7 +5773,7 @@
       setupDatabaseTest();
       setupDataInputs();
       applyAgentProfileToData();
-      setTimeout(() => loadNextQuoteNumber({silent:true, force:!val('quoteNumber')}), 1200);
+      setTimeout(() => loadNextQuoteNumber({silent:true, force:!val('quoteNumber')}), 180);
       setupLedwall();
       setupGrenke();
       if(window.SEEMAX_IFIS && window.SEEMAX_IFIS.setup) window.SEEMAX_IFIS.setup();

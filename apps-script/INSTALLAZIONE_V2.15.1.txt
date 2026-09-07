@@ -11,9 +11,10 @@ ORDINE CONSIGLIATO
 7. Verifica il messaggio:
 
    SEEMAX v2.15.1 configurato: ponte nativo con fallback, salvataggi
-   reattivi e coda email asincrona attivi.
+   reattivi, coda email asincrona e contatori preventivo attivi.
 
-8. Verifica che il Foglio contenga EMAIL_CODA.
+8. Verifica che il Foglio contenga EMAIL_CODA. La stessa procedura ricostruisce
+   i contatori preventivo ADMIN e AGENTE nelle Proprietà script.
 9. In Apps Script > Trigger verifica processEmailQueueV2151 ogni minuto.
 10. Apri Esegui il deployment > Gestisci deployment.
 11. Modifica il deployment Web App esistente.
@@ -26,7 +27,7 @@ CONTROLLO RAPIDO
 
 - config frontend: 2.15.1
 - backend: seemax-management-suite-2.15.1
-- cache PWA: seemax-management-v2-15-1
+- cache PWA: seemax-management-v2-15-1-background-operations-ui
 - funzione upgrade: upgradeSeemaxV2151
 - worker email: processEmailQueueV2151
 
@@ -39,6 +40,12 @@ DOPO L'INSTALLAZIONE
 3. Cambia lo stato di una pratica e verifica la riga in EMAIL_CODA.
 4. Pubblica nuove Patch notes e prova ONCE e ALWAYS.
 5. Esegui una prova con due utenti contemporanei.
+6. Elimina un cliente, una pratica e un documento: il pannello deve restare
+   non bloccante e la riga deve sparire soltanto dopo la conferma.
+7. Registra un carico e uno scarico: la giacenza deve aggiornarsi soltanto
+   dopo la conferma, senza ricaricare tutto il catalogo.
+8. Apri il Quotation Planner e verifica che il numero preventivo venga
+   valorizzato sia con profilo ADMIN sia con profilo AGENTE.
 
 L'email può essere inviata fino a circa un minuto dopo la variazione di stato.
 La notifica interna viene registrata subito.

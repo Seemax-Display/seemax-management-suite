@@ -176,30 +176,82 @@
     setTimeout(() => { item.classList.remove("show"); setTimeout(() => item.remove(), 250); }, 3500);
   }
 
-  function saveProgressEntityName(entity) {
-    return entity === "practices" ? "pratica" : "cliente";
+  function backgroundProgressDescriptor(kind, entity, record) {
+    const value = record || {};
+    if (kind === "delete") {
+      const descriptions = {
+        clients: { article: "il", entityName: "cliente", itemLabel: "Cliente", fallback: "Cliente selezionato" },
+        practices: { article: "la", entityName: "pratica", itemLabel: "Pratica", fallback: "Pratica selezionata" },
+        documents: { article: "il", entityName: "file", itemLabel: "File", fallback: "File caricato" }
+      };
+      const current = descriptions[entity] || { article: "l’", entityName: "elemento", itemLabel: "Elemento", fallback: "Elemento selezionato" };
+      const name = entity === "clients"
+        ? value.ragioneSociale
+        : entity === "practices" ? (value.numero || value.cliente)
+          : entity === "documents" ? (value.nome || value.file_name) : (value.nome || value.id);
+      return {
+        itemLabel: current.itemLabel,
+        name: String(name || current.fallback).trim(),
+        activeTitle: `Sto eliminando ${current.article} ${current.entityName}…`,
+        completeTitle: "Eliminazione completata",
+        initialPhase: "Preparazione dell’eliminazione…",
+        successPhase: "Eliminazione confermata dal database"
+      };
+    }
+    if (kind === "inventory") {
+      const operation = String(value.operazione || value.operation || "CARICO").toUpperCase() === "SCARICO" ? "SCARICO" : "CARICO";
+      const quantity = Math.max(0, Number(value.quantita || value.quantity || 0));
+      const product = String(value.product_name || value.prodotto || value.nome || value.product_id || "Prodotto selezionato").trim();
+      return {
+        itemLabel: operation === "CARICO" ? "Carico merce" : "Scarico merce",
+        name: `${product}${quantity ? ` · ${quantity} cabinet` : ""}`,
+        activeTitle: operation === "CARICO" ? "Sto caricando la merce…" : "Sto scaricando la merce…",
+        completeTitle: operation === "CARICO" ? "Carico completato" : "Scarico completato",
+        initialPhase: "Preparazione del movimento…",
+        successPhase: "Giacenza confermata dal database"
+      };
+    }
+    const practice = entity === "practices";
+    return {
+      itemLabel: practice ? "Pratica" : "Cliente",
+      name: String(practice ? (value.numero || value.cliente || "Nuova pratica") : (value.ragioneSociale || "Nuovo cliente")).trim(),
+      activeTitle: practice ? "Sto caricando la pratica…" : "Sto caricando il cliente…",
+      completeTitle: "Salvataggio completato",
+      initialPhase: "Preparazione del salvataggio…",
+      successPhase: "Salvataggio confermato dal database"
+    };
   }
 
-  function saveProgressRecordName(entity, record) {
-    if (entity === "practices") return String((record || {}).numero || (record || {}).cliente || "Nuova pratica").trim();
-    return String((record || {}).ragioneSociale || "Nuovo cliente").trim();
-  }
-
-  function saveProgressPhase(progress) {
+  function backgroundProgressPhase(item, progress) {
+    if (item.kind === "delete") {
+      if (progress < 34) return "Invio della richiesta di eliminazione…";
+      if (progress < 62) return "Eliminazione dal database…";
+      if (progress < 82) return "Attesa della conferma…";
+      return "Verifica finale dell’eliminazione…";
+    }
+    if (item.kind === "inventory") {
+      if (progress < 34) return "Invio del movimento al database…";
+      if (progress < 62) return "Aggiornamento della giacenza…";
+      if (progress < 82) return "Attesa della conferma…";
+      return "Verifica finale del magazzino…";
+    }
     if (progress < 34) return "Invio dei dati al database…";
     if (progress < 62) return "Elaborazione del salvataggio…";
     if (progress < 82) return "Attesa della conferma…";
     return "Verifica finale del salvataggio…";
   }
 
-  function startSaveProgress(entity, record) {
+  function startBackgroundProgress(kind, entity, record) {
     const id = `save-progress-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const descriptor = backgroundProgressDescriptor(kind, entity, record);
     const item = {
       id,
+      kind,
       entity,
-      name: saveProgressRecordName(entity, record),
+      recordId: String((record || {}).id || (record || {}).username || ""),
+      ...descriptor,
       progress: 9,
-      phase: "Preparazione del salvataggio…",
+      phase: descriptor.initialPhase,
       status: "active",
       startedAt: Date.now(),
       timer: 0
@@ -207,12 +259,33 @@
     item.timer = window.setInterval(() => {
       if (item.status !== "active") return;
       item.progress = Math.min(92, item.progress + Math.max(0.7, (92 - item.progress) * 0.085));
-      item.phase = saveProgressPhase(item.progress);
+      item.phase = backgroundProgressPhase(item, item.progress);
       renderSaveProgressCenter();
     }, 360);
     saveProgressState.items.set(id, item);
     renderSaveProgressCenter();
     return id;
+  }
+
+  function startSaveProgress(entity, record) {
+    return startBackgroundProgress("save", entity, record);
+  }
+
+  function startDeleteProgress(entity, record) {
+    return startBackgroundProgress("delete", entity, record);
+  }
+
+  function startInventoryProgress(payload, product) {
+    return startBackgroundProgress("inventory", "inventory", {
+      ...(payload || {}),
+      product_name: (product || {}).nome || (product || {}).sku || (payload || {}).product_id || "Prodotto selezionato"
+    });
+  }
+
+  function hasActiveBackgroundProgress(kind, entity, recordId) {
+    return Array.from(saveProgressState.items.values()).some((item) =>
+      item.status === "active" && item.kind === kind && item.entity === entity && String(item.recordId || "") === String(recordId || "")
+    );
   }
 
   function updateSaveProgress(id, phase) {
@@ -223,15 +296,15 @@
     renderSaveProgressCenter();
   }
 
-  function settleSaveProgress(id, status, record, errorMessage = "") {
+  function settleBackgroundProgress(id, status, record, errorMessage = "") {
     const item = saveProgressState.items.get(id);
     if (!item || item.status !== "active") return;
     window.clearInterval(item.timer);
     item.timer = 0;
     item.status = status;
-    item.name = saveProgressRecordName(item.entity, record) || item.name;
+    if (record) item.name = backgroundProgressDescriptor(item.kind, item.entity, record).name || item.name;
     item.progress = status === "complete" ? 100 : Math.max(12, Math.min(100, item.progress));
-    item.phase = status === "complete" ? "Salvataggio confermato dal database" : (errorMessage || "Salvataggio non confermato");
+    item.phase = status === "complete" ? item.successPhase : (errorMessage || "Operazione non confermata");
     renderSaveProgressCenter();
     window.setTimeout(() => {
       const current = saveProgressState.items.get(id);
@@ -239,6 +312,10 @@
       saveProgressState.items.delete(id);
       renderSaveProgressCenter();
     }, status === "complete" ? 2600 : 7000);
+  }
+
+  function settleSaveProgress(id, status, record, errorMessage = "") {
+    settleBackgroundProgress(id, status, record, errorMessage);
   }
 
   function completeSaveProgress(id, record) {
@@ -249,6 +326,16 @@
     if (!id) return;
     const message = String(error && error.message || error || "Salvataggio non riuscito.");
     settleSaveProgress(id, "failed", record, message);
+  }
+
+  function completeBackgroundProgress(id, record) {
+    if (id) settleBackgroundProgress(id, "complete", record);
+  }
+
+  function failBackgroundProgress(id, record, error) {
+    if (!id) return;
+    const message = String(error && error.message || error || "Operazione non riuscita.");
+    settleBackgroundProgress(id, "failed", record, message);
   }
 
   function renderSaveProgressCenter() {
@@ -262,15 +349,14 @@
     const primary = active[active.length - 1] || failed[failed.length - 1] || items[items.length - 1];
     const progressItems = active.length ? active : items;
     const progress = Math.round(progressItems.reduce((total, item) => total + Number(item.progress || 0), 0) / Math.max(1, progressItems.length));
-    const entityName = saveProgressEntityName(primary.entity);
     center.classList.toggle("multiple", items.length > 1);
     center.classList.toggle("complete", !active.length && !failed.length);
     center.classList.toggle("failed", !active.length && failed.length > 0);
     $("saveProgressIcon").textContent = active.length ? "↻" : failed.length ? "!" : "✓";
     $("saveProgressTitle").textContent = active.length > 1
-      ? `${active.length} salvataggi in corso…`
-      : active.length ? `Sto caricando ${entityName === "pratica" ? "la" : "il"} ${entityName}…`
-        : failed.length ? "Salvataggio da verificare" : "Salvataggio completato";
+      ? `${active.length} operazioni in corso…`
+      : active.length ? primary.activeTitle
+        : failed.length ? "Operazione da verificare" : primary.completeTitle;
     $("saveProgressSubtitle").textContent = `${primary.name} · ${primary.phase}`;
     $("saveProgressPercent").textContent = `${progress}%`;
     $("saveProgressBar").style.width = `${progress}%`;
@@ -278,7 +364,7 @@
     $("saveProgressItems").innerHTML = items.map((item) => {
       const icon = item.status === "active" ? "↻" : item.status === "failed" ? "!" : "✓";
       const status = item.status === "active" ? `${Math.round(item.progress)}%` : item.status === "failed" ? "Da verificare" : "Completato";
-      return `<div class="save-progress-item ${esc(item.status)}"><span>${icon}</span><div><strong>${esc(saveProgressEntityName(item.entity))}</strong><small title="${esc(item.name)}">${esc(item.name)}</small></div><em>${esc(status)}</em></div>`;
+      return `<div class="save-progress-item ${esc(item.status)}"><span>${icon}</span><div><strong>${esc(item.itemLabel)}</strong><small title="${esc(item.name)}">${esc(item.name)}</small></div><em>${esc(status)}</em></div>`;
     }).join("");
   }
 
@@ -2593,6 +2679,11 @@
       (!!requestToken && String(item.request_token || "") === requestToken)
     );
     if (index >= 0) {
+      const currentVersion = Number(rows[index].record_version || 0);
+      const incomingVersion = Number(row.record_version || 0);
+      /* Due risposte concorrenti possono arrivare in ordine inverso. La riga
+         con record_version maggiore resta sempre autorevole nel browser. */
+      if (currentVersion > 0 && incomingVersion > 0 && incomingVersion < currentVersion) return;
       const merged = { ...rows[index], ...row };
       if (!row.__sync_state) {
         delete merged.__sync_state;
@@ -2972,22 +3063,31 @@
 
   async function removeEntity(entity, id) {
     const label = ENTITY_LABELS[entity] || "elemento";
+    if (hasActiveBackgroundProgress("delete", entity, id)) {
+      toast(`L’eliminazione di questo ${label} è già in corso.`, "info");
+      return;
+    }
+    const existing = (state.data[entity] || []).find((item) => String(item.id || item.username) === String(id));
     if (!confirm(`Eliminare definitivamente questo ${label}?`)) return;
-    setLoading(true, "Eliminazione…");
+    const backgroundDeleteNotice = ["clients", "practices", "documents"].includes(entity) && !api.isFastMode();
+    const deleteProgressId = backgroundDeleteNotice ? startDeleteProgress(entity, existing || { id }) : "";
+    if (!backgroundDeleteNotice) setLoading(true, "Eliminazione…");
     try {
-      const existing = (state.data[entity] || []).find((item) => String(item.id || item.username) === String(id));
+      updateSaveProgress(deleteProgressId, "Eliminazione in background…");
       await api.remove(entity, id, Number(existing && existing.record_version || 0));
+      completeBackgroundProgress(deleteProgressId, existing || { id });
       state.data[entity] = (state.data[entity] || []).filter((item) => String(item.id || item.username) !== String(id));
       if (entity === "documents") { const library = documentLibrary(); delete library.placements[id]; saveDocumentLibrary(library); }
       updateLocalDashboard(); scheduleBootstrapCache(); renderRoute(); toast(`${label} eliminato.`);
     }
     catch (error) {
+      failBackgroundProgress(deleteProgressId, existing || { id }, error);
       if (String(error.message || "").includes("CONFLICT_RECORD")) {
         toast("L'elemento è cambiato prima dell'eliminazione. I dati sono stati aggiornati e nulla è stato cancellato.", "danger");
         try { await loadAll(false); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
       } else toast(error.message, "danger");
     }
-    finally { setLoading(false); }
+    finally { if (!backgroundDeleteNotice) setLoading(false); }
   }
 
   async function toggleActivity(id) {
@@ -3380,24 +3480,33 @@
       const payload = serializeForm(form);
       payload.request_token = form.dataset.requestToken || newRequestToken();
       if (!String(payload.descrizione || "").trim()) { toast("Inserisci una descrizione del movimento.", "danger"); return; }
-      setLoading(true, "Registrazione movimento magazzino…");
+      const product = (state.data.products || []).find((item) => String(item.id) === String(payload.product_id));
+      const inventoryProgressId = startInventoryProgress(payload, product);
+      updateSaveProgress(inventoryProgressId, "Movimento magazzino in background…");
+      closeModal();
       try {
         const result = await api.adjustInventory(payload);
-        if (Array.isArray(result.products)) {
+        completeBackgroundProgress(inventoryProgressId, { ...payload, product_name: (result.product || {}).nome || (product || {}).nome });
+        if (result.product) replaceLocalEntity("products", result.product);
+        else if (Array.isArray(result.products)) {
           state.data.products = result.products;
           updateLocalDashboard();
           scheduleBootstrapCache();
-        } else if (result.product) replaceLocalEntity("products", result.product);
+        }
         if (result.movement) {
           state.data.movements ||= [];
-          state.data.movements.unshift(result.movement);
+          const movementIndex = state.data.movements.findIndex((item) => String(item.id) === String(result.movement.id));
+          if (movementIndex >= 0) state.data.movements[movementIndex] = { ...state.data.movements[movementIndex], ...result.movement };
+          else state.data.movements.push(result.movement);
+          state.data.movements.sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")));
           state.data.movements = state.data.movements.slice(0, 100);
         }
-        closeModal();
         renderRoute();
         celebrateSuccess(payload.operazione === "CARICO" ? "📥" : "📤", payload.operazione === "CARICO" ? "Carico registrato" : "Scarico registrato", `${Number(payload.quantita || 0)} cabinet · ${String(payload.descrizione || "").trim()}`);
-      } catch (error) { toast(error.message, "danger"); }
-      finally { setLoading(false); }
+      } catch (error) {
+        failBackgroundProgress(inventoryProgressId, { ...payload, product_name: (product || {}).nome }, error);
+        toast(`${error.message} La giacenza visualizzata non è stata modificata.`, "danger");
+      }
       return;
     }
     if (event.target.id === "profileForm") {

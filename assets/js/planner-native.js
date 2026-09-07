@@ -135,7 +135,8 @@
       /* Il Planner nativo usa lo stesso trasporto affidabile del gestionale
          per creare la pratica: niente payload estesi in una URL JSONP. */
       window.SEEMAX_NATIVE_API = {
-        createPracticeFromQuote: (payload) => window.SeemaxApi.createPracticeFromQuote(payload)
+        createPracticeFromQuote: (payload) => window.SeemaxApi.createPracticeFromQuote(payload),
+        nextQuoteNumber: (scope) => window.SeemaxApi.nextQuoteNumber(scope)
       };
       const execute = new Function("document", "window", "location", "history", applicationScript);
       execute(scopedDocument, windowProxy(scopedDocument, locationState, listeners, container), locationState, scopedHistory);

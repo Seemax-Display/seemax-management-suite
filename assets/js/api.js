@@ -1075,11 +1075,28 @@ async function getAdminContent() {
       entity: "movements",
       requestToken: payload.request_token
     });
-    /* La risposta e poi verificata rileggendo PRODOTTI_LED, la stessa fonte
-       mostrata nel Catalogo. */
-    const products = await list("products");
-    const confirmed = products.find((row) => String(row.id) === String(response.product && response.product.id || payload.product_id));
-    return { product: confirmed || response.product, products, movement: response.movement, duplicate: response.duplicate === true };
+    /* Il backend rilegge e verifica gia la cella PRODOTTI_LED dentro il lock.
+       Usare quella riga confermata evita una seconda lettura completa del
+       catalogo dopo ogni movimento. */
+    return { product: response.product, movement: response.movement, duplicate: response.duplicate === true };
+  }
+
+  async function nextQuoteNumber(scope) {
+    const quoteScope = String(scope || "AGENTE").toUpperCase() === "ADMIN" ? "ADMIN" : "AGENTE";
+    if (config.demoMode) {
+      const settings = demo.settings();
+      const start = Number(quoteScope === "ADMIN" ? settings.numero_preventivo_admin_iniziale : settings.numero_preventivo_agenti_iniziale) || 1;
+      return { ok: true, next_num: String(start), next_id: `${start}-${String(new Date().getFullYear()).slice(-2)}`, quote_scope: quoteScope };
+    }
+    const requestId = uid("next-quote");
+    try {
+      const response = await callManagementBridge("nextquote", { quote_scope: quoteScope }, requestId, 30000);
+      delete response.__seemax_transport;
+      online = true;
+      return response;
+    } catch (bridgeError) {
+      return retryRead((attempt) => jsonp("nextquote", { quote_scope: quoteScope }, attempt ? 50000 : 30000), 2);
+    }
   }
 
   async function setPracticeStockWarning(practice, visible) {
@@ -1188,5 +1205,5 @@ async function getAdminContent() {
     };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();
