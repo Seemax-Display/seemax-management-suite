@@ -1,0 +1,25 @@
+SEEMAX MANAGEMENT SUITE 2.16.0 - INSTALLAZIONE
+
+1. Apri il Foglio Google operativo.
+2. Vai in Estensioni > Apps Script.
+3. Sostituisci Code.gs con il file incluso in questa cartella.
+4. Salva.
+5. In una finestra senza operazioni degli agenti, esegui upgradeSeemaxV2160.
+6. Autorizza Google Drive se richiesto.
+7. Controlla il messaggio finale e la chiave IMPOSTAZIONI backup_pre_rilascio_v2160_url.
+8. Esegui auditSheetStructureV2160: unused deve essere vuoto.
+9. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+10. Pubblica tutti i file frontend su GitHub Pages.
+11. Esegui un refresh forzato del browser.
+
+L'upgrade:
+- crea una copia integrale e recuperabile del Foglio prima di pulizia e reset;
+- elimina soltanto le schede assenti da SHEET_SCHEMAS;
+- nasconde le tabelle tecniche ancora utilizzate;
+- riallinea i contatori atomici di pratiche e preventivi;
+- azzera una sola volta profilo e trofei dei non-ADMIN;
+- preserva identità, credenziali, dati operativi e account ADMIN;
+- attiva la versione seemax-management-suite-2.16.0.
+
+Non eliminare manualmente PATCH_NOTES, PATCH_ITEMS, ARCHIVIO_PREVENTIVI,
+NOTIFICHE, EMAIL_CODA o LOG: sono tabelle tecniche attive.

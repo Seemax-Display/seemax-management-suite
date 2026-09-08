@@ -6,7 +6,7 @@
   const FAST_MODE_KEY = "SEEMAX_MANAGEMENT_FAST_MODE_V1";
   const FAST_QUEUE_KEY = "SEEMAX_MANAGEMENT_FAST_QUEUE_V1";
   const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
-  const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_V1_";
+  const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_";
   const DEMO_FIRST_ACCESS_PREFIX = "SEEMAX_MANAGEMENT_DEMO_ACCESSED_V1_";
   const POST_MESSAGE_GRACE_MS = 2600;
   const MUTATION_POST_GRACE_MS = 700;
@@ -366,7 +366,9 @@
     return session ? { agent_username: session.username, agent_key: session.key } : {};
   }
 
-  function bootstrapCacheKey() { return BOOTSTRAP_CACHE_PREFIX + String((session || {}).username || "anonymous"); }
+  function bootstrapCacheKey() {
+    return BOOTSTRAP_CACHE_PREFIX + String(config.version || "unknown") + "_" + String((session || {}).username || "anonymous");
+  }
   function cachedBootstrap(maxAgeMs = 12 * 60 * 60 * 1000) {
     const cached = readLocal(bootstrapCacheKey(), null);
     if (!cached || !cached.data || Date.now() - Number(cached.savedAt || 0) > maxAgeMs) return null;

@@ -2,10 +2,13 @@
 
 ## `assets/js/config.js`
 
-- `INCOLLA_QUI_URL_APPS_SCRIPT_EXEC`
 - `INSERISCI_TELEFONO`
 - `INSERISCI_EMAIL`
 - `INSERISCI_SEDE_AZIENDALE`
+
+L'URL Apps Script operativo è già valorizzato nel pacchetto. I dati commerciali
+condivisi vanno comunque verificati nella scheda ADMIN `Generali` prima della
+pubblicazione; quelli nel file di configurazione sono valori di ripiego.
 
 ## Foglio AGENTI
 

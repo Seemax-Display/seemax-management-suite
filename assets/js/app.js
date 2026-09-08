@@ -1697,7 +1697,13 @@
   }
 
   function renderPractices() {
-    let rows = (state.data.practices || []).slice();
+    const allPractices = state.data.practices || [];
+    const statusCounts = Object.fromEntries(STATUSES.map((status) => [status, 0]));
+    allPractices.forEach((practice) => {
+      const status = String(practice.stato || "");
+      if (Object.prototype.hasOwnProperty.call(statusCounts, status)) statusCounts[status] += 1;
+    });
+    let rows = allPractices.slice();
     const query = String(state.practiceQuery || "").trim().toLowerCase();
     const searchableFields = api.isAdmin() ? ["numero", "id", "cliente", "titolo", "agente", "agent_username"] : ["numero", "id", "cliente", "titolo"];
     if (query) rows = rows.filter((row) => searchableFields.some((key) => String(row[key] || "").toLowerCase().includes(query)));
@@ -1722,7 +1728,7 @@
     const start = (state.practicePage - 1) * pageSize;
     const visibleRows = rows.slice(start, start + pageSize);
     const layout = currentPracticeLayout();
-    const chips = STATUSES.map((s) => `<button class="filter-chip ${state.filterStatus === s ? "active" : ""}" data-filter-status="${esc(s)}">${esc(s)} <strong>${state.data.practices.filter((p) => p.stato === s).length}</strong></button>`).join("");
+    const chips = STATUSES.map((s) => `<button class="filter-chip ${state.filterStatus === s ? "active" : ""}" data-filter-status="${esc(s)}">${esc(s)} <strong>${statusCounts[s] || 0}</strong></button>`).join("");
     const sortOptions = [
       ["created", "Data creazione"], ["stato", "Esito / stato"], ["numero", "ID pratica"], ["cliente", "Nome cliente"],
       ["tipo", "Tipologia"], ["finanziaria", "Finanziaria"], ["valore", "Valore"]
@@ -1732,26 +1738,36 @@
       <label>Ordina per<select id="practiceSort">${sortOptions.map(([value, label]) => `<option value="${value}" ${state.practiceSort === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
       <label>Ordine<select id="practiceDirection"><option value="asc" ${state.practiceDirection === "asc" ? "selected" : ""}>Crescente</option><option value="desc" ${state.practiceDirection === "desc" ? "selected" : ""}>Decrescente</option></select></label>
     </div>`;
-    const layoutControls = `<div class="practice-layout-toolbar"><div><strong>Organizzazione pratiche</strong><span>Preferenza salvata soltanto su questo dispositivo</span></div><div class="practice-layout-switch"><button class="${layout === "table" ? "active" : ""}" data-action="set-practice-layout" data-layout="table">☷ Visione attuale</button><button class="${layout === "type" ? "active" : ""}" data-action="set-practice-layout" data-layout="type">▦ Per tipologia</button></div></div>`;
+    const layoutControls = `<div class="practice-layout-toolbar"><div><strong>Organizzazione pratiche</strong><span>Preferenza salvata soltanto su questo dispositivo</span></div><div class="practice-layout-switch"><button class="${layout === "table" ? "active" : ""}" data-action="set-practice-layout" data-layout="table" aria-label="Visualizza le pratiche in dettaglio">☷ IN DETTAGLIO</button><button class="${layout === "type" ? "active" : ""}" data-action="set-practice-layout" data-layout="type" aria-label="Visualizza le pratiche per tipologia">▦ PER TIPOLOGIA</button></div></div>`;
     const pagination = rows.length > pageSize ? `<nav class="practice-pagination" aria-label="Pagine pratiche">
       <button class="btn ghost" data-practice-page="${state.practicePage - 1}" ${state.practicePage === 1 ? "disabled" : ""}>← Precedente</button>
       <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => `<button class="${page === state.practicePage ? "active" : ""}" data-practice-page="${page}" aria-label="Pagina ${page}">${page}</button>`).join("")}</div>
       <button class="btn ghost" data-practice-page="${state.practicePage + 1}" ${state.practicePage === pageCount ? "disabled" : ""}>Successiva →</button>
     </nav>` : "";
     const range = rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} di ${rows.length} pratiche` : "0 pratiche";
+    const typeCounts = { ACQUISTO: 0, NOLEGGIO: 0, LEASING: 0 };
+    rows.forEach((practice) => {
+      const type = String(practice.tipo_pratica || "ACQUISTO").toUpperCase();
+      if (Object.prototype.hasOwnProperty.call(typeCounts, type)) typeCounts[type] += 1;
+    });
     const resultBody = layout === "type" && visibleRows.length
       ? ["ACQUISTO", "NOLEGGIO", "LEASING"].map((type) => {
         const group = visibleRows.filter((practice) => String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type);
         if (!group.length) return "";
-        const totalCount = rows.filter((practice) => String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type).length;
+        const totalCount = typeCounts[type] || 0;
         const icon = type === "ACQUISTO" ? "🛒" : type === "NOLEGGIO" ? "🔄" : "🏦";
         return `<section class="practice-type-group type-${type.toLowerCase()}"><header><span>${icon}</span><div><strong>${type}</strong><small>${totalCount} ${totalCount === 1 ? "pratica" : "pratiche"} nei risultati</small></div></header>${practiceTable(group, false, api.isAdmin())}</section>`;
       }).join("")
       : (visibleRows.length ? practiceTable(visibleRows, false, api.isAdmin()) : emptyState("Nessuna pratica trovata", "Modifica ricerca, filtro o ordinamento.", "", ""));
-    return `${viewToolbar("Nuova pratica", "new-practice", `<div class="filter-strip"><button class="filter-chip ${state.filterStatus ? "" : "active"}" data-filter-status="">Tutte <strong>${state.data.practices.length}</strong></button>${chips}</div>`)}${layoutControls}${controls}<section class="panel"><div class="practice-result-count">${range}</div>${resultBody}${pagination}</section>`;
+    return `${viewToolbar("Nuova pratica", "new-practice", `<div class="filter-strip"><button class="filter-chip ${state.filterStatus ? "" : "active"}" data-filter-status="">Tutte <strong>${allPractices.length}</strong></button>${chips}</div>`)}${layoutControls}${controls}<section class="panel"><div class="practice-result-count">${range}</div>${resultBody}${pagination}</section>`;
   }
 
   function renderClients() {
+    const practiceCountByClient = new Map();
+    (state.data.practices || []).forEach((practice) => {
+      const clientId = String(practice.clientId || "");
+      if (clientId) practiceCountByClient.set(clientId, (practiceCountByClient.get(clientId) || 0) + 1);
+    });
     const rows = filterRows(state.data.clients, ["ragioneSociale", "referente", "piva", "email", "telefono", "citta", "creato_da_nome", "creato_da_username"]).slice();
     const sortKey = state.clientSort || (api.isAdmin() ? "created" : "name");
     const direction = state.clientDirection === "desc" ? -1 : 1;
@@ -1787,13 +1803,14 @@
     </nav>` : "";
     const range = rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} di ${rows.length} clienti` : "0 clienti";
     return `${viewToolbar("Nuovo cliente", "new-client", `<p class="toolbar-note">${range}</p>`)}${controls}<div class="card-grid">${visibleRows.length ? visibleRows.map((c) => {
-      const count = state.data.practices.filter((p) => p.clientId === c.id).length;
-      const locked = String(c.ha_pratiche_collegate || "NO").toUpperCase() === "SI" || state.data.practices.some((p) => p.clientId === c.id);
+      const count = practiceCountByClient.get(String(c.id || "")) || 0;
+      const locked = String(c.ha_pratiche_collegate || "NO").toUpperCase() === "SI" || count > 0;
       const canEdit = api.isAdmin() || String(c.puo_modificare || "NO").toUpperCase() === "SI";
       const shared = String(c.condiviso || "NO").toUpperCase() === "SI";
       const ownerLabel = c.creato_da_nome || c.creato_da_username || c.agent_username || "Utente Seemax";
       const syncing = String(c.__sync_state || "").toUpperCase() === "PENDING";
-      return `<article class="client-card ${shared ? "shared-client" : ""} ${syncing ? "record-sync-pending" : ""}"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)} ${shared ? `<span class="shared-client-badge">CONDIVISO</span>` : ""}${recordSyncBadge(c)}</h3><p>${esc(c.referente || "Referente non indicato")}</p>${api.isAdmin() ? `<small>Associato a: ${esc(ownerLabel)}</small>` : shared ? `<small>Creato da: ${esc(ownerLabel)}</small>` : ""}</div>${syncing ? `<span class="locked-record" title="Salvataggio in corso">↻</span>` : locked ? `<span class="locked-record" title="Cliente collegato a una pratica: eliminazione disabilitata">🔒</span>` : canEdit ? `<button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button>` : `<span class="locked-record" title="Cliente consultabile ma modificabile soltanto dal creatore">◉</span>`}</div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche personali</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi conferma" : canEdit ? "Apri anagrafica" : "Consulta anagrafica"}</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}" ${syncing ? "disabled" : ""}>＋ Pratica</button></div></article>`;
+      const contact = String(c.referente || "").trim();
+      return `<article class="client-card ${shared ? "shared-client" : ""} ${syncing ? "record-sync-pending" : ""}"><div class="client-top"><span class="avatar">${initials(c.ragioneSociale)}</span><div><h3>${esc(c.ragioneSociale)} ${shared ? `<span class="shared-client-badge">CONDIVISO</span>` : ""}${recordSyncBadge(c)}</h3>${contact ? `<p>${esc(contact)}</p>` : ""}${api.isAdmin() ? `<small>Associato a: ${esc(ownerLabel)}</small>` : shared ? `<small>Creato da: ${esc(ownerLabel)}</small>` : ""}</div>${syncing ? `<span class="locked-record" title="Salvataggio in corso">↻</span>` : locked ? `<span class="locked-record" title="Cliente collegato a una pratica: eliminazione disabilitata">🔒</span>` : canEdit ? `<button class="more-action" data-action="delete-client" data-id="${esc(c.id)}">⋮</button>` : `<span class="locked-record" title="Cliente consultabile ma modificabile soltanto dal creatore">◉</span>`}</div><dl><div><dt>Località</dt><dd>${esc(c.citta || "—")}</dd></div><div><dt>Telefono</dt><dd>${esc(c.telefono || "—")}</dd></div><div><dt>Email</dt><dd>${esc(c.email || "—")}</dd></div><div><dt>Pratiche personali</dt><dd>${count}</dd></div></dl><div class="card-actions"><button class="btn soft" data-action="edit-client" data-id="${esc(c.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi conferma" : canEdit ? "Apri anagrafica" : "Consulta anagrafica"}</button><button class="btn ghost" data-action="new-practice-client" data-id="${esc(c.id)}" ${syncing ? "disabled" : ""}>＋ Pratica</button></div></article>`;
     }).join("") : emptyState("Nessun cliente", "Aggiungi la prima anagrafica.", "Nuovo cliente", "new-client")}</div>${pagination}`;
   }
 

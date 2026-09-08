@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2153().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2160().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.15.3";
+var SEEMAX_VERSION = "seemax-management-suite-2.16.0";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -69,6 +69,19 @@ var SHEET_SCHEMAS = {
   LOG: ["data", "username", "ruolo", "azione", "entita", "record_id", "dettaglio"]
 };
 
+/* Le tabelle operative restano visibili per rendere il database semplice da
+   consultare. Quelle tecniche sono indispensabili al sistema ma vengono
+   nascoste: il codice continua a leggerle e scriverle normalmente. */
+var SEEMAX_VISIBLE_SHEETS_V2160_ = {
+  AGENTI: true,
+  PRODOTTI_LED: true,
+  CLIENTI: true,
+  PRATICHE: true,
+  DOCUMENTI: true,
+  IMPOSTAZIONI: true,
+  MOVIMENTI_MAGAZZINO: true
+};
+
 /* Queste colonne possono contenere il placeholder amministrativo 0000.
    Il formato testo impedisce a Google Fogli di convertirlo nel numero 0. */
 var ADMIN_UNKNOWN_TEXT_COLUMNS = {
@@ -98,7 +111,8 @@ function setupSeemaxDatabase() {
   backfillExistingIds_();
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
-  return "DATABASE SEEMAX 2.15.3 configurato: PDF nominati correttamente, patch notes pubblicabili e profili pronti per il lancio.";
+  organizeActiveSheetsForReleaseV2160_();
+  return "DATABASE SEEMAX 2.16.0 configurato: struttura ordinata, profili pronti e controlli di rilascio attivi.";
 }
 
 
@@ -281,17 +295,61 @@ function upgradeSeemaxV2153() {
   });
 }
 
+function upgradeSeemaxV2160() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+
+    /* La copia completa viene creata prima della rimozione delle schede
+       obsolete e prima dell'azzeramento definitivo dei profili agente. */
+    var sheetResult = cleanupUnusedSheetsForReleaseV2160_();
+    var resetResult = resetAgentProfilesForOfficialReleaseV2160_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.16.0 · preparazione al rilascio ufficiale, fogli ordinati e trofei agenti azzerati.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.16.0 pronto per il rilascio: " + resetResult.message + " " + sheetResult.message;
+  });
+}
+
 /* Azzeramento di lancio eseguito una sola volta. Non modifica identità,
    credenziali, ruoli, contatti, pratiche o clienti. Gli ADMIN conservano le
    proprie personalizzazioni e ottengono comunque tutti i trofei dal controllo
    autorizzativo, mentre gli agenti ripartono dai dati creati dopo questo istante. */
 function resetAgentProfilesForLaunchV2153_() {
+  return resetNonAdminProfilesForRelease_({
+    marker: "reset_profili_v2153_eseguito",
+    markerAt: "reset_profili_v2153_il",
+    actor: "SYSTEM_V2153",
+    note: "Azzeramento profili agenti per avvio operativo v2.15.3"
+  });
+}
+
+function resetAgentProfilesForOfficialReleaseV2160_() {
+  return resetNonAdminProfilesForRelease_({
+    marker: "reset_profili_v2160_eseguito",
+    markerAt: "reset_profili_v2160_il",
+    actor: "SYSTEM_V2160",
+    note: "Azzeramento definitivo profili e trofei agenti per rilascio ufficiale v2.16.0"
+  });
+}
+
+function resetNonAdminProfilesForRelease_(options) {
+  options = options || {};
+  var marker = String(options.marker || "reset_profili_eseguito");
+  var markerAt = String(options.markerAt || marker + "_il");
+  var actor = String(options.actor || "SYSTEM_RELEASE");
+  var note = String(options.note || "Azzeramento profili agenti per rilascio");
   var settings = getSettings_(true);
-  if (normalizeYesNo_(settings.reset_profili_v2153_eseguito, "NO") === "SI") {
+  if (normalizeYesNo_(settings[marker], "NO") === "SI") {
     if (normalizeYesNo_(settings.beta_sblocca_trofei, "NO") !== "NO") {
       upsertSettingsBatch_({ beta_sblocca_trofei: "NO" }, "Trofei beta disattivati per il lancio");
     }
-    return { reset: false, agents: 0, reset_at: String(settings.reset_profili_v2153_il || ""), message: "reset profili già eseguito in precedenza." };
+    return { reset: false, agents: 0, reset_at: String(settings[markerAt] || ""), message: "reset profili già eseguito in precedenza." };
   }
 
   var agentsSheet = sheet_("AGENTI");
@@ -330,15 +388,123 @@ function resetAgentProfilesForLaunchV2153_() {
       });
       range.setValues(values);
     });
+
+    var metadataDefaults = {
+      aggiornatoIl: function () { return resetAt; },
+      aggiornato_da: function () { return actor; },
+      request_token: function (index) { return "profile-reset-" + actor.toLowerCase() + "-" + String(usernames[index][0] || "utente").toLowerCase().replace(/[^a-z0-9._-]+/g, "-"); }
+    };
+    Object.keys(metadataDefaults).forEach(function (field) {
+      var columnIndex = headers.indexOf(field);
+      if (columnIndex < 0) return;
+      var range = agentsSheet.getRange(2, columnIndex + 1, rowCount, 1);
+      var values = range.getValues();
+      resetRows.forEach(function (shouldReset, index) {
+        if (shouldReset) values[index][0] = metadataDefaults[field](index);
+      });
+      range.setValues(values);
+    });
+
+    var versionIndex = headers.indexOf("record_version");
+    if (versionIndex >= 0) {
+      var versionRange = agentsSheet.getRange(2, versionIndex + 1, rowCount, 1);
+      var versionValues = versionRange.getValues();
+      resetRows.forEach(function (shouldReset, index) {
+        if (shouldReset) versionValues[index][0] = Math.max(0, Number(versionValues[index][0] || 0)) + 1;
+      });
+      versionRange.setValues(versionValues);
+    }
     invalidateTable_("AGENTI");
   }
 
-  upsertSettingsBatch_({
-    beta_sblocca_trofei: "NO",
-    reset_profili_v2153_eseguito: "SI",
-    reset_profili_v2153_il: resetAt
-  }, "Azzeramento profili agenti per avvio operativo v2.15.3");
+  var resetSettings = { beta_sblocca_trofei: "NO" };
+  resetSettings[marker] = "SI";
+  resetSettings[markerAt] = resetAt;
+  upsertSettingsBatch_(resetSettings, note);
   return { reset: true, agents: resetCount, reset_at: resetAt, message: resetCount + " profili agente azzerati per il lancio." };
+}
+
+/* Crea una copia integrale recuperabile del database una sola volta, quindi
+   elimina dal file operativo esclusivamente i fogli non presenti nello schema
+   applicativo. Tutti i fogli attivi sono determinati da SHEET_SCHEMAS: non
+   esistono liste manuali divergenti tra lettura, scrittura e pulizia. */
+function cleanupUnusedSheetsForReleaseV2160_() {
+  var ss = db_();
+  var activeNames = Object.keys(SHEET_SCHEMAS);
+  var activeMap = {};
+  activeNames.forEach(function (name) { activeMap[name] = true; });
+  var unusedSheets = ss.getSheets().filter(function (sheet) { return !activeMap[sheet.getName()]; });
+  var unusedNames = unusedSheets.map(function (sheet) { return sheet.getName(); });
+  var settings = getSettings_(true);
+  var preReleaseBackupId = String(settings.backup_pre_rilascio_v2160_id || "");
+  var backupId = preReleaseBackupId;
+  var backupUrl = String(settings.backup_pre_rilascio_v2160_url || "");
+  var backupAt = String(settings.backup_pre_rilascio_v2160_il || "");
+
+  /* Alla prima esecuzione il backup protegge anche il reset dei profili. Se
+     in futuro compaiono nuove schede estranee, una nuova copia le protegge
+     prima di rimuoverle invece di affidarsi al vecchio backup di rilascio. */
+  if (!preReleaseBackupId || unusedSheets.length) {
+    SpreadsheetApp.flush();
+    var createdAt = new Date();
+    var stamp = Utilities.formatDate(createdAt, Session.getScriptTimeZone() || "Europe/Rome", "yyyy-MM-dd_HH-mm-ss");
+    var backupFile = DriveApp.getFileById(ss.getId()).makeCopy(ss.getName() + " - BACKUP PRE-RILASCIO 2.16.0 - " + stamp);
+    backupId = backupFile.getId();
+    backupUrl = "https://docs.google.com/spreadsheets/d/" + backupId + "/edit";
+    backupAt = createdAt.toISOString();
+    var backupSettings = {
+      backup_pulizia_v2160_ultimo_id: backupId,
+      backup_pulizia_v2160_ultimo_url: backupUrl,
+      backup_pulizia_v2160_ultimo_il: backupAt
+    };
+    if (!preReleaseBackupId) {
+      backupSettings.backup_pre_rilascio_v2160_id = backupId;
+      backupSettings.backup_pre_rilascio_v2160_url = backupUrl;
+      backupSettings.backup_pre_rilascio_v2160_il = backupAt;
+    }
+    upsertSettingsBatch_(backupSettings, "Copia integrale automatica precedente alla pulizia e al reset v2.16.0");
+  }
+
+  unusedSheets.forEach(function (sheet) { ss.deleteSheet(sheet); });
+  RUNTIME_SHEET_CACHE_ = {};
+  RUNTIME_HEADER_CACHE_ = {};
+  resetRequestDataCaches_();
+  upsertSettingsBatch_({
+    pulizia_fogli_v2160_eseguita_il: new Date().toISOString(),
+    pulizia_fogli_v2160_rimossi: unusedNames.join(", "),
+    pulizia_fogli_v2160_backup_url: backupUrl
+  }, "Pulizia sicura delle schede non utilizzate dal sistema");
+  return {
+    removed: unusedNames,
+    backup_id: backupId,
+    backup_url: backupUrl,
+    backup_at: backupAt,
+    message: unusedNames.length ? unusedNames.length + " fogli non utilizzati rimossi dopo il backup completo." : "Nessun foglio estraneo allo schema attivo rilevato."
+  };
+}
+
+function organizeActiveSheetsForReleaseV2160_() {
+  var ss = db_();
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) return;
+    if (SEEMAX_VISIBLE_SHEETS_V2160_[name]) sheet.showSheet();
+    else sheet.hideSheet();
+  });
+}
+
+function auditSheetStructureV2160() {
+  var ss = db_();
+  var activeMap = {};
+  Object.keys(SHEET_SCHEMAS).forEach(function (name) { activeMap[name] = true; });
+  var sheets = ss.getSheets();
+  return {
+    version: SEEMAX_VERSION,
+    active: sheets.filter(function (sheet) { return activeMap[sheet.getName()]; }).map(function (sheet) { return sheet.getName(); }),
+    unused: sheets.filter(function (sheet) { return !activeMap[sheet.getName()]; }).map(function (sheet) { return sheet.getName(); }),
+    visible: sheets.filter(function (sheet) { return !sheet.isSheetHidden(); }).map(function (sheet) { return sheet.getName(); }),
+    hidden_technical: sheets.filter(function (sheet) { return activeMap[sheet.getName()] && sheet.isSheetHidden(); }).map(function (sheet) { return sheet.getName(); })
+  };
 }
 
 
@@ -3537,7 +3703,7 @@ function touchLoginBestEffort_(username) {
   }
 }
 
-function settingsCacheKey_() { return "SEEMAX_SETTINGS_V2151"; }
+function settingsCacheKey_() { return "SEEMAX_SETTINGS_" + SEEMAX_VERSION; }
 
 function invalidateSettingsCache_() {
   try { CacheService.getScriptCache().remove(settingsCacheKey_()); } catch (error) { /* cache opzionale */ }
