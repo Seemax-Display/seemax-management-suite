@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-15-2-background-quotes-documents";
+const CACHE = "seemax-management-v2-15-3-pdf-patch-profile-reset";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",

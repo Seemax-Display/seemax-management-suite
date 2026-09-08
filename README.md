@@ -79,7 +79,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.15.2 segui [docs/AGGIORNAMENTO_V2.15.2.md](docs/AGGIORNAMENTO_V2.15.2.md). La guida comprende il salvataggio preventivi in background, l'upload manuale non bloccante, la nuova nomenclatura PDF e la procedura di collaudo. Restano disponibili la [guida 2.15.1](docs/AGGIORNAMENTO_V2.15.1.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+Per aggiornare un'installazione già operativa alla versione 2.15.3 segui [docs/AGGIORNAMENTO_V2.15.3.md](docs/AGGIORNAMENTO_V2.15.3.md). La guida comprende la nomenclatura PDF realmente applicata dal browser, la pubblicazione affidabile delle Patch Notes e l'azzeramento di lancio di trofei e personalizzazioni degli agenti. Restano disponibili la [guida 2.15.2](docs/AGGIORNAMENTO_V2.15.2.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 

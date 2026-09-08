@@ -1,0 +1,21 @@
+SEEMAX MANAGEMENT SUITE 2.15.3 - RELEASE MANIFEST
+
+Versione frontend: 2.15.3
+Versione backend: seemax-management-suite-2.15.3
+Cache Service Worker: seemax-management-v2-15-3-pdf-patch-profile-reset
+Funzione upgrade: upgradeSeemaxV2153
+
+Interventi:
+- nome PDF dinamico imposto al documento di stampa e al documento host;
+- ripristino automatico del titolo pagina dopo la stampa;
+- nuova pubblicazione automatica quando cambiano le Patch Notes;
+- pulsante ADMIN Salva e pubblica e popup di conferma immediato;
+- nuova colonna AGENTI.trofei_reset_il;
+- reset idempotente di profilo e bacheca per gli agenti;
+- esclusione dei dati storici precedenti dal calcolo trofei;
+- disattivazione dello sblocco beta per gli agenti;
+- sblocco completo preservato per ADMIN.
+
+Test automatici:
+- scripts/verify-v2.15.3.js
+- scripts/test-release-v2.15.3.js

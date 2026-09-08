@@ -1,0 +1,23 @@
+SEEMAX MANAGEMENT SUITE 2.15.3
+
+Questo pacchetto contiene frontend GitHub Pages, Quotation Planner e backend Apps Script coordinati.
+
+PRIMA DI PUBBLICARE
+
+1. Conserva una copia del Code.gs attualmente operativo.
+2. Sostituiscilo con apps-script/Code.gs.
+3. Esegui upgradeSeemaxV2153.
+4. Pubblica una nuova versione della Web App.
+5. Carica l'intero pacchetto frontend su GitHub.
+6. Esegui un refresh forzato dopo l'aggiornamento di GitHub Pages.
+
+NOVITA PRINCIPALI
+
+- nome PDF dinamico applicato anche al documento principale del browser;
+- Patch Notes sempre ripubblicate quando vengono modificate;
+- conferma visiva immediata della pubblicazione per ADMIN;
+- reset una tantum di trofei e personalizzazioni degli agenti;
+- progressi trofei calcolati soltanto dal nuovo punto di partenza;
+- tutti i trofei ancora disponibili per ADMIN.
+
+Consulta docs/AGGIORNAMENTO_V2.15.3.md per procedura e collaudo.

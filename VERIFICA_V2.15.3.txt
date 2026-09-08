@@ -1,0 +1,15 @@
+VERIFICA STATICA E FUNZIONALE SEEMAX 2.15.3 - SUPERATA
+
+Script: scripts/verify-v2.15.3.js
+Esito: 247 controlli superati.
+
+Ambiti verificati:
+- sintassi frontend e backend;
+- versioni frontend/backend/cache;
+- API e trasporto mutazioni;
+- operazioni in background;
+- pubblicazione Patch Notes e revisioni per account;
+- conferma esplicita delle comunicazioni;
+- reset profili idempotente;
+- sblocco trofei limitato agli ADMIN;
+- sicurezza multiutente preesistente.

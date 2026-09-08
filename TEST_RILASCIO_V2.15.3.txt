@@ -1,0 +1,17 @@
+TEST MIRATI RILASCIO SEEMAX 2.15.3 - SUPERATI
+
+Script: scripts/test-release-v2.15.3.js
+Esito: 22 controlli superati.
+
+Verifiche dinamiche:
+- formato completo del nome PDF;
+- titolo imposto al documento host e al documento di stampa;
+- ripristino del titolo dopo la stampa;
+- esclusione di pratiche e clienti storici dal calcolo trofei;
+- reset delle personalizzazioni dei soli agenti;
+- preservazione di personalizzazione e bacheca ADMIN;
+- disattivazione dello sblocco beta globale;
+- idempotenza della migrazione di reset.
+
+Nome PDF atteso e ottenuto nel test:
+Prev. n. 151-26 - del 07-09-2026 - Azienda Test Srl - Ledwall Display P2.5 - 2,00x1,50 - BIFACCIALE
