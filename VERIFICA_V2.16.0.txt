@@ -1,0 +1,20 @@
+VERIFICA STATICA E FUNZIONALE SEEMAX 2.16.0 - SUPERATA
+
+Script: scripts/verify-v2.16.0.js
+Esito: 257 controlli superati.
+
+Ambiti verificati:
+- sintassi frontend e backend;
+- versioni frontend/backend/cache;
+- struttura e pulizia sicura dei fogli;
+- reset profili e trofei non-ADMIN;
+- diciture Pratiche e schede Clienti;
+- rendering lineare dei conteggi;
+- invalidazione della cache bootstrap al cambio versione;
+- invalidazione della cache impostazioni Apps Script al cambio versione;
+- API e trasporto delle mutazioni;
+- operazioni in background;
+- pubblicazione Patch Notes e revisioni per account;
+- esportazione PDF dei preventivi;
+- caricamento documenti e movimenti magazzino;
+- lock, versionamento, idempotenza e sicurezza multiutente.

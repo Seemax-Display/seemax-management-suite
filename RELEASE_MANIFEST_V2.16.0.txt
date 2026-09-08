@@ -1,0 +1,26 @@
+SEEMAX MANAGEMENT SUITE 2.16.0 - RELEASE MANIFEST
+
+Versione frontend: 2.16.0
+Versione backend: seemax-management-suite-2.16.0
+Cache Service Worker: seemax-management-v2-16-0-release-ready
+Funzione upgrade: upgradeSeemaxV2160
+Funzione audit fogli: auditSheetStructureV2160
+
+Interventi:
+- backup integrale automatico del Foglio pre-rilascio;
+- eliminazione delle sole schede fuori dall'allowlist SHEET_SCHEMAS;
+- tabelle tecniche attive nascoste e tabelle operative visibili;
+- nuovo reset idempotente v2.16.0 per tutti i non-ADMIN;
+- baseline trofei aggiornata e record_version incrementata;
+- account e personalizzazioni ADMIN preservati;
+- modalità pratiche rinominate IN DETTAGLIO e PER TIPOLOGIA;
+- placeholder del referente non valorizzato eliminato;
+- conteggi frontend per pratiche e clienti calcolati in un solo passaggio;
+- cache bootstrap isolata per versione per non mostrare profili pre-reset;
+- cache impostazioni Apps Script isolata per versione;
+- lock, autorizzazioni, idempotenza e trasporto confermato preservati.
+
+Test automatici:
+- scripts/verify-v2.16.0.js
+- scripts/test-release-v2.16.0.js
+- suite di regressione 2.15.3 e 2.15.2

@@ -1,0 +1,28 @@
+SEEMAX MANAGEMENT SUITE 2.16.0 - PRE-RILASCIO UFFICIALE
+
+Questo pacchetto contiene frontend GitHub Pages, Quotation Planner e backend Apps Script coordinati.
+
+PRIMA DI PUBBLICARE
+
+1. Sostituisci il Code.gs operativo con apps-script/Code.gs.
+2. Esegui upgradeSeemaxV2160 durante una breve finestra senza salvataggi degli agenti.
+3. Autorizza Google Drive se richiesto: l'upgrade crea una copia integrale automatica.
+4. Controlla in IMPOSTAZIONI la chiave backup_pre_rilascio_v2160_url.
+5. Esegui auditSheetStructureV2160 e verifica che unused sia vuoto.
+6. Pubblica una nuova versione della Web App.
+7. Carica l'intero frontend su GitHub Pages.
+8. Esegui un refresh forzato.
+
+NOVITA PRINCIPALI
+
+- fogli estranei allo schema attivo rimossi solo dopo backup completo;
+- tabelle tecniche necessarie nascoste, non eliminate;
+- profili, bacheche e trofei azzerati per tutti i non-ADMIN;
+- dati storici esclusi dai nuovi obiettivi agente;
+- modalità pratiche IN DETTAGLIO e PER TIPOLOGIA;
+- placeholder del referente rimosso dalle schede cliente;
+- conteggi frontend riutilizzati per ridurre il lavoro di rendering;
+- cache locale separata per versione, senza dati pre-reset al primo avvio;
+- protezioni multiutente, lock e idempotenza preservati.
+
+Consulta docs/AGGIORNAMENTO_V2.16.0.md per procedura, collaudo e ripristino.

@@ -1,0 +1,23 @@
+TEST MIRATI RILASCIO SEEMAX 2.16.0 - SUPERATI
+
+Script: scripts/test-release-v2.16.0.js
+Esito: 43 controlli superati.
+
+Verifiche dinamiche:
+- reset di tutti e soli gli account non-ADMIN;
+- preservazione completa dell'account ADMIN;
+- azzeramento profilo, personalizzazioni e bacheca;
+- nuova baseline dei trofei e incremento record_version;
+- token tecnico distinto per account;
+- idempotenza del reset;
+- backup creato prima della prima eliminazione;
+- rimozione esclusiva delle schede fuori schema;
+- conservazione di tutte le tabelle attive;
+- visibilità delle tabelle operative e occultamento di quelle tecniche;
+- audit della struttura e ripetizione sicura della pulizia;
+- nuova copia automatica se compaiono schede estranee dopo il rilascio;
+- diciture UI e rimozione del placeholder referente;
+- conteggi frontend in singolo passaggio;
+- cache bootstrap separata per versione per evitare profili pre-reset temporanei;
+- cache impostazioni Apps Script separata per versione;
+- lock e contatori atomici preservati.

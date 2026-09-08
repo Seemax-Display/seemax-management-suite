@@ -23,7 +23,7 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - più Ledwall nella stessa pratica, con calcolo aggregato dei cabinet e indirizzo unico o alternativo per ogni installazione aggiuntiva;
 - scarico magazzino non bloccante: se la disponibilità non basta la pratica viene salvata, resta segnalata e l'impegno viene mantenuto in attesa senza creare giacenze negative;
 - deroga ADMIN `0000` per registrare temporaneamente dati non disponibili, preservata come testo anche negli indirizzi importati nelle pratiche;
-- organizzazione delle pratiche in visione corrente oppure per Acquisto, Noleggio e Leasing, memorizzata localmente;
+- organizzazione delle pratiche nelle modalità `IN DETTAGLIO` e `PER TIPOLOGIA`, memorizzata localmente;
 - workflow pratiche semplificato: Inserita, Accettata, Sospesa, Bocciata e Completata;
 - notifiche interne con campanella ed email gratuita all'agente responsabile;
 - documenti e media caricati direttamente e archiviati su Google Drive;
@@ -58,6 +58,9 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - giacenze del Catalogo lette e verificate direttamente in `PRODOTTI_LED.giacenza_attuale`;
 - controllo ADMIN dell'avviso giacenza per ogni pratica Inserita, Sospesa o Completata;
 - contatore pratiche nelle Proprietà script, senza scansione completa a ogni creazione;
+- struttura Google Sheets ripulita automaticamente con backup integrale preventivo e tabelle tecniche attive nascoste;
+- trofei e personalizzazioni degli agenti azzerati al punto di partenza ufficiale, senza modificare gli ADMIN;
+- conteggi delle schede clienti e pratiche calcolati in un solo passaggio per un rendering più rapido;
 - diagnostica dei tempi di salvataggio consultabile dalla console del browser;
 - refresh manuale con nuova lettura del database e fallback locale dichiarato in caso di disservizio.
 
@@ -79,7 +82,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.15.3 segui [docs/AGGIORNAMENTO_V2.15.3.md](docs/AGGIORNAMENTO_V2.15.3.md). La guida comprende la nomenclatura PDF realmente applicata dal browser, la pubblicazione affidabile delle Patch Notes e l'azzeramento di lancio di trofei e personalizzazioni degli agenti. Restano disponibili la [guida 2.15.2](docs/AGGIORNAMENTO_V2.15.2.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+Per aggiornare un'installazione già operativa alla versione 2.16.0 segui [docs/AGGIORNAMENTO_V2.16.0.md](docs/AGGIORNAMENTO_V2.16.0.md). La guida descrive il backup pre-rilascio, la pulizia sicura dei fogli, il reset definitivo degli agenti e il collaudo. Restano disponibili la [guida 2.15.3](docs/AGGIORNAMENTO_V2.15.3.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 
