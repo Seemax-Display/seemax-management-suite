@@ -1,0 +1,26 @@
+SEEMAX MANAGEMENT SUITE 2.15.3 - INSTALLAZIONE
+
+1. Apri il Foglio Google operativo.
+2. Vai in Estensioni > Apps Script.
+3. Sostituisci Code.gs con il file incluso in questa cartella.
+4. Salva.
+5. Esegui upgradeSeemaxV2153.
+6. Autorizza lo script se richiesto.
+7. Pubblica una nuova versione della Web App, mantenendo lo stesso URL /exec.
+8. Pubblica tutti i file frontend su GitHub Pages.
+9. Esegui un refresh forzato del browser.
+
+L'upgrade:
+- aggiunge AGENTI.trofei_reset_il;
+- azzera una sola volta profilo e bacheca degli agenti;
+- preserva account, credenziali, ruolo e dati operativi;
+- lascia invariato il profilo ADMIN e mantiene tutti i trofei disponibili all'ADMIN;
+- disattiva lo sblocco beta globale;
+- attiva la versione seemax-management-suite-2.15.3.
+
+Controlli manuali consigliati:
+- esportazione PDF con nome dinamico;
+- modifica e pubblicazione Patch Notes;
+- popup immediato per ADMIN;
+- profilo agente iniziale senza trofei storici;
+- privilegi trofei ADMIN invariati.

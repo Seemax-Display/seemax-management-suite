@@ -17,6 +17,7 @@
   const tutorialState = { active: false, index: 0, steps: [], previousRoute: "dashboard" };
   let pendingWelcomeMessage = false;
   let pendingPatchNotesMessage = false;
+  let pendingMessageAcknowledgement = null;
   let profileBoardDraft = [];
 
   const NAV = [
@@ -625,7 +626,7 @@
   }
 
   function betaTrophiesUnlocked() {
-    return settingEnabled("beta_sblocca_trofei", !!(config.betaTest && config.betaTest.unlockAllTrophies));
+    return api.isAdmin();
   }
 
 
@@ -639,7 +640,7 @@
     featureOneTitle: "Esplora il tuo nuovo spazio di lavoro",
     featureOneMessage: "Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.",
     featureTwoTitle: "Personalizza profilo e bacheca",
-    featureTwoMessage: "Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.",
+    featureTwoMessage: "Personalizza il tuo profilo e costruisci la bacheca con i riconoscimenti che sbloccherai attraverso il lavoro operativo.",
     warningTitle: "Ambiente di prova",
     warningMessage: "I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in Seemax For You verranno invece importati in Seemax Management Suite.",
     feedbackMessage: "Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da PC sia da smartphone. Il tuo feedback ci aiuterà a plasmare la versione finale.",
@@ -919,7 +920,16 @@
   }
 
   function communicationActionsMarkup(type, fastMode) {
-    return `<div class="message-editor-actions"><p>${fastMode ? "Passa alla Modalità Standard per modificare le comunicazioni condivise." : "Salva modifica i contenuti senza disturbare chi li ha già letti. Salva e ripubblica crea una nuova pubblicazione visibile a tutti."}</p><div><button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn soft" type="submit" value="save" ${fastMode ? "disabled" : ""}>Salva</button><button class="btn primary" type="submit" value="republish" ${fastMode ? "disabled" : ""}>Salva e ripubblica</button></div></div>`;
+    const patchNotes = String(type || "").toLowerCase() === "patch";
+    const help = fastMode
+      ? "Passa alla Modalità Standard per modificare le comunicazioni condivise."
+      : patchNotes
+        ? "Il salvataggio pubblica automaticamente una nuova revisione visibile secondo la frequenza selezionata."
+        : "Salva modifica i contenuti senza disturbare chi li ha già letti. Salva e ripubblica crea una nuova pubblicazione visibile a tutti.";
+    const buttons = patchNotes
+      ? `<button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn primary" type="submit" value="republish" ${fastMode ? "disabled" : ""}>Salva e pubblica</button>`
+      : `<button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn soft" type="submit" value="save" ${fastMode ? "disabled" : ""}>Salva</button><button class="btn primary" type="submit" value="republish" ${fastMode ? "disabled" : ""}>Salva e ripubblica</button>`;
+    return `<div class="message-editor-actions"><p>${help}</p><div>${buttons}</div></div>`;
   }
 
   function renderWelcomeSettingsTab() {
@@ -981,7 +991,7 @@
 
   function patchNotesMessageMarkup(patch, options = {}) {
     const items = (patch.items || []).filter((item) => String(item.attivo || "SI").toUpperCase() !== "NO" && (item.title || item.text));
-    return `<div class="suite-patch-message ${options.preview ? "preview" : ""}"><div class="suite-patch-hero"><span class="suite-patch-icon">🚀</span><div><small>${esc(patch.label || patch.version || "AGGIORNAMENTO")}</small><h3>${esc(patch.title || "Novità Seemax")}</h3>${patch.intro ? `<p>${esc(patch.intro).replace(/\n/g, "<br>")}</p>` : ""}</div></div>${items.length ? `<div class="suite-patch-list">${items.map((item) => `<article><span>${esc(item.emoji || "✨")}</span><div><strong>${esc(item.title || "Aggiornamento")}</strong><p>${esc(item.text || "").replace(/\n/g, "<br>")}</p></div></article>`).join("")}</div>` : ""}${patch.footer ? `<p class="suite-patch-footer">${esc(patch.footer).replace(/\n/g, "<br>")}</p>` : ""}<div class="form-actions"><button class="btn primary" data-action="close-modal">Ho capito</button></div></div>`;
+    return `<div class="suite-patch-message ${options.preview ? "preview" : ""}"><div class="suite-patch-hero"><span class="suite-patch-icon">🚀</span><div><small>${esc(patch.label || patch.version || "AGGIORNAMENTO")}</small><h3>${esc(patch.title || "Novità Seemax")}</h3>${patch.intro ? `<p>${esc(patch.intro).replace(/\n/g, "<br>")}</p>` : ""}</div></div>${items.length ? `<div class="suite-patch-list">${items.map((item) => `<article><span>${esc(item.emoji || "✨")}</span><div><strong>${esc(item.title || "Aggiornamento")}</strong><p>${esc(item.text || "").replace(/\n/g, "<br>")}</p></div></article>`).join("")}</div>` : ""}${patch.footer ? `<p class="suite-patch-footer">${esc(patch.footer).replace(/\n/g, "<br>")}</p>` : ""}<div class="form-actions"><button class="btn primary" data-action="acknowledge-message">Ho capito</button></div></div>`;
   }
 
   function formatCommunicationText(value) {
@@ -1005,7 +1015,7 @@
       ${features ? `<div class="beta-welcome-grid">${features}</div>` : ""}
       ${(welcome.warningTitle || welcome.warningMessage) ? `<section class="beta-welcome-warning"><span aria-hidden="true">⚠️</span><div>${welcome.warningTitle ? `<strong>${esc(welcome.warningTitle)}</strong>` : ""}${welcome.warningMessage ? `<p>${formatCommunicationText(welcome.warningMessage)}</p>` : ""}</div></section>` : ""}
       ${welcome.feedbackMessage ? `<section class="beta-welcome-feedback"><span aria-hidden="true">💬</span><p>${formatCommunicationText(welcome.feedbackMessage)}</p></section>` : ""}
-      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="close-modal">${esc(welcome.primaryButton || BETA_WELCOME_DEFAULTS.primaryButton)}</button></div>
+      <div class="form-actions"><button class="btn primary beta-welcome-start" data-action="acknowledge-message">${esc(welcome.primaryButton || BETA_WELCOME_DEFAULTS.primaryButton)}</button></div>
     </div>`;
   }
 
@@ -1057,7 +1067,7 @@
       { chapter: "Dashboard", selector: ".dashboard-grid", title: "Pipeline, agenda e aggiornamenti", text: "Questa zona riunisce lo stato delle pratiche, le prossime attività e le pratiche aggiornate più recentemente." },
       { chapter: "Profilo", route: "profile", selector: ".profile-hero", title: "Il tuo spazio personale", text: "Qui trovi nome, ruolo, descrizione ed eventuale riconoscimento Agente del mese. Usa Personalizza profilo per aggiornare la tua presentazione." },
       { chapter: "Profilo", selector: ".profile-stats-grid", title: "Le tue statistiche", text: "Questi indicatori considerano esclusivamente le pratiche COMPLETATE e mostrano schermo più utilizzato, pratica maggiore, tipologia preferita e provvigioni ottenute." },
-      { chapter: "Profilo", selector: ".profile-trophy-board", title: "Bacheca trofei personalizzabile", text: "Aggiungi fino a otto trofei e disponili nell'ordine che preferisci. Durante la fase beta tutti i riconoscimenti sono temporaneamente disponibili per le prove." },
+      { chapter: "Profilo", selector: ".profile-trophy-board", title: "Bacheca trofei personalizzabile", text: "Aggiungi fino a otto trofei sbloccati e disponili nell'ordine che preferisci. I progressi vengono aggiornati dal lavoro operativo." },
       { chapter: "Pratiche", route: "practices", selector: ".view-toolbar", title: "Gestione delle pratiche", text: "Crea una nuova pratica e filtra immediatamente l'archivio per Inserita, Accettata, Sospesa, Bocciata o Completata." },
       { chapter: "Pratiche", selector: ".practice-controls", title: "Ricerca e ordinamento", text: "Cerca per ID o intestazione e ordina per esito, identificativo, cliente, tipologia, finanziaria, valore e, per gli amministratori, agente." },
       { chapter: "Pratiche", selector: ".practice-result-count", title: "Risultati e pagine", text: "Sono mostrati dieci elementi per pagina. Il contatore indica sempre quali risultati stai visualizzando." },
@@ -1085,15 +1095,16 @@
     const welcome = welcomeContentSettings();
     if (!messageShouldDisplay("WELCOME", welcome)) return false;
     openModal(welcome.modalTitle, betaWelcomeMessageMarkup(welcome), { wide: true, kicker: "Seemax Management Suite", subtitle: welcome.modalSubtitle, panelClass: "beta-welcome-modal" });
-    markMessageSeen("WELCOME", welcome);
+    pendingMessageAcknowledgement = { type: "WELCOME", content: welcome };
     return true;
   }
 
-  function showPatchNotesMessage() {
+  function showPatchNotesMessage(force = false) {
     const patch = patchNotesContentSettings();
-    if (!messageShouldDisplay("PATCH_NOTES", patch)) return false;
+    if (!force && !messageShouldDisplay("PATCH_NOTES", patch)) return false;
+    if (!patch.enabled) return false;
     openModal("Novità Seemax", patchNotesMessageMarkup(patch), { wide: true, kicker: patch.version || "Patch notes", panelClass: "suite-patch-modal" });
-    markMessageSeen("PATCH_NOTES", patch);
+    pendingMessageAcknowledgement = { type: "PATCH_NOTES", content: patch };
     return true;
   }
 
@@ -1393,9 +1404,9 @@
     const cards = achievements.map((item) => {
       const percent = Math.min(100, Math.round(Number(item.current || 0) / Number(item.target || 1) * 100));
       const progress = item.currency ? `${euros(item.current)} / ${euros(item.target)}` : `${item.current} / ${item.target}`;
-      return `<article class="trophy-slot ${item.unlocked ? "unlocked" : "locked"}"><div class="trophy-icon">${item.unlocked ? item.icon : "🔒"}</div><div><small>${item.betaUnlocked ? "DISPONIBILE NEL TEST BETA" : item.unlocked ? "TROFEO SBLOCCATO" : "OBIETTIVO IN CORSO"}</small><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><div class="trophy-progress"><i style="width:${percent}%"></i></div><strong>${progress}</strong></div></article>`;
+      return `<article class="trophy-slot ${item.unlocked ? "unlocked" : "locked"}"><div class="trophy-icon">${item.unlocked ? item.icon : "🔒"}</div><div><small>${item.betaUnlocked ? "DISPONIBILE PER ADMIN" : item.unlocked ? "TROFEO SBLOCCATO" : "OBIETTIVO IN CORSO"}</small><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><div class="trophy-progress"><i style="width:${percent}%"></i></div><strong>${progress}</strong></div></article>`;
     }).join("");
-    const body = `<div class="trophy-board"><div class="trophy-board-head"><span>🏅</span><div><h3>${unlocked} trofei disponibili su ${achievements.length}</h3><p>${betaTrophiesUnlocked() ? "Durante la fase beta tutti i riconoscimenti sono temporaneamente utilizzabili nella tua bacheca." : "Ogni risultato viene aggiornato automaticamente dai dati delle tue pratiche e dei tuoi clienti."}</p></div></div><div class="trophy-grid">${cards}</div></div>`;
+    const body = `<div class="trophy-board"><div class="trophy-board-head"><span>🏅</span><div><h3>${unlocked} trofei disponibili su ${achievements.length}</h3><p>${betaTrophiesUnlocked() ? "L’account ADMIN può verificare e utilizzare tutti i riconoscimenti." : "Ogni risultato viene aggiornato automaticamente dai dati delle tue pratiche e dei tuoi clienti successivi all’avvio operativo."}</p></div></div><div class="trophy-grid">${cards}</div></div>`;
     openModal("La mia bacheca trofei", body, { wide: true, kicker: "Obiettivi e riconoscimenti" });
   }
 
@@ -1406,8 +1417,8 @@
 
   function profileAchievements() {
     const source = (((state.data || {}).dashboard || {}).agentOfMonth || {}).achievements || [];
-    const betaUnlock = betaTrophiesUnlocked();
-    return source.map((item) => ({ ...item, betaUnlocked: betaUnlock && !item.unlocked, unlocked: api.isAdmin() || betaUnlock ? true : !!item.unlocked }));
+    const adminUnlock = betaTrophiesUnlocked();
+    return source.map((item) => ({ ...item, betaUnlocked: adminUnlock && !item.unlocked, unlocked: adminUnlock ? true : !!item.unlocked }));
   }
 
   function parseProfileBoard(user, achievements) {
@@ -1481,7 +1492,7 @@
         <article><span>📊</span><div><small>Tipologia preferita</small><strong>${esc(stats.favoriteType)}</strong><p>${stats.favoriteTypeCount ? `${stats.favoriteTypeCount} pratiche completate` : "Nessun dato disponibile"}</p></div></article>
         <article><span>💰</span><div><small>Provvigioni ottenute finora</small><strong>${euros(stats.commissions)}</strong><p>Calcolate su ${stats.completed} pratiche completate</p></div></article>
       </section>
-      <section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">La tua collezione</span><h3>Bacheca trofei</h3><p>${betaTrophiesUnlocked() ? "Durante la fase beta puoi organizzare e mostrare fino a otto riconoscimenti tra quelli temporaneamente disponibili." : "Organizza e mostra fino a otto riconoscimenti tra quelli che hai sbloccato."}</p></div><button class="btn gold" data-action="edit-profile-board">🏅 Modifica bacheca</button></div>
+      <section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">La tua collezione</span><h3>Bacheca trofei</h3><p>${betaTrophiesUnlocked() ? "L’account ADMIN può organizzare e mostrare fino a otto riconoscimenti tra quelli disponibili." : "Organizza e mostra fino a otto riconoscimenti tra quelli che hai sbloccato."}</p></div><button class="btn gold" data-action="edit-profile-board">🏅 Modifica bacheca</button></div>
         <div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>✨</span><h3>Sembra un po’ vuoto qui.</h3><p>Perché non lo abbellisci con i tuoi traguardi?</p></div>`}</div>
       </section>
     </div>`;
@@ -1549,7 +1560,7 @@
     const available = achievements.filter((item) => item.unlocked);
     const renderAvailable = available.map((item) => `<button type="button" class="profile-available-trophy ${profileBoardDraft.includes(item.id) ? "selected" : ""}" data-action="profile-board-toggle" data-id="${esc(item.id)}"><span>${item.icon}</span><div><strong>${esc(item.title)}</strong><small>${profileBoardDraft.includes(item.id) ? "Nella bacheca" : "Aggiungi"}</small></div></button>`).join("");
     const body = `<form id="profileBoardForm"><div class="profile-editor-grid"><section><span class="section-kicker">Trofei disponibili</span><h3>${available.length} riconoscimenti ${betaTrophiesUnlocked() ? "disponibili" : "sbloccati"}</h3><div class="profile-available-grid">${renderAvailable || "Nessun trofeo ancora disponibile."}</div></section><section><span class="section-kicker">Ordine in bacheca</span><h3 data-profile-board-count>${profileBoardDraft.length} di 8 posizioni occupate</h3><p>Trascina i trofei o usa le frecce per cambiarne l’ordine. Puoi anche salvarla completamente vuota.</p><div class="profile-board-sort" id="profileBoardSort">${profileBoardOrderedMarkup(available)}</div></section></div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Salva bacheca</button></div></form>`;
-    openModal("Modifica la bacheca", body, { wide: true, kicker: "Trofei in evidenza", subtitle: betaTrophiesUnlocked() ? "Fase beta: tutti i trofei sono temporaneamente disponibili" : api.isAdmin() ? "Modalità test admin: tutti i trofei sono disponibili" : "Scegli e ordina fino a otto traguardi" });
+    openModal("Modifica la bacheca", body, { wide: true, kicker: "Trofei in evidenza", subtitle: api.isAdmin() ? "Modalità ADMIN: tutti i trofei sono disponibili" : "Scegli e ordina fino a otto traguardi" });
   }
 
   function refreshProfileBoardEditor() {
@@ -1941,6 +1952,7 @@
   }
 
   function openModal(title, body, options = {}) {
+    pendingMessageAcknowledgement = null;
     const panelClasses = ["modal-panel", options.wide ? "wide" : "", options.panelClass || ""].filter(Boolean).join(" ");
     $("modalRoot").innerHTML = `<div class="modal-layer"><section class="${esc(panelClasses)}" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><header><div><span class="section-kicker">${esc(options.kicker || "Seemax Management")}</span><h2 id="modalTitle">${esc(title)}</h2>${options.subtitle ? `<p>${esc(options.subtitle)}</p>` : ""}</div><button class="icon-btn" data-action="close-modal" aria-label="Chiudi">×</button></header><div class="modal-body">${body}</div></section></div>`;
     document.body.classList.add("modal-open");
@@ -1948,9 +1960,17 @@
   }
 
   function closeModal() {
+    pendingMessageAcknowledgement = null;
     $("modalRoot").innerHTML = "";
     document.body.classList.remove("modal-open");
     if (pendingWelcomeMessage || pendingPatchNotesMessage) setTimeout(showNextStartupMessage, 280);
+  }
+
+  function acknowledgeMessage() {
+    const acknowledgement = pendingMessageAcknowledgement;
+    pendingMessageAcknowledgement = null;
+    if (acknowledgement) markMessageSeen(acknowledgement.type, acknowledgement.content);
+    closeModal();
   }
 
   function field(label, name, value = "", options = {}) {
@@ -3358,6 +3378,7 @@
       "preview-patch-message": previewPatchNotesMessage,
       "add-patch-item": addPatchItemEditor,
       "remove-patch-item": () => removePatchItemEditor(id),
+      "acknowledge-message": acknowledgeMessage,
       "close-modal": closeModal,
       "toggle-login-password": toggleLoginPassword,
       "open-notifications": openNotifications,
@@ -3525,8 +3546,9 @@
 
   async function saveAdminCommunicationForm(form, section, republish) {
     const payload = section === "WELCOME" ? collectWelcomeMessageForm(form) : collectPatchNotesForm(form);
-    payload.republish = republish ? "SI" : "NO";
-    setLoading(true, republish ? "Salvataggio e ripubblicazione…" : "Salvataggio comunicazione…");
+    const publishNow = section === "PATCH_NOTES" ? true : republish;
+    payload.republish = publishNow ? "SI" : "NO";
+    setLoading(true, publishNow ? "Salvataggio e pubblicazione…" : "Salvataggio comunicazione…");
     try {
       const saved = await api.saveAdminContent(payload);
       state.data.adminContent = saved || state.data.adminContent || {};
@@ -3534,10 +3556,22 @@
       if (saved) {
         state.data.settings = { ...(state.data.settings || {}), admin_content_revision: Number(saved.revision || payload.expected_revision + 1) };
       }
+      if (section === "PATCH_NOTES" && saved && saved.patchNotes) {
+        const revision = Math.max(1, Number(saved.patchNotes.publication_revision || 1));
+        state.data.messageState = {
+          ...(state.data.messageState || {}),
+          patch_seen_revision: Math.min(Number((state.data.messageState || {}).patch_seen_revision || 0), revision - 1),
+          patch_publication_revision: revision
+        };
+        try { localStorage.removeItem(messageSeenStorageKey("PATCH_NOTES")); } catch (error) { /* memoria locale facoltativa */ }
+      }
       scheduleBootstrapCache();
       renderRoute();
       const label = section === "WELCOME" ? "Benvenuto Beta" : "Patch notes";
-      toast(republish ? `${label} salvato e ripubblicato.` : `${label} salvato senza nuova pubblicazione.`);
+      toast(publishNow ? `${label} salvato e pubblicato.` : `${label} salvato senza nuova pubblicazione.`);
+      if (section === "PATCH_NOTES" && saved && saved.patchNotes && messageEnabled(saved.patchNotes.enabled, false)) {
+        setTimeout(() => showPatchNotesMessage(true), 180);
+      }
     } catch (error) {
       if (String(error.message || "").includes("CONFLICT_RECORD")) {
         toast("Le comunicazioni sono state modificate da un altro amministratore. Ricarico i dati aggiornati.", "danger");

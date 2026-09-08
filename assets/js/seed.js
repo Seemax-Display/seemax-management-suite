@@ -37,7 +37,7 @@
       { id: "act-demo-3", practiceId: "PR-003-26", titolo: "Confermare data sopralluogo", tipo: "Appuntamento", scadenza: iso(4), stato: "Aperta", assegnatoA: "Agente Dimostrativo" }
     ],
     movements: [],
-    users: (window.SEEMAX_APP_CONFIG.demoAccounts || []).map((u, i) => ({ id: u.username, username: u.username, nome_visualizzato: u.displayName, email: u.email, telefono: u.phone, stato: "ATTIVO", ruolo: u.role, note: i === 0 ? "Account amministrativo demo" : "Account agente demo" })),
+    users: (window.SEEMAX_APP_CONFIG.demoAccounts || []).map((u, i) => ({ id: u.username, username: u.username, nome_visualizzato: u.displayName, email: u.email, telefono: u.phone, stato: "ATTIVO", ruolo: u.role, note: i === 0 ? "Account amministrativo demo" : "Account agente demo", nome_profilo: "", descrizione_profilo: "", tema_profilo: "gradient", colore_profilo: "#0B5EC4", icona_profilo: "", bacheca_trofei_json: "[]", trofei_reset_il: new Date().toISOString() })),
     settings: {
       iva_percentuale: 22,
       acconto_percentuale: 30,
@@ -46,7 +46,7 @@
       numero_preventivo_admin_iniziale: 1,
       numero_preventivo_agenti_iniziale: 1,
       obiettivo_fatturato: 500000,
-      beta_sblocca_trofei: "SI",
+      beta_sblocca_trofei: "NO",
       admin_content_revision: 1,
       welcome_message_enabled: "SI",
       welcome_message_frequency: "ONCE",
@@ -62,7 +62,7 @@
       welcome_message_feature_1_title: "Esplora il tuo nuovo spazio di lavoro",
       welcome_message_feature_1_body: "Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente.",
       welcome_message_feature_2_title: "Personalizza profilo e bacheca",
-      welcome_message_feature_2_body: "Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.",
+      welcome_message_feature_2_body: "Personalizza il tuo profilo e costruisci la bacheca con i riconoscimenti che sbloccherai attraverso il lavoro operativo.",
       welcome_message_warning_title: "Ambiente di prova",
       welcome_message_warning_body: "I dati inseriti nella modalità demo sono esclusivamente dimostrativi e restano sul dispositivo.",
       welcome_message_feedback_body: "Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo.",

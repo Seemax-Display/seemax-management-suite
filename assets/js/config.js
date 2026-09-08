@@ -6,7 +6,7 @@
  */
 window.SEEMAX_APP_CONFIG = {
   appName: "Seemax Management Suite",
-  version: "2.15.2",
+  version: "2.15.3",
   demoMode: false,
   performanceDiagnostics: true,
   appsScriptUrl: "https://script.google.com/macros/s/AKfycbxNBdyg27CBYRu9M1FRFCw3Sm701hUZ5UQTyHPI3cE3AuoW8LaBRx_E6TLOoAxzHQCf/exec",
@@ -14,7 +14,7 @@ window.SEEMAX_APP_CONFIG = {
      La visualizzazione del Benvenuto Beta è gestita esclusivamente
      dall'editor ADMIN e dalle chiavi welcome_message_* del Foglio. */
   betaTest: {
-    unlockAllTrophies: true
+    unlockAllTrophies: false
   },
   company: {
     legalName: "LED LAB COMPANY",

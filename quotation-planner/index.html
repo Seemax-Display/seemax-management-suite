@@ -4958,6 +4958,26 @@
       setTimeout(printNow, 3500);
     }
 
+    function holdPrintDocumentTitle(fileName){
+      const documents = [];
+      const add = candidate => {
+        if(candidate && typeof candidate.title === 'string' && !documents.includes(candidate)) documents.push(candidate);
+      };
+      try{ add(window.top && window.top.document); }catch(error){ /* contesto cross-origin non utilizzato */ }
+      try{ add(window.parent && window.parent.document); }catch(error){ /* contesto cross-origin non utilizzato */ }
+      try{ add(document); }catch(error){ /* proxy del Planner integrato */ }
+      const previous = documents.map(doc => ({doc, title:doc.title}));
+      documents.forEach(doc => { doc.title = fileName; });
+      let restored = false;
+      return () => {
+        if(restored) return;
+        restored = true;
+        previous.forEach(entry => {
+          try{ if(entry.doc.title === fileName) entry.doc.title = entry.title; }catch(error){ /* ripristino facoltativo */ }
+        });
+      };
+    }
+
     function waitForQuoteImagesThenPrint(){
       const source = document.getElementById('quotePrint');
       if(!source) return;
@@ -4968,20 +4988,28 @@
       const iosWindow = iosPrint ? window.open('', '_blank') : null;
       const styles = Array.from(document.querySelectorAll('style')).map(node => `<style>${String(node.textContent || '').replace(/:host/g, ':root')}</style>`).join('\n');
       const viewport = iosPrint ? 'width=794, initial-scale=1' : 'width=device-width,initial-scale=1';
-      const printMarkup = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="${viewport}"><base href="${safe(dedicatedPrintBase())}"><title>${safe(suggestedPrintFileName())}</title>${styles}${iosPrint ? dedicatedPrintStyles() : ''}</head><body class="sqp-native-body integrated-suite management-native${iosPrint ? ' sqp-ios-print' : ''}">${source.outerHTML}</body></html>`;
+      const printFileName = suggestedPrintFileName();
+      const restoreDocumentTitle = holdPrintDocumentTitle(printFileName);
+      const printMarkup = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="${viewport}"><base href="${safe(dedicatedPrintBase())}"><title>${safe(printFileName)}</title>${styles}${iosPrint ? dedicatedPrintStyles() : ''}</head><body class="sqp-native-body integrated-suite management-native${iosPrint ? ' sqp-ios-print' : ''}">${source.outerHTML}</body></html>`;
 
       if(iosWindow){
         const printDoc = iosWindow.document;
         printDoc.open();
         printDoc.write(printMarkup);
         printDoc.close();
+        printDoc.title = printFileName;
         let printed = false;
         const printNow = () => {
-          if(printed || iosWindow.closed) return;
+          if(printed || iosWindow.closed){ restoreDocumentTitle(); return; }
           printed = true;
           iosWindow.focus();
-          iosWindow.addEventListener('afterprint', () => setTimeout(() => { try{ iosWindow.close(); }catch(error){ /* chiusura facoltativa */ } }, 250), {once:true});
-          iosWindow.print();
+          iosWindow.addEventListener('afterprint', () => {
+            restoreDocumentTitle();
+            setTimeout(() => { try{ iosWindow.close(); }catch(error){ /* chiusura facoltativa */ } }, 250);
+          }, {once:true});
+          try{ iosWindow.print(); }
+          catch(error){ restoreDocumentTitle(); throw error; }
+          setTimeout(restoreDocumentTitle, 15000);
         };
         waitForImagesInPrintDocument(printDoc, printNow);
         return;
@@ -5000,13 +5028,19 @@
       printDoc.open();
       printDoc.write(printMarkup);
       printDoc.close();
+      printDoc.title = printFileName;
       let printed = false;
       const printNow = () => {
         if(printed) return;
         printed = true;
         frame.contentWindow.focus();
-        frame.contentWindow.print();
-        setTimeout(() => frame.remove(), 2500);
+        frame.contentWindow.addEventListener('afterprint', () => {
+          restoreDocumentTitle();
+          setTimeout(() => frame.remove(), 250);
+        }, {once:true});
+        try{ frame.contentWindow.print(); }
+        catch(error){ restoreDocumentTitle(); frame.remove(); throw error; }
+        setTimeout(() => { restoreDocumentTitle(); frame.remove(); }, 15000);
       };
       waitForImagesInPrintDocument(printDoc, printNow);
     }

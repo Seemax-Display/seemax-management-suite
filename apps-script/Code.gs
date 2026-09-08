@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2152().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2153().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.15.2";
+var SEEMAX_VERSION = "seemax-management-suite-2.15.3";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -54,7 +54,7 @@ var ENTITY_SHEETS = {
 };
 
 var SHEET_SCHEMAS = {
-  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "trofei_reset_il", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -98,7 +98,7 @@ function setupSeemaxDatabase() {
   backfillExistingIds_();
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
-  return "DATABASE SEEMAX 2.15.2 configurato: comunicazioni, preventivi e documenti in background attivi.";
+  return "DATABASE SEEMAX 2.15.3 configurato: PDF nominati correttamente, patch notes pubblicabili e profili pronti per il lancio.";
 }
 
 
@@ -264,6 +264,81 @@ function upgradeSeemaxV2152() {
     styleSheets_();
     return "SEEMAX v2.15.2 configurato: salvataggio preventivi confermato e upload documenti non bloccante attivi.";
   });
+}
+
+function upgradeSeemaxV2153() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    rebuildQuoteCountersV2151_();
+    var resetResult = resetAgentProfilesForLaunchV2153_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Upgrade Management Suite v2.15.3 · nome PDF, pubblicazione Patch Notes e azzeramento profili agenti.");
+    styleSheets_();
+    return "SEEMAX v2.15.3 configurato: nome PDF corretto, Patch Notes ripubblicabili e " + resetResult.message;
+  });
+}
+
+/* Azzeramento di lancio eseguito una sola volta. Non modifica identità,
+   credenziali, ruoli, contatti, pratiche o clienti. Gli ADMIN conservano le
+   proprie personalizzazioni e ottengono comunque tutti i trofei dal controllo
+   autorizzativo, mentre gli agenti ripartono dai dati creati dopo questo istante. */
+function resetAgentProfilesForLaunchV2153_() {
+  var settings = getSettings_(true);
+  if (normalizeYesNo_(settings.reset_profili_v2153_eseguito, "NO") === "SI") {
+    if (normalizeYesNo_(settings.beta_sblocca_trofei, "NO") !== "NO") {
+      upsertSettingsBatch_({ beta_sblocca_trofei: "NO" }, "Trofei beta disattivati per il lancio");
+    }
+    return { reset: false, agents: 0, reset_at: String(settings.reset_profili_v2153_il || ""), message: "reset profili già eseguito in precedenza." };
+  }
+
+  var agentsSheet = sheet_("AGENTI");
+  var headers = sheetHeaders_(agentsSheet);
+  var rowCount = Math.max(0, agentsSheet.getLastRow() - 1);
+  var usernameIndex = headers.indexOf("username");
+  var roleIndex = headers.indexOf("ruolo");
+  var resetAt = new Date().toISOString();
+  var resetCount = 0;
+
+  if (rowCount > 0 && usernameIndex >= 0 && roleIndex >= 0) {
+    var usernames = agentsSheet.getRange(2, usernameIndex + 1, rowCount, 1).getDisplayValues();
+    var roles = agentsSheet.getRange(2, roleIndex + 1, rowCount, 1).getDisplayValues();
+    var resetRows = usernames.map(function (row, index) {
+      var hasUser = String(row[0] || "").trim() !== "";
+      var isAgent = String(roles[index][0] || "AGENTE").trim().toUpperCase() !== "ADMIN";
+      if (hasUser && isAgent) resetCount += 1;
+      return hasUser && isAgent;
+    });
+    var defaults = {
+      nome_profilo: "",
+      descrizione_profilo: "",
+      tema_profilo: "gradient",
+      colore_profilo: "#0B5EC4",
+      icona_profilo: "",
+      bacheca_trofei_json: "[]",
+      trofei_reset_il: resetAt
+    };
+    Object.keys(defaults).forEach(function (field) {
+      var columnIndex = headers.indexOf(field);
+      if (columnIndex < 0) throw new Error("Colonna AGENTI mancante durante il reset: " + field);
+      var range = agentsSheet.getRange(2, columnIndex + 1, rowCount, 1);
+      var values = range.getValues();
+      resetRows.forEach(function (shouldReset, index) {
+        if (shouldReset) values[index][0] = defaults[field];
+      });
+      range.setValues(values);
+    });
+    invalidateTable_("AGENTI");
+  }
+
+  upsertSettingsBatch_({
+    beta_sblocca_trofei: "NO",
+    reset_profili_v2153_eseguito: "SI",
+    reset_profili_v2153_il: resetAt
+  }, "Azzeramento profili agenti per avvio operativo v2.15.3");
+  return { reset: true, agents: resetCount, reset_at: resetAt, message: resetCount + " profili agente azzerati per il lancio." };
 }
 
 
@@ -504,7 +579,7 @@ function managementBootstrap_(p) {
   data.patchNotes = patchNotesContent_(false);
   data.messageState = messageStateForUser_(currentUserRow, settings, data.patchNotes);
   if (isAdmin_(user)) data.adminContent = adminContent_(settings);
-  data.dashboard = dashboard_(data, user, allPractices, allClients, allUsers);
+  data.dashboard = dashboard_(data, currentUserRow, allPractices, allClients, allUsers);
   return {
     ok: true,
     data: data,
@@ -663,9 +738,18 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
   }
   if (entity === "users") {
     payload.id = payload.username;
+    var existingAccount = findRowObject_("AGENTI", "username", payload.username);
     if (!payload.chiave_id_agente) {
-      var existingUser = findRowObject_("AGENTI", "username", payload.username);
-      if (existingUser) payload.chiave_id_agente = existingUser.chiave_id_agente;
+      if (existingAccount) payload.chiave_id_agente = existingAccount.chiave_id_agente;
+    }
+    if (!existingAccount) {
+      payload.nome_profilo = "";
+      payload.descrizione_profilo = "";
+      payload.tema_profilo = "gradient";
+      payload.colore_profilo = "#0B5EC4";
+      payload.icona_profilo = "";
+      payload.bacheca_trofei_json = "[]";
+      payload.trofei_reset_il = new Date().toISOString();
     }
   }
   var row = upsertEntity_(entity, payload, user);
@@ -770,8 +854,7 @@ function managementSaveProfile_(p) {
     var updated = [];
     if (owns("bacheca_trofei_json")) {
       var allowedAchievements = ["month_1", "month_streak_3", "practice_50k", "practice_100k", "clients_10", "purchase_5", "rental_5", "leasing_5", "completed_10", "revenue_250k"];
-      var betaUnlocksAllTrophies = String(getSettings_().beta_sblocca_trofei || "NO").toUpperCase() === "SI";
-      if (!isAdmin_(user) && !betaUnlocksAllTrophies) {
+      if (!isAdmin_(user)) {
         var achievementData = agentOfMonth_(rowsToObjects_(sheet_("PRATICHE")), rowsToObjects_(sheet_("CLIENTI")), user, rowsToObjects_(sheet_("AGENTI")));
         allowedAchievements = (achievementData.achievements || []).filter(function (achievement) { return achievement.unlocked; }).map(function (achievement) { return achievement.id; });
       }
@@ -2172,16 +2255,9 @@ function managementSaveAdminContentLocked_(user, payload) {
     var patch = payload.patchNotes && typeof payload.patchNotes === "object" ? payload.patchNotes : {};
     var existingPatchKey = String(currentNotes.publication_key || "").trim();
     var currentPatchRevision = Math.max(1, Number(currentNotes.publication_revision || 1));
-    var patchPublicationRevision = republish ? currentPatchRevision + 1 : currentPatchRevision;
-    var patchPublicationKey = republish || !existingPatchKey ? uid_("patch-pub") : existingPatchKey;
-    var publishPatchNow = republish || !existingPatchKey;
     var patchValues = {
       enabled: normalizeYesNo_(patch.enabled, currentNotes.enabled || "NO"),
-      publication_revision: patchPublicationRevision,
       display_mode: normalizeMessageDisplayMode_(patch.display_mode || currentNotes.display_mode || "ONCE"),
-      publication_key: patchPublicationKey,
-      published_at: publishPatchNow ? now : String(currentNotes.published_at || ""),
-      published_by: publishPatchNow ? String(user.username || "") : String(currentNotes.published_by || ""),
       version: String(patch.version !== undefined ? patch.version : currentNotes.version || SEEMAX_VERSION).trim().slice(0, 120),
       label: String(patch.label !== undefined ? patch.label : currentNotes.label || "SEEMAX MANAGEMENT SUITE").trim().slice(0, 160),
       title: String(patch.title !== undefined ? patch.title : currentNotes.title || "Aggiornamento").trim().slice(0, 220),
@@ -2189,17 +2265,21 @@ function managementSaveAdminContentLocked_(user, payload) {
       footer: String(patch.footer !== undefined ? patch.footer : currentNotes.footer || "").trim().slice(0, 1600)
     };
     var sourceItems = Array.isArray(patch.items) ? patch.items : rowsToObjects_(sheet_("PATCH_ITEMS"));
-    var items = sourceItems.slice(0, 12).map(function (item) {
-      item = item && typeof item === "object" ? item : {};
-      return {
-        emoji: String(item.emoji || "✨").trim().slice(0, 16),
-        title: String(item.title || "").trim().slice(0, 180),
-        text: String(item.text || "").trim().slice(0, 900),
-        attivo: normalizeYesNo_(item.attivo !== undefined ? item.attivo : item.active, "SI")
-      };
-    }).filter(function (item) { return item.title || item.text; });
+    var items = normalizePatchItemsForSaveV2153_(sourceItems);
+    var currentItems = normalizePatchItemsForSaveV2153_(rowsToObjects_(sheet_("PATCH_ITEMS")));
+    var contentChanged = patchContentFingerprintV2153_(patchValues, items) !== patchContentFingerprintV2153_(currentNotes, currentItems);
+    /* Una modifica reale alle Patch Notes è una nuova pubblicazione. In
+       precedenza il pulsante Salva poteva aggiornare il foglio lasciando la
+       stessa revisione, quindi tutti gli utenti che l'avevano già letta non
+       vedevano alcun popup. Il backend ora garantisce il riarmo anche ai
+       frontend meno recenti. */
+    var publishPatchNow = republish || contentChanged || !existingPatchKey;
+    patchValues.publication_revision = publishPatchNow ? currentPatchRevision + 1 : currentPatchRevision;
+    patchValues.publication_key = publishPatchNow ? uid_("patch-pub") : existingPatchKey;
+    patchValues.published_at = publishPatchNow ? now : String(currentNotes.published_at || "");
+    patchValues.published_by = publishPatchNow ? String(user.username || "") : String(currentNotes.published_by || "");
     writePatchContentBatch_(patchValues, items);
-    logParts.push("patch notes" + (republish ? " ripubblicate" : " aggiornate"));
+    logParts.push("patch notes" + (publishPatchNow ? " pubblicate" : " confermate senza variazioni"));
   }
 
   upsertSettingsBatch_(settingsValues, "Comunicazioni aggiornate da Management Suite");
@@ -2219,6 +2299,32 @@ function normalizeYesNo_(value, fallback) {
 function normalizeMessageDisplayMode_(value) {
   var mode = String(value || "ONCE").trim().toUpperCase().replace(/[\s-]+/g, "_");
   return ["ALWAYS", "SEMPRE", "OGNI_APERTURA"].indexOf(mode) >= 0 ? "ALWAYS" : "ONCE";
+}
+
+function normalizePatchItemsForSaveV2153_(sourceItems) {
+  return (Array.isArray(sourceItems) ? sourceItems : []).slice(0, 12).map(function (item) {
+    item = item && typeof item === "object" ? item : {};
+    return {
+      emoji: String(item.emoji || "✨").trim().slice(0, 16),
+      title: String(item.title || "").trim().slice(0, 180),
+      text: String(item.text || "").trim().slice(0, 900),
+      attivo: normalizeYesNo_(item.attivo !== undefined ? item.attivo : item.active, "SI")
+    };
+  }).filter(function (item) { return item.title || item.text; });
+}
+
+function patchContentFingerprintV2153_(notes, items) {
+  var source = notes || {};
+  return JSON.stringify({
+    enabled: normalizeYesNo_(source.enabled, "NO"),
+    display_mode: normalizeMessageDisplayMode_(source.display_mode || "ONCE"),
+    version: String(source.version || "").trim(),
+    label: String(source.label || "").trim(),
+    title: String(source.title || "").trim(),
+    intro: String(source.intro || "").trim(),
+    footer: String(source.footer || "").trim(),
+    items: normalizePatchItemsForSaveV2153_(items)
+  });
 }
 
 function publicationKeyFromRevisionV2144_(prefix, revision, fallback) {
@@ -2312,7 +2418,7 @@ function defaultBetaWelcomeContent_() {
     feature_one_title: "Esplora il tuo nuovo spazio di lavoro",
     feature_one_message: "Crea clienti, inserisci pratiche, prepara preventivi con il Quotation Planner e consulta catalogo e giacenze: tutto è finalmente raccolto in un unico ambiente. Seemax Management Suite è l’evoluzione definitiva del tuo spazio di lavoro.",
     feature_two_title: "Personalizza profilo e bacheca",
-    feature_two_message: "Per tutta la fase di test, ogni trofeo è temporaneamente disponibile. Scegli i tuoi preferiti, ordinali e prova tutte le possibilità di personalizzazione.",
+    feature_two_message: "Personalizza il tuo profilo e costruisci la bacheca con i riconoscimenti che sbloccherai attraverso il lavoro operativo.",
     warning_title: "Ambiente di prova",
     warning_message: "I dati e le pratiche inseriti saranno registrati nel database esclusivamente per il collaudo e le prove di carico del sistema. Non saranno riportati nella versione definitiva. I progressi già ottenuti in Seemax For You verranno invece importati in Seemax Management Suite.",
     feedback_message: "Il tuo contributo è prezioso: segnala all’amministratore Seemax impressioni, anomalie e suggerimenti emersi durante l’utilizzo, sia da PC sia da smartphone. Il tuo feedback ci aiuterà a plasmare la versione finale.",
@@ -2416,6 +2522,29 @@ function practiceCompletionDate_(practice) {
   return date && !isNaN(date.getTime()) ? date : null;
 }
 
+function trophyResetDate_(user) {
+  var raw = String(user && user.trofei_reset_il || "").trim();
+  var date = raw ? new Date(raw) : null;
+  return date && !isNaN(date.getTime()) ? date : null;
+}
+
+function achievementRecordDate_(record, fields) {
+  var source = record || {};
+  var names = fields || [];
+  for (var i = 0; i < names.length; i++) {
+    var raw = String(source[names[i]] || "").trim();
+    if (!raw) continue;
+    var date = new Date(raw);
+    if (!isNaN(date.getTime())) return date;
+  }
+  return null;
+}
+
+function achievementAfterReset_(date, resetDate) {
+  if (!resetDate) return true;
+  return !!date && date.getTime() >= resetDate.getTime();
+}
+
 function monthKey_(date) {
   return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
 }
@@ -2479,10 +2608,25 @@ function agentOfMonth_(practices, clients, currentUser, userRows) {
   });
   var award = history.filter(function (row) { return row.period === previousKey; })[0] || null;
   var username = String(currentUser && currentUser.username || "");
-  var ownCompleted = completed.filter(function (practice) { return String(practice.agent_username || "") === username; });
-  var ownPractices = (practices || []).filter(function (practice) { return String(practice.agent_username || "") === username; });
-  var ownClients = (clients || []).filter(function (client) { return String(client.creato_da_username || client.agent_username || "") === username; });
-  var ownWinningPeriods = history.filter(function (row) { return String(row.agent_username || "") === username; }).map(function (row) { return row.period; }).sort();
+  var resetDate = trophyResetDate_(currentUser);
+  var ownCompleted = completed.filter(function (practice) {
+    return String(practice.agent_username || "") === username && achievementAfterReset_(practiceCompletionDate_(practice), resetDate);
+  });
+  var ownPractices = (practices || []).filter(function (practice) {
+    var created = achievementRecordDate_(practice, ["creatoIl", "aggiornatoIl"]);
+    return String(practice.agent_username || "") === username && achievementAfterReset_(created, resetDate);
+  });
+  var ownClients = (clients || []).filter(function (client) {
+    var created = achievementRecordDate_(client, ["creatoIl", "aggiornatoIl"]);
+    return String(client.creato_da_username || client.agent_username || "") === username && achievementAfterReset_(created, resetDate);
+  });
+  var ownWinningPeriods = history.filter(function (row) {
+    if (String(row.agent_username || "") !== username) return false;
+    if (!resetDate) return true;
+    var parts = String(row.period || "").split("-");
+    var periodEnd = parts.length === 2 ? new Date(Number(parts[0]), Number(parts[1]), 1) : null;
+    return periodEnd && !isNaN(periodEnd.getTime()) && periodEnd.getTime() > resetDate.getTime();
+  }).map(function (row) { return row.period; }).sort();
   var maxStreak = 0, streak = 0, previousIndex = null;
   ownWinningPeriods.forEach(function (period) {
     var parts = period.split("-");
@@ -3321,7 +3465,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", trofei_reset_il: user.trofei_reset_il || "", welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }
@@ -3532,7 +3676,7 @@ function seedSettings_() {
     numero_preventivo_admin_iniziale: 1,
     numero_preventivo_agenti_iniziale: 1,
     obiettivo_fatturato: 500000,
-    beta_sblocca_trofei: "SI",
+    beta_sblocca_trofei: "NO",
     req_acquisto_destinatario_ordine: "SI",
     req_acquisto_clientid: "SI",
     req_acquisto_valore: "SI",

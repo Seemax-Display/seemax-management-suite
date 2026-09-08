@@ -149,10 +149,23 @@
     });
     const award = history.find((row) => row.period === previousKey) || null;
     const username = String((currentUser || {}).username || "");
-    const ownCompleted = completed.filter((practice) => String(practice.agent_username || "") === username);
-    const ownPractices = (practices || []).filter((practice) => String(practice.agent_username || "") === username);
-    const ownClients = (clients || []).filter((client) => String(client.creato_da_username || client.agent_username || "") === username);
-    const winningPeriods = history.filter((row) => String(row.agent_username || "") === username).map((row) => row.period).sort();
+    const resetRaw = String((currentUser || {}).trofei_reset_il || "").trim();
+    const resetDate = resetRaw && !Number.isNaN(new Date(resetRaw).getTime()) ? new Date(resetRaw) : null;
+    const afterReset = (raw) => {
+      if (!resetDate) return true;
+      const date = raw ? new Date(raw) : null;
+      return !!date && !Number.isNaN(date.getTime()) && date.getTime() >= resetDate.getTime();
+    };
+    const ownCompleted = completed.filter((practice) => String(practice.agent_username || "") === username && afterReset(practice.completataIl || practice.aggiornatoIl || practice.creatoIl));
+    const ownPractices = (practices || []).filter((practice) => String(practice.agent_username || "") === username && afterReset(practice.creatoIl || practice.aggiornatoIl));
+    const ownClients = (clients || []).filter((client) => String(client.creato_da_username || client.agent_username || "") === username && afterReset(client.creatoIl || client.aggiornatoIl));
+    const winningPeriods = history.filter((row) => {
+      if (String(row.agent_username || "") !== username) return false;
+      if (!resetDate) return true;
+      const [year, month] = String(row.period || "").split("-").map(Number);
+      const periodEnd = new Date(year, month, 1);
+      return !Number.isNaN(periodEnd.getTime()) && periodEnd.getTime() > resetDate.getTime();
+    }).map((row) => row.period).sort();
     let maxStreak = 0, streak = 0, previousIndex = null;
     winningPeriods.forEach((period) => { const [year, month] = period.split("-").map(Number); const index = year * 12 + month; streak = previousIndex !== null && index === previousIndex + 1 ? streak + 1 : 1; maxStreak = Math.max(maxStreak, streak); previousIndex = index; });
     const countType = (type) => ownPractices.filter((practice) => String(practice.tipo_pratica || "ACQUISTO").toUpperCase() === type).length;
