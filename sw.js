@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-16-0-release-ready";
+const CACHE = "seemax-management-v2-16-1-quotation-admin";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",

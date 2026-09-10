@@ -1,0 +1,8 @@
+TEST RILASCIO SEEMAX 2.16.1 - SUPERATI
+
+Script: scripts/test-release-v2.16.1.js
+Esito: 51 controlli completati senza errori.
+
+Il test conferma versione frontend/backend/cache, preservazione del rilascio
+2.16.0, reset idempotente, pulizia sicura, nuova autorizzazione preventivi
+ADMIN, filtro agente, ordinamento e attribuzione autore.

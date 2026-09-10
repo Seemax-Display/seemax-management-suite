@@ -1,0 +1,28 @@
+SEEMAX MANAGEMENT SUITE 2.16.1 - RELEASE MANIFEST
+
+Versione frontend: 2.16.1
+Versione backend: seemax-management-suite-2.16.1
+Cache Service Worker: seemax-management-v2-16-1-quotation-admin
+Funzione upgrade: upgradeSeemaxV2161
+
+Interventi:
+- correzione del caricamento ADMIN dei preventivi appartenenti agli agenti;
+- consegna del payload completo soltanto dopo autenticazione e verifica ADMIN;
+- rimozione del payload JSON grezzo e della password storica dalla risposta autenticata ordinaria;
+- chiave account esclusa dai nuovi record e rimossa dai record esistenti durante l'upgrade;
+- endpoint pubblico limitato ai preventivi manuali e al solo contenuto cifrato necessario;
+- metadati autore restituiti dall'elenco esclusivamente per la vista ADMIN;
+- filtro preventivi per agente;
+- ordinamento per agente o data, crescente o decrescente;
+- badge Creato da su ogni preventivo nella vista ADMIN;
+- formato italiano per data e ora di creazione;
+- elenco, caricamento ed eliminazione collegati al ponte Apps Script persistente;
+- fallback JSONP standalone preservato;
+- comportamento e autorizzazioni della vista AGENTE preservati;
+- lock, idempotenza, contatori e operazioni in background invariati.
+
+Test automatici:
+- scripts/test-quotation-admin-v2.16.1.js
+- scripts/test-release-v2.16.1.js
+- scripts/verify-v2.16.1.js
+- suite di regressione 2.16.0, 2.15.3 e 2.15.2

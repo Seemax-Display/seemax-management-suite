@@ -1,0 +1,22 @@
+TEST PREVENTIVI ADMIN SEEMAX 2.16.1 - SUPERATI
+
+Script: scripts/test-quotation-admin-v2.16.1.js
+Esito: 34 controlli completati senza errori.
+
+Copertura:
+- ADMIN vede tutti i preventivi;
+- AGENTE vede soltanto i propri;
+- metadati autore disponibili soltanto nella lista ADMIN;
+- payload autorizzato disponibile soltanto per ADMIN su preventivo altrui;
+- risposta ADMIN alleggerita senza duplicare anche il payload cifrato;
+- payload JSON grezzo e password storica rimossi dalla risposta autenticata;
+- chiavi account escluse dai nuovi record e dalle risposte;
+- preventivi autenticati non accessibili dal percorso pubblico;
+- percorso con password limitato al solo payload cifrato necessario;
+- preventivo proprio ancora caricato dal payload cifrato;
+- accesso incrociato tra agenti bloccato;
+- ordinamento per data corretto;
+- ordinamento alfabetico per agente corretto;
+- filtro per singolo agente corretto;
+- controlli e autore costruiti soltanto nella vista ADMIN.
+- elenco, caricamento ed eliminazione preferiscono il ponte persistente nativo.

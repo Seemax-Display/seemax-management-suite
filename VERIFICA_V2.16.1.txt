@@ -1,0 +1,9 @@
+VERIFICA STATICA E FUNZIONALE SEEMAX 2.16.1 - SUPERATA
+
+Script: scripts/verify-v2.16.1.js
+Esito: 276 controlli completati senza errori.
+
+La suite copre sintassi, versioni coordinate, autorizzazioni, archivio
+preventivi ADMIN, comunicazioni, protezioni multiutente, operazioni in
+background, contatori, cache, fogli, profili, documenti e regressioni delle
+funzioni già presenti.

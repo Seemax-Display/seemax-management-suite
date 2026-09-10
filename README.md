@@ -52,6 +52,8 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - aggiornamento del magazzino dalla riga già verificata dal backend, senza rilettura completa del catalogo;
 - numero preventivo del Planner tramite ponte nativo e contatori persistenti distinti per ADMIN e agenti;
 - salvataggio dei preventivi tramite mutazione nativa confermata, in background e senza riletture ripetute dell'archivio;
+- archivio preventivi ADMIN completo: caricamento autorizzato dei preventivi degli agenti, filtro per autore, ordinamento per agente/data e attribuzione visibile su ogni scheda;
+- elenco, apertura ed eliminazione preventivi sul ponte persistente, con chiavi account escluse dai record e percorso pubblico limitato ai payload cifrati manuali;
 - upload manuale dei documenti con avanzamento non bloccante dalla preparazione locale fino alla conferma su Drive e nel database;
 - nome del PDF preventivo composto automaticamente da numero, data, intestazione cliente, prodotto, misura e configurazione mono/bifacciale;
 - coda email asincrona: le notifiche non trattengono più il lock delle operazioni principali;
@@ -82,7 +84,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione già operativa alla versione 2.16.0 segui [docs/AGGIORNAMENTO_V2.16.0.md](docs/AGGIORNAMENTO_V2.16.0.md). La guida descrive il backup pre-rilascio, la pulizia sicura dei fogli, il reset definitivo degli agenti e il collaudo. Restano disponibili la [guida 2.15.3](docs/AGGIORNAMENTO_V2.15.3.md), [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e il [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+Per aggiornare un'installazione 2.16.0 alla versione 2.16.1 segui [docs/AGGIORNAMENTO_V2.16.1.md](docs/AGGIORNAMENTO_V2.16.1.md). È un aggiornamento correttivo dell'archivio preventivi e non ripete la pulizia del Foglio né il reset dei profili. Per un'installazione precedente resta disponibile la [guida 2.16.0](docs/AGGIORNAMENTO_V2.16.0.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 

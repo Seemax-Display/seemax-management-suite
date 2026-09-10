@@ -1,0 +1,28 @@
+SEEMAX MANAGEMENT SUITE 2.16.1 - ARCHIVIO PREVENTIVI ADMIN
+
+Questo pacchetto contiene frontend GitHub Pages, Quotation Planner e backend Apps Script coordinati.
+
+PRIMA DI PUBBLICARE
+
+1. Verifica che il sistema operativo sia gia alla versione 2.16.0.
+2. Sostituisci il Code.gs operativo con apps-script/Code.gs.
+3. Esegui upgradeSeemaxV2161.
+4. Pubblica una nuova versione della Web App.
+5. Carica l'intero frontend su GitHub Pages.
+6. Esegui un refresh forzato.
+
+NOVITA PRINCIPALI
+
+- caricamento ADMIN dei preventivi creati dagli agenti corretto;
+- verifica autorizzativa mantenuta nel backend;
+- filtro dell'archivio per singolo agente;
+- ordinamento per agente o data di creazione;
+- ordine crescente o decrescente;
+- autore visibile su ogni preventivo soltanto all'ADMIN;
+- chiavi account escluse dall'archivio e rimosse dai record storici;
+- preventivi autenticati non accessibili dal percorso pubblico;
+- elenco, caricamento ed eliminazione instradati sul collegamento persistente;
+- percorso personale degli agenti e isolamento tra account invariati;
+- nessuna pulizia dei fogli o ripetizione del reset profili.
+
+Consulta docs/AGGIORNAMENTO_V2.16.1.md per procedura e collaudo.
