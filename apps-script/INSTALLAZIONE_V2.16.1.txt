@@ -1,0 +1,30 @@
+SEEMAX MANAGEMENT SUITE 2.16.1 - INSTALLAZIONE CORRETTIVA
+
+PER UN SISTEMA GIA AGGIORNATO ALLA 2.16.0
+
+1. Apri il Foglio Google operativo.
+2. Vai in Estensioni > Apps Script.
+3. Sostituisci Code.gs con il file incluso in questa cartella.
+4. Salva ed esegui upgradeSeemaxV2161.
+5. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+6. Pubblica tutti i file frontend su GitHub Pages.
+7. Attendi l'aggiornamento ed esegui un refresh forzato.
+
+L'upgrade 2.16.1:
+- non elimina fogli;
+- non ripete il reset di profili o trofei;
+- non modifica clienti, pratiche o preventivi;
+- rimuove eventuali chiavi account salvate in passato nella colonna tecnica agent_key;
+- verifica gli schemi e riallinea i contatori;
+- attiva la versione seemax-management-suite-2.16.1.
+
+COLLAUDO MINIMO
+
+1. Salva un preventivo con un account AGENTE.
+2. Accedi come ADMIN e apri Preventivi Registrati.
+3. Controlla autore, filtro agente e ordinamento agente/data.
+4. Carica il preventivo dell'agente.
+5. Verifica con un altro agente che l'archivio altrui non sia accessibile.
+
+Se la 2.16.0 non e mai stata installata, applica prima le istruzioni di
+INSTALLAZIONE_V2.16.0.txt e la funzione upgradeSeemaxV2160.

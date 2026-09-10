@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2160().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2161().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.16.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.16.1";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -23,6 +23,9 @@ var SEEMAX_FRONTEND_ORIGINS_ = [
 var SEEMAX_BRIDGE_ACTIONS_ = {
   nextquote: true,
   savequote: true,
+  listquotes: true,
+  loadquote_agent: true,
+  deletequote_agent: true,
   management_upsert: true,
   management_remove: true,
   management_save_settings: true,
@@ -112,7 +115,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.16.0 configurato: struttura ordinata, profili pronti e controlli di rilascio attivi.";
+  return "DATABASE SEEMAX 2.16.1 configurato: archivio preventivi ADMIN corretto e controlli di rilascio attivi.";
 }
 
 
@@ -314,6 +317,37 @@ function upgradeSeemaxV2160() {
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.16.0 pronto per il rilascio: " + resetResult.message + " " + sheetResult.message;
   });
+}
+
+function upgradeSeemaxV2161() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    var removedArchiveKeys = clearArchivedQuoteKeysV2161_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento correttivo v2.16.1 · caricamento preventivi agenti per ADMIN, autore e ordinamento archivio.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.16.1 configurato: l’ADMIN può caricare, filtrare e ordinare i preventivi di tutti gli agenti. Chiavi archivio rimosse: " + removedArchiveKeys + ".";
+  });
+}
+
+function clearArchivedQuoteKeysV2161_() {
+  var archiveSheet = sheet_("ARCHIVIO_PREVENTIVI");
+  var headers = sheetHeaders_(archiveSheet);
+  var keyColumn = headers.indexOf("agent_key");
+  var lastRow = archiveSheet.getLastRow();
+  if (keyColumn < 0 || lastRow < 2) return 0;
+  var range = archiveSheet.getRange(2, keyColumn + 1, lastRow - 1, 1);
+  var values = range.getDisplayValues();
+  var populated = values.reduce(function (count, row) { return count + (String(row[0] || "").trim() ? 1 : 0); }, 0);
+  if (populated) range.clearContent();
+  invalidateTable_("ARCHIVIO_PREVENTIVI");
+  return populated;
 }
 
 /* Azzeramento di lancio eseguito una sola volta. Non modifica identità,
@@ -2931,7 +2965,10 @@ function saveQuotationLocked_(p) {
     return { ok: false, error: "Numero preventivo già utilizzato.", error_code: "QUOTE_NUMBER_CHANGED", next_num: next.next_num, next_id: next.next_id };
   }
   var record = {};
-  Object.keys(p).forEach(function (key) { if (["action", "requestId"].indexOf(key) < 0) record[key] = p[key]; });
+  /* agent_key autentica la richiesta ma non deve mai diventare un dato del
+     preventivo né essere scritto nel Foglio. */
+  Object.keys(p).forEach(function (key) { if (["action", "requestId", "agent_key"].indexOf(key) < 0) record[key] = p[key]; });
+  if (sheetHeaders_("ARCHIVIO_PREVENTIVI").indexOf("agent_key") >= 0) record.agent_key = "";
   record.id_preventivo = id;
   record.data_salvataggio = new Date().toISOString();
   record.agent_username = record.agent_username || (user ? user.username : "");
@@ -2944,25 +2981,84 @@ function saveQuotationLocked_(p) {
 
 function listQuotes_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
-  var rows = rowsToObjects_(sheet_("ARCHIVIO_PREVENTIVI")).filter(function (row) { return !row.deleted_at && (isAdmin_(user) || String(row.agent_username || "") === String(user.username)); });
+  var adminView = isAdmin_(user);
+  var rows = rowsToObjects_(sheet_("ARCHIVIO_PREVENTIVI")).filter(function (row) { return !row.deleted_at && (adminView || String(row.agent_username || "") === String(user.username)); });
   rows.sort(function (a, b) { return String(b.data_salvataggio || "").localeCompare(String(a.data_salvataggio || "")); });
-  return { ok: true, quotes: rows.slice(0, 200).map(function (row) { return { id_preventivo: row.id_preventivo, cliente_visibile: row.cliente_visibile || row.cliente_azienda, data_salvataggio: row.data_salvataggio, totale_preventivo_riferimento: row.totale_preventivo_riferimento, finanziaria_selezionata: row.finanziaria_selezionata }; }) };
+  return {
+    ok: true,
+    admin_view: adminView,
+    quotes: rows.slice(0, 200).map(function (row) {
+      var item = {
+        id_preventivo: row.id_preventivo,
+        cliente_visibile: row.cliente_visibile || row.cliente_azienda,
+        data_salvataggio: row.data_salvataggio,
+        data_preventivo: row.data_preventivo,
+        totale_preventivo_riferimento: row.totale_preventivo_riferimento,
+        finanziaria_selezionata: row.finanziaria_selezionata
+      };
+      /* I metadati di attribuzione servono esclusivamente alla vista ADMIN.
+         L'archivio personale degli agenti mantiene la risposta precedente. */
+      if (adminView) {
+        item.agent_username = String(row.agent_username || "");
+        item.agent_display_name = String(row.agent_display_name || row.agente || row.agent_username || "Accesso esterno");
+        item.quote_scope = String(row.quote_scope || "AGENTE");
+      }
+      return item;
+    })
+  };
 }
 
 function loadQuoteAgent_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   var row = findRowObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", p.id_preventivo);
   if (!row || row.deleted_at) throw new Error("Preventivo non trovato.");
-  if (!isAdmin_(user) && String(row.agent_username || "") !== String(user.username)) throw new Error("Preventivo non autorizzato.");
-  row.ok = true;
-  return row;
+  var adminView = isAdmin_(user);
+  var ownerUsername = String(row.agent_username || "");
+  var foreignQuote = ownerUsername !== String(user.username || "");
+  if (!adminView && foreignQuote) throw new Error("Preventivo non autorizzato.");
+
+  var response = {
+    ok: true,
+    id_preventivo: row.id_preventivo,
+    agent_username: ownerUsername,
+    agent_display_name: String(row.agent_display_name || row.agente || ownerUsername || "Accesso esterno"),
+    save_request_token: row.save_request_token || "",
+    requested_by_admin: adminView,
+    foreign_quote: foreignQuote
+  };
+  /* I preventivi autenticati sono cifrati nel browser con la chiave del loro
+     autore. Un ADMIN non possiede quella chiave: dopo il controllo del ruolo
+     il backend gli consegna la copia JSON completa già salvata insieme al
+     record. Gli agenti continuano invece a ricevere soltanto il payload
+     cifrato del proprio archivio. */
+  if (adminView && foreignQuote) {
+    var authorizedPayload = String(row.payload_json_completo || "").trim();
+    if (!authorizedPayload) throw new Error("Questo preventivo storico non contiene i dati completi necessari al caricamento amministrativo.");
+    response.authorized_payload_json = authorizedPayload;
+  } else {
+    response.payload_criptato = row.payload_criptato;
+    response.salt = row.salt;
+    response.iv = row.iv;
+  }
+  return response;
 }
 
 function loadQuotePublic_(p) {
   var row = findRowObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", p.id_preventivo);
   if (!row || row.deleted_at) throw new Error("Preventivo non trovato.");
-  row.ok = true;
-  return row;
+  if (String(row.saved_by_login || "").toUpperCase() === "SI") throw new Error("Preventivo protetto da account. Accedi al Planner per caricarlo.");
+  /* Il percorso con password deve ricevere soltanto il contenuto cifrato:
+     password, JSON completo e campi gestionali non sono dati pubblici. */
+  return {
+    ok: true,
+    id_preventivo: row.id_preventivo,
+    payload_criptato: row.payload_criptato,
+    salt: row.salt,
+    iv: row.iv,
+    versione_planner: row.versione_planner,
+    versione_config: row.versione_config,
+    save_request_token: row.save_request_token || ""
+  };
 }
 
 function deleteQuoteAgent_(p) {

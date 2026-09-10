@@ -1124,6 +1124,41 @@ async function getAdminContent() {
     });
   }
 
+  async function listQuotations() {
+    if (config.demoMode) return { ok: true, admin_view: isAdmin(), quotes: [] };
+    const requestId = uid("quote-list");
+    try {
+      const response = await callManagementBridge("listquotes", {}, requestId, 45000);
+      delete response.__seemax_transport;
+      online = true;
+      return response;
+    } catch (bridgeError) {
+      if (bridgeError && bridgeError.code === "BRIDGE_SERVER_ERROR") throw bridgeError;
+      return retryRead((attempt) => jsonp("listquotes", authParams(), attempt ? 60000 : 40000), 2);
+    }
+  }
+
+  async function loadQuotation(id) {
+    if (config.demoMode) throw new Error("Archivio preventivi online non disponibile in modalità demo.");
+    const requestId = uid("quote-load");
+    const values = { id_preventivo: String(id || "") };
+    try {
+      const response = await callManagementBridge("loadquote_agent", values, requestId, 45000);
+      delete response.__seemax_transport;
+      online = true;
+      return response;
+    } catch (bridgeError) {
+      if (bridgeError && bridgeError.code === "BRIDGE_SERVER_ERROR") throw bridgeError;
+      return retryRead((attempt) => jsonp("loadquote_agent", { ...authParams(), ...values }, attempt ? 60000 : 40000), 2);
+    }
+  }
+
+  async function deleteQuotation(id) {
+    if (config.demoMode) return { ok: true, demo: true };
+    const requestToken = uid("quote-delete");
+    return postMutation("deletequote_agent", { id_preventivo: String(id || "") }, { requestToken, maxWait: 90000 });
+  }
+
   async function setPracticeStockWarning(practice, visible) {
     if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
     const requestToken = uid("stock-warning");
@@ -1230,5 +1265,5 @@ async function getAdminContent() {
     };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, listQuotations, loadQuotation, deleteQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();
