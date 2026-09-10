@@ -169,11 +169,17 @@
     .agent-login-status.is-connected strong{color:#065f46}
     body.sqp-lite .agent-access-ui{display:none!important}
     .agent-quote-list{display:grid;gap:10px;margin-top:12px}
+    .agent-quote-admin-tools{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.8fr);gap:10px;margin-top:12px;padding:12px;border:1px solid #bfdbfe;background:#f8fbff;border-radius:15px}
+    .agent-quote-admin-tools .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+    .agent-quote-admin-tools label{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#475569}
+    .agent-quote-admin-tools select{width:100%;min-width:0;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);padding:10px 11px;font-weight:750}
     .agent-quote-item{border:1px solid var(--line);background:#fff;border-radius:16px;padding:12px;box-shadow:0 8px 18px rgba(15,23,42,.05)}
     .agent-quote-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
     .agent-quote-title{font-weight:950;color:#0f172a;font-size:14px;line-height:1.25}
     .agent-quote-meta{font-size:12px;color:#64748b;line-height:1.45;margin-top:4px}
+    .agent-quote-owner{display:inline-flex;align-items:center;gap:6px;margin-top:7px;padding:5px 8px;border-radius:999px;background:#eaf2ff;color:#174ea6;font-size:11px;font-weight:850}
     .agent-quote-actions{display:flex;justify-content:flex-end;margin-top:10px}
+    @media (max-width:760px){.agent-quote-admin-tools{grid-template-columns:1fr}}
 
     .view{display:none;animation:fadeIn .2s ease both}
     .view.active{display:block}
@@ -2094,7 +2100,7 @@
     // =============================
     const ONLINE_ARCHIVE = {
       enabled:true,
-      version:'database-archive-unificato-v5.2-background-confirmed',
+      version:'database-archive-unificato-v5.3-admin-cross-account',
       minPasswordLength:4
     };
 
@@ -2996,6 +3002,108 @@
       }
     }
 
+    const agentQuoteArchiveState = {
+      quotes:[],
+      adminView:false,
+      filterAgent:'',
+      sortBy:'date',
+      direction:'desc'
+    };
+
+    function quoteArchiveOwnerKey(quote){
+      const username = String(quote && quote.agent_username || '').trim();
+      return username || '__external__:' + quoteArchiveOwnerLabel(quote).toLocaleLowerCase('it');
+    }
+
+    function quoteArchiveOwnerLabel(quote){
+      return String(quote && (quote.agent_display_name || quote.agent_username) || 'Accesso esterno').trim() || 'Accesso esterno';
+    }
+
+    function quoteArchiveDateValue(quote){
+      const source = quote && (quote.data_salvataggio || quote.saved_at || quote.data_preventivo) || '';
+      const timestamp = Date.parse(source);
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    function quoteArchiveDateLabel(quote){
+      const source = quote && (quote.data_salvataggio || quote.saved_at || quote.data_preventivo) || '';
+      const timestamp = Date.parse(source);
+      if(!Number.isFinite(timestamp)) return String(source || '');
+      try{
+        return new Intl.DateTimeFormat('it-IT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}).format(new Date(timestamp));
+      }catch(error){ return String(source || ''); }
+    }
+
+    function visibleAgentArchiveQuotes(){
+      const selectedAgent = agentQuoteArchiveState.filterAgent;
+      const direction = agentQuoteArchiveState.direction === 'asc' ? 1 : -1;
+      const quotes = agentQuoteArchiveState.quotes.filter(quote => !selectedAgent || quoteArchiveOwnerKey(quote) === selectedAgent);
+      quotes.sort((left, right) => {
+        if(agentQuoteArchiveState.sortBy === 'agent'){
+          const ownerOrder = quoteArchiveOwnerLabel(left).localeCompare(quoteArchiveOwnerLabel(right), 'it', {sensitivity:'base'});
+          if(ownerOrder) return ownerOrder * direction;
+          return quoteArchiveDateValue(right) - quoteArchiveDateValue(left);
+        }
+        const dateOrder = quoteArchiveDateValue(left) - quoteArchiveDateValue(right);
+        if(dateOrder) return dateOrder * direction;
+        return quoteArchiveOwnerLabel(left).localeCompare(quoteArchiveOwnerLabel(right), 'it', {sensitivity:'base'});
+      });
+      return quotes;
+    }
+
+    function renderAgentQuoteArchive(panel){
+      if(!panel) return;
+      const adminView = agentQuoteArchiveState.adminView;
+      const quotes = visibleAgentArchiveQuotes();
+      const agents = [];
+      const knownAgents = new Set();
+      agentQuoteArchiveState.quotes.forEach(quote => {
+        const key = quoteArchiveOwnerKey(quote);
+        if(knownAgents.has(key)) return;
+        knownAgents.add(key);
+        agents.push({key, label:quoteArchiveOwnerLabel(quote)});
+      });
+      agents.sort((left, right) => left.label.localeCompare(right.label, 'it', {sensitivity:'base'}));
+      const agentOptions = agents.map(agent => `<option value="${safe(agent.key)}"${agentQuoteArchiveState.filterAgent === agent.key ? ' selected' : ''}>${safe(agent.label)}</option>`).join('');
+      const adminTools = adminView ? `<div class="agent-quote-admin-tools" aria-label="Organizzazione preventivi ADMIN">
+        <div class="field"><label for="adminQuoteAgentFilter">Agente</label><select id="adminQuoteAgentFilter"><option value="">Tutti gli agenti</option>${agentOptions}</select></div>
+        <div class="field"><label for="adminQuoteSortBy">Ordina per</label><select id="adminQuoteSortBy"><option value="date"${agentQuoteArchiveState.sortBy === 'date' ? ' selected' : ''}>Data creazione</option><option value="agent"${agentQuoteArchiveState.sortBy === 'agent' ? ' selected' : ''}>Agente</option></select></div>
+        <div class="field"><label for="adminQuoteSortDirection">Ordine</label><select id="adminQuoteSortDirection"><option value="desc"${agentQuoteArchiveState.direction === 'desc' ? ' selected' : ''}>Decrescente</option><option value="asc"${agentQuoteArchiveState.direction === 'asc' ? ' selected' : ''}>Crescente</option></select></div>
+      </div>` : '';
+      const listHtml = quotes.length ? quotes.map(quote => {
+        const id = safe(quote.id_preventivo || quote.id || '');
+        const cliente = safe(quote.cliente_visibile || quote.cliente_azienda || 'Cliente non indicato');
+        const data = safe(quoteArchiveDateLabel(quote));
+        const totale = safe(quote.totale_preventivo_riferimento || quote.totale || '');
+        const fin = safe(quote.finanziaria_selezionata || '');
+        const owner = adminView ? `<div class="agent-quote-owner">👤 Creato da: ${safe(quoteArchiveOwnerLabel(quote))}</div>` : '';
+        return `<div class="agent-quote-item"><div class="agent-quote-top"><div><div class="agent-quote-title">${id} · ${cliente}</div><div class="agent-quote-meta">${data ? 'Creato: ' + data + '<br>' : ''}${totale ? 'Totale: ' + totale + ' · ' : ''}${fin ? 'Finanza: ' + fin : ''}</div>${owner}</div></div><div class="agent-quote-actions"><button class="btn primary" type="button" data-agent-load-quote="${id}">Carica</button><button class="btn ghost" type="button" data-agent-delete-quote="${id}">Elimina</button></div></div>`;
+      }).join('') : `<div class="notice warn">${agentQuoteArchiveState.filterAgent ? 'Nessun preventivo trovato per l’agente selezionato.' : 'Nessun preventivo trovato in questo archivio.'}</div>`;
+      const subtitle = adminView
+        ? `Archivio completo · ${agentQuoteArchiveState.quotes.length} preventiv${agentQuoteArchiveState.quotes.length === 1 ? 'o' : 'i'} registrat${agentQuoteArchiveState.quotes.length === 1 ? 'o' : 'i'}.`
+        : `Archivio di ${safe(agentSession.displayName || agentSession.username)}.`;
+      const note = adminView
+        ? '<strong>Vista ADMIN:</strong> puoi consultare i preventivi di tutti gli agenti, filtrarli e ordinarli per autore o data di creazione.'
+        : '<strong>Accesso S.Q.P. attivo:</strong> scegli un preventivo da caricare oppure elimina definitivamente quelli non necessari.';
+      panel.innerHTML = `<div class="draft-modal-head"><div><h3>PREVENTIVI REGISTRATI</h3><p>${subtitle}</p></div><button class="draft-close" type="button" data-close-online-archive aria-label="Chiudi">×</button></div>
+        <div class="online-archive-note">${note}</div>
+        ${adminTools}
+        <div class="agent-quote-list">${listHtml}</div>`;
+      document.querySelectorAll('[data-close-online-archive]').forEach(el => el.addEventListener('click', closeAgentModal));
+      document.querySelectorAll('[data-agent-load-quote]').forEach(btn => btn.addEventListener('click', () => loadAgentQuote(btn.dataset.agentLoadQuote)));
+      document.querySelectorAll('[data-agent-delete-quote]').forEach(btn => btn.addEventListener('click', () => deleteAgentQuote(btn.dataset.agentDeleteQuote)));
+      const agentFilter = $('adminQuoteAgentFilter');
+      if(agentFilter) agentFilter.addEventListener('change', () => { agentQuoteArchiveState.filterAgent = agentFilter.value; renderAgentQuoteArchive(panel); });
+      const sortBy = $('adminQuoteSortBy');
+      if(sortBy) sortBy.addEventListener('change', () => {
+        agentQuoteArchiveState.sortBy = sortBy.value === 'agent' ? 'agent' : 'date';
+        agentQuoteArchiveState.direction = agentQuoteArchiveState.sortBy === 'agent' ? 'asc' : 'desc';
+        renderAgentQuoteArchive(panel);
+      });
+      const direction = $('adminQuoteSortDirection');
+      if(direction) direction.addEventListener('change', () => { agentQuoteArchiveState.direction = direction.value === 'asc' ? 'asc' : 'desc'; renderAgentQuoteArchive(panel); });
+    }
+
     async function openAgentQuoteListModal(){
       if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il caricamento dei preventivi online è disabilitato in Modalità Rapida.', {title:'Caricamento non disponibile', theme:'lite'}); return; }
       if(!agentLoggedIn()){ openAgentLoginModal(); return; }
@@ -3006,23 +3114,17 @@
       layer.classList.remove('hidden');
       document.querySelectorAll('[data-close-online-archive]').forEach(el => el.addEventListener('click', closeAgentModal));
       try{
-        const res = await jsonpRequest('listquotes', 15000, {agent_username:agentSession.username, agent_key:agentSession.key});
+        const nativeApi = nativeQuotationApi();
+        const res = nativeApi && typeof nativeApi.listQuotations === 'function'
+          ? await nativeApi.listQuotations()
+          : await jsonpRequest('listquotes', 15000, {agent_username:agentSession.username, agent_key:agentSession.key});
         if(!res || !res.ok) throw new Error((res && res.error) || 'Lista preventivi non disponibile.');
-        const quotes = Array.isArray(res.quotes) ? res.quotes : [];
-        const listHtml = quotes.length ? quotes.map(q => {
-          const id = safe(q.id_preventivo || q.id || '');
-          const cliente = safe(q.cliente_visibile || q.cliente_azienda || 'Cliente non indicato');
-          const data = safe(q.data_salvataggio || q.saved_at || q.data_preventivo || '');
-          const totale = safe(q.totale_preventivo_riferimento || q.totale || '');
-          const fin = safe(q.finanziaria_selezionata || '');
-          return `<div class="agent-quote-item"><div class="agent-quote-top"><div><div class="agent-quote-title">${id} · ${cliente}</div><div class="agent-quote-meta">${data ? 'Salvato: ' + data + '<br>' : ''}${totale ? 'Totale: ' + totale + ' · ' : ''}${fin ? 'Finanza: ' + fin : ''}</div></div></div><div class="agent-quote-actions"><button class="btn primary" type="button" data-agent-load-quote="${id}">Carica</button><button class="btn ghost" type="button" data-agent-delete-quote="${id}">Elimina</button></div></div>`;
-        }).join('') : '<div class="notice warn">Nessun preventivo trovato per questo agente.</div>';
-        panel.innerHTML = `<div class="draft-modal-head"><div><h3>PREVENTIVI REGISTRATI</h3><p>Archivio di ${safe(agentSession.displayName || agentSession.username)}.</p></div><button class="draft-close" type="button" data-close-online-archive aria-label="Chiudi">×</button></div>
-          <div class="online-archive-note"><strong>Accesso S.Q.P. attivo:</strong> scegli un preventivo da caricare oppure elimina definitivamente quelli non necessari.</div>
-          <div class="agent-quote-list">${listHtml}</div>`;
-        document.querySelectorAll('[data-close-online-archive]').forEach(el => el.addEventListener('click', closeAgentModal));
-        document.querySelectorAll('[data-agent-load-quote]').forEach(btn => btn.addEventListener('click', () => loadAgentQuote(btn.dataset.agentLoadQuote)));
-        document.querySelectorAll('[data-agent-delete-quote]').forEach(btn => btn.addEventListener('click', () => deleteAgentQuote(btn.dataset.agentDeleteQuote)));
+        agentQuoteArchiveState.quotes = Array.isArray(res.quotes) ? res.quotes.slice() : [];
+        agentQuoteArchiveState.adminView = !!res.admin_view && admin;
+        agentQuoteArchiveState.filterAgent = '';
+        agentQuoteArchiveState.sortBy = 'date';
+        agentQuoteArchiveState.direction = 'desc';
+        renderAgentQuoteArchive(panel);
       }catch(err){
         panel.innerHTML = `<div class="draft-modal-head"><div><h3>PREVENTIVI REGISTRATI</h3><p>Archivio non disponibile.</p></div><button class="draft-close" type="button" data-close-online-archive aria-label="Chiudi">×</button></div><div class="notice danger">${safe(err && err.message ? err.message : err)}</div>`;
         document.querySelectorAll('[data-close-online-archive]').forEach(el => el.addEventListener('click', closeAgentModal));
@@ -3031,14 +3133,21 @@
 
     async function deleteAgentQuote(id){
       if(!id || !agentLoggedIn()) return;
-      const ok = await sqpConfirm('Vuoi eliminare definitivamente il preventivo ' + id + ' dal tuo archivio? Questa operazione non potrà essere annullata.', {title:'Elimina preventivo', confirmText:'Elimina definitivamente', cancelText:'Annulla', theme:'lite'});
+      const selectedQuote = agentQuoteArchiveState.quotes.find(quote => String(quote.id_preventivo || quote.id || '') === String(id));
+      const archiveLabel = agentQuoteArchiveState.adminView && selectedQuote && quoteArchiveOwnerKey(selectedQuote) !== String(agentSession.username)
+        ? 'dall’archivio di ' + quoteArchiveOwnerLabel(selectedQuote)
+        : 'dal tuo archivio';
+      const ok = await sqpConfirm('Vuoi eliminare definitivamente il preventivo ' + id + ' ' + archiveLabel + '? Questa operazione non potrà essere annullata.', {title:'Elimina preventivo', confirmText:'Elimina definitivamente', cancelText:'Annulla', theme:'lite'});
       if(!ok) return;
       try{
         showPersistentCalcLoading('Eliminazione preventivo', 'Aggiornamento DATABASE SEEMAX...');
-        const res = await jsonpRequest('deletequote_agent', 15000, {id_preventivo:id, agent_username:agentSession.username, agent_key:agentSession.key});
+        const nativeApi = nativeQuotationApi();
+        const res = nativeApi && typeof nativeApi.deleteQuotation === 'function'
+          ? await nativeApi.deleteQuotation(id)
+          : await jsonpRequest('deletequote_agent', 15000, {id_preventivo:id, agent_username:agentSession.username, agent_key:agentSession.key});
         if(!res || !res.ok) throw new Error((res && res.error) || 'Eliminazione non riuscita.');
         hideCalcLoading();
-        showDraftToast('Preventivo eliminato dal tuo archivio.');
+        showDraftToast('Preventivo eliminato ' + archiveLabel + '.');
         openAgentQuoteListModal();
       }catch(err){
         hideCalcLoading();
@@ -3048,21 +3157,35 @@
 
     async function loadAgentQuote(id){
       if(!id || !agentLoggedIn()) return;
-      const ok = await sqpConfirm('Caricare questo preventivo dal tuo archivio? I dati attualmente compilati verranno sostituiti.', {title:'Carica preventivo', confirmText:'Carica', cancelText:'Annulla'});
+      const selectedQuote = agentQuoteArchiveState.quotes.find(quote => String(quote.id_preventivo || quote.id || '') === String(id));
+      const foreignArchive = agentQuoteArchiveState.adminView && selectedQuote && quoteArchiveOwnerKey(selectedQuote) !== String(agentSession.username);
+      const archiveLabel = foreignArchive ? 'dall’archivio di ' + quoteArchiveOwnerLabel(selectedQuote) : 'dal tuo archivio';
+      const ok = await sqpConfirm('Caricare questo preventivo ' + archiveLabel + '? I dati attualmente compilati verranno sostituiti.', {title:'Carica preventivo', confirmText:'Carica', cancelText:'Annulla'});
       if(!ok) return;
       try{
-        showPersistentCalcLoading('Caricamento preventivo', 'Recupero del preventivo dal tuo archivio...');
-        const record = await jsonpRequest('loadquote_agent', 15000, {id_preventivo:id, agent_username:agentSession.username, agent_key:agentSession.key});
+        showPersistentCalcLoading('Caricamento preventivo', 'Recupero del preventivo ' + archiveLabel + '...');
+        const nativeApi = nativeQuotationApi();
+        const record = nativeApi && typeof nativeApi.loadQuotation === 'function'
+          ? await nativeApi.loadQuotation(id)
+          : await jsonpRequest('loadquote_agent', 15000, {id_preventivo:id, agent_username:agentSession.username, agent_key:agentSession.key});
         if(!record || !record.ok) throw new Error((record && record.error) || 'Preventivo non trovato.');
-        const plain = await decryptArchivePayload(record.payload_criptato, record.salt, record.iv, agentSession.key);
-        const draft = JSON.parse(plain);
+        let draft;
+        if(record.authorized_payload_json){
+          /* Il backend valorizza questo campo soltanto dopo aver autenticato
+             un ADMIN che sta aprendo il preventivo di un altro utente. */
+          draft = JSON.parse(record.authorized_payload_json);
+        }else{
+          const plain = await decryptArchivePayload(record.payload_criptato, record.salt, record.iv, agentSession.key);
+          draft = JSON.parse(plain);
+        }
         hideCalcLoading();
         applyDraftPayload(draft);
         closeAgentModal();
-        showDraftToast('✅ FILE CARICATO DAL TUO ARCHIVIO · Codice ' + id + '.');
+        const sourceLabel = record.foreign_quote && selectedQuote ? 'DALL’ARCHIVIO DI ' + quoteArchiveOwnerLabel(selectedQuote).toUpperCase() : 'DAL TUO ARCHIVIO';
+        showDraftToast('✅ FILE CARICATO ' + sourceLabel + ' · Codice ' + id + '.');
       }catch(err){
         hideCalcLoading();
-        await sqpAlert('Non riesco a caricare il preventivo dal tuo archivio. Dettaglio: ' + (err && err.message ? err.message : err), {title:'Caricamento non riuscito', theme:'lite'});
+        await sqpAlert('Non riesco a caricare il preventivo ' + archiveLabel + '. Dettaglio: ' + (err && err.message ? err.message : err), {title:'Caricamento non riuscito', theme:'lite'});
       }
     }
 
