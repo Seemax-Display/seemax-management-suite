@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2161().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2170().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.16.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.17.0";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -57,7 +57,7 @@ var ENTITY_SHEETS = {
 };
 
 var SHEET_SCHEMAS = {
-  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "trofei_reset_il", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "prefisso_pratica", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "trofei_reset_il", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -112,10 +112,12 @@ function setupSeemaxDatabase() {
   managementDocumentsFolder_();
   seedPlaceholderAdmin_();
   backfillExistingIds_();
+  assignUniquePracticePrefixesV2162_();
+  rebuildPracticeCountersV2140_();
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.16.1 configurato: archivio preventivi ADMIN corretto e controlli di rilascio attivi.";
+  return "DATABASE SEEMAX 2.17.0 configurato: documenti pratica consultabili e commesse d'ordine locali attive.";
 }
 
 
@@ -333,6 +335,42 @@ function upgradeSeemaxV2161() {
     styleSheets_();
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.16.1 configurato: l’ADMIN può caricare, filtrare e ordinare i preventivi di tutti gli agenti. Chiavi archivio rimosse: " + removedArchiveKeys + ".";
+  });
+}
+
+function upgradeSeemaxV2162() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    var prefixResult = assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    var removedArchiveKeys = clearArchivedQuoteKeysV2161_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento correttivo v2.16.2 · prefissi pratica univoci per agente e numerazione definitiva esclusivamente server-side.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.16.2 configurato: " + prefixResult.updated + " prefissi agente riallineati; numerazione pratiche protetta da collisioni. Chiavi archivio rimosse: " + removedArchiveKeys + ".";
+  });
+}
+
+function upgradeSeemaxV2170() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento v2.17.0 · documenti visualizzabili e scaricabili nelle pratiche operative, commessa d'ordine locale riservata agli ADMIN.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.17.0 configurato: documenti delle pratiche consultabili e generazione locale delle commesse d'ordine attiva per gli ADMIN.";
   });
 }
 
@@ -857,6 +895,15 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
       };
     }
   }
+  var isNewPractice = entity === "practices" && String(payload.nuova_pratica || "NO").toUpperCase() === "SI";
+  if (isNewPractice) {
+    /* Numero e ID mostrati nel modulo sono soltanto un'anteprima. Una nuova
+       pratica non deve mai essere scambiata per una riga storica con lo
+       stesso prefisso: il numero definitivo viene assegnato più avanti,
+       sotto lo stesso ScriptLock che protegge tutte le scritture. */
+    payload.id = "";
+    payload.expected_record_version = 0;
+  }
   if (["clients", "practices"].indexOf(entity) >= 0) assertAdminUnknownUsage_(payload, user);
   if (["clients", "practices", "documents"].indexOf(entity) >= 0) {
     var ownedRecord = entity === "practices" && payload.id ? findRowObject_("PRATICHE", "id", payload.id) : null;
@@ -951,6 +998,7 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
       payload.bacheca_trofei_json = "[]";
       payload.trofei_reset_il = new Date().toISOString();
     }
+    payload.prefisso_pratica = validatePracticePrefixForAccountV2162_(payload, existingAccount);
   }
   var row = upsertEntity_(entity, payload, user);
   if (entity === "clients") logRoutineUpsert_(user, entity, row.id || "", "Salvataggio da Management Suite");
@@ -1733,11 +1781,174 @@ function nextPracticeNumber_() {
   return String(next).padStart(3, "0") + "-" + year;
 }
 
+function normalizePracticePrefixV2162_(value) {
+  var text = String(value || "").trim().toUpperCase();
+  try { text = text.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (error) { /* runtime legacy */ }
+  return text.replace(/[^A-Z0-9]/g, "").substring(0, 6);
+}
+
+function practicePrefixCandidatesV2162_(user) {
+  var source = String(user && (user.nome_visualizzato || user.displayName || user.username) || "SM").trim().toUpperCase();
+  try { source = source.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (error) { /* runtime legacy */ }
+  var parts = source.replace(/[^A-Z0-9]+/g, " ").trim().split(/\s+/).filter(String);
+  var first = parts[0] || "S";
+  var last = parts.length > 1 ? parts[parts.length - 1] : first;
+  var raw = [];
+  var explicit = normalizePracticePrefixV2162_(user && user.prefisso_pratica);
+  if (explicit) raw.push(explicit);
+  if (parts.length > 1) {
+    raw.push(first.charAt(0) + last.charAt(0));
+    raw.push(first.charAt(0) + last.substring(0, 2));
+    raw.push(first.substring(0, 2) + last.charAt(0));
+    raw.push(first.charAt(0) + last.substring(0, 3));
+    raw.push(first.substring(0, 2) + last.substring(0, 2));
+  } else {
+    raw.push(first.substring(0, 2));
+    raw.push(first.substring(0, 3));
+    raw.push(first.substring(0, 4));
+  }
+  var username = normalizePracticePrefixV2162_(user && user.username);
+  if (username) raw.push(username.substring(0, Math.max(2, Math.min(6, username.length))));
+  var seen = {};
+  return raw.map(normalizePracticePrefixV2162_).filter(function (prefix) {
+    if (prefix.length < 2 || seen[prefix]) return false;
+    seen[prefix] = true;
+    return true;
+  });
+}
+
+function practicePrefixFromNumberV2162_(number) {
+  var match = String(number || "").trim().toUpperCase().match(/^([A-Z][A-Z0-9]{0,5})(\d{4})$/);
+  return match ? match[1] : "";
+}
+
+function allocatePracticePrefixesV2162_(users, practices) {
+  var rows = (users || []).filter(function (user) { return String(user && user.username || "").trim(); });
+  var nameOwners = {};
+  var knownUsernames = {};
+  rows.forEach(function (user) {
+    knownUsernames[String(user.username)] = true;
+    var nameKey = normalizeKey_(user.nome_visualizzato || user.displayName || user.username);
+    if (!nameOwners[nameKey]) nameOwners[nameKey] = [];
+    nameOwners[nameKey].push(String(user.username));
+  });
+  var history = {};
+  var historicalOwner = {};
+  (practices || []).forEach(function (practice, practiceIndex) {
+    var username = String(practice.agent_username || "").trim();
+    if (!username || !knownUsernames[username]) {
+      var owners = nameOwners[normalizeKey_(practice.agente || "")] || [];
+      if (owners.length === 1) username = owners[0];
+    }
+    var prefix = practicePrefixFromNumberV2162_(practice.numero);
+    if (!username || !knownUsernames[username] || !prefix) return;
+    if (!history[username]) history[username] = {};
+    history[username][prefix] = Number(history[username][prefix] || 0) + 1;
+    var suffixMatch = String(practice.numero || "").trim().toUpperCase().match(/(\d{4})$/);
+    var sequence = suffixMatch ? Number(suffixMatch[1]) : 999999;
+    var owner = historicalOwner[prefix];
+    if (!owner || sequence < owner.sequence || (sequence === owner.sequence && practiceIndex < owner.index)) {
+      historicalOwner[prefix] = { username: username, sequence: sequence, index: practiceIndex };
+    }
+  });
+  var ranked = rows.map(function (user, index) {
+    var counts = history[String(user.username)] || {};
+    var historicalTotal = Object.keys(counts).reduce(function (total, prefix) { return total + Number(counts[prefix] || 0); }, 0);
+    return { user: user, index: index, historicalTotal: historicalTotal, explicit: normalizePracticePrefixV2162_(user.prefisso_pratica) ? 1 : 0 };
+  }).sort(function (left, right) {
+    return right.historicalTotal - left.historicalTotal || right.explicit - left.explicit || left.index - right.index;
+  });
+  var used = {};
+  var assignments = {};
+  ranked.forEach(function (entry) {
+    var user = entry.user;
+    var username = String(user.username);
+    var counts = history[username] || {};
+    var historical = Object.keys(counts).filter(function (prefix) {
+      return historicalOwner[prefix] && historicalOwner[prefix].username === username;
+    }).sort(function (left, right) { return Number(counts[right] || 0) - Number(counts[left] || 0) || left.localeCompare(right); });
+    var candidates = historical.concat(practicePrefixCandidatesV2162_(user));
+    var available = function (prefix) {
+      var owner = historicalOwner[prefix];
+      return prefix && !used[prefix] && (!owner || owner.username === username);
+    };
+    var chosen = candidates.filter(available)[0] || "";
+    if (!chosen) {
+      var base = practicePrefixCandidatesV2162_(user)[0] || "SM";
+      var suffix = 2;
+      chosen = normalizePracticePrefixV2162_(base + suffix);
+      while (!available(chosen)) {
+        suffix += 1;
+        chosen = normalizePracticePrefixV2162_(base.substring(0, Math.max(2, 6 - String(suffix).length)) + suffix);
+      }
+    }
+    assignments[username] = chosen;
+    used[chosen] = username;
+  });
+  return assignments;
+}
+
+function assignUniquePracticePrefixesV2162_() {
+  var agentSheet = sheet_("AGENTI");
+  var headers = sheetHeaders_(agentSheet);
+  var prefixIndex = headers.indexOf("prefisso_pratica");
+  var lastRow = agentSheet.getLastRow();
+  if (prefixIndex < 0 || lastRow < 2) return { updated: 0, assignments: {} };
+  var values = agentSheet.getRange(2, 1, lastRow - 1, headers.length).getDisplayValues();
+  var users = values.map(function (row) { return objectFromValues_(headers, row); });
+  var assignments = allocatePracticePrefixesV2162_(users, rowsToObjects_(sheet_("PRATICHE")));
+  var prefixValues = values.map(function (row) {
+    var user = objectFromValues_(headers, row);
+    return [assignments[String(user.username || "")] || String(row[prefixIndex] || "")];
+  });
+  var updated = prefixValues.reduce(function (count, row, index) {
+    return count + (String(row[0] || "") !== String(values[index][prefixIndex] || "") ? 1 : 0);
+  }, 0);
+  if (updated) agentSheet.getRange(2, prefixIndex + 1, prefixValues.length, 1).setValues(prefixValues);
+  invalidateTable_("AGENTI");
+  return { updated: updated, assignments: assignments };
+}
+
+function validatePracticePrefixForAccountV2162_(payload, existingAccount) {
+  var username = String(payload.username || existingAccount && existingAccount.username || "").trim();
+  var existingPrefix = normalizePracticePrefixV2162_(existingAccount && existingAccount.prefisso_pratica);
+  var requested = normalizePracticePrefixV2162_(payload.prefisso_pratica || existingPrefix);
+  var users = rowsToObjects_(sheet_("AGENTI"));
+  if (!requested) {
+    var candidate = {};
+    Object.keys(existingAccount || {}).forEach(function (key) { candidate[key] = existingAccount[key]; });
+    Object.keys(payload || {}).forEach(function (key) { candidate[key] = payload[key]; });
+    var found = false;
+    users = users.map(function (user) {
+      if (String(user.username || "") !== username) return user;
+      found = true;
+      return candidate;
+    });
+    if (!found) users.push(candidate);
+    requested = allocatePracticePrefixesV2162_(users, rowsToObjects_(sheet_("PRATICHE")))[username] || "";
+  }
+  if (requested.length < 2 || requested.length > 6) throw new Error("Il prefisso pratiche deve contenere da 2 a 6 lettere o numeri.");
+  var duplicate = users.filter(function (user) {
+    return String(user.username || "") !== username && normalizePracticePrefixV2162_(user.prefisso_pratica) === requested;
+  })[0];
+  if (duplicate) throw new Error("Il prefisso pratiche " + requested + " è già assegnato a " + String(duplicate.nome_visualizzato || duplicate.username) + ".");
+  if (existingPrefix && requested !== existingPrefix && findRowObject_("PRATICHE", "agent_username", username)) {
+    throw new Error("Il prefisso pratiche non può essere modificato perché l’agente possiede già pratiche registrate.");
+  }
+  return requested;
+}
+
 function practiceInitials_(user) {
-  var source = String(user.nome_visualizzato || user.username || "SM").trim();
-  var parts = source.split(/\s+/).filter(String);
-  var initials = parts.length > 1 ? parts[0].charAt(0) + parts[parts.length - 1].charAt(0) : source.replace(/[^A-Za-z0-9]/g, "").substring(0, 2);
-  return String(initials || "SM").toUpperCase();
+  var explicit = normalizePracticePrefixV2162_(user && user.prefisso_pratica);
+  if (explicit.length >= 2) return explicit;
+  var username = String(user && user.username || "").trim();
+  if (username) {
+    try {
+      var fallbackAssignments = allocatePracticePrefixesV2162_(rowsToObjects_(sheet_("AGENTI")), rowsToObjects_(sheet_("PRATICHE")));
+      if (fallbackAssignments[username]) return fallbackAssignments[username];
+    } catch (error) { /* l'upgrade resta il percorso principale */ }
+  }
+  return practicePrefixCandidatesV2162_(user)[0] || "SM";
 }
 
 function practiceCounterPropertyKey_(prefix) {
@@ -1777,7 +1988,7 @@ function nextPracticeIdentifier_(user) {
 function rebuildPracticeCountersV2140_() {
   var counters = {};
   practiceNumberValues_().forEach(function (value) {
-    var match = String(value || "").toUpperCase().match(/^([A-Z0-9]{1,2})(\d{4})$/);
+    var match = String(value || "").toUpperCase().match(/^([A-Z][A-Z0-9]{0,5})(\d{4})$/);
     if (!match) return;
     counters[match[1]] = Math.max(Number(counters[match[1]] || 0), Number(match[2]) || 0);
   });
@@ -3727,7 +3938,7 @@ function authenticate_(username, key) {
 }
 
 function publicUser_(user) {
-  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", trofei_reset_il: user.trofei_reset_il || "", welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
+  return { id: user.id || user.username, username: user.username, displayName: user.nome_visualizzato || user.username, nome_visualizzato: user.nome_visualizzato || user.username, prefisso_pratica: practiceInitials_(user), email: user.email || "", telefono: user.telefono || "", stato: user.stato || "ATTIVO", role: String(user.ruolo || "AGENTE").toUpperCase(), ruolo: String(user.ruolo || "AGENTE").toUpperCase(), ultimo_accesso: user.ultimo_accesso || "", primo_accesso: false, note: user.note || "", nome_profilo: user.nome_profilo || "", descrizione_profilo: user.descrizione_profilo || "", tema_profilo: user.tema_profilo || "gradient", colore_profilo: user.colore_profilo || "#0B5EC4", icona_profilo: user.icona_profilo || "", bacheca_trofei_json: user.bacheca_trofei_json || "[]", trofei_reset_il: user.trofei_reset_il || "", welcome_seen_revision: Number(user.welcome_seen_revision || 0), patch_seen_revision: Number(user.patch_seen_revision || 0), record_version: Number(user.record_version || 0), aggiornatoIl: user.aggiornatoIl || "", aggiornato_da: user.aggiornato_da || "" };
 }
 
 function isAdmin_(user) { return String(user && user.ruolo || "AGENTE").toUpperCase() === "ADMIN"; }

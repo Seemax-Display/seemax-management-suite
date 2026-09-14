@@ -1,0 +1,21 @@
+SEEMAX MANAGEMENT SUITE 2.17.0 - DOCUMENTI E COMMESSA D'ORDINE
+
+1. Apri il progetto Apps Script collegato al database operativo.
+2. Sostituisci Code.gs con il file della versione 2.17.0.
+3. Salva il progetto.
+4. Esegui una volta upgradeSeemaxV2170().
+5. Autorizza lo script, se richiesto.
+6. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+7. Pubblica su GitHub Pages l'intero frontend 2.17.0, incluso assets/js/work-order.js.
+8. Esegui Ctrl+F5 oppure riavvia la PWA.
+
+L'UPGRADE NON CANCELLA E NON RESETTA DATI.
+
+La commessa d'ordine viene generata localmente nel browser. Non crea fogli,
+non scrive record, non modifica il magazzino e non utilizza il lock multiutente.
+
+CONTROLLO RAPIDO
+- apri con ADMIN una pratica Accettata;
+- verifica il pulsante Genera commessa;
+- apri Sezione Documenti e prova Visualizza e Scarica;
+- genera l'anteprima e usa Stampa / Salva PDF.

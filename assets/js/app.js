@@ -1888,7 +1888,7 @@
     const rootDrop = currentFolder ? `<div class="current-folder-head"><button class="btn ghost" data-action="document-root">← Archivio principale</button><div><span>📁</span><strong>${esc(currentFolder.name)}</strong><small>Trascina qui file esterni oppure documenti già caricati.</small></div></div>` : "";
     const list = rows.length ? rows.map((d) => {
       const syncing = !!d.__sync_state;
-      return `<article class="document-row document-draggable ${heldDocumentId === d.id ? "picked-up" : ""} ${syncing ? "record-sync-pending" : ""}" draggable="${syncing ? "false" : "true"}" data-document-drag="${esc(d.id)}"><span class="file-icon document-emoji">${documentEmoji(d)}</span><div><strong>${esc(d.nome)} ${recordSyncBadge(d)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${d.url && !syncing ? `<a class="btn soft" href="${esc(d.url)}" target="_blank" rel="noopener">Apri file ↗</a>` : `<span class="placeholder-pill">${syncing ? "Caricamento in corso" : "File non disponibile"}</span>`}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi" : "Modifica"}</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>×</button></div></article>`;
+      return `<article class="document-row document-draggable ${heldDocumentId === d.id ? "picked-up" : ""} ${syncing ? "record-sync-pending" : ""}" draggable="${syncing ? "false" : "true"}" data-document-drag="${esc(d.id)}"><span class="file-icon document-emoji">${documentEmoji(d)}</span><div><strong>${esc(d.nome)} ${recordSyncBadge(d)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${syncing ? `<span class="placeholder-pill">Caricamento in corso</span>` : documentActionMarkup(d)}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi" : "Modifica"}</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>×</button></div></article>`;
     }).join("") : emptyState("Cartella vuota", api.isFastMode() ? "Nessun documento presente." : "Carica o trascina qui il primo file.", api.isFastMode() ? "" : "Carica documento", "new-document");
     return `${toolbar}${breadcrumb}${folders}<section class="panel document-drop-zone" data-document-folder="${esc(state.documentFolderId)}">${rootDrop}<div class="document-list">${list}</div></section>`;
   }
@@ -2051,9 +2051,133 @@
 
   function nextPracticeIdentifierPreview(user) {
     const source = user && (user.nome_visualizzato || user.displayName || user.username) || "SM";
-    const prefix = initials(source).replace(/[^A-Z0-9]/g, "").slice(0, 2) || "SM";
+    const configuredPrefix = String(user && user.prefisso_pratica || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    const prefix = configuredPrefix || initials(source).replace(/[^A-Z0-9]/g, "").slice(0, 2) || "SM";
     const existingNumbers = (state.data.practices || []).filter((practice) => !practice.agent_username || String(practice.agent_username) === String(user && user.username || "")).map((practice) => String(practice.numero || "")).filter((number) => number.startsWith(prefix)).map((number) => Number(number.slice(prefix.length))).filter(Number.isFinite);
     return prefix + String((existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1).padStart(4, "0");
+  }
+
+  function safeDocumentUrl(documentRecord) {
+    const raw = String(documentRecord && documentRecord.url || "").trim();
+    if (!raw) return "";
+    try {
+      const parsed = new URL(raw, window.location.href);
+      return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : "";
+    } catch (error) { return ""; }
+  }
+
+  function documentDriveFileId(documentRecord) {
+    const direct = String(documentRecord && documentRecord.file_id || "").trim();
+    if (/^[A-Za-z0-9_-]{10,}$/.test(direct)) return direct;
+    const url = safeDocumentUrl(documentRecord);
+    if (!url) return "";
+    try {
+      const parsed = new URL(url);
+      const queryId = String(parsed.searchParams.get("id") || "").trim();
+      if (/^[A-Za-z0-9_-]{10,}$/.test(queryId)) return queryId;
+      const pathMatch = parsed.pathname.match(/\/d\/([A-Za-z0-9_-]{10,})/);
+      return pathMatch ? pathMatch[1] : "";
+    } catch (error) { return ""; }
+  }
+
+  function documentActionMarkup(documentRecord, unavailableLabel = "File non disponibile") {
+    const viewUrl = safeDocumentUrl(documentRecord);
+    if (!viewUrl) return `<span class="placeholder-pill">${esc(unavailableLabel)}</span>`;
+    const fileId = documentDriveFileId(documentRecord);
+    const downloadUrl = fileId ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}` : viewUrl;
+    return `<span class="practice-document-actions"><a class="btn soft" href="${esc(viewUrl)}" target="_blank" rel="noopener noreferrer">Visualizza ↗</a><a class="btn ghost" href="${esc(downloadUrl)}" target="_blank" rel="noopener noreferrer" download>Scarica ↓</a></span>`;
+  }
+
+  function practiceDocumentListMarkup(documents) {
+    const rows = Array.isArray(documents) ? documents : [];
+    if (!rows.length) return `<div class="practice-document-empty"><span>🗂️</span><div><strong>Nessun documento ancora caricato</strong><small>Gli allegati associati alla pratica appariranno qui appena confermati.</small></div></div>`;
+    return `<div class="practice-existing-documents"><div class="practice-existing-documents-heading"><div><span>📎</span><strong>Documenti già caricati</strong></div><small>${rows.length} ${rows.length === 1 ? "allegato disponibile" : "allegati disponibili"}</small></div><ul class="practice-document-list">${rows.map((documentRecord) => {
+      const syncing = String(documentRecord.__sync_state || "").toUpperCase() === "PENDING";
+      return `<li class="${syncing ? "record-sync-pending" : ""}"><span class="practice-document-icon">${documentEmoji(documentRecord)}</span><div><strong>${esc(documentRecord.nome || documentRecord.file_name || "Documento")}${recordSyncBadge(documentRecord)}</strong><small>${esc(documentRecord.tipo || "Documento")} · ${dateIt(documentRecord.data || documentRecord.aggiornatoIl)}</small></div>${syncing ? `<span class="placeholder-pill">Caricamento in corso</span>` : documentActionMarkup(documentRecord)}</li>`;
+    }).join("")}</ul></div>`;
+  }
+
+  function recordArray(value) {
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value || "[]") : value;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) { return []; }
+  }
+
+  function workOrderMeasure(width, height, fallback) {
+    const format = (value) => Number(value).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (Number(width) > 0 && Number(height) > 0) return `${format(width)} x ${format(height)} m`;
+    return String(fallback || "").trim() || "-";
+  }
+
+  function workOrderProducts(record) {
+    const inventoryRows = recordArray(record.righe_magazzino_json);
+    let configurations = recordArray(record.ledwall_configurazioni_json);
+    if (!configurations.length) configurations = recordArray(record.righe_json);
+    if (!configurations.length) configurations = [{
+      product_id: inventoryRows[0] && inventoryRows[0].product_id,
+      modello_display: record.modelli_display,
+      misura_display: record.misure_display,
+      bifacciale: record.bifacciale,
+      cabinet_necessari: record.cabinet_da_sottrarre,
+      stock_lines: inventoryRows
+    }];
+    return configurations.map((configuration, index) => {
+      const stockLines = Array.isArray(configuration.stock_lines) ? configuration.stock_lines : Array.isArray(configuration.righe_magazzino) ? configuration.righe_magazzino : [];
+      const product = (state.data.products || []).find((item) => String(item.id) === String(configuration.product_id || "")) || {};
+      const lineProducts = stockLines.map((line) => (state.data.products || []).find((item) => String(item.id) === String(line.product_id || "")) || line);
+      const codes = [...new Set(lineProducts.map((item) => String(item.sku || item.product_id || item.id || "").trim()).filter(Boolean))];
+      const cabinetTotal = Number(configuration.cabinet_necessari || configuration.cabinet_da_sottrarre || configuration.cabinet || 0) || stockLines.reduce((sum, line) => sum + Number(line.quantita || 0), 0);
+      const rawName = configuration.modello_display || configuration.prodotto || product.nome || (String(configuration.product_id || "").toUpperCase() === "P391_UNIFIED" ? "P3.91" : "") || record.modelli_display || `Ledwall ${index + 1}`;
+      return {
+        name: /^ledwall/i.test(String(rawName)) ? String(rawName) : `Ledwall Display ${rawName}`,
+        code: codes.join(" + ") || product.sku || configuration.sku || configuration.product_id || "-",
+        size: workOrderMeasure(configuration.larghezza, configuration.altezza, configuration.misura_display || configuration.misura || record.misure_display),
+        configuration: String(configuration.bifacciale || record.bifacciale || "NO").toUpperCase() === "SI" ? "Bifacciale" : "Monofacciale",
+        cabinets: cabinetTotal ? `${cabinetTotal} pz` : "-"
+      };
+    });
+  }
+
+  function workOrderAddress(client, record) {
+    const clientAddress = [client.indirizzo, client.civico, client.cap, client.localita || client.comune || client.citta, client.provincia].filter((part) => String(part || "").trim());
+    if (clientAddress.length) return clientAddress.join(", ");
+    return [record.installazione_indirizzo, record.installazione_civico, record.installazione_cap, record.installazione_localita || record.installazione_comune, record.installazione_provincia].filter((part) => String(part || "").trim()).join(", ");
+  }
+
+  function workOrderPayload(record) {
+    const client = (state.data.clients || []).find((item) => String(item.id) === String(record.clientId || "")) || {};
+    const agentUser = (state.data.users || []).find((item) => String(item.username) === String(record.agent_username || "")) || {};
+    return {
+      generatedAt: new Date(),
+      company: config.company || {},
+      practice: { number: record.numero || record.id, stato: record.stato, agente: record.agente },
+      client: {
+        name: record.cliente || record.intestatario_nome || client.ragioneSociale,
+        contact: client.referente || record.intestatario_nome,
+        phone: record.intestatario_telefono || client.telefono,
+        email: record.intestatario_email || client.email,
+        address: workOrderAddress(client, record)
+      },
+      agent: {
+        name: record.agente || agentUser.nome_visualizzato || agentUser.displayName || record.agent_username,
+        contact: agentUser.email || agentUser.telefono || "Agente commerciale"
+      },
+      products: workOrderProducts(record)
+    };
+  }
+
+  function generateWorkOrder(id) {
+    if (!api.isAdmin()) { toast("La commessa d’ordine è riservata agli amministratori.", "danger"); return; }
+    const record = (state.data.practices || []).find((item) => String(item.id) === String(id));
+    if (!record) { toast("Pratica non trovata.", "danger"); return; }
+    if (String(record.stato || "").trim().toUpperCase() !== "ACCETTATA") { toast("La commessa può essere generata soltanto per una pratica Accettata.", "danger"); return; }
+    if (String(record.__sync_state || "").toUpperCase() === "PENDING") { toast("Attendi la conferma della pratica prima di generare la commessa.", "danger"); return; }
+    if (!window.SeemaxWorkOrder || typeof window.SeemaxWorkOrder.open !== "function") { toast("Generatore della commessa non disponibile. Aggiorna la pagina e riprova.", "danger"); return; }
+    try {
+      const generated = window.SeemaxWorkOrder.open(workOrderPayload(record));
+      toast(`Commessa ${generated.fileName} pronta per la stampa.`);
+    } catch (error) { toast(error.message || "Impossibile aprire la commessa d’ordine.", "danger"); }
   }
 
   function openCompletedPractice(record) {
@@ -2077,7 +2201,7 @@
       return `<article><span>${index + 1}</span><div><small>LEDWALL ${index + 1}</small><strong>${value(configuration.modello_display)}</strong><p>${value(configuration.larghezza)}×${value(configuration.altezza)} m · ${Number(configuration.cabinet_necessari || 0)} cabinet · ${configuration.bifacciale === "SI" ? "Bifacciale" : "Monofacciale"}</p><em>📍 ${value(specificAddress, "Indirizzo unico della pratica")}</em></div></article>`;
     }).join("")}</div>` : "";
     const inventory = inventoryRows.length ? inventoryRows.map((row) => `<li><span>${value(row.descrizione || row.product_id)}</span><strong>${Number(row.quantita || 0)} cabinet</strong></li>`).join("") : `<li><span>${value(record.cabinet_da_sottrarre, "Composizione non indicata")}</span></li>`;
-    const documentList = documents.length ? documents.map((document) => `<li><span class="completed-document-icon">📄</span><div><strong>${value(document.nome || document.file_name)}</strong><small>${value(document.tipo || "Documento")} · ${dateIt(document.data || document.aggiornatoIl)}</small></div>${document.url ? `<a class="btn soft" href="${esc(document.url)}" target="_blank" rel="noopener">Apri ↗</a>` : `<span class="placeholder-pill">Non disponibile</span>`}</li>`).join("") : `<li class="empty"><span>🗂️</span><div><strong>Nessun allegato registrato</strong><small>La pratica resta consultabile come archivio definitivo.</small></div></li>`;
+    const documentList = documents.length ? documents.map((document) => `<li><span class="completed-document-icon">📄</span><div><strong>${value(document.nome || document.file_name)}</strong><small>${value(document.tipo || "Documento")} · ${dateIt(document.data || document.aggiornatoIl)}</small></div>${documentActionMarkup(document, "Non disponibile")}</li>`).join("") : `<li class="empty"><span>🗂️</span><div><strong>Nessun allegato registrato</strong><small>La pratica resta consultabile come archivio definitivo.</small></div></li>`;
     const origin = String(record.origine || "").toUpperCase().includes("QUOTATION PLANNER") ? "Importata dal Seemax Quotation Planner" : record.origine || "Creata nel Management Suite";
     const body = `<article class="completed-practice-view">
       <header class="completed-practice-hero"><span class="completed-seal">✓</span><div><small>PRATICA CONCLUSA</small><h3>${value(record.numero)}</h3><p>${value(record.cliente)} · ${value(record.tipo_pratica || record.finanziaria)}</p></div><div class="completed-lock"><span>🔒</span><strong>Sola lettura</strong><small>Archivio non modificabile</small></div></header>
@@ -2252,13 +2376,20 @@
         <p class="field-help full">Non hai ancora registrato un account? <a href="https://www.led-cloud.com/#/Account/Login" target="_blank" rel="noopener">Fallo adesso.</a></p>
       </div>
     </div></fieldset>`;
-    const existingDocuments = (state.data.documents || []).filter((doc) => String(doc.practiceId || "") === String(record.id || ""));
+    const existingDocuments = !isNewForm
+      ? (state.data.documents || []).filter((doc) => String(doc.practiceId || "") === String(record.id || ""))
+      : [];
     const uploadFields = (PRACTICE_DOCUMENTS[practiceType] || []).map(([key, label]) => {
       const existing = existingDocuments.find((doc) => String(doc.tipo_pratica_documento || "") === key || String(doc.tipo || "").toLowerCase() === label.toLowerCase());
       const required = req(key) && !existing;
       return `<label class="practice-upload">${esc(label)} ${requiredMark(req(key))}${existing ? `<small class="uploaded-file">✓ Già caricato: ${esc(existing.nome || existing.file_name)}</small>` : ""}<input type="file" name="practice_file_${esc(key)}" data-practice-document="${esc(key)}" data-document-label="${esc(label)}" ${required ? "required" : ""} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"></label>`;
     }).join("");
-    const uploads = uploadFields ? `<fieldset class="practice-section full"><legend>Documentazione della pratica</legend>${api.isFastMode() ? `<div class="fast-upload-note">Per allegare documenti passa alla Modalità Standard.</div>` : `<div class="practice-upload-grid">${uploadFields}</div>`}</fieldset>` : "";
+    const uploadControls = api.isFastMode()
+      ? `<div class="fast-upload-note">La consultazione resta disponibile. Per allegare nuovi documenti passa alla Modalità Standard.</div>`
+      : uploadFields
+        ? `<div class="practice-upload-grid">${uploadFields}</div>`
+        : `<div class="practice-upload-help"><span>＋</span><div><strong>Aggiungi altri allegati dalla sezione Documenti</strong><small>Seleziona questa pratica nel campo di collegamento: il file apparirà automaticamente in questo elenco.</small></div></div>`;
+    const uploads = `<fieldset class="practice-section full practice-documents-panel"><legend>Documentazione della pratica</legend>${practiceDocumentListMarkup(existingDocuments)}${uploadControls}</fieldset>`;
     const technicalFields = `<fieldset class="practice-configurator practice-multi-ledwall full"><legend>Prodotti della pratica</legend>
       <div class="multi-ledwall-intro"><span>🖥️</span><div><strong>Una sola pratica, più Ledwall</strong><p>Aggiungi tutte le installazioni previste. Cabinet e disponibilità vengono calcolati e sommati automaticamente.</p></div></div>
       <div id="practiceLedwallList" class="practice-ledwall-list"></div>
@@ -2268,14 +2399,15 @@
     const identityFields = `<fieldset class="practice-section full"><legend>Identificazione</legend><div class="form-grid">${field("Identificativo pratica", "numero", number, { required: true, readonly: true })}${statusField}${assigneeField}</div></fieldset>`;
     const tabPanel = (name, content, active) => `<section class="form-tab-panel full ${active ? "active" : ""}" data-form-panel="${name}">${content}</section>`;
     const practiceTabs = practiceType === "ACQUISTO"
-      ? [["recipient", "Destinatario Ordine"], ["product", "Prodotto della pratica"], ["value", "Valore della Pratica"], ["address", "Indirizzo di Installazione"], ["technical", "Dettagli Tecnici"]]
+      ? [["recipient", "Destinatario Ordine"], ["product", "Prodotto della pratica"], ["value", "Valore della Pratica"], ["address", "Indirizzo di Installazione"], ["technical", "Dettagli Tecnici"], ["documents", "Sezione Documenti"]]
       : [["client", "Cliente"], ["product", "Prodotto della pratica"], ["value", "Valore della Pratica"], ["finance", "Condizioni Finanziaria"], ["address", "Indirizzo di Installazione"], ["technical", "Dettagli Tecnici"], ["documents", "Sezione Documenti"]];
     const tabNavigation = `<nav class="form-tabs practice-form-tabs full" aria-label="Sezioni pratica">${practiceTabs.map(([key, label], index) => `<button type="button" class="form-tab ${index === 0 ? "active" : ""}" data-form-tab="${key}"><i></i>${label}</button>`).join("")}</nav>`;
     const tabContent = practiceType === "ACQUISTO"
-      ? tabPanel("recipient", purchaseDestination + identityFields + personalData + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") }))
+      ? tabPanel("recipient", purchaseDestination + identityFields + personalData + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") })) + tabPanel("documents", uploads)
       : tabPanel("client", identityFields + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("finance", financeFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") })) + tabPanel("documents", uploads);
     const plannerImportNotice = isPlannerPracticePending(record) ? `<div class="planner-practice-notice full"><span>✦</span><div><strong>Pratica importata dal Quotation Planner</strong><p>Completa e verifica i dati mancanti prima di proseguire con l’iter commerciale.</p></div></div>` : "";
-    const fields = plannerImportNotice + typeSummary + practiceStockWarningAdminControl(record) + tabNavigation + tabContent +
+    const workOrderAction = !isNewForm && api.isAdmin() && String(record.stato || "").trim().toUpperCase() === "ACCETTATA" ? `<section class="work-order-launch full"><span>🧾</span><div><small>STRUMENTO TECNICO LOCALE</small><strong>Commessa d’ordine</strong><p>Genera il documento A4 con cliente, agente e prodotti. Nessun dato aggiuntivo viene inviato al database.</p></div><button type="button" class="btn primary" data-action="generate-work-order" data-id="${esc(record.id)}">Genera commessa</button></section>` : "";
+    const fields = plannerImportNotice + typeSummary + workOrderAction + practiceStockWarningAdminControl(record) + tabNavigation + tabContent +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
       `<input type="hidden" name="modelli_display" value="${esc(record.modelli_display || "")}"><input type="hidden" name="misure_display" value="${esc(record.misure_display || "")}"><input type="hidden" name="bifacciale" value="${esc(record.bifacciale || "NO")}"><input type="hidden" name="cabinet_da_sottrarre" value="${esc(record.cabinet_da_sottrarre || "")}"><input type="hidden" name="righe_magazzino_json" value="${esc(record.righe_magazzino_json || "[]")}"><input type="hidden" name="ledwall_configurazioni_json" value="${esc(record.ledwall_configurazioni_json || "[]")}"><input type="hidden" name="p391_unificato" value="${esc(record.p391_unificato || "NO")}"><input type="hidden" name="p391_cabinet_50100" value="${esc(record.p391_cabinet_50100 || "0")}"><input type="hidden" name="p391_cabinet_5050" value="${esc(record.p391_cabinet_5050 || "0")}">` +
       (record.righe_json ? `<input type="hidden" name="righe_json" value="${esc(record.righe_json)}">` : "");
@@ -2740,7 +2872,7 @@
 
   function openUser(id) {
     const r = state.data.users.find((u) => (u.id || u.username) === id) || { ruolo: "AGENTE", stato: "ATTIVO" };
-    const fields = field("Nome visualizzato", "nome_visualizzato", r.nome_visualizzato, { required: true }) + field("Username", "username", r.username, { required: true, readonly: !!r.username }) + field(r.id ? "Nuova Chiave ID (lascia vuoto per non cambiarla)" : "Chiave ID", "chiave_id_agente", "", { required: !r.id }) + field("Ruolo", "ruolo", r.ruolo, { options: ["AGENTE", "ADMIN"] }) + field("Email", "email", r.email, { type: "email" }) + field("Telefono", "telefono", r.telefono) + field("Stato", "stato", r.stato, { options: ["ATTIVO", "SOSPESO"] }) + field("Note", "note", r.note, { type: "textarea", full: true });
+    const fields = field("Nome visualizzato", "nome_visualizzato", r.nome_visualizzato, { required: true }) + field("Username", "username", r.username, { required: true, readonly: !!r.username }) + field("Prefisso pratiche", "prefisso_pratica", r.prefisso_pratica || "", { required: !!r.id }) + field(r.id ? "Nuova Chiave ID (lascia vuoto per non cambiarla)" : "Chiave ID", "chiave_id_agente", "", { required: !r.id }) + field("Ruolo", "ruolo", r.ruolo, { options: ["AGENTE", "ADMIN"] }) + field("Email", "email", r.email, { type: "email" }) + field("Telefono", "telefono", r.telefono) + field("Stato", "stato", r.stato, { options: ["ATTIVO", "SOSPESO"] }) + `<p class="field-help full">Il prefisso identifica la sequenza delle pratiche dell’agente (es. MPL → MPL0001). Deve essere univoco; dopo la prima pratica non può più essere modificato.</p>` + field("Note", "note", r.note, { type: "textarea", full: true });
     openModal(r.id ? "Modifica agente" : "Nuovo agente", formShell("users", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Accessi S.Q.P." });
   }
 
@@ -2930,7 +3062,7 @@
     let backgroundSaveNotice = false;
     let saveProgressId = "";
     record.expected_record_version = Number(form.dataset.recordVersion || 0);
-    record.request_token = form.dataset.requestToken || newRequestToken();
+    record.request_token = (current.__sync_new_record && current.request_token) || form.dataset.requestToken || newRequestToken();
     Object.keys(record).filter((key) => key.startsWith("practice_file_")).forEach((key) => delete record[key]);
     delete record.cabinet_calculated;
     delete record.display_width;
@@ -2978,8 +3110,13 @@
       if (!api.isAdmin() && isNewRecord) record.stato = "Inserita";
       if (isNewRecord) record.creatoIl = record.creatoIl || nowIso;
       record.aggiornatoIl = now;
-      record.id = record.id || "PR-" + record.numero;
-      if (isNewRecord) record.nuova_pratica = "SI";
+      if (isNewRecord) {
+        /* L'identificativo mostrato nel modulo è solo un'anteprima. Il record
+           ottimistico usa un ID provvisorio univoco; numero e ID definitivi
+           vengono assegnati dal backend sotto ScriptLock. */
+        record.id = "TMP-" + record.request_token;
+        record.nuova_pratica = "SI";
+      } else record.id = record.id || "PR-" + record.numero;
       record.documenti_richiesti_json = JSON.stringify((PRACTICE_DOCUMENTS[record.tipo_pratica] || []).filter(([key]) => practiceRequired(record.tipo_pratica, key)).map(([key]) => key));
     }
     if (entity === "documents") {
@@ -3341,6 +3478,7 @@
       "new-client": () => openClient(), "edit-client": () => openClient(id), "delete-client": () => removeEntity("clients", id), "new-practice-client": () => openPracticeTypeChooser(id),
       "choose-practice-type": () => openPractice(null, data.clientId || "", data.type),
       "back-practice-types": () => openPracticeTypeChooser(),
+      "generate-work-order": () => generateWorkOrder(id),
       "new-product": () => openProduct(), "edit-product": () => openProduct(id), "product-tech": () => openProductTech(id), "delete-product": () => removeEntity("products", id),
       "inventory-adjust": openInventoryAdjustment,
       "toggle-practice-stock-warning": async () => {

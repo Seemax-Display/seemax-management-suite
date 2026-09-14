@@ -1,0 +1,20 @@
+SEEMAX MANAGEMENT SUITE 2.16.2 - PREFISSI PRATICHE UNIVOCI
+
+1. Apri il progetto Apps Script collegato al database operativo.
+2. Sostituisci Code.gs con il file della versione 2.16.2.
+3. Salva il progetto.
+4. Esegui una volta upgradeSeemaxV2162().
+5. Autorizza lo script, se richiesto.
+6. Verifica nel foglio AGENTI la nuova colonna prefisso_pratica.
+7. Controlla che Michele Purgino risulti MP e Mario Platania MPL.
+8. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+9. Pubblica il frontend 2.16.2 su GitHub Pages.
+10. Esegui Ctrl+F5.
+
+L'upgrade:
+- non rinumera e non modifica le pratiche esistenti;
+- assegna un prefisso univoco a ogni account;
+- conserva il prefisso del proprietario della prima pratica storica;
+- ricostruisce i contatori delle pratiche;
+- mantiene lock, versionamento e token idempotenti;
+- attiva la versione seemax-management-suite-2.16.2.
