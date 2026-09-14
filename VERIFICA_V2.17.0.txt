@@ -1,0 +1,34 @@
+SEEMAX MANAGEMENT SUITE 2.17.0 - VERIFICA DI CONSEGNA
+
+[OK] Frontend 2.17.0
+[OK] Backend seemax-management-suite-2.17.0
+[OK] Service Worker seemax-management-v2-17-0-work-orders
+[OK] Funzione upgradeSeemaxV2170
+[OK] Nuovo assets/js/work-order.js caricato e memorizzato dalla PWA
+[OK] Documenti visibili dentro le pratiche operative
+[OK] Azioni separate Visualizza e Scarica
+[OK] Accesso ai documenti determinato dai dati già autorizzati dal bootstrap
+[OK] Comando commessa visibile soltanto all'ADMIN su pratica Accettata
+[OK] Controlli autorizzativi ripetuti prima della generazione
+[OK] Generazione interamente locale, senza database
+[OK] Cliente, agente e configurazioni Ledwall valorizzati dai dati già caricati
+[OK] Tecnico incaricato lasciato intenzionalmente vuoto
+[OK] Tabella materiali con tre colonne richieste
+[OK] Bordi e altezze delle righe uniformi
+[OK] Variante compatta multi-Ledwall
+[OK] Nome anteprima/PDF derivato da pratica e cliente
+[OK] Funzioni 2.16.2 e protezioni multiutente preservate
+[OK] Nessuna cancellazione o modifica automatica dei dati esistenti
+
+COLLAUDO POST-PUBBLICAZIONE
+1. Accedere come ADMIN.
+2. Aprire una pratica Inserita con almeno un documento e provare Visualizza/Scarica.
+3. Ripetere su una pratica Accettata.
+4. Verificare che Genera commessa sia presente soltanto sulla pratica Accettata.
+5. Generare il documento, controllare i dati e usare Stampa / Salva PDF.
+6. Accedere come AGENTE e verificare che il comando commessa non sia disponibile.
+7. Confermare che ciascun account possa aprire soltanto i documenti autorizzati.
+
+Nota: la riuscita effettiva di Visualizza/Scarica dipende anche dai permessi
+Google Drive già applicati ai singoli file. Il nuovo codice non amplia tali
+permessi e non rende pubblici documenti precedentemente riservati.

@@ -1,0 +1,43 @@
+SEEMAX MANAGEMENT SUITE 2.17.0 - RELEASE MANIFEST
+
+Versione frontend: 2.17.0
+Versione backend: seemax-management-suite-2.17.0
+Cache Service Worker: seemax-management-v2-17-0-work-orders
+Funzione upgrade: upgradeSeemaxV2170
+
+FUNZIONI PRINCIPALI
+- documenti già caricati visibili nelle pratiche operative;
+- apertura del documento in una nuova scheda;
+- download diretto da Google Drive;
+- scheda Documenti disponibile anche per le pratiche Acquisto;
+- commessa d'ordine A4 locale;
+- comando visibile soltanto all'ADMIN su pratica Accettata;
+- riepilogo multi-Ledwall e tabella tecnica compilabile a penna;
+- impaginazione con bordi allineati e variante compatta automatica.
+
+FILE NUOVO
+- assets/js/work-order.js
+
+FILE MODIFICATI
+- index.html
+- assets/js/app.js
+- assets/css/app.css
+- assets/js/config.js
+- sw.js
+- apps-script/Code.gs
+- README.md
+
+FILE DI VERIFICA
+- scripts/test-release-v2.17.0.js
+- TEST_RILASCIO_V2.17.0.txt
+- VERIFICA_V2.17.0.txt
+
+COMPATIBILITA PRESERVATA
+- ScriptLock, record_version e request_token;
+- salvataggi e upload in background;
+- movimenti di magazzino concorrenti;
+- archivio preventivi ADMIN;
+- prefissi pratica univoci;
+- pubblicazione Patch Notes;
+- bridge nativo e fallback POST;
+- cache bootstrap e aggiornamento silenzioso.

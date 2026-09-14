@@ -1,8 +1,8 @@
-const CACHE = "seemax-management-v2-16-1-quotation-admin";
+const CACHE = "seemax-management-v2-17-0-work-orders";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
-  "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/js/planner-native.js",
+  "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/js/planner-native.js", "./assets/js/work-order.js",
   "./assets/icons/icon.svg", "./manifest.webmanifest",
   "./assets/conformity/p19-1.png", "./assets/conformity/p19-2.png",
   "./assets/conformity/p25-1.png", "./assets/conformity/p25-2.png",

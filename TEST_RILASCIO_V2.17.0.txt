@@ -1,0 +1,42 @@
+SEEMAX MANAGEMENT SUITE 2.17.0 - ESITO TEST
+
+Data verifica: 14/09/2026
+
+TEST PRINCIPALE
+Comando: node scripts/test-release-v2.17.0.js
+Esito: OK - 72 controlli superati
+
+AMBITI VERIFICATI
+- sintassi JavaScript frontend e backend;
+- JavaScript inline del Quotation Planner;
+- corrispondenza versione frontend/backend/cache;
+- ordine di caricamento e cache del generatore commessa;
+- URL sicuri dei documenti;
+- comandi Visualizza e Scarica;
+- assenza di documenti estranei nelle pratiche nuove;
+- tab Documenti per Acquisto, Noleggio e Leasing;
+- visibilità e controllo runtime ADMIN + ACCETTATA;
+- blocco della generazione su pratica ancora in sincronizzazione;
+- assenza di fetch, API Apps Script o endpoint dedicati nella commessa;
+- formato A4 e sezioni operative richieste;
+- protezione dei testi inseriti nel documento;
+- griglia tecnica a colonne fisse e righe simmetriche;
+- otto righe manuali nel formato ordinario;
+- impaginazione compatta automatica per più Ledwall;
+- apertura locale dell'anteprima e titolo PDF;
+- ScriptLock, record_version e request_token;
+- sequenze pratica MP/MPL;
+- preventivi ADMIN e salvataggi in background;
+- upload documenti e movimenti di magazzino;
+- pubblicazione Patch Notes;
+- assenza di conflitti Git e parentesi CSS bilanciate.
+
+REGRESSIONI ESEGUITE
+- Backend optimization test 2.15.2: OK - 32 controlli;
+- Transport test 2.15.2: OK;
+- Operazioni UI/progresso 2.15.2: OK;
+- Preventivi in background 2.15.2: OK - 9 controlli;
+- Preventivi ADMIN 2.16.1: OK - 34 controlli.
+
+Il collaudo finale dei permessi reali dei file Google Drive deve essere eseguito
+dopo il deployment, usando gli account operativi ADMIN e AGENTE.

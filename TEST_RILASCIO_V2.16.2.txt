@@ -1,0 +1,11 @@
+TEST RILASCIO SEEMAX 2.16.2 - SUPERATI
+
+Script: scripts/test-release-v2.16.2.js
+Controlli: 36
+
+Sono inoltre risultati positivi:
+- 32 controlli sulle ottimizzazioni backend 2.15.2;
+- 9 controlli sul salvataggio preventivi in background;
+- test operazioni UI in background;
+- 34 controlli sull'archivio preventivi ADMIN 2.16.1;
+- sintassi di app.js, api.js, config.js, planner-native.js, sw.js e Code.gs.

@@ -1,0 +1,25 @@
+SEEMAX MANAGEMENT SUITE 2.17.0
+DOCUMENTI OPERATIVI E COMMESSA D'ORDINE
+
+NOVITA
+- allegati visibili e scaricabili dentro le pratiche Inserite e Accettate;
+- comandi Visualizza e Scarica uniformati anche nell'archivio completato;
+- commessa d'ordine A4 riservata agli ADMIN;
+- generazione consentita soltanto per una pratica Accettata e già confermata;
+- cliente, agente e tutti i Ledwall compilati automaticamente;
+- tecnico, materiali, note e firma compilabili a penna;
+- griglia tecnica allineata e variante compatta per più Ledwall;
+- nessuna comunicazione con Google Sheets durante la generazione.
+
+INSTALLAZIONE
+1. Pubblica il frontend 2.17.0 su GitHub Pages.
+2. Sostituisci Code.gs nel progetto Apps Script.
+3. Esegui upgradeSeemaxV2170().
+4. Pubblica una nuova versione del deployment Web App mantenendo lo stesso URL /exec.
+5. Esegui Ctrl+F5 oppure riapri la PWA.
+
+IMPORTANTE
+Il file assets/js/work-order.js deve essere caricato su GitHub insieme agli
+altri file. La funzione non modifica alcun dato operativo.
+
+Guida completa: docs/AGGIORNAMENTO_V2.17.0.md

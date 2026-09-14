@@ -1,0 +1,15 @@
+TEST PREFISSI PRATICHE SEEMAX 2.16.2 - SUPERATI
+
+Script: scripts/test-practice-prefixes-v2.16.2.js
+Controlli: 25
+
+Esito verificato:
+- Michele Purgino conserva MP;
+- Mario Platania riceve MPL;
+- PR-MP0001 non viene consultata come destinazione di una nuova pratica;
+- il backend assegna PR-MPL0001 nel flusso simulato;
+- la migrazione scrive soltanto la colonna prefisso_pratica;
+- prefissi futuri sempre univoci;
+- prefissi da 2 a 6 caratteri supportati;
+- contatori indipendenti ricostruiti correttamente;
+- retry idempotente preservato.

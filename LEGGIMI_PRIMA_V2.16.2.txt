@@ -1,0 +1,23 @@
+SEEMAX MANAGEMENT SUITE 2.16.2
+PREFISSI PRATICHE UNIVOCI
+
+Questo aggiornamento corregge la collisione tra Michele Purgino e Mario Platania.
+
+RISULTATO ATTESO
+- Michele Purgino conserva MP: MP0001, MP0002, ...
+- Mario Platania usa MPL: MPL0001, MPL0002, ...
+- gli ID tecnici saranno rispettivamente PR-MP0001 e PR-MPL0001;
+- le pratiche storiche non vengono rinumerate.
+
+INSTALLAZIONE
+1. Carica il frontend 2.16.2 su GitHub Pages.
+2. Sostituisci Code.gs nel progetto Apps Script.
+3. Esegui upgradeSeemaxV2162().
+4. Controlla la colonna prefisso_pratica nel foglio AGENTI.
+5. Pubblica una nuova versione del deployment Web App mantenendo lo stesso URL /exec.
+6. Esegui Ctrl+F5.
+
+IMPORTANTE
+Numero e ID definitivi delle nuove pratiche vengono ora assegnati esclusivamente dal backend sotto ScriptLock. Il numero visibile durante la compilazione è soltanto un'anteprima e non può più entrare in conflitto con una pratica archiviata.
+
+Guida completa: docs/AGGIORNAMENTO_V2.16.2.md

@@ -27,6 +27,8 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - workflow pratiche semplificato: Inserita, Accettata, Sospesa, Bocciata e Completata;
 - notifiche interne con campanella ed email gratuita all'agente responsabile;
 - documenti e media caricati direttamente e archiviati su Google Drive;
+- documenti già caricati consultabili e scaricabili direttamente anche dalle pratiche operative Inserite e Accettate;
+- commessa d'ordine A4 generata interamente nel browser dagli ADMIN per le pratiche Accettate, senza nuove letture o scritture sul database;
 - cartelle documentali locali, trascinamento desktop e spostamento con pressione prolungata su smartphone;
 - attività, scadenze e appuntamenti;
 - gestione agenti e ruoli ADMIN/AGENTE;
@@ -84,7 +86,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione 2.16.0 alla versione 2.16.1 segui [docs/AGGIORNAMENTO_V2.16.1.md](docs/AGGIORNAMENTO_V2.16.1.md). È un aggiornamento correttivo dell'archivio preventivi e non ripete la pulizia del Foglio né il reset dei profili. Per un'installazione precedente resta disponibile la [guida 2.16.0](docs/AGGIORNAMENTO_V2.16.0.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+Per aggiornare un'installazione 2.16.2 alla versione 2.17.0 segui [docs/AGGIORNAMENTO_V2.17.0.md](docs/AGGIORNAMENTO_V2.17.0.md). La release rende consultabili e scaricabili gli allegati dentro le pratiche operative e introduce la commessa d'ordine locale riservata agli ADMIN. Per installazioni precedenti resta disponibile la guida [2.16.2](docs/AGGIORNAMENTO_V2.16.2.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 
@@ -101,6 +103,7 @@ assets/js/store.js            Database locale demo
 assets/js/api.js              Collegamento Google Apps Script
 assets/js/app.js              Funzioni del gestionale
 assets/js/planner-native.js   Runtime nativo del Quotation Planner
+assets/js/work-order.js       Generatore locale della commessa d'ordine A4
 quotation-planner/index.html  Quotation Planner originale
 apps-script/Code.gs           Backend e setup Google Sheets
 docs/                         Guide operative

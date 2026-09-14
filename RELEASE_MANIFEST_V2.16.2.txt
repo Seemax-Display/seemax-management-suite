@@ -1,0 +1,30 @@
+SEEMAX MANAGEMENT SUITE 2.16.2 - RELEASE MANIFEST
+
+Versione frontend: 2.16.2
+Versione backend: seemax-management-suite-2.16.2
+Cache Service Worker: seemax-management-v2-16-2-practice-prefixes
+Funzione upgrade: upgradeSeemaxV2162
+
+CORREZIONI PRINCIPALI
+- nuova colonna AGENTI.prefisso_pratica;
+- assegnazione automatica e univoca dei prefissi;
+- conservazione della serie storica MP per Michele Purgino;
+- nuova serie MPL per Mario Platania;
+- anteprima numero separata dall'ID tecnico;
+- ID locale TMP legato al request_token;
+- numero e ID definitivi assegnati sotto ScriptLock;
+- recupero idempotente della pratica locale Da verificare;
+- protezione dei prefissi già utilizzati.
+
+FILE DI VERIFICA
+- scripts/test-practice-prefixes-v2.16.2.js
+- scripts/test-release-v2.16.2.js
+
+COMPATIBILITA PRESERVATA
+- archivio preventivi ADMIN;
+- salvataggi e upload in background;
+- magazzino concorrente;
+- record_version e request_token;
+- bridge nativo e fallback POST;
+- patch notes e comunicazioni ADMIN;
+- Quotation Planner integrato.
