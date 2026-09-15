@@ -4,7 +4,7 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "", settingsTab: "general" };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "", settingsTab: "general", catalogTab: "LEDWALL" };
   let installPrompt = null;
   let heldDocumentId = "";
   let documentHoldTimer = null;
@@ -36,7 +36,7 @@
     dashboard: ["Dashboard", "Panoramica commerciale e operativa"],
     practices: ["Pratiche", "Gestisci il percorso dal contatto all’installazione"],
     clients: ["Clienti", "Anagrafiche, contatti e storico commerciale"],
-    catalog: ["Catalogo prodotti", "Listini Ledwall, promozioni e specifiche"],
+    catalog: ["Catalogo prodotti", "Ledwall, Croci, LED speciali e Schermi LCD"],
     planner: ["Seemax Quotation Planner", "Calcolatore Ledwall, Grenke e IFIS"],
     documents: ["Documenti", "Preventivi, contratti e allegati collegati"],
     activities: ["Attività", "Scadenze, telefonate e appuntamenti"],
@@ -95,6 +95,62 @@
     "P3.91": ["Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 65.536 pixel/m²", "LED: SMD1921", "Cabinet: Alluminio Rental", "Peso cabinet: 4 kg / 6,3 kg", "Scala di grigi: 16", "Temperatura: da -10° a +45°", "Protezione: IP65", "Consumo medio: 230 W/m²", "Consumo massimo: 800 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 3–4 m", "Luminosità: 4000–6000 cd/m²", "Refresh: 1920–3840 Hz"],
     "P4": ["Pixel pitch: 4", "Certificazione: CCC/CE/ROHS", "Modalità: Indoor / Outdoor", "Densità pixel: 62.500 pixel/m²", "LED: SMD1921", "Cabinet: Alluminio Rental", "Dimensioni cabinet: 0.96×0.96 m", "Peso cabinet: 9 kg / 11 kg", "Scala di grigi: 16", "Temperatura: da -20° a +60°", "Protezione: IP65", "Consumo medio: 280 W/m²", "Consumo massimo: 800 W/m²", "Vita media: oltre 100.000 ore", "Visibilità: 4 m", "Luminosità: 4500–5000 cd/m²", "Refresh: 1920–3840 Hz"]
   };
+  const CATALOG_TABS = [
+    { id: "LEDWALL", label: "Ledwall", icon: "▦" },
+    { id: "ALTRI_LED", label: "Croci ed Altri Led", icon: "✚" },
+    { id: "LCD", label: "Schermi LCD", icon: "▣" }
+  ];
+
+  function productCatalogTab(product) {
+    const explicit = String((product || {}).catalogo_tab || "").trim().toUpperCase();
+    if (["LEDWALL", "ALTRI_LED", "LCD"].includes(explicit)) return explicit;
+    const source = `${(product || {}).id || ""} ${(product || {}).nome || ""} ${(product || {}).categoria || ""}`.toLowerCase();
+    if (/lcd|totem/.test(source)) return "LCD";
+    if (/croce|cross|floor|transparent/.test(source)) return "ALTRI_LED";
+    return "LEDWALL";
+  }
+
+  function productCalculationMode(product) {
+    const explicit = String((product || {}).tipo_calcolo || "").trim().toUpperCase();
+    if (["MODULARE", "MODULARE_ESATTO", "UNITA"].includes(explicit)) return explicit;
+    const source = `${(product || {}).id || ""} ${(product || {}).nome || ""}`.toLowerCase();
+    if (/floor|transparent/.test(source)) return "MODULARE_ESATTO";
+    if (productCatalogTab(product) === "LCD" || /croce|cross/.test(source)) return "UNITA";
+    return "MODULARE";
+  }
+
+  function productInventoryUnit(product, quantity = 2) {
+    const pieces = String((product || {}).unita_magazzino || "").trim().toUpperCase() === "PEZZI";
+    if (pieces) return Number(quantity) === 1 ? "pezzo" : "pezzi";
+    return "cabinet";
+  }
+
+  function productFormatLabel(product) {
+    const explicit = String((product || {}).formato_label || "").trim();
+    if (explicit) return explicit;
+    const x = Number((product || {}).cabX || 0);
+    const y = Number((product || {}).cabY || 0);
+    return x > 0 && y > 0 ? `${x}×${y} cm` : "Formato non indicato";
+  }
+
+  function productOptionLabel(product) {
+    if (product.unifiedP391) return `${product.nome} · composizione automatica 50×100 + 50×50 cm`;
+    const mode = productCalculationMode(product);
+    if (mode === "UNITA") return `${product.nome} · articolo a quantità`;
+    return `${product.nome} · ${mode === "MODULARE_ESATTO" ? "modulo" : "cabinet"} ${productFormatLabel(product)}`;
+  }
+
+  function exactMultiple(value, step) {
+    const ratio = Number(value) / Number(step);
+    return Number.isFinite(ratio) && Math.abs(ratio - Math.round(ratio)) < 0.000001;
+  }
+
+  function snapUpToStep(value, step) {
+    const numeric = Number(value);
+    const unit = Number(step);
+    if (!Number.isFinite(numeric) || !Number.isFinite(unit) || numeric <= 0 || unit <= 0) return unit || numeric;
+    return Math.max(unit, Math.ceil((numeric - 1e-8) / unit) * unit);
+  }
 
   function esc(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -203,9 +259,10 @@
       const operation = String(value.operazione || value.operation || "CARICO").toUpperCase() === "SCARICO" ? "SCARICO" : "CARICO";
       const quantity = Math.max(0, Number(value.quantita || value.quantity || 0));
       const product = String(value.product_name || value.prodotto || value.nome || value.product_id || "Prodotto selezionato").trim();
+      const unitLabel = String(value.unit_label || "unità");
       return {
         itemLabel: operation === "CARICO" ? "Carico merce" : "Scarico merce",
-        name: `${product}${quantity ? ` · ${quantity} cabinet` : ""}`,
+        name: `${product}${quantity ? ` · ${quantity} ${unitLabel}` : ""}`,
         activeTitle: operation === "CARICO" ? "Sto caricando la merce…" : "Sto scaricando la merce…",
         completeTitle: operation === "CARICO" ? "Carico completato" : "Scarico completato",
         initialPhase: "Preparazione del movimento…",
@@ -323,7 +380,8 @@
   function startInventoryProgress(payload, product) {
     return startBackgroundProgress("inventory", "inventory", {
       ...(payload || {}),
-      product_name: (product || {}).nome || (product || {}).sku || (payload || {}).product_id || "Prodotto selezionato"
+      product_name: (product || {}).nome || (product || {}).sku || (payload || {}).product_id || "Prodotto selezionato",
+      unit_label: String((product || {}).unita_magazzino || "").toUpperCase() === "PEZZI" ? (Number((payload || {}).quantita) === 1 ? "pezzo" : "pezzi") : "cabinet"
     });
   }
 
@@ -1815,18 +1873,26 @@
   }
 
   function renderCatalog() {
-    const rows = filterRows(state.data.products, ["nome", "categoria", "descrizione"]);
+    if (!CATALOG_TABS.some((tab) => tab.id === state.catalogTab)) state.catalogTab = "LEDWALL";
+    const allRows = filterRows(state.data.products, ["nome", "categoria", "descrizione", "sku"]);
+    const rows = allRows.filter((product) => productCatalogTab(product) === state.catalogTab);
+    const activeTab = CATALOG_TABS.find((tab) => tab.id === state.catalogTab) || CATALOG_TABS[0];
     const inventoryAction = api.isAdmin() ? `<button class="btn inventory-button" data-action="inventory-adjust">📦 Carico / Scarico</button>` : "";
     const source = state.data.database_meta && state.data.database_meta.inventory_source;
-    return `${viewToolbar("Nuovo prodotto", api.isAdmin() ? "new-product" : "", `<div class="catalog-toolbar-info"><p class="toolbar-note">Listino ${api.isAdmin() ? "amministrativo" : "agente"} · ${rows.length} configurazioni${source ? " · Giacenze sincronizzate" : ""}</p>${inventoryAction}</div>`)}<div class="product-grid">${rows.map((p) => {
+    const tabs = `<nav class="catalog-tabs" aria-label="Categorie catalogo">${CATALOG_TABS.map((tab) => {
+      const count = (state.data.products || []).filter((product) => productCatalogTab(product) === tab.id).length;
+      return `<button type="button" class="catalog-tab ${tab.id === state.catalogTab ? "active" : ""}" data-action="set-catalog-tab" data-catalog-tab="${tab.id}" aria-pressed="${tab.id === state.catalogTab}"><span>${tab.icon}</span><strong>${esc(tab.label)}</strong><small>${count}</small></button>`;
+    }).join("")}</nav>`;
+    return `${viewToolbar("Nuovo prodotto", api.isAdmin() ? "new-product" : "", `<div class="catalog-toolbar-info"><p class="toolbar-note">${esc(activeTab.label)} · ${rows.length} ${rows.length === 1 ? "prodotto" : "prodotti"}${source ? " · Giacenze sincronizzate" : ""}</p>${inventoryAction}</div>`)}${tabs}<div class="product-grid">${rows.length ? rows.map((p) => {
       const promo = Number(p.prezzoPromoAgenti || 0);
       const price = promo || Number(p.prezzoAgente || 0);
       const promoActive = promo || String(p.promo_attiva || "NO").toUpperCase() === "SI";
       const stock = Number(p.giacenza_attuale || 0);
       const stockLabel = p.stato_giacenza || (stock > 0 ? "DISPONIBILE" : "NON DISPONIBILE");
-      const image = p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}" loading="lazy">` : `<div class="pixel-pattern"></div>`;
-      return `<article class="product-card"><div class="product-visual">${image}<span>${esc(p.nome)}</span>${promoActive ? `<em>PROMO</em>` : ""}</div><div class="product-body"><div class="product-title"><div><span>${esc(p.categoria || "Ledwall")}</span><h3>${esc(p.nome)} · ${p.cabX}×${p.cabY} cm</h3></div>${badge(p.attivo === "SI" ? "Attivo" : "Non attivo")}</div><div class="stock-summary"><div><small>${esc(stockLabel)}</small><strong>${stock} pz</strong></div><span>${esc(p.sku || p.id || "")}</span></div><p>${esc(p.descrizione || p.infoAgenti || "Scheda tecnica disponibile nel Quotation Planner.")}</p><div class="price-grid"><div><small>Prezzo agente</small><strong>${price ? euros(price) : "Da definire"}</strong>${promo ? `<del>${euros(p.prezzoAgente)}</del>` : ""}</div>${api.isAdmin() ? `<div><small>Prezzo cliente</small><strong>${Number(p.prezzoPromoClienti || p.prezzoCliente || 0) ? euros(p.prezzoPromoClienti || p.prezzoCliente) : "Da definire"}</strong></div><div><small>Costo base</small><strong>${Number(p.prezzoCina || 0) ? euros(p.prezzoCina) : "—"}</strong></div>` : ""}</div><div class="card-actions"><button class="btn soft" data-action="product-tech" data-id="${esc(p.id)}">Scheda tecnica</button>${api.isAdmin() ? `<button class="btn ghost" data-action="edit-product" data-id="${esc(p.id)}">Modifica</button>` : ""}</div></div></article>`;
-    }).join("")}</div>`;
+      const unit = productInventoryUnit(p, stock);
+      const image = p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}" loading="lazy"><span class="product-image-label">${esc(p.nome)}</span>` : `<div class="pixel-pattern"></div><span>${esc(p.nome)}</span>`;
+      return `<article class="product-card"><div class="product-visual ${p.immagine_url ? "has-image" : ""}">${image}${promoActive ? `<em>PROMO</em>` : ""}</div><div class="product-body"><div class="product-title"><div><span>${esc(p.categoria || "Prodotto Seemax")}</span><h3>${esc(p.nome)} · ${esc(productFormatLabel(p))}</h3></div>${badge(String(p.attivo || "SI").toUpperCase() === "SI" ? "Attivo" : "Non attivo")}</div><div class="stock-summary"><div><small>${esc(stockLabel)}</small><strong>${stock} ${esc(unit)}</strong></div><span>${esc(p.sku || p.id || "")}</span></div><p>${esc(p.descrizione || p.infoAgenti || "Scheda tecnica disponibile nel catalogo.")}</p><div class="price-grid"><div><small>Prezzo agente</small><strong>${price ? euros(price) : "Da definire"}</strong>${promo ? `<del>${euros(p.prezzoAgente)}</del>` : ""}</div>${api.isAdmin() ? `<div><small>Prezzo cliente</small><strong>${Number(p.prezzoPromoClienti || p.prezzoCliente || 0) ? euros(p.prezzoPromoClienti || p.prezzoCliente) : "Da definire"}</strong></div><div><small>Costo base</small><strong>${Number(p.prezzoCina || 0) ? euros(p.prezzoCina) : "—"}</strong></div>` : ""}</div><div class="card-actions"><button class="btn soft" data-action="product-tech" data-id="${esc(p.id)}">Scheda tecnica</button>${api.isAdmin() ? `<button class="btn ghost" data-action="edit-product" data-id="${esc(p.id)}">Modifica</button>` : ""}</div></div></article>`;
+    }).join("") : emptyState(`Nessun prodotto in ${activeTab.label}`, "I prodotti di questa categoria appariranno qui dopo la configurazione.", api.isAdmin() ? "Nuovo prodotto" : "", "new-product")}</div>`;
   }
 
   function renderPlanner() {
@@ -2129,12 +2195,15 @@
       const codes = [...new Set(lineProducts.map((item) => String(item.sku || item.product_id || item.id || "").trim()).filter(Boolean))];
       const cabinetTotal = Number(configuration.cabinet_necessari || configuration.cabinet_da_sottrarre || configuration.cabinet || 0) || stockLines.reduce((sum, line) => sum + Number(line.quantita || 0), 0);
       const rawName = configuration.modello_display || configuration.prodotto || product.nome || (String(configuration.product_id || "").toUpperCase() === "P391_UNIFIED" ? "P3.91" : "") || record.modelli_display || `Ledwall ${index + 1}`;
+      const unitMode = productCalculationMode(configuration.tipo_calcolo ? configuration : product) === "UNITA";
+      const ledwallProduct = productCatalogTab(configuration.catalogo_tab ? configuration : product) === "LEDWALL";
+      const displayName = ledwallProduct && !/^ledwall/i.test(String(rawName)) ? `Ledwall Display ${rawName}` : String(rawName);
       return {
-        name: /^ledwall/i.test(String(rawName)) ? String(rawName) : `Ledwall Display ${rawName}`,
+        name: displayName,
         code: codes.join(" + ") || product.sku || configuration.sku || configuration.product_id || "-",
-        size: workOrderMeasure(configuration.larghezza, configuration.altezza, configuration.misura_display || configuration.misura || record.misure_display),
-        configuration: String(configuration.bifacciale || record.bifacciale || "NO").toUpperCase() === "SI" ? "Bifacciale" : "Monofacciale",
-        cabinets: cabinetTotal ? `${cabinetTotal} pz` : "-"
+        size: unitMode ? (configuration.formato_label || productFormatLabel(product)) : workOrderMeasure(configuration.larghezza, configuration.altezza, configuration.misura_display || configuration.misura || record.misure_display),
+        configuration: unitMode ? "Articolo a quantità" : (String(configuration.bifacciale || record.bifacciale || "NO").toUpperCase() === "SI" ? "Bifacciale" : "Monofacciale"),
+        cabinets: cabinetTotal ? `${cabinetTotal} ${productInventoryUnit(product, cabinetTotal)}` : "-"
       };
     });
   }
@@ -2195,12 +2264,16 @@
     };
     const address = [addressSource.indirizzo, addressSource.civico, addressSource.cap, addressSource.localita || addressSource.comune || addressSource.citta, addressSource.provincia, addressSource.regione].filter((entry) => String(entry || "").trim()).join(", ");
     const ledwallArchive = ledwallConfigurations.length ? `<div class="completed-ledwall-list">${ledwallConfigurations.map((configuration, index) => {
+      const product = (state.data.products || []).find((item) => String(item.id) === String(configuration.product_id || "")) || configuration;
+      const unitMode = productCalculationMode(configuration.tipo_calcolo ? configuration : product) === "UNITA";
+      const quantity = Number(configuration.quantita_unita || configuration.cabinet_necessari || 0);
       const specificAddress = String(configuration.indirizzo_tipo || "INDIRIZZO UNICO") === "PRESSO ALTRO INDIRIZZO"
         ? [configuration.installazione_indirizzo, configuration.installazione_civico, configuration.installazione_cap, configuration.installazione_localita || configuration.installazione_comune, configuration.installazione_provincia, configuration.installazione_regione].filter((entry) => String(entry || "").trim()).join(", ")
         : address;
-      return `<article><span>${index + 1}</span><div><small>LEDWALL ${index + 1}</small><strong>${value(configuration.modello_display)}</strong><p>${value(configuration.larghezza)}×${value(configuration.altezza)} m · ${Number(configuration.cabinet_necessari || 0)} cabinet · ${configuration.bifacciale === "SI" ? "Bifacciale" : "Monofacciale"}</p><em>📍 ${value(specificAddress, "Indirizzo unico della pratica")}</em></div></article>`;
+      const configurationText = unitMode ? `${value(configuration.formato_label || productFormatLabel(product))} · ${quantity} ${productInventoryUnit(product, quantity)}` : `${value(configuration.larghezza)}×${value(configuration.altezza)} m · ${Number(configuration.cabinet_necessari || 0)} cabinet · ${configuration.bifacciale === "SI" ? "Bifacciale" : "Monofacciale"}`;
+      return `<article><span>${index + 1}</span><div><small>PRODOTTO ${index + 1}</small><strong>${value(configuration.modello_display)}</strong><p>${configurationText}</p><em>📍 ${value(specificAddress, "Indirizzo unico della pratica")}</em></div></article>`;
     }).join("")}</div>` : "";
-    const inventory = inventoryRows.length ? inventoryRows.map((row) => `<li><span>${value(row.descrizione || row.product_id)}</span><strong>${Number(row.quantita || 0)} cabinet</strong></li>`).join("") : `<li><span>${value(record.cabinet_da_sottrarre, "Composizione non indicata")}</span></li>`;
+    const inventory = inventoryRows.length ? inventoryRows.map((row) => { const product = (state.data.products || []).find((item) => String(item.id) === String(row.product_id || "")) || {}; return `<li><span>${value(row.descrizione || row.product_id)}</span><strong>${Number(row.quantita || 0)} ${esc(productInventoryUnit(product, row.quantita))}</strong></li>`; }).join("") : `<li><span>${value(record.cabinet_da_sottrarre, "Composizione non indicata")}</span></li>`;
     const documentList = documents.length ? documents.map((document) => `<li><span class="completed-document-icon">📄</span><div><strong>${value(document.nome || document.file_name)}</strong><small>${value(document.tipo || "Documento")} · ${dateIt(document.data || document.aggiornatoIl)}</small></div>${documentActionMarkup(document, "Non disponibile")}</li>`).join("") : `<li class="empty"><span>🗂️</span><div><strong>Nessun allegato registrato</strong><small>La pratica resta consultabile come archivio definitivo.</small></div></li>`;
     const origin = String(record.origine || "").toUpperCase().includes("QUOTATION PLANNER") ? "Importata dal Seemax Quotation Planner" : record.origine || "Creata nel Management Suite";
     const body = `<article class="completed-practice-view">
@@ -2209,14 +2282,14 @@
       <section class="completed-summary-grid">${item("Stato", badge("Completata"), { html: true })}${item("Completata il", dateIt(record.completataIl || record.aggiornatoIl))}${item("Agente responsabile", record.agente || record.agent_username)}${item("Valore pratica", euros(record.valore || 0))}${item("Provvigione", euros(record.valore_provvigione || 0))}${item("Origine", origin)}</section>
       <div class="completed-sections">
         <section><div class="completed-section-heading"><span>👤</span><div><small>INTESTAZIONE</small><h4>Cliente e destinatario</h4></div></div><div class="completed-detail-grid">${item("Cliente / intestatario", record.cliente || record.intestatario_nome)}${item("Destinatario ordine", record.destinatario_ordine || "Cliente")}${item("E-mail intestatario", record.intestatario_email || client.email)}${item("Telefono", record.intestatario_telefono || client.telefono)}</div></section>
-        <section><div class="completed-section-heading"><span>🖥️</span><div><small>FORNITURA</small><h4>${ledwallConfigurations.length > 1 ? `${ledwallConfigurations.length} Ledwall associati` : "Prodotto e configurazione"}</h4></div></div>${ledwallArchive || `<div class="completed-detail-grid">${item("Modello display", record.modelli_display)}${item("Misura preventivata", record.misure_display)}${item("Bifacciale", record.bifacciale || "NO")}${item("Gestione Ledwall", record.gestione_ledwall)}</div>`}<ul class="completed-inventory-list">${inventory}</ul></section>
+        <section><div class="completed-section-heading"><span>🖥️</span><div><small>FORNITURA</small><h4>${ledwallConfigurations.length > 1 ? `${ledwallConfigurations.length} prodotti associati` : "Prodotto e configurazione"}</h4></div></div>${ledwallArchive || `<div class="completed-detail-grid">${item("Modello display", record.modelli_display)}${item("Misura preventivata", record.misure_display)}${item("Bifacciale", record.bifacciale || "NO")}${item("Gestione display", record.gestione_ledwall)}</div>`}<ul class="completed-inventory-list">${inventory}</ul></section>
         <section><div class="completed-section-heading"><span>📍</span><div><small>INSTALLAZIONE</small><h4>Sede e requisiti tecnici</h4></div></div><div class="completed-detail-grid">${item("Tipo indirizzo", record.indirizzo_installazione_tipo)}${item("Indirizzo completo", address, { wide: true })}${item("SIM traffico rete", record.sim_richiesta || "NO")}${item("Predisposizione elettrica", record.predisposizione_elettrica || "NO")}${record.cloud_username ? item("Account Cloud", record.cloud_username) : ""}</div></section>
         ${String(record.tipo_pratica || "").toUpperCase() === "ACQUISTO" ? "" : `<section><div class="completed-section-heading"><span>🏦</span><div><small>CONDIZIONI</small><h4>${value(record.finanziaria)} e pagamenti</h4></div></div><div class="completed-detail-grid">${item("Finanziaria", record.finanziaria)}${item("Numero rate", record.numero_rate)}${item("Periodicità", record.periodicita_pagamento)}${item("Preventivo S.Q.P.", record.preventivo_id)}</div></section>`}
         <section class="completed-documents-section"><div class="completed-section-heading"><span>🗂️</span><div><small>DOCUMENTI</small><h4>Allegati archiviati</h4></div></div><ul class="completed-document-list">${documentList}</ul></section>
         ${record.note ? `<section><div class="completed-section-heading"><span>💬</span><div><small>ANNOTAZIONI</small><h4>Note finali</h4></div></div><p class="completed-notes">${esc(record.note)}</p></section>` : ""}
       </div>
       ${practiceStockWarningAdminControl(record)}
-      <footer class="completed-practice-footer"><div><span>${String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "⚠" : "✓"}</span><p><strong>${String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "Scarico magazzino in attesa" : "Magazzino consolidato"}</strong><small>${String(record.magazzino_applicato || "NO").toUpperCase() === "SI" ? "I cabinet previsti risultano già contabilizzati." : String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "La pratica è salvata; i cabinet non sono stati sottratti perché la giacenza è insufficiente." : "Nessun movimento di magazzino risulta applicato."}</small></p></div><button type="button" class="btn primary" data-action="close-modal">Chiudi archivio</button></footer>
+      <footer class="completed-practice-footer"><div><span>${String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "⚠" : "✓"}</span><p><strong>${String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "Scarico magazzino in attesa" : "Magazzino consolidato"}</strong><small>${String(record.magazzino_applicato || "NO").toUpperCase() === "SI" ? "Le quantità previste risultano già contabilizzate." : String(record.magazzino_in_attesa || "NO").toUpperCase() === "SI" ? "La pratica è salvata; le quantità non sono state sottratte perché la giacenza è insufficiente." : "Nessun movimento di magazzino risulta applicato."}</small></p></div><button type="button" class="btn primary" data-action="close-modal">Chiudi archivio</button></footer>
     </article>`;
     openModal(`Pratica ${record.numero}`, body, { wide: true, panelClass: "completed-practice-modal", kicker: "Archivio pratiche concluse", subtitle: "Consultazione definitiva · sola lettura" });
   }
@@ -2260,9 +2333,14 @@
     };
     const resolveProductId = (raw, stockLines) => {
       const source = `${raw.product_id || ""} ${raw.modello_display || raw.prodotto || ""}`.toLowerCase().replace(/,/g, ".");
-      if (source.includes("p3.91") || source.includes("p391") || (stockLines || []).some((line) => isP391Id(line.product_id))) return "P391_UNIFIED";
       const exact = logicalProducts.find((product) => String(product.id) === String(raw.product_id || ""));
       if (exact) return exact.id;
+      const namedSpecial = logicalProducts.find((product) => {
+        const candidate = `${product.id || ""} ${product.nome || ""}`.toLowerCase();
+        return (/floor/.test(source) && /floor/.test(candidate)) || (/transparent/.test(source) && /transparent/.test(candidate)) || (/croce|cross/.test(source) && candidate.includes(String(raw.modello_display || raw.prodotto || "").toLowerCase())) || (/totem|smx[\s-]*430/.test(source) && /totem|smx[\s-]*430/.test(candidate));
+      });
+      if (namedSpecial) return namedSpecial.id;
+      if (String(raw.product_id || "").toUpperCase() === "P391_UNIFIED" || source.includes("p3.91") || source.includes("p391") || (stockLines || []).some((line) => isP391Id(line.product_id))) return "P391_UNIFIED";
       const model = (source.match(/p(?:1\.9|2\.5|3\.91|3|4)/) || [])[0] || "";
       const matched = logicalProducts.find((product) => String(product.nome || "").toLowerCase().startsWith(model));
       return (matched || logicalProducts[0] || {}).id || "";
@@ -2279,6 +2357,11 @@
         larghezza: raw.larghezza !== undefined && raw.larghezza !== "" ? raw.larghezza : (measure.width || Number(product.cabX || 50) / 100),
         altezza: raw.altezza !== undefined && raw.altezza !== "" ? raw.altezza : (measure.height || Number(product.cabY || 50) / 100),
         bifacciale: String(raw.bifacciale || "NO").toUpperCase() === "SI" ? "SI" : "NO",
+        quantita_unita: Number(raw.quantita_unita || raw.quantita || raw.cabinet_necessari || raw.cabinet_da_sottrarre || raw.cabinet || 1),
+        tipo_calcolo: raw.tipo_calcolo || productCalculationMode(product),
+        unita_magazzino: raw.unita_magazzino || product.unita_magazzino || "CABINET",
+        formato_label: raw.formato_label || productFormatLabel(product),
+        catalogo_tab: raw.catalogo_tab || productCatalogTab(product),
         cabinet_necessari: Number(raw.cabinet_necessari || raw.cabinet_da_sottrarre || raw.cabinet || 0),
         stock_lines: stockLines,
         indirizzo_tipo: index === 0 ? "INDIRIZZO UNICO" : String(raw.indirizzo_tipo || "INDIRIZZO UNICO").toUpperCase(),
@@ -2367,7 +2450,7 @@
       <div id="missingClientAddressNotice" class="client-completion-alert full is-hidden">Non esiste un indirizzo nell’anagrafica cliente. Inseriscilo adesso: verrà registrato automaticamente anche nel cliente.</div>
     </div></fieldset>`;
     const technicalManagement = `<fieldset class="practice-section full"><legend>Dettagli tecnici</legend><div class="form-grid">
-      ${field("Gestione del Ledwall", "gestione_ledwall", management, { options: ["", "In locale con cavo di rete", "In locale con Wi-Fi", "Via Smartphone", "In Cloud"], required: req("gestione_ledwall") })}
+      ${field("Gestione del display", "gestione_ledwall", management, { options: ["", "In locale con cavo di rete", "In locale con Wi-Fi", "Via Smartphone", "In Cloud"], required: req("gestione_ledwall") })}
       ${field("SIM per traffico rete richiesta", "sim_richiesta", record.sim_richiesta || "NO", { options: ["NO", "SI"] })}
       ${field("Predisposizione elettrica presente", "predisposizione_elettrica", record.predisposizione_elettrica || "NO", { options: ["NO", "SI"] })}
       <div class="cloud-fields form-grid full conditional-section" data-visible-when-management="IN CLOUD">
@@ -2391,9 +2474,9 @@
         : `<div class="practice-upload-help"><span>＋</span><div><strong>Aggiungi altri allegati dalla sezione Documenti</strong><small>Seleziona questa pratica nel campo di collegamento: il file apparirà automaticamente in questo elenco.</small></div></div>`;
     const uploads = `<fieldset class="practice-section full practice-documents-panel"><legend>Documentazione della pratica</legend>${practiceDocumentListMarkup(existingDocuments)}${uploadControls}</fieldset>`;
     const technicalFields = `<fieldset class="practice-configurator practice-multi-ledwall full"><legend>Prodotti della pratica</legend>
-      <div class="multi-ledwall-intro"><span>🖥️</span><div><strong>Una sola pratica, più Ledwall</strong><p>Aggiungi tutte le installazioni previste. Cabinet e disponibilità vengono calcolati e sommati automaticamente.</p></div></div>
+      <div class="multi-ledwall-intro"><span>🖥️</span><div><strong>Una sola pratica, più prodotti</strong><p>Aggiungi Ledwall, Croci, LED speciali o Schermi LCD. Quantità e disponibilità vengono calcolate e sommate automaticamente.</p></div></div>
       <div id="practiceLedwallList" class="practice-ledwall-list"></div>
-      <button type="button" class="btn soft add-practice-ledwall" id="addPracticeLedwall"><span>＋</span> Aggiungi un altro Ledwall</button>
+      <button type="button" class="btn soft add-practice-ledwall" id="addPracticeLedwall"><span>＋</span> Aggiungi un altro prodotto</button>
       <div id="practiceInventorySummary" class="practice-inventory-summary"></div>
     </fieldset>`;
     const identityFields = `<fieldset class="practice-section full"><legend>Identificazione</legend><div class="form-grid">${field("Identificativo pratica", "numero", number, { required: true, readonly: true })}${statusField}${assigneeField}</div></fieldset>`;
@@ -2560,10 +2643,13 @@
     const summary = document.getElementById("practiceInventorySummary");
     if (!form || !list || !addButton) return;
     form.noValidate = true;
-    let configurations = (initialLedwalls || []).map((item, index) => ({ ...item, id: item.id || `ledwall-${index + 1}` }));
-    if (!configurations.length) configurations = [{ id: "ledwall-1", product_id: (products[0] || {}).id || "", bifacciale: "NO", indirizzo_tipo: "INDIRIZZO UNICO" }];
+    let configurations = (initialLedwalls || []).map((item, index) => ({ ...item, id: item.id || `product-${index + 1}` }));
+    if (!configurations.length) configurations = [{ id: "product-1", product_id: (products[0] || {}).id || "", quantita_unita: 1, bifacciale: "NO", indirizzo_tipo: "INDIRIZZO UNICO" }];
 
-    const productOptions = (selected) => products.map((product) => `<option value="${esc(product.id)}" ${String(product.id) === String(selected) ? "selected" : ""}>${esc(product.nome)}${product.unifiedP391 ? " · composizione automatica 50×100 + 50×50 cm" : ` · cabinet ${esc(product.cabX)}×${esc(product.cabY)} cm`}</option>`).join("");
+    const productOptions = (selected) => CATALOG_TABS.map((tab) => {
+      const grouped = products.filter((product) => productCatalogTab(product) === tab.id);
+      return grouped.length ? `<optgroup label="${esc(tab.label)}">${grouped.map((product) => `<option value="${esc(product.id)}" ${String(product.id) === String(selected) ? "selected" : ""}>${esc(productOptionLabel(product))}</option>`).join("")}</optgroup>` : "";
+    }).join("");
     const locationFields = (item, index) => `<div class="ledwall-alternate-address ${String(item.indirizzo_tipo || "") === "PRESSO ALTRO INDIRIZZO" ? "" : "is-hidden"}" data-ledwall-address-fields>
       <div class="form-grid">
         <label>Regione ${requiredMark(true)}<select name="ledwall_${index}_regione"><option value="${esc(item.installazione_regione || "")}">${esc(item.installazione_regione || "Seleziona regione")}</option></select></label>
@@ -2581,19 +2667,27 @@
         const product = products.find((candidate) => candidate.id === item.product_id) || products[0] || {};
         const stepX = Number(product.cabX || 50) / 100;
         const stepY = Number(product.cabY || 50) / 100;
+        const unitMode = productCalculationMode(product) === "UNITA";
+        const initialQuantity = Number(item.quantita_unita || item.cabinet_necessari || 1);
         const otherAddress = String(item.indirizzo_tipo || "INDIRIZZO UNICO") === "PRESSO ALTRO INDIRIZZO";
         return `<article class="practice-ledwall-card" data-ledwall-index="${index}">
-          <header><div><span>LEDWALL ${index + 1}</span><strong>${esc(item.modello_display || product.nome || "Configurazione display")}</strong></div>${index ? `<button type="button" class="remove-ledwall" data-remove-ledwall="${index}" aria-label="Rimuovi Ledwall">×</button>` : `<span class="primary-ledwall-pill">PRINCIPALE</span>`}</header>
+          <header><div><span>PRODOTTO ${index + 1}</span><strong>${esc(item.modello_display || product.nome || "Configurazione prodotto")}</strong></div>${index ? `<button type="button" class="remove-ledwall" data-remove-ledwall="${index}" aria-label="Rimuovi prodotto">×</button>` : `<span class="primary-ledwall-pill">PRINCIPALE</span>`}</header>
           <div class="form-grid ledwall-product-grid">
-            <label class="full">Display di riferimento ${requiredMark(true)}<select name="ledwall_${index}_product_id" data-ledwall-product required>${productOptions(item.product_id || product.id)}</select></label>
-            <label>Larghezza display (m) ${requiredMark(true)}<input name="ledwall_${index}_larghezza" data-ledwall-width type="number" min="${stepX}" step="${stepX}" value="${esc(item.larghezza || stepX)}" required></label>
-            <label>Altezza display (m) ${requiredMark(true)}<input name="ledwall_${index}_altezza" data-ledwall-height type="number" min="${stepY}" step="${stepY}" value="${esc(item.altezza || stepY)}" required></label>
-            <label>Bifacciale ${requiredMark(true)}<select name="ledwall_${index}_bifacciale" data-ledwall-bifacial required><option value="NO" ${item.bifacciale !== "SI" ? "selected" : ""}>NO</option><option value="SI" ${item.bifacciale === "SI" ? "selected" : ""}>SI</option></select></label>
-            <label>Cabinet necessari<input name="ledwall_${index}_cabinet" data-ledwall-cabinets value="${Number(item.cabinet_necessari || 0)}" readonly><small class="cabinet-availability" data-ledwall-availability></small></label>
+            <label class="full">Prodotto di riferimento ${requiredMark(true)}<select name="ledwall_${index}_product_id" data-ledwall-product required>${productOptions(item.product_id || product.id)}</select></label>
+            <div class="form-grid full product-dimension-fields ${unitMode ? "is-hidden" : ""}" data-product-dimensions>
+              <label>Larghezza display (m) ${requiredMark(true)}<input name="ledwall_${index}_larghezza" data-ledwall-width type="number" min="${stepX}" step="${stepX}" value="${esc(item.larghezza || stepX)}" ${unitMode ? "" : "required"}></label>
+              <label>Altezza display (m) ${requiredMark(true)}<input name="ledwall_${index}_altezza" data-ledwall-height type="number" min="${stepY}" step="${stepY}" value="${esc(item.altezza || stepY)}" ${unitMode ? "" : "required"}></label>
+              <label>Bifacciale ${requiredMark(true)}<select name="ledwall_${index}_bifacciale" data-ledwall-bifacial ${unitMode ? "" : "required"}><option value="NO" ${item.bifacciale !== "SI" ? "selected" : ""}>NO</option><option value="SI" ${item.bifacciale === "SI" ? "selected" : ""}>SI</option></select></label>
+            </div>
+            <div class="form-grid full product-quantity-fields ${unitMode ? "" : "is-hidden"}" data-product-quantity-fields>
+              <label>Quantità articoli ${requiredMark(true)}<input name="ledwall_${index}_quantita" data-product-quantity type="number" min="1" step="1" value="${initialQuantity}" ${unitMode ? "required" : ""}></label>
+              <div class="unit-product-format"><small>FORMATO / MODELLO</small><strong data-product-format>${esc(productFormatLabel(product))}</strong><span>La quantità viene registrata in pezzi.</span></div>
+            </div>
+            <label><span data-product-count-label>${unitMode ? "Pezzi necessari" : "Cabinet necessari"}</span><input name="ledwall_${index}_cabinet" data-ledwall-cabinets value="${Number(item.cabinet_necessari || 0)}" readonly><small class="cabinet-availability" data-ledwall-availability></small></label>
             <div class="measure-validation full" data-ledwall-validation></div>
           </div>
           <div class="ledwall-address-choice">
-            <div><small>SEDE DI INSTALLAZIONE</small><strong>${index === 0 ? "Indirizzo principale della pratica" : "Dove verrà installato questo Ledwall?"}</strong></div>
+            <div><small>SEDE DI INSTALLAZIONE</small><strong>${index === 0 ? "Indirizzo principale della pratica" : "Dove verrà installato questo prodotto?"}</strong></div>
             ${index === 0 ? `<input type="hidden" name="ledwall_${index}_indirizzo_tipo" value="INDIRIZZO UNICO"><span class="unique-address-pill">📍 INDIRIZZO UNICO</span>` : `<select name="ledwall_${index}_indirizzo_tipo" data-ledwall-address-type><option value="INDIRIZZO UNICO" ${!otherAddress ? "selected" : ""}>INDIRIZZO UNICO</option><option value="PRESSO ALTRO INDIRIZZO" ${otherAddress ? "selected" : ""}>PRESSO ALTRO INDIRIZZ.</option></select>`}
           </div>
           ${index ? locationFields(item, index) : ""}
@@ -2626,26 +2720,52 @@
       const widthInput = card.querySelector("[data-ledwall-width]");
       const heightInput = card.querySelector("[data-ledwall-height]");
       const bifacialInput = card.querySelector("[data-ledwall-bifacial]");
+      const quantityInput = card.querySelector("[data-product-quantity]");
       const cabinetInput = card.querySelector("[data-ledwall-cabinets]");
       const validation = card.querySelector("[data-ledwall-validation]");
       const product = products.find((item) => item.id === productInput.value) || products[0] || {};
+      const calculationMode = productCalculationMode(product);
+      const unitMode = calculationMode === "UNITA";
       const cardTitle = card.querySelector("header>div>strong");
-      if (cardTitle) cardTitle.textContent = String(product.nome || "Configurazione display");
+      if (cardTitle) cardTitle.textContent = String(product.nome || "Configurazione prodotto");
       const stepX = Number(product.cabX || 50) / 100;
       const stepY = Number(product.cabY || 50) / 100;
       widthInput.step = String(stepX); widthInput.min = String(stepX);
       heightInput.step = String(stepY); heightInput.min = String(stepY);
+      card.querySelector("[data-product-dimensions]")?.classList.toggle("is-hidden", unitMode);
+      card.querySelector("[data-product-quantity-fields]")?.classList.toggle("is-hidden", !unitMode);
+      widthInput.required = !unitMode; heightInput.required = !unitMode; bifacialInput.required = !unitMode; quantityInput.required = unitMode;
+      if (unitMode) bifacialInput.value = "NO";
+      const countLabel = card.querySelector("[data-product-count-label]");
+      if (countLabel) countLabel.textContent = unitMode ? "Pezzi necessari" : "Cabinet necessari";
+      const formatNode = card.querySelector("[data-product-format]");
+      if (formatNode) formatNode.textContent = productFormatLabel(product);
       const addressType = card.querySelector(`[name="ledwall_${index}_indirizzo_tipo"]`)?.value || "INDIRIZZO UNICO";
       const addressValue = (key) => card.querySelector(`[name="ledwall_${index}_${key}"]`)?.value || "";
       const base = {
-        ...(configurations[index] || {}), id: configurations[index]?.id || `ledwall-${index + 1}`,
-        product_id: product.id, modello_display: String(product.nome || "").split(" - ")[0],
-        larghezza: widthInput.value, altezza: heightInput.value, bifacciale: bifacialInput.value,
+        ...(configurations[index] || {}), id: configurations[index]?.id || `product-${index + 1}`,
+        product_id: product.id, modello_display: String(product.nome || ""),
+        larghezza: widthInput.value, altezza: heightInput.value, bifacciale: unitMode ? "NO" : bifacialInput.value,
+        quantita_unita: unitMode ? quantityInput.value : "", tipo_calcolo: calculationMode,
+        unita_magazzino: String(product.unita_magazzino || (unitMode ? "PEZZI" : "CABINET")).toUpperCase(),
+        formato_label: productFormatLabel(product), catalogo_tab: productCatalogTab(product),
         indirizzo_tipo: index === 0 ? "INDIRIZZO UNICO" : addressType,
         installazione_regione: addressValue("regione"), installazione_provincia: addressValue("provincia"),
         installazione_comune: addressValue("comune"), installazione_cap: addressValue("cap"),
         installazione_localita: addressValue("localita"), installazione_indirizzo: addressValue("indirizzo"), installazione_civico: addressValue("civico")
       };
+      if (unitMode) {
+        if (isAdminUnknown(quantityInput.value)) {
+          cabinetInput.value = "0000";
+          validation.innerHTML = `<strong>Dato non disponibile:</strong> completa la quantità prima di impegnare il magazzino.`;
+          return { ...base, cabinet_necessari: "0000", stock_lines: [], unknown: true };
+        }
+        const quantity = Number(quantityInput.value || 0);
+        const validQuantity = Number.isInteger(quantity) && quantity > 0;
+        cabinetInput.value = validQuantity ? quantity : 0;
+        validation.innerHTML = validQuantity ? `${quantity} ${productInventoryUnit(product, quantity)} · ${esc(productFormatLabel(product))}.` : `<strong>Quantità non valida:</strong> inserisci un numero intero maggiore di zero.`;
+        return { ...base, larghezza: stepX, altezza: stepY, bifacciale: "NO", quantita_unita: quantity, cabinet_necessari: validQuantity ? quantity : 0, stock_lines: validQuantity ? [{ product_id: product.id, quantita: quantity, descrizione: product.nome }] : [], unknown: false, invalid: !validQuantity };
+      }
       if (isAdminUnknown(widthInput.value) || isAdminUnknown(heightInput.value)) {
         cabinetInput.value = "0000";
         validation.innerHTML = `<strong>Dato non disponibile:</strong> completa la misura prima di impegnare il magazzino.`;
@@ -2658,6 +2778,8 @@
       const y = Math.max(1, Math.ceil((height - 1e-8) / stepY));
       const exactX = Math.abs(width / stepX - Math.round(width / stepX)) < 0.001;
       const exactY = Math.abs(height / stepY - Math.round(height / stepY)) < 0.001;
+      const exactRequired = calculationMode === "MODULARE_ESATTO";
+      const exactValid = exactX && exactY;
       let rows = [];
       let count = x * y * faces;
       if (product.id === "P391_UNIFIED") {
@@ -2674,10 +2796,11 @@
         validation.innerHTML = (!exactX || !exactY) ? `<strong>Misura adattata:</strong> configurazione reale ${realizedWidth.toFixed(2)}×${realizedHeight.toFixed(2)} m. Composizione: ${rectangularCount} cabinet 50×100 e ${squareCount} cabinet 50×50${faces === 2 ? " (bifacciale)" : ""}.` : `P3.91 unificato: ${rectangularCount} cabinet 50×100 e ${squareCount} cabinet 50×50${faces === 2 ? " (bifacciale)" : ""}.`;
       } else {
         rows = [{ product_id: product.id, quantita: count, descrizione: product.nome }];
-        validation.innerHTML = (!exactX || !exactY) ? `<strong>Misura adattata:</strong> configurazione reale ${(x * stepX).toFixed(2)}×${(y * stepY).toFixed(2)} m (${count} cabinet${faces === 2 ? ", bifacciale" : ""}).` : `Misura realizzabile esattamente con ${count} cabinet.`;
+        if (exactRequired && !exactValid) validation.innerHTML = `<strong>Misura da allineare:</strong> usa multipli esatti di ${stepX.toFixed(2)}×${stepY.toFixed(2)} m. Al rilascio del campo la misura verrà portata al modulo successivo.`;
+        else validation.innerHTML = (!exactValid) ? `<strong>Misura adattata:</strong> configurazione reale ${(x * stepX).toFixed(2)}×${(y * stepY).toFixed(2)} m (${count} cabinet${faces === 2 ? ", bifacciale" : ""}).` : `Misura realizzabile esattamente con ${count} cabinet.`;
       }
       cabinetInput.value = count;
-      return { ...base, larghezza: width, altezza: height, cabinet_necessari: count, stock_lines: rows, unknown: false };
+      return { ...base, larghezza: width, altezza: height, cabinet_necessari: count, stock_lines: rows, unknown: false, invalid: exactRequired && !exactValid };
     }
 
     function calculateAll() {
@@ -2699,22 +2822,24 @@
       cards.forEach((card, index) => {
         const availability = card.querySelector("[data-ledwall-availability]");
         const cardRows = configurations[index].stock_lines || [];
+        const configuredProduct = products.find((product) => String(product.id) === String(configurations[index].product_id)) || {};
+        const unit = productInventoryUnit(configuredProduct, 2);
         const relevant = cardRows.map((row) => shortages.find((entry) => String(entry.product_id).toLowerCase() === String(row.product_id).toLowerCase())).filter(Boolean);
         const insufficient = relevant.some((row) => row.missing > 0);
         card.classList.toggle("stock-insufficient", insufficient);
         availability.className = `cabinet-availability ${insufficient ? "insufficient" : "available"}`;
-        availability.textContent = configurations[index].unknown ? "Quantità da definire" : relevant.map((row) => `${row.descrizione}: ${row.available} disponibili · ${row.quantita} totali nella pratica`).join(" · ");
+        availability.textContent = configurations[index].unknown ? "Quantità da definire" : relevant.map((row) => `${row.descrizione}: ${row.available} ${unit} disponibili · ${row.quantita} richiesti`).join(" · ");
         if (insufficient) card.querySelector("[data-ledwall-validation]").innerHTML += `<div class="ledwall-shortage-warning">⚠ Giacenza insufficiente. La pratica può comunque essere salvata.</div>`;
       });
       const hasShortage = shortages.some((row) => row.missing > 0);
       summary.className = `practice-inventory-summary ${hasShortage ? "insufficient" : "available"}`;
-      summary.innerHTML = inventoryRows.length ? `<div><span>${hasShortage ? "⚠" : "✓"}</span><div><strong>${hasShortage ? "Giacenza insufficiente, salvataggio consentito" : "Composizione disponibile"}</strong><p>${shortages.map((row) => `${esc(row.descrizione)}: ${row.quantita} necessari / ${row.available} disponibili${row.missing ? ` · mancanti ${row.missing}` : ""}`).join(" · ")}</p></div></div><small>${configurations.length} Ledwall · ${configurations.reduce((sum, item) => sum + Number(item.cabinet_necessari || 0), 0)} cabinet complessivi</small>` : `<div><span>⚠</span><div><strong>Composizione da completare</strong><p>Definisci le misure dei Ledwall prima dell’impegno di magazzino.</p></div></div>`;
+      summary.innerHTML = inventoryRows.length ? `<div><span>${hasShortage ? "⚠" : "✓"}</span><div><strong>${hasShortage ? "Giacenza insufficiente, salvataggio consentito" : "Composizione disponibile"}</strong><p>${shortages.map((row) => `${esc(row.descrizione)}: ${row.quantita} richiesti / ${row.available} disponibili${row.missing ? ` · mancanti ${row.missing}` : ""}`).join(" · ")}</p></div></div><small>${configurations.length} ${configurations.length === 1 ? "prodotto" : "prodotti"} · ${configurations.reduce((sum, item) => sum + Number(item.cabinet_necessari || 0), 0)} unità di magazzino</small>` : `<div><span>⚠</span><div><strong>Composizione da completare</strong><p>Definisci misure o quantità dei prodotti prima dell’impegno di magazzino.</p></div></div>`;
       form.elements.modelli_display.value = configurations.map((item) => item.modello_display).filter(Boolean).join(" | ");
-      form.elements.misure_display.value = configurations.map((item, index) => `Ledwall ${index + 1}: ${item.larghezza}x${item.altezza}`).join(" | ");
+      form.elements.misure_display.value = configurations.map((item, index) => productCalculationMode(item) === "UNITA" ? `Prodotto ${index + 1}: ${item.formato_label} · ${item.quantita_unita} pezzi` : `Prodotto ${index + 1}: ${item.larghezza}x${item.altezza} m`).join(" | ");
       form.elements.bifacciale.value = configurations.some((item) => item.bifacciale === "SI") ? "SI" : "NO";
       form.elements.cabinet_da_sottrarre.value = configurations.some((item) => item.unknown) && !inventoryRows.length ? "0000" : inventoryRows.map((line) => `${line.descrizione}: ${line.quantita}`).join(" | ");
       form.elements.righe_magazzino_json.value = JSON.stringify(inventoryRows);
-      form.elements.ledwall_configurazioni_json.value = JSON.stringify(configurations.map(({ unknown, ...item }) => item));
+      form.elements.ledwall_configurazioni_json.value = JSON.stringify(configurations.map(({ unknown, invalid, ...item }) => item));
       const rectangular = grouped["p391-50100"] || grouped["P391-50100"];
       const square = grouped["p391-5050"] || grouped["P391-5050"];
       form.elements.p391_unificato.value = rectangular || square ? "SI" : "NO";
@@ -2723,10 +2848,28 @@
     }
 
     list.addEventListener("input", (event) => {
-      if (event.target.matches("[data-ledwall-width],[data-ledwall-height]")) calculateAll();
+      if (event.target.matches("[data-ledwall-width],[data-ledwall-height],[data-product-quantity]")) calculateAll();
     });
     list.addEventListener("change", (event) => {
       if (event.target.matches("[data-ledwall-address-type]")) updateAddressRequirements();
+      const card = event.target.closest("[data-ledwall-index]");
+      if (card && event.target.matches("[data-ledwall-product]")) {
+        const product = products.find((item) => item.id === event.target.value) || products[0] || {};
+        const stepX = Number(product.cabX || 50) / 100;
+        const stepY = Number(product.cabY || 50) / 100;
+        card.querySelector("[data-ledwall-width]").value = stepX;
+        card.querySelector("[data-ledwall-height]").value = stepY;
+        card.querySelector("[data-ledwall-bifacial]").value = "NO";
+        card.querySelector("[data-product-quantity]").value = 1;
+      }
+      if (card && event.target.matches("[data-ledwall-width],[data-ledwall-height]")) {
+        const selected = products.find((item) => item.id === card.querySelector("[data-ledwall-product]").value) || {};
+        if (productCalculationMode(selected) === "MODULARE_ESATTO" && !isAdminUnknown(event.target.value)) {
+          const step = event.target.matches("[data-ledwall-width]") ? Number(selected.cabX || 50) / 100 : Number(selected.cabY || 50) / 100;
+          const snapped = snapUpToStep(event.target.value, step);
+          event.target.value = Number(snapped.toFixed(4));
+        }
+      }
       calculateAll();
     });
     list.addEventListener("click", (event) => {
@@ -2737,7 +2880,7 @@
     });
     addButton.addEventListener("click", () => {
       const product = products[0] || {};
-      configurations.push({ id: `ledwall-${Date.now()}`, product_id: product.id || "", modello_display: product.nome || "", larghezza: Number(product.cabX || 50) / 100, altezza: Number(product.cabY || 50) / 100, bifacciale: "NO", indirizzo_tipo: "INDIRIZZO UNICO" });
+      configurations.push({ id: `product-${Date.now()}`, product_id: product.id || "", modello_display: product.nome || "", larghezza: Number(product.cabX || 50) / 100, altezza: Number(product.cabY || 50) / 100, quantita_unita: 1, bifacciale: "NO", indirizzo_tipo: "INDIRIZZO UNICO" });
       render();
       list.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
@@ -2786,18 +2929,18 @@
   }
 
   function openProduct(id) {
-    const r = state.data.products.find((p) => p.id === id) || { attivo: "SI", categoria: "Ledwall Outdoor" };
+    const r = state.data.products.find((p) => p.id === id) || { attivo: "SI", categoria: "Ledwall Outdoor", catalogo_tab: state.catalogTab || "LEDWALL", tipo_calcolo: "MODULARE", unita_magazzino: "CABINET" };
     const canonical = String(r.nome || "").startsWith("P3.91") ? "P3.91" : String(r.nome || "").startsWith("P4") ? "P4" : r.nome;
     const specs = TECH_SPECS[canonical] || [];
     const spec = (key, prefix) => r[key] || ((specs.find((line) => line.toLowerCase().startsWith(prefix.toLowerCase())) || "").split(":").slice(1).join(":").trim());
     const section = (title, content) => `<fieldset class="product-form-section full"><legend>${esc(title)}</legend><div class="form-grid">${content}</div></fieldset>`;
     const fields =
-      section("Dettagli", field("Nome / Pixel Pitch", "nome", r.nome, { required: true }) + field("SKU", "sku", r.sku) + field("Categoria", "categoria", r.categoria) + field("Descrizione", "descrizione", r.descrizione, { type: "textarea", full: true }) + field("Larghezza cabinet (cm)", "cabX", r.cabX || 50, { type: "number" }) + field("Altezza cabinet (cm)", "cabY", r.cabY || 50, { type: "number" })) +
+      section("Dettagli", field("Nome prodotto", "nome", r.nome, { required: true }) + field("SKU", "sku", r.sku) + field("Categoria", "categoria", r.categoria) + field("Sezione catalogo", "catalogo_tab", productCatalogTab(r), { options: ["LEDWALL", "ALTRI_LED", "LCD"] }) + field("Tipo di calcolo", "tipo_calcolo", productCalculationMode(r), { options: ["MODULARE", "MODULARE_ESATTO", "UNITA"] }) + field("Unità di magazzino", "unita_magazzino", String(r.unita_magazzino || "CABINET").toUpperCase(), { options: ["CABINET", "PEZZI"] }) + field("Formato visualizzato", "formato_label", r.formato_label || productFormatLabel(r)) + field("Descrizione", "descrizione", r.descrizione, { type: "textarea", full: true }) + field("Larghezza modulo / articolo (cm)", "cabX", r.cabX || 50, { type: "number" }) + field("Altezza modulo / articolo (cm)", "cabY", r.cabY || 50, { type: "number" })) +
       section("Costi", field("Prezzo agente", "prezzoAgente", r.prezzoAgente || 0, { type: "number", step: "0.01" }) + field("Prezzo cliente", "prezzoCliente", r.prezzoCliente || 0, { type: "number", step: "0.01" }) + field("Costo base", "prezzoCina", r.prezzoCina || 0, { type: "number", step: "0.01" }) + field("Promo agente", "prezzoPromoAgenti", r.prezzoPromoAgenti || "", { type: "number", step: "0.01" }) + field("Promo cliente", "prezzoPromoClienti", r.prezzoPromoClienti || "", { type: "number", step: "0.01" }) + field("Promo attiva", "promo_attiva", r.promo_attiva || "NO", { options: ["SI", "NO"] })) +
-      section("Giacenze", field("Giacenza iniziale", "giacenza_iniziale", r.giacenza_iniziale || 0, { type: "number", min: 0 }) + field("Giacenza attuale", "giacenza_attuale", r.giacenza_attuale || 0, { type: "number", min: 0 }) + field("Stato giacenza", "stato_giacenza", r.stato_giacenza || "DISPONIBILE", { options: ["DISPONIBILE", "IN ARRIVO", "SOLO SU ORDINAZIONE", "NON DISPONIBILE"] })) +
-      section("Scheda tecnica", field("Pixel pitch", "tech_pixel_pitch", spec("tech_pixel_pitch", "Pixel pitch")) + field("Certificazione", "tech_certificazione", spec("tech_certificazione", "Certificazione")) + field("Modalità di utilizzo", "tech_utilizzo", spec("tech_utilizzo", "Modalità")) + field("Densità pixel", "tech_densita_pixel", spec("tech_densita_pixel", "Densità pixel")) + field("LED standard", "tech_led_standard", spec("tech_led_standard", "LED")) + field("Materiale cabinet", "tech_materiale_cabinet", spec("tech_materiale_cabinet", "Cabinet")) + field("Peso cabinet", "tech_peso_cabinet", spec("tech_peso_cabinet", "Peso cabinet")) + field("Scala di grigi", "tech_scala_grigi", spec("tech_scala_grigi", "Scala di grigi")) + field("Temperatura operativa", "tech_temperatura", spec("tech_temperatura", "Temperatura")) + field("Valore IP", "tech_ip", spec("tech_ip", "Protezione")) + field("Consumo medio", "tech_consumo_medio", spec("tech_consumo_medio", "Consumo medio")) + field("Consumo massimo", "tech_consumo_massimo", spec("tech_consumo_massimo", "Consumo massimo")) + field("Vita media", "tech_vita_media", spec("tech_vita_media", "Vita media")) + field("Visibilità", "tech_visibilita", spec("tech_visibilita", "Visibilità")) + field("Luminosità", "tech_luminosita", spec("tech_luminosita", "Luminosità")) + field("Frequenza aggiornamento", "tech_refresh", spec("tech_refresh", "Refresh"))) +
+      section("Giacenze", field("Giacenza iniziale", "giacenza_iniziale", r.giacenza_iniziale || 0, { type: "number", min: 0 }) + field("Giacenza attuale", "giacenza_attuale", r.giacenza_attuale || 0, { type: "number", min: 0 }) + field("Stato giacenza", "stato_giacenza", r.stato_giacenza || "DA CONFIGURARE", { options: ["DA CONFIGURARE", "DISPONIBILE", "IN ARRIVO", "SOLO SU ORDINAZIONE", "NON DISPONIBILE"] })) +
+      section("Scheda tecnica", field("Pixel pitch", "tech_pixel_pitch", spec("tech_pixel_pitch", "Pixel pitch")) + field("Certificazione", "tech_certificazione", spec("tech_certificazione", "Certificazione")) + field("Modalità di utilizzo", "tech_utilizzo", spec("tech_utilizzo", "Modalità")) + field("Densità pixel", "tech_densita_pixel", spec("tech_densita_pixel", "Densità pixel")) + field("LED standard", "tech_led_standard", spec("tech_led_standard", "LED")) + field("Materiale cabinet", "tech_materiale_cabinet", spec("tech_materiale_cabinet", "Cabinet")) + field("Peso cabinet", "tech_peso_cabinet", spec("tech_peso_cabinet", "Peso cabinet")) + field("Scala di grigi", "tech_scala_grigi", spec("tech_scala_grigi", "Scala di grigi")) + field("Temperatura operativa", "tech_temperatura", spec("tech_temperatura", "Temperatura")) + field("Misura tecnica", "tech_misura", r.tech_misura || spec("tech_misura", "Dimensioni")) + field("Valore IP", "tech_ip", spec("tech_ip", "Protezione")) + field("Consumo medio", "tech_consumo_medio", spec("tech_consumo_medio", "Consumo medio")) + field("Consumo massimo", "tech_consumo_massimo", spec("tech_consumo_massimo", "Consumo massimo")) + field("Vita media", "tech_vita_media", spec("tech_vita_media", "Vita media")) + field("Visibilità", "tech_visibilita", spec("tech_visibilita", "Visibilità")) + field("Luminosità", "tech_luminosita", spec("tech_luminosita", "Luminosità")) + field("Frequenza aggiornamento", "tech_refresh", spec("tech_refresh", "Refresh"))) +
       section("Altro", field("Immagine prodotto", "immagine_url", r.immagine_url, { full: true }) + field("Link scheda tecnica", "scheda_url", r.scheda_url, { full: true }) + field("Informazioni agenti", "infoAgenti", r.infoAgenti, { type: "textarea", full: true }) + field("Informazioni amministrative", "infoAdmin", r.infoAdmin, { type: "textarea", full: true }) + field("Prodotto attivo", "attivo", r.attivo || "SI", { options: ["SI", "NO"] }));
-    openModal(r.id ? "Modifica prodotto" : "Nuovo prodotto", formShell("products", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Catalogo Ledwall" });
+    openModal(r.id ? "Modifica prodotto" : "Nuovo prodotto", formShell("products", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Catalogo prodotti" });
   }
 
   function openInventoryAdjustment() {
@@ -2810,11 +2953,11 @@
     if (!products.length) { toast("Nessun prodotto disponibile in catalogo.", "danger"); return; }
     const recent = (state.data.movements || []).slice(0, 12);
     const body = `<form id="inventoryAdjustmentForm" class="inventory-adjustment-form" data-request-token="${newRequestToken()}">
-      <div class="inventory-current-card"><span>📦</span><div><small>GIACENZA ATTUALE</small><strong id="inventoryCurrentStock">${Number(products[0].giacenza_attuale || 0)} cabinet</strong><p id="inventoryCurrentProduct">${esc(products[0].nome)} · ${esc(products[0].cabX)}×${esc(products[0].cabY)} cm</p></div></div>
+      <div class="inventory-current-card"><span>📦</span><div><small>GIACENZA ATTUALE</small><strong id="inventoryCurrentStock">${Number(products[0].giacenza_attuale || 0)} ${esc(productInventoryUnit(products[0], products[0].giacenza_attuale))}</strong><p id="inventoryCurrentProduct">${esc(products[0].nome)} · ${esc(productFormatLabel(products[0]))}</p></div></div>
       <div class="form-grid">
-        <label class="full">Prodotto ${requiredMark(true)}<select name="product_id" required>${products.map((product) => `<option value="${esc(product.id)}">${esc(product.nome)} · ${esc(product.cabX)}×${esc(product.cabY)} cm · ${Number(product.giacenza_attuale || 0)} pz</option>`).join("")}</select></label>
+        <label class="full">Prodotto ${requiredMark(true)}<select name="product_id" required>${products.map((product) => `<option value="${esc(product.id)}">${esc(product.nome)} · ${esc(productFormatLabel(product))} · ${Number(product.giacenza_attuale || 0)} ${esc(productInventoryUnit(product, product.giacenza_attuale))}</option>`).join("")}</select></label>
         <fieldset class="inventory-operation full"><legend>Tipo di movimento ${requiredMark(true)}</legend><div class="destination-grid"><label class="choice-card load"><input type="radio" name="operazione" value="CARICO" checked><span><strong>＋ Carico</strong><small>Aumenta la giacenza disponibile.</small></span></label><label class="choice-card unload"><input type="radio" name="operazione" value="SCARICO"><span><strong>− Scarico</strong><small>Riduce la giacenza disponibile.</small></span></label></div></fieldset>
-        <label>Quantità cabinet ${requiredMark(true)}<input name="quantita" type="number" min="1" step="1" value="1" required></label>
+        <label>Quantità ${requiredMark(true)}<input name="quantita" type="number" min="1" step="1" value="1" required><small id="inventoryQuantityUnit">Unità da registrare nel magazzino</small></label>
         <label class="full">Descrizione del movimento ${requiredMark(true)}<textarea name="descrizione" required maxlength="500" placeholder="Es. Arrivo merce ordine 125, rettifica inventario, cabinet destinati a demo…"></textarea></label>
       </div>
       <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annulla</button><button class="btn primary" type="submit">Registra movimento</button></div>
@@ -2826,8 +2969,10 @@
       const product = products.find((item) => String(item.id) === String(form.elements.product_id.value)) || products[0];
       const stock = document.getElementById("inventoryCurrentStock");
       const label = document.getElementById("inventoryCurrentProduct");
-      if (stock) stock.textContent = `${Number(product.giacenza_attuale || 0)} cabinet`;
-      if (label) label.textContent = `${product.nome} · ${product.cabX}×${product.cabY} cm`;
+      if (stock) stock.textContent = `${Number(product.giacenza_attuale || 0)} ${productInventoryUnit(product, product.giacenza_attuale)}`;
+      if (label) label.textContent = `${product.nome} · ${productFormatLabel(product)}`;
+      const quantityUnit = document.getElementById("inventoryQuantityUnit");
+      if (quantityUnit) quantityUnit.textContent = `Unità registrata: ${productInventoryUnit(product, 2)}`;
     };
     form.elements.product_id.addEventListener("change", refreshCurrent);
   }
@@ -2837,10 +2982,10 @@
     if (!p) return;
     const canonical = String(p.nome || "").startsWith("P3.91") ? "P3.91" : String(p.nome || "").startsWith("P4") ? "P4" : p.nome;
     const summary = String(p.infoAgenti || p.descrizione || "").split("|").map((line) => line.trim()).filter(Boolean);
-    const editableSpecs = [["Pixel pitch",p.tech_pixel_pitch],["Certificazione",p.tech_certificazione],["Modalità",p.tech_utilizzo],["Densità pixel",p.tech_densita_pixel],["LED",p.tech_led_standard],["Cabinet",p.tech_materiale_cabinet],["Peso cabinet",p.tech_peso_cabinet],["Scala di grigi",p.tech_scala_grigi],["Temperatura",p.tech_temperatura],["Protezione",p.tech_ip],["Consumo medio",p.tech_consumo_medio],["Consumo massimo",p.tech_consumo_massimo],["Vita media",p.tech_vita_media],["Visibilità",p.tech_visibilita],["Luminosità",p.tech_luminosita],["Refresh",p.tech_refresh]].filter((entry) => entry[1]).map((entry) => `${entry[0]}: ${entry[1]}`);
+    const editableSpecs = [["Pixel pitch",p.tech_pixel_pitch],["Certificazione",p.tech_certificazione],["Modalità",p.tech_utilizzo],["Densità pixel",p.tech_densita_pixel],["LED",p.tech_led_standard],["Cabinet",p.tech_materiale_cabinet],["Peso cabinet",p.tech_peso_cabinet],["Scala di grigi",p.tech_scala_grigi],["Temperatura",p.tech_temperatura],["Misura",p.tech_misura],["Protezione",p.tech_ip],["Consumo medio",p.tech_consumo_medio],["Consumo massimo",p.tech_consumo_massimo],["Vita media",p.tech_vita_media],["Visibilità",p.tech_visibilita],["Luminosità",p.tech_luminosita],["Refresh",p.tech_refresh]].filter((entry) => entry[1]).map((entry) => `${entry[0]}: ${entry[1]}`);
     const details = [...summary, ...(editableSpecs.length ? editableSpecs : (TECH_SPECS[canonical] || []))].filter((line, index, all) => all.indexOf(line) === index);
     const stock = Number(p.giacenza_attuale || 0);
-    const body = `<div class="tech-sheet"><div class="tech-sheet-image">${p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}">` : `<div class="pixel-pattern"></div>`}</div><div><span class="section-kicker">${esc(p.sku || p.id || "Ledwall")}</span><h3>${esc(p.nome)} · ${esc(p.cabX)}×${esc(p.cabY)} cm</h3><div class="tech-spec-grid">${details.length ? details.map((line) => { const parts = line.split(":"); return `<div><small>${esc(parts.length > 1 ? parts.shift() : "SPECIFICA")}</small><strong>${esc(parts.join(":").trim() || line)}</strong></div>`; }).join("") : `<p>Scheda tecnica da completare.</p>`}</div><div class="stock-summary"><div><small>${esc(p.stato_giacenza || (stock ? "DISPONIBILE" : "NON DISPONIBILE"))}</small><strong>${stock} pz</strong></div><span>${String(p.promo_attiva || "NO").toUpperCase() === "SI" ? "PROMO ATTIVA" : "LISTINO ORDINARIO"}</span></div></div></div>`;
+    const body = `<div class="tech-sheet"><div class="tech-sheet-image">${p.immagine_url ? `<img src="${esc(p.immagine_url)}" alt="${esc(p.nome)}">` : `<div class="pixel-pattern"></div>`}</div><div><span class="section-kicker">${esc(p.sku || p.id || "Prodotto")}</span><h3>${esc(p.nome)} · ${esc(productFormatLabel(p))}</h3><div class="tech-spec-grid">${details.length ? details.map((line) => { const parts = line.split(":"); return `<div><small>${esc(parts.length > 1 ? parts.shift() : "SPECIFICA")}</small><strong>${esc(parts.join(":").trim() || line)}</strong></div>`; }).join("") : `<p>Scheda tecnica da completare.</p>`}</div><div class="stock-summary"><div><small>${esc(p.stato_giacenza || (stock ? "DISPONIBILE" : "NON DISPONIBILE"))}</small><strong>${stock} ${esc(productInventoryUnit(p, stock))}</strong></div><span>${String(p.promo_attiva || "NO").toUpperCase() === "SI" ? "PROMO ATTIVA" : "LISTINO ORDINARIO"}</span></div></div></div>`;
     openModal(`Scheda tecnica ${p.nome}`, body, { wide: true, kicker: "Catalogo Seemax" });
   }
 
@@ -2982,9 +3127,18 @@
     if (entity === "practices") {
       let ledwalls = [];
       try { ledwalls = JSON.parse(form.elements.ledwall_configurazioni_json?.value || "[]"); } catch (error) { ledwalls = []; }
-      if (!ledwalls.length) { toast("Inserisci almeno un Ledwall nella pratica.", "danger"); return; }
-      const invalidLedwall = ledwalls.find((item) => !isAdminUnknown(item.larghezza) && !isAdminUnknown(item.altezza) && (Number(item.larghezza || 0) <= 0 || Number(item.altezza || 0) <= 0));
-      if (invalidLedwall) { toast("Inserisci larghezza e altezza maggiori di zero per tutti i Ledwall.", "danger"); return; }
+      if (!ledwalls.length) { toast("Inserisci almeno un prodotto nella pratica.", "danger"); return; }
+      const invalidProduct = ledwalls.find((item) => {
+        if (String(item.tipo_calcolo || "").toUpperCase() === "UNITA") return !isAdminUnknown(item.quantita_unita) && (!Number.isInteger(Number(item.quantita_unita)) || Number(item.quantita_unita) <= 0);
+        return !isAdminUnknown(item.larghezza) && !isAdminUnknown(item.altezza) && (Number(item.larghezza || 0) <= 0 || Number(item.altezza || 0) <= 0);
+      });
+      if (invalidProduct) { toast("Controlla misure e quantità di tutti i prodotti.", "danger"); return; }
+      const invalidExactProduct = ledwalls.find((item) => {
+        if (String(item.tipo_calcolo || "").toUpperCase() !== "MODULARE_ESATTO" || isAdminUnknown(item.larghezza) || isAdminUnknown(item.altezza)) return false;
+        const product = (state.data.products || []).find((candidate) => String(candidate.id) === String(item.product_id)) || {};
+        return !exactMultiple(item.larghezza, Number(product.cabX || 50) / 100) || !exactMultiple(item.altezza, Number(product.cabY || 50) / 100);
+      });
+      if (invalidExactProduct) { toast("Le misure di Floor Led e Transparent Led devono rispettare multipli esatti dei rispettivi cabinet.", "danger"); return; }
     }
     const practiceAttachments = entity === "practices"
       ? Array.from(form.querySelectorAll("[data-practice-document]")).filter((input) => input.files && input.files[0]).map((input) => ({
@@ -3480,6 +3634,7 @@
       "back-practice-types": () => openPracticeTypeChooser(),
       "generate-work-order": () => generateWorkOrder(id),
       "new-product": () => openProduct(), "edit-product": () => openProduct(id), "product-tech": () => openProductTech(id), "delete-product": () => removeEntity("products", id),
+      "set-catalog-tab": () => { state.catalogTab = data.catalogTab || "LEDWALL"; renderRoute(); },
       "inventory-adjust": openInventoryAdjustment,
       "toggle-practice-stock-warning": async () => {
         const practice = (state.data.practices || []).find((item) => String(item.id) === String(id));
@@ -3767,7 +3922,8 @@
       closeModal();
       try {
         const result = await api.adjustInventory(payload);
-        completeBackgroundProgress(inventoryProgressId, { ...payload, product_name: (result.product || {}).nome || (product || {}).nome });
+        const savedInventoryProduct = result.product || product || {};
+        completeBackgroundProgress(inventoryProgressId, { ...payload, product_name: savedInventoryProduct.nome || (product || {}).nome, unit_label: productInventoryUnit(savedInventoryProduct, payload.quantita) });
         if (result.product) replaceLocalEntity("products", result.product);
         else if (Array.isArray(result.products)) {
           state.data.products = result.products;
@@ -3783,7 +3939,7 @@
           state.data.movements = state.data.movements.slice(0, 100);
         }
         renderRoute();
-        celebrateSuccess(payload.operazione === "CARICO" ? "📥" : "📤", payload.operazione === "CARICO" ? "Carico registrato" : "Scarico registrato", `${Number(payload.quantita || 0)} cabinet · ${String(payload.descrizione || "").trim()}`);
+        celebrateSuccess(payload.operazione === "CARICO" ? "📥" : "📤", payload.operazione === "CARICO" ? "Carico registrato" : "Scarico registrato", `${Number(payload.quantita || 0)} ${productInventoryUnit(savedInventoryProduct, payload.quantita)} · ${String(payload.descrizione || "").trim()}`);
       } catch (error) {
         failBackgroundProgress(inventoryProgressId, { ...payload, product_name: (product || {}).nome }, error);
         toast(`${error.message} La giacenza visualizzata non è stata modificata.`, "danger");

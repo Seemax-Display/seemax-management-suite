@@ -1068,11 +1068,13 @@ async function getAdminContent() {
       const before = Number(product.giacenza_attuale || 0);
       const after = before + (operation === "CARICO" ? quantity : -quantity);
       if (!["CARICO", "SCARICO"].includes(operation) || !Number.isInteger(quantity) || quantity <= 0) throw new Error("Movimento non valido.");
-      if (after < 0) throw new Error(`Lo scarico supera la giacenza disponibile: ${before} cabinet.`);
-      const savedProduct = demo.upsert("products", { ...product, giacenza_attuale: after, aggiornatoIl: new Date().toISOString() });
+      if (after < 0) throw new Error(`Lo scarico supera la giacenza disponibile: ${before} unità.`);
+      const currentStatus = String(product.stato_giacenza || "").toUpperCase();
+      const nextStatus = after > 0 && ["NON DISPONIBILE", "DA CONFIGURARE"].includes(currentStatus) ? "DISPONIBILE" : after <= 0 && currentStatus === "DISPONIBILE" ? "NON DISPONIBILE" : product.stato_giacenza;
+      const savedProduct = demo.upsert("products", { ...product, giacenza_attuale: after, stato_giacenza: nextStatus, aggiornatoIl: new Date().toISOString() });
       const movement = demo.upsert("movements", {
         id: uid("mov"), data: new Date().toISOString(), product_id: product.id, sku: product.sku || product.id,
-        prodotto: `${product.nome || product.id} ${product.cabX || ""}x${product.cabY || ""}`,
+        prodotto: `${product.nome || product.id} · ${product.formato_label || `${product.cabX || ""}x${product.cabY || ""}`}`,
         quantita: operation === "CARICO" ? quantity : -quantity, tipo_movimento: `${operation}_MANUALE`,
         giacenza_prima: before, giacenza_dopo: after, username: (session || {}).username || "demo", note: payload.descrizione || "",
         request_token: payload.request_token

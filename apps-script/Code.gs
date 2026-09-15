@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2170().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2180().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.17.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.18.0";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -58,7 +58,7 @@ var ENTITY_SHEETS = {
 
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "prefisso_pratica", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "trofei_reset_il", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "catalogo_tab", "tipo_calcolo", "unita_magazzino", "formato_label", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_misura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -117,7 +117,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.17.0 configurato: documenti pratica consultabili e commesse d'ordine locali attive.";
+  return "DATABASE SEEMAX 2.18.0 configurato: catalogo multiprodotto e calcolo pratiche per cabinet o quantità attivi.";
 }
 
 
@@ -371,6 +371,28 @@ function upgradeSeemaxV2170() {
     styleSheets_();
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.17.0 configurato: documenti delle pratiche consultabili e generazione locale delle commesse d'ordine attiva per gli ADMIN.";
+  });
+}
+
+function upgradeSeemaxV2180() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    /* Consolida i prodotti esistenti senza sovrascrivere prezzi, promozioni
+       o giacenze già modificati dall'amministratore e aggiunge i nuovi
+       articoli con disponibilità iniziale pari a zero. */
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento v2.18.0 · catalogo Ledwall, Croci e Altri Led, Schermi LCD e configuratore pratiche multiprodotto.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.18.0 configurato: nuovi prodotti a giacenza zero, tre sezioni Catalogo e calcolo pratiche multiprodotto attivi.";
   });
 }
 
@@ -1373,40 +1395,81 @@ function normalizePracticeLedwallConfigurations_(practice) {
   var p391Square = 0;
   var normalized = configurations.map(function (raw, index) {
     var item = raw && typeof raw === "object" ? raw : {};
+    var requestedProductId = String(item.product_id || "").trim();
+    var unifiedP391 = requestedProductId.toUpperCase() === "P391_UNIFIED";
+    var canonicalId = unifiedP391 ? "P391_UNIFIED" : (canonicalProductId_(requestedProductId || item.modello_display || item.prodotto, item.cabX, item.cabY) || requestedProductId);
+    var product = unifiedP391 ? null : findInventoryProduct_(canonicalId);
+    var calculationMode = unifiedP391 ? "MODULARE" : productCalculationMode_(product || item);
+    var inventoryUnit = unifiedP391 ? "CABINET" : productInventoryUnit_(product || item);
+    var formatLabel = unifiedP391 ? "Composizione 50×100 + 50×50 cm" : productFormatLabel_(product || item);
     var width = item.larghezza;
     var height = item.altezza;
-    if (!isAdminUnknownValue_(width) && (!Number(width) || Number(width) <= 0)) throw new Error("Ledwall " + (index + 1) + ": larghezza non valida.");
-    if (!isAdminUnknownValue_(height) && (!Number(height) || Number(height) <= 0)) throw new Error("Ledwall " + (index + 1) + ": altezza non valida.");
+    var quantityValue = item.quantita_unita !== undefined && item.quantita_unita !== "" ? item.quantita_unita : item.cabinet_necessari;
+    var unknownConfiguration = calculationMode === "UNITA" ? isAdminUnknownValue_(quantityValue) : (isAdminUnknownValue_(width) || isAdminUnknownValue_(height));
+    if (calculationMode === "UNITA") {
+      if (!unknownConfiguration && (!Number.isInteger(Number(quantityValue)) || Number(quantityValue) <= 0)) throw new Error("Prodotto " + (index + 1) + ": quantità non valida.");
+    } else {
+      if (!isAdminUnknownValue_(width) && (!Number(width) || Number(width) <= 0)) throw new Error("Prodotto " + (index + 1) + ": larghezza non valida.");
+      if (!isAdminUnknownValue_(height) && (!Number(height) || Number(height) <= 0)) throw new Error("Prodotto " + (index + 1) + ": altezza non valida.");
+      if (!unknownConfiguration && calculationMode === "MODULARE_ESATTO" && product) {
+        var exactStepX = Number(product.cabX || 0) / 100;
+        var exactStepY = Number(product.cabY || 0) / 100;
+        if (!exactModuleMultiple_(width, exactStepX) || !exactModuleMultiple_(height, exactStepY)) {
+          throw new Error("Prodotto " + (index + 1) + ": le misure devono essere multipli esatti di " + exactStepX + "×" + exactStepY + " m.");
+        }
+      }
+    }
     var addressType = index === 0 ? "INDIRIZZO UNICO" : String(item.indirizzo_tipo || "INDIRIZZO UNICO").toUpperCase();
     if (["INDIRIZZO UNICO", "PRESSO ALTRO INDIRIZZO"].indexOf(addressType) < 0) addressType = "INDIRIZZO UNICO";
     if (addressType === "PRESSO ALTRO INDIRIZZO") {
       var missing = ["regione", "provincia", "comune", "cap", "indirizzo", "civico"].filter(function (key) {
         return !String(item["installazione_" + key] || "").trim();
       });
-      if (missing.length) throw new Error("Ledwall " + (index + 1) + ": completa " + missing.join(", ") + " dell'indirizzo alternativo.");
+      if (missing.length) throw new Error("Prodotto " + (index + 1) + ": completa " + missing.join(", ") + " dell'indirizzo alternativo.");
     }
-    var stockLines = Array.isArray(item.stock_lines) ? item.stock_lines : [];
     var normalizedLines = [];
-    stockLines.forEach(function (line) {
-      var productId = canonicalProductId_(line.product_id || line.modello_display, line.cabX, line.cabY) || String(line.product_id || "").trim();
-      var quantity = Number(line.quantita || 0);
-      if (!productId || !Number.isFinite(quantity) || quantity <= 0) return;
-      var description = String(line.descrizione || line.modello_display || productId);
-      normalizedLines.push({ product_id: productId, quantita: quantity, descrizione: description });
-      if (!grouped[productId]) grouped[productId] = { product_id: productId, quantita: 0, descrizione: description };
-      grouped[productId].quantita += quantity;
-      if (productId === "p391-50100") p391Rectangular += quantity;
-      if (productId === "p391-5050") p391Square += quantity;
+    var model = String((product && product.nome) || item.modello_display || item.prodotto || "Prodotto").trim();
+    var bifacial = calculationMode === "UNITA" ? "NO" : (String(item.bifacciale || "NO").toUpperCase() === "SI" ? "SI" : "NO");
+    var faces = bifacial === "SI" ? 2 : 1;
+    if (!unknownConfiguration && calculationMode === "UNITA" && product) {
+      normalizedLines.push({ product_id: product.id, quantita: Number(quantityValue), descrizione: model });
+    } else if (!unknownConfiguration && unifiedP391) {
+      var cellsWide = Math.max(1, Math.ceil((Number(width) - 0.00000001) / 0.5));
+      var cellsHigh = Math.max(1, Math.ceil((Number(height) - 0.00000001) / 0.5));
+      var rectangularCount = cellsWide * Math.floor(cellsHigh / 2) * faces;
+      var squareCount = cellsWide * (cellsHigh % 2) * faces;
+      if (rectangularCount) normalizedLines.push({ product_id: "p391-50100", quantita: rectangularCount, descrizione: "P3.91 · cabinet 50×100 cm" });
+      if (squareCount) normalizedLines.push({ product_id: "p391-5050", quantita: squareCount, descrizione: "P3.91 · cabinet 50×50 cm" });
+    } else if (!unknownConfiguration && product) {
+      var stepX = Number(product.cabX || 50) / 100;
+      var stepY = Number(product.cabY || 50) / 100;
+      var count = Math.max(1, Math.ceil((Number(width) - 0.00000001) / stepX)) * Math.max(1, Math.ceil((Number(height) - 0.00000001) / stepY)) * faces;
+      normalizedLines.push({ product_id: product.id, quantita: count, descrizione: model });
+    } else if (!unknownConfiguration) {
+      /* Compatibilità per eventuali prodotti personalizzati creati prima
+         della v2.18.0 e non riconducibili a un ID canonico. */
+      (Array.isArray(item.stock_lines) ? item.stock_lines : []).forEach(function (line) {
+        var fallbackId = canonicalProductId_(line.product_id || line.modello_display, line.cabX, line.cabY) || String(line.product_id || "").trim();
+        var fallbackQuantity = Number(line.quantita || 0);
+        if (fallbackId && Number.isFinite(fallbackQuantity) && fallbackQuantity > 0) normalizedLines.push({ product_id: fallbackId, quantita: fallbackQuantity, descrizione: String(line.descrizione || line.modello_display || fallbackId) });
+      });
+    }
+    normalizedLines.forEach(function (line) {
+      if (!grouped[line.product_id]) grouped[line.product_id] = { product_id: line.product_id, quantita: 0, descrizione: line.descrizione };
+      grouped[line.product_id].quantita += Number(line.quantita || 0);
+      if (line.product_id === "p391-50100") p391Rectangular += Number(line.quantita || 0);
+      if (line.product_id === "p391-5050") p391Square += Number(line.quantita || 0);
     });
-    var model = String(item.modello_display || item.prodotto || "Ledwall").trim();
-    var bifacial = String(item.bifacciale || "NO").toUpperCase() === "SI" ? "SI" : "NO";
     models.push(model);
-    measures.push("Ledwall " + (index + 1) + ": " + String(width) + "x" + String(height));
+    measures.push(calculationMode === "UNITA" ? "Prodotto " + (index + 1) + ": " + formatLabel + " · " + String(quantityValue) + " pezzi" : "Prodotto " + (index + 1) + ": " + String(width) + "x" + String(height) + " m");
     if (bifacial === "SI") anyBifacial = true;
     return {
-      id: String(item.id || "ledwall-" + (index + 1)), product_id: String(item.product_id || ""), modello_display: model,
+      id: String(item.id || "product-" + (index + 1)), product_id: canonicalId, modello_display: model,
       larghezza: width, altezza: height, bifacciale: bifacial,
-      cabinet_necessari: isAdminUnknownValue_(item.cabinet_necessari) ? "0000" : normalizedLines.reduce(function (sum, line) { return sum + Number(line.quantita || 0); }, 0),
+      quantita_unita: calculationMode === "UNITA" ? quantityValue : "",
+      tipo_calcolo: calculationMode, unita_magazzino: inventoryUnit, formato_label: formatLabel,
+      catalogo_tab: unifiedP391 ? "LEDWALL" : productCatalogTab_(product || item),
+      cabinet_necessari: unknownConfiguration ? "0000" : normalizedLines.reduce(function (sum, line) { return sum + Number(line.quantita || 0); }, 0),
       stock_lines: normalizedLines, indirizzo_tipo: addressType,
       installazione_regione: String(item.installazione_regione || ""), installazione_provincia: String(item.installazione_provincia || ""),
       installazione_comune: String(item.installazione_comune || ""), installazione_cap: String(item.installazione_cap || ""),
@@ -2183,7 +2246,7 @@ function escapeHtml_(value) {
 
 function applyInventoryForPractice_(practice, user, direction, movementType) {
   var lines = inventoryLinesFromPractice_(practice);
-  if (!lines.length) throw new Error("La pratica non contiene righe cabinet valide per il magazzino.");
+  if (!lines.length) throw new Error("La pratica non contiene righe prodotto valide per il magazzino.");
   var products = {};
   lines.forEach(function (line) {
     var product = findInventoryProduct_(line.product_id);
@@ -2205,7 +2268,7 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
     upsertObject_("MOVIMENTI_MAGAZZINO", "id", movementId, {
       id: movementId, data: new Date().toISOString(), practiceId: practice.id,
       numero_pratica: practice.numero || "", cliente: practice.cliente || "", product_id: product.id,
-      sku: product.sku || product.id, prodotto: product.nome + " " + product.cabX + "x" + product.cabY,
+      sku: product.sku || product.id, prodotto: product.nome + " · " + productFormatLabel_(product),
       quantita: delta, tipo_movimento: movementType, giacenza_prima: before, giacenza_dopo: after,
       username: user.username, note: "Movimento automatico da stato pratica"
     });
@@ -2221,12 +2284,12 @@ function practiceInventoryAssessment_(practice, alreadyApplied) {
     return isAdminUnknownValue_(item && item.cabinet_necessari) || !Array.isArray(item && item.stock_lines) || !item.stock_lines.length;
   });
   if (undefinedConfiguration) {
-    return { insufficient: true, detail: "Composizione cabinet di uno o più Ledwall ancora da completare.", shortages: [] };
+    return { insufficient: true, detail: "Composizione di uno o più prodotti ancora da completare.", shortages: [] };
   }
   var shortages = [];
   var lines = inventoryLinesFromPractice_(practice);
   if (!lines.length && isAdminUnknownValue_(practice.cabinet_da_sottrarre)) {
-    return { insufficient: true, detail: "Composizione cabinet da completare: dato registrato con deroga amministratore.", shortages: [] };
+    return { insufficient: true, detail: "Composizione prodotti da completare: dato registrato con deroga amministratore.", shortages: [] };
   }
   lines.forEach(function (line) {
     var product = findInventoryProduct_(line.product_id);
@@ -2281,10 +2344,10 @@ function managementInventoryAdjustLocked_(p) {
   var before = Number(product.giacenza_attuale || 0);
   var delta = operation === "CARICO" ? quantity : -quantity;
   var after = before + delta;
-  if (after < 0) throw new Error("Lo scarico supera la giacenza disponibile: " + before + " cabinet.");
+  if (after < 0) throw new Error("Lo scarico supera la giacenza disponibile: " + before + " unità.");
   product.giacenza_attuale = after;
   if (after <= 0 && String(product.stato_giacenza || "").toUpperCase() === "DISPONIBILE") product.stato_giacenza = "NON DISPONIBILE";
-  if (after > 0 && String(product.stato_giacenza || "").toUpperCase() === "NON DISPONIBILE") product.stato_giacenza = "DISPONIBILE";
+  if (after > 0 && ["NON DISPONIBILE", "DA CONFIGURARE"].indexOf(String(product.stato_giacenza || "").toUpperCase()) >= 0) product.stato_giacenza = "DISPONIBILE";
   product.expected_record_version = Number(product.record_version || 0);
   product.request_token = requestToken;
   var version = prepareVersionedRecord_("PRODOTTI_LED", "id", product.id, product, user);
@@ -2305,7 +2368,7 @@ function managementInventoryAdjustLocked_(p) {
     cliente: "",
     product_id: savedProduct.id,
     sku: savedProduct.sku || savedProduct.id,
-    prodotto: String(savedProduct.nome || savedProduct.id) + " " + String(savedProduct.cabX || "") + "x" + String(savedProduct.cabY || ""),
+    prodotto: String(savedProduct.nome || savedProduct.id) + " · " + productFormatLabel_(savedProduct),
     quantita: delta,
     tipo_movimento: operation + "_MANUALE",
     giacenza_prima: before,
@@ -2365,7 +2428,13 @@ function inventoryDefaultValue_(productId, field) {
     "p391-50100": { giacenza_iniziale: 56, giacenza_attuale: 56 },
     "p391-5050": { giacenza_iniziale: 64, giacenza_attuale: 64 },
     "p4-9696": { giacenza_iniziale: 8, giacenza_attuale: 8 },
-    "p4-6464": { giacenza_iniziale: 4, giacenza_attuale: 4 }
+    "p4-6464": { giacenza_iniziale: 4, giacenza_attuale: 4 },
+    "cross-p5-6464": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "cross-p10-9696": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "cross-p10-128128": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "floor-led-50100": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "transparent-led-100100": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "lcd-totem-smx-430-cp": { giacenza_iniziale: 0, giacenza_attuale: 0 }
   };
   var product = defaults[String(productId || "")] || {};
   return Object.prototype.hasOwnProperty.call(product, field) ? product[field] : null;
@@ -2524,6 +2593,15 @@ function backfillPracticeStockWarningsV2100_() {
 
 function canonicalProductId_(value, cabX, cabY) {
   var raw = String(value || "").toLowerCase().replace(/,/g, ".").replace(/p3[-_ ]91/g, "p3.91").replace(/p2[-_ ]5/g, "p2.5").replace(/p1[-_ ]9/g, "p1.9");
+  /* I prodotti speciali P3.91 vengono riconosciuti prima della famiglia
+     Ledwall P3.91, evitando che Floor e Transparent confluiscano nel
+     prodotto unificato 50x100/50x50. */
+  if (/floor-led-50100|floor\s*led|dance\s*floor/.test(raw)) return "floor-led-50100";
+  if (/transparent-led-100100|transparent\s*led/.test(raw)) return "transparent-led-100100";
+  if (/lcd-totem-smx-430-cp|smx[\s-]*430[\s-]*cp|totem\s*lcd/.test(raw)) return "lcd-totem-smx-430-cp";
+  if (/cross-p5-6464|croce.*p5/.test(raw)) return "cross-p5-6464";
+  if (/cross-p10-128128|croce.*p10.*(128x128|1\.28x1\.28)/.test(raw) || (/croce.*p10/.test(raw) && Number(cabX) === 128)) return "cross-p10-128128";
+  if (/cross-p10-9696|croce.*p10/.test(raw)) return Number(cabX) === 128 ? "cross-p10-128128" : "cross-p10-9696";
   if (/p391-50100|p3\.91.*(0\.50x1\.00|50x100)/.test(raw)) return "p391-50100";
   if (/p391-5050|p3\.91.*(0\.50x0\.50|50x50)/.test(raw)) return "p391-5050";
   if (raw.indexOf("p3.91") >= 0) return Number(cabY) === 50 ? "p391-5050" : "p391-50100";
@@ -2533,6 +2611,42 @@ function canonicalProductId_(value, cabX, cabY) {
   if (/p4-6464|p4.*(0\.64x0\.64|64x64)/.test(raw) || (raw.indexOf("p4") >= 0 && Number(cabX) === 64)) return "p4-6464";
   if (/p4-9696|p4/.test(raw)) return "p4-9696";
   return "";
+}
+
+function productCatalogTab_(product) {
+  var explicit = String(product && product.catalogo_tab || "").trim().toUpperCase();
+  if (["LEDWALL", "ALTRI_LED", "LCD"].indexOf(explicit) >= 0) return explicit;
+  var source = String((product && (product.id || product.nome || product.categoria)) || "").toLowerCase();
+  if (/lcd|totem/.test(source)) return "LCD";
+  if (/croce|cross|floor|transparent/.test(source)) return "ALTRI_LED";
+  return "LEDWALL";
+}
+
+function productCalculationMode_(product) {
+  var explicit = String(product && product.tipo_calcolo || "").trim().toUpperCase();
+  if (["MODULARE", "MODULARE_ESATTO", "UNITA"].indexOf(explicit) >= 0) return explicit;
+  var source = String((product && (product.id || product.nome)) || "").toLowerCase();
+  if (/floor|transparent/.test(source)) return "MODULARE_ESATTO";
+  if (productCatalogTab_(product) === "LCD" || /croce|cross/.test(source)) return "UNITA";
+  return "MODULARE";
+}
+
+function productInventoryUnit_(product) {
+  var explicit = String(product && product.unita_magazzino || "").trim().toUpperCase();
+  return explicit === "PEZZI" ? "PEZZI" : "CABINET";
+}
+
+function productFormatLabel_(product) {
+  var explicit = String(product && product.formato_label || "").trim();
+  if (explicit) return explicit;
+  var x = Number(product && product.cabX || 0);
+  var y = Number(product && product.cabY || 0);
+  return x > 0 && y > 0 ? String(x) + "×" + String(y) + " cm" : "Formato non indicato";
+}
+
+function exactModuleMultiple_(value, step) {
+  var ratio = Number(value) / Number(step);
+  return Number.isFinite(ratio) && Math.abs(ratio - Math.round(ratio)) < 0.000001;
 }
 
 function normalizeKey_(value) { return String(value || "").trim().toLowerCase().replace(/\s+/g, " "); }
@@ -4376,6 +4490,63 @@ function selfTestInventoryMergeV2130() {
   };
 }
 
+function productDefaultsV2180_() {
+  var crossCommon = {
+    categoria: "Croce farmacia Outdoor", catalogo_tab: "ALTRI_LED", tipo_calcolo: "UNITA", unita_magazzino: "PEZZI",
+    giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "DA CONFIGURARE", promo_attiva: "NO", attivo: "SI",
+    immagine_url: "assets/catalog/croce-farmacia.jpg", tech_utilizzo: "Outdoor", tech_scala_grigi: "16348",
+    tech_temperatura: "da -20° a +60°", tech_ip: "IP65", tech_consumo_medio: "350 W/m²", tech_consumo_massimo: "700 W/m²",
+    tech_vita_media: "> 100.000 ore", tech_certificazione: "CCC/CE/ROHS", tech_visibilita: "5,00 m / 10 m", tech_luminosita: "> 4500 cd/m²"
+  };
+  function cross(overrides) {
+    var row = {};
+    Object.keys(crossCommon).forEach(function (key) { row[key] = crossCommon[key]; });
+    Object.keys(overrides).forEach(function (key) { row[key] = overrides[key]; });
+    row.descrizione = "Croce farmacia " + row.tech_pixel_pitch + " · formato " + row.formato_label + " · utilizzo outdoor.";
+    row.infoAgenti = "Croce farmacia " + row.tech_pixel_pitch + " | Misura croce: " + row.tech_misura + " | Outdoor IP65 | Luminosità superiore a 4500 cd/m²";
+    row.infoAdmin = "Nuovo prodotto v2.18.0 | Prezzo di listino agente: " + row.prezzoAgente + " euro | Giacenza iniziale: 0";
+    return row;
+  }
+  var modularCommon = {
+    categoria: "LED speciale Indoor / Outdoor", catalogo_tab: "ALTRI_LED", tipo_calcolo: "MODULARE_ESATTO", unita_magazzino: "CABINET",
+    giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "DA CONFIGURARE", promo_attiva: "NO", attivo: "SI",
+    tech_pixel_pitch: "3.91", tech_utilizzo: "Indoor / Outdoor", tech_densita_pixel: "65.536 pixel/m²", tech_led_standard: "SMD1415",
+    tech_scala_grigi: "16348", tech_temperatura: "da -20° a +60°", tech_consumo_medio: "280 W/m²", tech_consumo_massimo: "800 W/m²",
+    tech_vita_media: "> 100.000 ore", tech_certificazione: "CCC/CE/ROHS", tech_visibilita: "3,00 m", tech_luminosita: "> 4500 cd/m²", tech_refresh: "1920 - 3840 Hz"
+  };
+  function modular(overrides) {
+    var row = {};
+    Object.keys(modularCommon).forEach(function (key) { row[key] = modularCommon[key]; });
+    Object.keys(overrides).forEach(function (key) { row[key] = overrides[key]; });
+    row.infoAdmin = "Nuovo prodotto v2.18.0 | Prezzo per cabinet: " + row.prezzoAgente + " euro | Giacenza iniziale: 0";
+    return row;
+  }
+  return [
+    cross({ id: "cross-p5-6464", sku: "SMX-CROSS-P5-6464", nome: "Croce Farmacia P5 64×64", cabX: 64, cabY: 64, formato_label: "64×64 cm", prezzoAgente: 999, tech_pixel_pitch: "5", tech_densita_pixel: "16.384 pixel/m²", tech_misura: "0,64×0,64 m" }),
+    cross({ id: "cross-p10-9696", sku: "SMX-CROSS-P10-9696", nome: "Croce Farmacia P10 96×96", cabX: 96, cabY: 96, formato_label: "96×96 cm", prezzoAgente: 1099, tech_pixel_pitch: "10", tech_densita_pixel: "9.216 pixel/m²", tech_misura: "0,96×0,96 m" }),
+    cross({ id: "cross-p10-128128", sku: "SMX-CROSS-P10-128128", nome: "Croce Farmacia P10 128×128", cabX: 128, cabY: 128, formato_label: "128×128 cm", prezzoAgente: 1449, tech_pixel_pitch: "10", tech_densita_pixel: "16.384 pixel/m²", tech_misura: "1,28×1,28 m" }),
+    modular({
+      id: "floor-led-50100", sku: "SMX-FLOOR-P391-50100", nome: "Floor Led P3.91", cabX: 50, cabY: 100, formato_label: "50×100 cm", prezzoAgente: 1800,
+      immagine_url: "assets/catalog/floor-led.jpg", tech_misura: "0,50×1,00 m",
+      descrizione: "Pavimento LED modulare Indoor / Outdoor con cabinet 0,50×1,00 m.",
+      infoAgenti: "Floor Led P3.91 | Cabinet 0,50×1,00 m | Incrementi esatti di 0,50×1,00 m | Indoor / Outdoor | Luminosità superiore a 4500 cd/m²"
+    }),
+    modular({
+      id: "transparent-led-100100", sku: "SMX-TRANSPARENT-P391-100100", nome: "Transparent Led P3.91", cabX: 100, cabY: 100, formato_label: "100×100 cm", prezzoAgente: 1200,
+      immagine_url: "assets/catalog/transparent-led.png", tech_misura: "1,00×1,00 m",
+      descrizione: "Transparent LED modulare Indoor / Outdoor con cabinet 1,00×1,00 m.",
+      infoAgenti: "Transparent Led P3.91 | Cabinet 1,00×1,00 m | Dimensioni configurabili esclusivamente a multipli di 1 m | Indoor / Outdoor | Luminosità superiore a 4500 cd/m²"
+    }),
+    {
+      id: "lcd-totem-smx-430-cp", sku: "SMX-430-CP", nome: "Totem LCD Indoor", categoria: "Schermo LCD Indoor", catalogo_tab: "LCD", tipo_calcolo: "UNITA", unita_magazzino: "PEZZI", formato_label: "SMX 430-CP",
+      cabX: 100, cabY: 100, prezzoAgente: 2000, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "DA CONFIGURARE", promo_attiva: "NO", attivo: "SI",
+      immagine_url: "assets/catalog/totem-lcd-indoor.png", descrizione: "Totem LCD touch Indoor SMX 430-CP con sistema operativo Android 10.",
+      infoAgenti: "SMX 430-CP è la soluzione INDOOR pensata per chi ricerca un dispositivo di rapida risposta e tecnologicamente avanzato. | Capacitive Touch tattile e altamente responsivo, con esperienza paragonabile ai dispositivi cellulari. | Retroilluminazione LED per migliore uniformità e colori più vividi. | Dissipazione del calore ottimizzata e lunga durata in funzionamento continuo. | Design con bordi sottili, elegante e robusto. | Vetro temperato rinforzato da 4 mm con serigrafia. | Pannello con durata fino a 30.000 ore. | Supporto Android e Windows, con opzioni a scelta. | Connettività: ingresso AC, modulo Wi-Fi integrato, antenna Wi-Fi e altre opzioni. | Semplice da controllare, gestire e personalizzare. | Sistema operativo Android 10.",
+      infoAdmin: "Nuovo prodotto v2.18.0 | Prezzo di listino agente: 2000 euro | Giacenza iniziale: 0"
+    }
+  ];
+}
+
 function seedProducts_() {
   var sheet = sheet_("PRODOTTI_LED");
   if (rowsToObjects_(sheet).length) return;
@@ -4387,7 +4558,7 @@ function seedProducts_() {
     { id: "p391-5050", sku: "SMX-P391-5050", nome: "P3.91 - 0.50x0.50", categoria: "Ledwall Indoor/Outdoor", cabX: 50, cabY: 50, prezzoAgente: 295, prezzoCliente: 335, prezzoCina: 150, attivo: "SI", immagine_url: "assets/catalog/p391-5050.jpg" },
     { id: "p4-9696", sku: "SMX-P4-9696", nome: "P4", categoria: "Ledwall Outdoor", cabX: 96, cabY: 96, prezzoAgente: 860, prezzoCliente: 1080, prezzoCina: 580, attivo: "SI", immagine_url: "assets/catalog/p4-9696.jpg" }
   ];
-  products.forEach(function (product) { upsertObject_("PRODOTTI_LED", "id", product.id, product); });
+  products.concat(productDefaultsV2180_()).forEach(function (product) { upsertObject_("PRODOTTI_LED", "id", product.id, product); });
 }
 
 function initializeInventoryV11_() {
@@ -4399,7 +4570,13 @@ function initializeInventoryV11_() {
     { id: "p391-5050", sku: "SMX-P391-5050", nome: "P3.91 - 0.50x0.50", cabX: 50, cabY: 50, prezzoAgente: 295, prezzoCliente: 335, prezzoCina: 150, giacenza_iniziale: 64, giacenza_attuale: 64, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p391-5050.jpg", descrizione: "Ledwall indoor/outdoor, cabinet quadrato.", infoAgenti: "Ledwall Display P3.91 | Misura Cabinet: 0.50x0.50 | Qualità ottima da medie e lunghe distanze | Utilizzabile indoor e outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P3.91 | 0.50x0.50 | Indoor/Outdoor | Costo Cina: 150 euro" },
     { id: "p4-9696", sku: "SMX-P4-9696", nome: "P4", cabX: 96, cabY: 96, giacenza_iniziale: 8, giacenza_attuale: 8, stato_giacenza: "DISPONIBILE", promo_attiva: "NO", immagine_url: "assets/catalog/p4-9696.jpg", descrizione: "Ledwall outdoor, formato 0.96x0.96.", infoAgenti: "Ledwall Display P4 | Misura Cabinet: 0.96x0.96 | Qualità buona da medie e lunghe distanze | Utilizzabile prevalentemente outdoor | Adatto per installazioni a parete e a bandiera", infoAdmin: "Ledwall Display P4 | 0.96x0.96 | Outdoor | Costo Cina: 580 euro" },
     { id: "p4-6464", sku: "SMX-P4-6464", nome: "P4 - 0.64x0.64", cabX: 64, cabY: 64, giacenza_iniziale: 4, giacenza_attuale: 4, stato_giacenza: "DISPONIBILE", promo_attiva: "SI", attivo: "SI", categoria: "Ledwall Outdoor", descrizione: "Prodotto catalogo: prezzo promozionale da completare.", immagine_url: "assets/catalog/p4-9696.jpg" }
-  ];
+  ].map(function (entry) {
+    entry.catalogo_tab = entry.catalogo_tab || "LEDWALL";
+    entry.tipo_calcolo = entry.tipo_calcolo || "MODULARE";
+    entry.unita_magazzino = entry.unita_magazzino || "CABINET";
+    entry.formato_label = entry.formato_label || String(entry.cabX) + "×" + String(entry.cabY) + " cm";
+    return entry;
+  }).concat(productDefaultsV2180_());
   defaults.forEach(function (entry) { consolidateProductRows_(entry); });
 }
 

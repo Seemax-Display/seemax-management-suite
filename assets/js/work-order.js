@@ -40,7 +40,7 @@
     const source = Array.isArray(input) ? input : [];
     const rows = source.filter(Boolean).map(function (product, index) {
       return {
-        name: text(product.name || product.nome || product.model, `Ledwall ${index + 1}`),
+        name: text(product.name || product.nome || product.model, `Prodotto ${index + 1}`),
         code: text(product.code || product.sku || product.product_id),
         size: text(product.size || product.measure || product.misura),
         configuration: text(product.configuration || product.configurazione || product.face),
@@ -141,7 +141,7 @@
     </div>
     <section class="card">
       ${sectionTitle("04", "PRODOTTO/I DI RIFERIMENTO")}
-      <table class="products"><thead><tr><th>PRODOTTO</th><th>CODICE</th><th>MISURE</th><th>CONFIGURAZIONE</th><th>CABINET</th></tr></thead><tbody>${productRows(products)}</tbody></table>
+      <table class="products"><thead><tr><th>PRODOTTO</th><th>CODICE</th><th>MISURE</th><th>CONFIGURAZIONE</th><th>QUANTITÀ</th></tr></thead><tbody>${productRows(products)}</tbody></table>
     </section>
     <section class="materials-wrap">
       ${sectionTitle("05", "MATERIALI UTILIZZATI", "Compilazione manuale a cura del tecnico")}

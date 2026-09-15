@@ -1,0 +1,23 @@
+SEEMAX MANAGEMENT SUITE 2.18.0 - CATALOGO MULTIPRODOTTO
+
+1. Apri il progetto Apps Script collegato al database operativo.
+2. Sostituisci Code.gs con il file della versione 2.18.0.
+3. Salva il progetto.
+4. Esegui una volta upgradeSeemaxV2180().
+5. Autorizza lo script, se richiesto.
+6. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+7. Pubblica su GitHub Pages l'intero frontend 2.18.0, incluse le nuove
+   immagini dentro assets/catalog.
+8. Esegui Ctrl+F5 oppure riavvia la PWA.
+
+L'UPGRADE NON CANCELLA E NON RESETTA I DATI ESISTENTI.
+
+Aggiunge sei prodotti con giacenza iniziale e attuale pari a zero. Le quantità
+già registrate sui Ledwall esistenti vengono conservate.
+
+CONTROLLO RAPIDO
+- verifica le tab Ledwall, Croci ed Altri Led, Schermi LCD;
+- crea una pratica con Transparent 2x3 m: risultato atteso 6 cabinet;
+- crea una pratica con due Croci: risultato atteso 2 pezzi;
+- registra un carico e verifica il passaggio da DA CONFIGURARE a DISPONIBILE.
+
