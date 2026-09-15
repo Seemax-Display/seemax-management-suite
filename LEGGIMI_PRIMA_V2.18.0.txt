@@ -1,0 +1,26 @@
+SEEMAX MANAGEMENT SUITE 2.18.0
+CATALOGO MULTIPRODOTTO
+
+NOVITA
+- tre tab Catalogo: Ledwall, Croci ed Altri Led, Schermi LCD;
+- tre Croci farmacia P5/P10;
+- Floor Led P3.91;
+- Transparent Led P3.91;
+- Totem LCD Indoor SMX 430-CP;
+- immagini prodotto incluse nel pacchetto;
+- prodotti selezionabili nelle pratiche;
+- Croci e Totem calcolati a pezzi;
+- Floor calcolato a moduli esatti 0,50x1,00 m;
+- Transparent calcolato esclusivamente a multipli di 1x1 m;
+- ricontrollo e ricalcolo delle quantità nel backend;
+- giacenze iniziali dei nuovi prodotti impostate a zero.
+
+INSTALLAZIONE
+1. Pubblica il frontend 2.18.0 su GitHub Pages.
+2. Sostituisci Code.gs nel progetto Apps Script.
+3. Esegui upgradeSeemaxV2180().
+4. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+5. Esegui Ctrl+F5 oppure riapri la PWA.
+
+Guida completa: docs/AGGIORNAMENTO_V2.18.0.md
+

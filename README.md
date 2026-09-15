@@ -15,12 +15,14 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - obbligatorietà dei campi configurabile dagli admin o dal foglio `IMPOSTAZIONI`;
 - ricerca, ordinamento e paginazione di clienti e pratiche (6 risultati per pagina);
 - ordinamento amministrativo iniziale dal record più recente e assegnazione dei nuovi clienti agli agenti;
-- catalogo Ledwall con immagini, schede tecniche, listini, promozioni e giacenze;
+- catalogo multiprodotto organizzato nelle tab `Ledwall`, `Croci ed Altri Led` e `Schermi LCD`, con immagini, schede tecniche, listini, promozioni e giacenze;
+- Croci farmacia P5/P10, Floor Led P3.91, Transparent Led P3.91 e Totem LCD Indoor SMX 430-CP già predisposti a giacenza zero;
 - inserimento diretto di pratiche Acquisto/Noleggio/Leasing dal riepilogo S.Q.P.;
 - scarico automatico e tracciato del magazzino allo stato Accettata;
 - carico/scarico manuale delle giacenze riservato agli ADMIN, con causale e storico;
 - pratiche inseribili anche con giacenza insufficiente, evidenziate da un avviso disattivabile sulla singola riga del Foglio Google;
-- più Ledwall nella stessa pratica, con calcolo aggregato dei cabinet e indirizzo unico o alternativo per ogni installazione aggiuntiva;
+- più prodotti nella stessa pratica, con calcolo aggregato dei cabinet o dei pezzi e indirizzo unico o alternativo per ogni installazione aggiuntiva;
+- dimensioni vincolate ai moduli fisici per Floor e Transparent LED; il Transparent 1×1 cresce esclusivamente a multipli di un metro;
 - scarico magazzino non bloccante: se la disponibilità non basta la pratica viene salvata, resta segnalata e l'impegno viene mantenuto in attesa senza creare giacenze negative;
 - deroga ADMIN `0000` per registrare temporaneamente dati non disponibili, preservata come testo anche negli indirizzi importati nelle pratiche;
 - organizzazione delle pratiche nelle modalità `IN DETTAGLIO` e `PER TIPOLOGIA`, memorizzata localmente;
@@ -86,7 +88,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione 2.16.2 alla versione 2.17.0 segui [docs/AGGIORNAMENTO_V2.17.0.md](docs/AGGIORNAMENTO_V2.17.0.md). La release rende consultabili e scaricabili gli allegati dentro le pratiche operative e introduce la commessa d'ordine locale riservata agli ADMIN. Per installazioni precedenti resta disponibile la guida [2.16.2](docs/AGGIORNAMENTO_V2.16.2.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+Per aggiornare un'installazione 2.17.0 alla versione 2.18.0 segui [docs/AGGIORNAMENTO_V2.18.0.md](docs/AGGIORNAMENTO_V2.18.0.md). La release aggiunge le tre sezioni del Catalogo e rende le pratiche compatibili con prodotti modulari o a quantità. Per installazioni precedenti resta disponibile la guida [2.17.0](docs/AGGIORNAMENTO_V2.17.0.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 

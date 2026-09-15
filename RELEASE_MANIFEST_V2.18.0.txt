@@ -1,0 +1,45 @@
+SEEMAX MANAGEMENT SUITE 2.18.0 - RELEASE MANIFEST
+
+Versione frontend: 2.18.0
+Versione backend: seemax-management-suite-2.18.0
+Cache Service Worker: seemax-management-v2-18-0-catalog-products
+Funzione upgrade: upgradeSeemaxV2180
+
+NUOVI PRODOTTI
+- Croce Farmacia P5 64x64
+- Croce Farmacia P10 96x96
+- Croce Farmacia P10 128x128
+- Floor Led P3.91 50x100
+- Transparent Led P3.91 100x100
+- Totem LCD Indoor SMX 430-CP
+
+NUOVI FILE
+- assets/catalog/croce-farmacia.jpg
+- assets/catalog/floor-led.jpg
+- assets/catalog/transparent-led.png
+- assets/catalog/totem-lcd-indoor.png
+- scripts/test-release-v2.18.0.js
+- docs/AGGIORNAMENTO_V2.18.0.md
+
+FILE MODIFICATI
+- assets/js/app.js
+- assets/js/api.js
+- assets/js/seed.js
+- assets/js/work-order.js
+- assets/js/config.js
+- assets/css/app.css
+- apps-script/Code.gs
+- sw.js
+- README.md
+
+COMPATIBILITA PRESERVATA
+- ScriptLock, record_version e request_token;
+- salvataggi e upload in background;
+- movimenti di magazzino concorrenti;
+- P3.91 Ledwall unificato;
+- Quotation Planner e archivio preventivi ADMIN;
+- prefissi pratica univoci;
+- documenti operativi e commessa d'ordine;
+- pubblicazione Patch Notes;
+- bridge nativo e fallback POST.
+

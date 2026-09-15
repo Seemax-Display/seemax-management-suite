@@ -1,0 +1,33 @@
+SEEMAX MANAGEMENT SUITE 2.18.0 - VERIFICA DI CONSEGNA
+
+[OK] Frontend 2.18.0
+[OK] Backend seemax-management-suite-2.18.0
+[OK] Service Worker seemax-management-v2-18-0-catalog-products
+[OK] Funzione upgradeSeemaxV2180
+[OK] Tre tab Catalogo presenti
+[OK] Sei nuovi prodotti aggiunti a giacenza zero
+[OK] Quattro immagini prodotto incluse localmente
+[OK] Prezzi richiesti registrati come prezzo agente
+[OK] Schede tecniche compilate con i dati forniti
+[OK] Nuovi prodotti selezionabili nelle pratiche
+[OK] Croci e Totem gestiti a quantità intera
+[OK] Floor vincolato ai cabinet 0,50x1,00 m
+[OK] Transparent vincolato ai cabinet 1,00x1,00 m
+[OK] Ricalcolo quantità ripetuto nel backend
+[OK] Floor/Transparent separati dal P3.91 Ledwall unificato
+[OK] Avviso giacenza non bloccante preservato
+[OK] Commessa compatibile con prodotti a pezzi
+[OK] Quotation Planner esistente non alterato dai nuovi modelli
+[OK] Lock, versionamento e idempotenza preservati
+[OK] Nessuna cancellazione o modifica automatica dei dati esistenti
+
+COLLAUDO POST-PUBBLICAZIONE
+1. Eseguire upgradeSeemaxV2180 dal Foglio operativo.
+2. Pubblicare una nuova versione della Web App.
+3. Pubblicare tutto il frontend, comprese le nuove immagini.
+4. Accedere come ADMIN e verificare le tre tab.
+5. Verificare Transparent 2x3 = 6 cabinet.
+6. Verificare due Croci = 2 pezzi.
+7. Eseguire un carico di prova e controllare PRODOTTI_LED.
+8. Ripetere la consultazione con un account AGENTE.
+

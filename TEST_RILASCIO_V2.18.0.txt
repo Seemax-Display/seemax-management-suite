@@ -1,0 +1,37 @@
+SEEMAX MANAGEMENT SUITE 2.18.0 - ESITO TEST
+
+Data verifica: 14/09/2026
+
+TEST PRINCIPALE
+Comando: node scripts/test-release-v2.18.0.js
+Esito: OK - 111 controlli superati
+
+AMBITI VERIFICATI
+- sintassi JavaScript frontend e backend;
+- JavaScript inline del Quotation Planner;
+- corrispondenza versione frontend/backend/cache;
+- funzione upgrade e nuove colonne PRODOTTI_LED;
+- sei nuovi prodotti, SKU, prezzi e giacenze a zero;
+- immagini locali dei quattro gruppi prodotto;
+- classificazione nelle tre tab del Catalogo;
+- disponibilità dei prodotti nel configuratore pratica;
+- Croci e Totem gestiti a pezzi;
+- Floor calcolato a moduli 0,50x1,00;
+- Transparent calcolato a moduli 1x1;
+- rifiuto backend delle misure non multiple;
+- separazione di Floor/Transparent dal P3.91 Ledwall unificato;
+- dati tecnici e misura Croce 128x128;
+- commessa compatibile con quantità generiche;
+- ScriptLock, record_version, request_token e prefissi pratica;
+- documenti, preventivi, upload, Patch Notes e operazioni in background.
+
+REGRESSIONI ESEGUITE
+- Backend optimization test 2.15.2: OK - 32 controlli;
+- Transport test 2.15.2: OK;
+- Operazioni UI/progresso 2.15.2: OK;
+- Preventivi in background 2.15.2: OK - 9 controlli;
+- Preventivi ADMIN 2.16.1: OK - 34 controlli.
+
+Il collaudo finale del Foglio Google operativo deve essere eseguito dopo il
+deployment, perché le autorizzazioni e le giacenze reali non sono replicate
+nell'ambiente di sviluppo.
