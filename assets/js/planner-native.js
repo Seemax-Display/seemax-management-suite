@@ -152,7 +152,7 @@
       ["btnDatabaseRefresh", "btnAgentLogin", "btnAgentLogout"].forEach((id) => {
         const control = shadow.getElementById(id); if (control) control.remove();
       });
-      const plannerLayers = ["draftModalLayer", "onlineArchiveModalLayer", "practiceTypeModalLayer", "calcLoadingLayer", "sqpDialogLayer", "patchNotesLayer", "tutorialLayer"]
+      const plannerLayers = ["draftModalLayer", "onlineArchiveModalLayer", "practiceTypeModalLayer", "calcLoadingLayer", "sqpDialogLayer", "productFamilyLayer", "patchNotesLayer", "tutorialLayer"]
         .map((id) => shadow.getElementById(id)).filter(Boolean);
       const syncPlannerLayerState = () => {
         const active = plannerLayers.some((layer) => !layer.classList.contains("hidden"));

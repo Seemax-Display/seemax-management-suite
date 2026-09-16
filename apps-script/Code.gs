@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2180().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2190().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.18.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.19.0";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -117,7 +117,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.18.0 configurato: catalogo multiprodotto e calcolo pratiche per cabinet o quantità attivi.";
+  return "DATABASE SEEMAX 2.19.0 configurato: catalogo multiprodotto e Quotation Planner Prodotti attivi.";
 }
 
 
@@ -393,6 +393,28 @@ function upgradeSeemaxV2180() {
     styleSheets_();
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.18.0 configurato: nuovi prodotti a giacenza zero, tre sezioni Catalogo e calcolo pratiche multiprodotto attivi.";
+  });
+}
+
+function upgradeSeemaxV2190() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    /* Completa i prezzi cliente dei prodotti introdotti nella v2.18.0.
+       Eventuali valori non vuoti già personalizzati dall'ADMIN prevalgono
+       sui nuovi valori predefiniti durante il consolidamento. */
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento v2.19.0 · Quotation Planner multiprodotto con Ledwall, Croci e LED Extra, Schermi LCD e listini agente/cliente distinti.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.19.0 configurato: Planner Prodotti, nuovi prezzi cliente e creazione pratiche multiprodotto attivi.";
   });
 }
 
@@ -1708,7 +1730,7 @@ function managementCreateFromQuoteLocked_(p, preparedUser, preparedPayload) {
   var company = String(payload.cliente_azienda || payload.cliente_referente || "").trim();
   if (!company) throw new Error("Inserisci almeno la ragione sociale o il referente cliente nel S.Q.P.");
   var items = Array.isArray(payload.righe) ? payload.righe : [];
-  if (!items.length) throw new Error("Il preventivo non contiene Ledwall selezionati.");
+  if (!items.length) throw new Error("Il preventivo non contiene prodotti selezionati.");
   var quoteId = String(payload.preventivo_id || "").trim();
   var tokenPractice = findRowObject_("PRATICHE", "request_token", requestToken);
   if (tokenPractice) {
@@ -1727,7 +1749,7 @@ function managementCreateFromQuoteLocked_(p, preparedUser, preparedPayload) {
   var finance = type === "ACQUISTO" ? "Acquisto diretto" : (type === "NOLEGGIO" ? "Grenke" : "IFIS");
   var number = nextPracticeIdentifier_(user);
   var title = items.map(function (item) {
-    return String(item.prodotto || "Ledwall") + " " + String(item.misura_m || item.misura_cm || "");
+    return String(item.prodotto || "Prodotto") + " " + String(item.misura_m || item.misura_cm || "");
   }).join(" + ");
   var practice = {
     id: "PR-" + number,
@@ -4522,24 +4544,24 @@ function productDefaultsV2180_() {
     return row;
   }
   return [
-    cross({ id: "cross-p5-6464", sku: "SMX-CROSS-P5-6464", nome: "Croce Farmacia P5 64×64", cabX: 64, cabY: 64, formato_label: "64×64 cm", prezzoAgente: 999, tech_pixel_pitch: "5", tech_densita_pixel: "16.384 pixel/m²", tech_misura: "0,64×0,64 m" }),
-    cross({ id: "cross-p10-9696", sku: "SMX-CROSS-P10-9696", nome: "Croce Farmacia P10 96×96", cabX: 96, cabY: 96, formato_label: "96×96 cm", prezzoAgente: 1099, tech_pixel_pitch: "10", tech_densita_pixel: "9.216 pixel/m²", tech_misura: "0,96×0,96 m" }),
-    cross({ id: "cross-p10-128128", sku: "SMX-CROSS-P10-128128", nome: "Croce Farmacia P10 128×128", cabX: 128, cabY: 128, formato_label: "128×128 cm", prezzoAgente: 1449, tech_pixel_pitch: "10", tech_densita_pixel: "16.384 pixel/m²", tech_misura: "1,28×1,28 m" }),
+    cross({ id: "cross-p5-6464", sku: "SMX-CROSS-P5-6464", nome: "Croce Farmacia P5 64×64", cabX: 64, cabY: 64, formato_label: "64×64 cm", prezzoAgente: 999, prezzoCliente: 1099, tech_pixel_pitch: "5", tech_densita_pixel: "16.384 pixel/m²", tech_misura: "0,64×0,64 m" }),
+    cross({ id: "cross-p10-9696", sku: "SMX-CROSS-P10-9696", nome: "Croce Farmacia P10 96×96", cabX: 96, cabY: 96, formato_label: "96×96 cm", prezzoAgente: 1099, prezzoCliente: 1299, tech_pixel_pitch: "10", tech_densita_pixel: "9.216 pixel/m²", tech_misura: "0,96×0,96 m" }),
+    cross({ id: "cross-p10-128128", sku: "SMX-CROSS-P10-128128", nome: "Croce Farmacia P10 128×128", cabX: 128, cabY: 128, formato_label: "128×128 cm", prezzoAgente: 1449, prezzoCliente: 1799, tech_pixel_pitch: "10", tech_densita_pixel: "16.384 pixel/m²", tech_misura: "1,28×1,28 m" }),
     modular({
-      id: "floor-led-50100", sku: "SMX-FLOOR-P391-50100", nome: "Floor Led P3.91", cabX: 50, cabY: 100, formato_label: "50×100 cm", prezzoAgente: 1800,
+      id: "floor-led-50100", sku: "SMX-FLOOR-P391-50100", nome: "Floor Led P3.91", cabX: 50, cabY: 100, formato_label: "50×100 cm", prezzoAgente: 1800, prezzoCliente: 2000,
       immagine_url: "assets/catalog/floor-led.jpg", tech_misura: "0,50×1,00 m",
       descrizione: "Pavimento LED modulare Indoor / Outdoor con cabinet 0,50×1,00 m.",
       infoAgenti: "Floor Led P3.91 | Cabinet 0,50×1,00 m | Incrementi esatti di 0,50×1,00 m | Indoor / Outdoor | Luminosità superiore a 4500 cd/m²"
     }),
     modular({
-      id: "transparent-led-100100", sku: "SMX-TRANSPARENT-P391-100100", nome: "Transparent Led P3.91", cabX: 100, cabY: 100, formato_label: "100×100 cm", prezzoAgente: 1200,
+      id: "transparent-led-100100", sku: "SMX-TRANSPARENT-P391-100100", nome: "Transparent Led P3.91", cabX: 100, cabY: 100, formato_label: "100×100 cm", prezzoAgente: 1200, prezzoCliente: 1500,
       immagine_url: "assets/catalog/transparent-led.png", tech_misura: "1,00×1,00 m",
       descrizione: "Transparent LED modulare Indoor / Outdoor con cabinet 1,00×1,00 m.",
       infoAgenti: "Transparent Led P3.91 | Cabinet 1,00×1,00 m | Dimensioni configurabili esclusivamente a multipli di 1 m | Indoor / Outdoor | Luminosità superiore a 4500 cd/m²"
     }),
     {
       id: "lcd-totem-smx-430-cp", sku: "SMX-430-CP", nome: "Totem LCD Indoor", categoria: "Schermo LCD Indoor", catalogo_tab: "LCD", tipo_calcolo: "UNITA", unita_magazzino: "PEZZI", formato_label: "SMX 430-CP",
-      cabX: 100, cabY: 100, prezzoAgente: 2000, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "DA CONFIGURARE", promo_attiva: "NO", attivo: "SI",
+      cabX: 100, cabY: 100, prezzoAgente: 2000, prezzoCliente: 2200, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "DA CONFIGURARE", promo_attiva: "NO", attivo: "SI",
       immagine_url: "assets/catalog/totem-lcd-indoor.png", descrizione: "Totem LCD touch Indoor SMX 430-CP con sistema operativo Android 10.",
       infoAgenti: "SMX 430-CP è la soluzione INDOOR pensata per chi ricerca un dispositivo di rapida risposta e tecnologicamente avanzato. | Capacitive Touch tattile e altamente responsivo, con esperienza paragonabile ai dispositivi cellulari. | Retroilluminazione LED per migliore uniformità e colori più vividi. | Dissipazione del calore ottimizzata e lunga durata in funzionamento continuo. | Design con bordi sottili, elegante e robusto. | Vetro temperato rinforzato da 4 mm con serigrafia. | Pannello con durata fino a 30.000 ore. | Supporto Android e Windows, con opzioni a scelta. | Connettività: ingresso AC, modulo Wi-Fi integrato, antenna Wi-Fi e altre opzioni. | Semplice da controllare, gestire e personalizzare. | Sistema operativo Android 10.",
       infoAdmin: "Nuovo prodotto v2.18.0 | Prezzo di listino agente: 2000 euro | Giacenza iniziale: 0"

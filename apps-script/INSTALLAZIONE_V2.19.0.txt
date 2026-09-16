@@ -1,0 +1,25 @@
+SEEMAX MANAGEMENT SUITE 2.19.0 - QUOTATION PLANNER PRODOTTI
+
+1. Apri il progetto Apps Script collegato al database operativo.
+2. Sostituisci Code.gs con il file della versione 2.19.0.
+3. Salva il progetto.
+4. Esegui una volta upgradeSeemaxV2190().
+5. Autorizza lo script, se richiesto.
+6. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+7. Pubblica su GitHub Pages l'intero frontend 2.19.0.
+8. Esegui Ctrl+F5 oppure riavvia la PWA.
+
+L'UPGRADE NON CANCELLA E NON RESETTA I DATI ESISTENTI.
+
+Completa i prezzi cliente dei prodotti introdotti nella 2.18.0. I valori non
+vuoti già personalizzati nel Foglio Google vengono conservati.
+
+CONTROLLO RAPIDO
+- apri PRODOTTI e verifica la scelta delle tre categorie;
+- verifica che LEDWALL continui a usare il calcolo precedente;
+- configura Transparent 3x2 m: risultato atteso 6 cabinet;
+- configura Floor 1,50x2 m: risultato atteso 6 cabinet;
+- configura due Croci P5: risultato atteso 2 pezzi;
+- configura un Totem LCD: installazione assente, trasferta e provvigione presenti;
+- salva, riapri e stampa un preventivo misto;
+- crea una pratica dal preventivo e controlla le righe prodotto.
