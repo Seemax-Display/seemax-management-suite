@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Seemax Quotation Planner | Ledwall + Grenke + IFIS</title>
+  <title>Seemax Quotation Planner | Prodotti + Grenke + IFIS</title>
   <style>
     :root{
       --bg:#f4f7fb;
@@ -705,7 +705,20 @@
     .sqp-dialog-foot{border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;border-radius:16px;padding:12px 13px;font-size:12.5px;line-height:1.5;margin-bottom:14px}
     body.sqp-lite .sqp-dialog-foot{border-color:#fecaca;background:#fff1f2;color:#7f1d1d}
     .sqp-dialog-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+    .product-family-layer.hidden{display:none}
+    .product-family-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .product-family-card{border:1px solid var(--line);background:linear-gradient(180deg,#fff,#f8fbff);color:var(--ink);border-radius:19px;padding:16px;text-align:left;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,.06);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+    .product-family-card:hover,.product-family-card:focus-visible{transform:translateY(-2px);border-color:#93c5fd;box-shadow:0 14px 28px rgba(37,99,235,.14);outline:none}
+    .product-family-card .family-icon{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:#eaf2ff;font-size:23px;margin-bottom:12px}
+    .product-family-card strong{display:block;color:#0a3570;font-size:14px;line-height:1.25;margin-bottom:5px}
+    .product-family-card span{display:block;color:#64748b;font-size:12px;line-height:1.45}
+    .product-family-current{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #bfdbfe;background:#eff6ff;border-radius:16px;padding:12px 13px;margin-bottom:14px}
+    .product-family-current strong{display:block;color:#0a3570;font-size:14px}
+    .product-family-current span{display:block;color:#64748b;font-size:12px;margin-top:3px}
+    .product-config-field.is-hidden{display:none!important}
+    .fixed-format-note{border:1px solid #bfdbfe;background:#f8fbff;color:#1e3a8a;border-radius:13px;padding:10px 11px;font-size:12px;line-height:1.45}
     @media (max-width:640px){.patch-notes-panel,.sqp-dialog-panel{border-radius:22px}.patch-notes-hero,.sqp-dialog-hero{padding:22px 18px 18px}.patch-notes-body,.sqp-dialog-body{padding:15px}.patch-notes-hero h3,.sqp-dialog-hero h3{font-size:22px}.patch-notes-item,.sqp-dialog-item{grid-template-columns:36px minmax(0,1fr)}.patch-notes-emoji,.sqp-dialog-emoji{width:36px;height:36px;border-radius:13px}.sqp-dialog-actions .btn{flex:1;min-width:130px}}
+    @media (max-width:760px){.product-family-grid{grid-template-columns:1fr}.product-family-card{display:grid;grid-template-columns:46px minmax(0,1fr);column-gap:12px;align-items:center}.product-family-card .family-icon{grid-row:1/3;margin:0}.product-family-card strong,.product-family-card span{grid-column:2}}
 
 
     /* CALCOLO MANUALE GRENKE / IFIS */
@@ -1086,7 +1099,7 @@
         </div>
         <div class="side-mini-grid">
           <div class="side-mini"><span>Modalità</span><strong id="sideMode">Admin</strong></div>
-          <div class="side-mini"><span>Ledwall</span><strong id="sideLedStatus">—</strong></div>
+          <div class="side-mini"><span>Prodotti</span><strong id="sideLedStatus">—</strong></div>
           <div class="side-mini"><span>Operazione Finanziaria</span><strong id="sideGrenkeStatus">—</strong></div>
           <div class="side-mini"><span>Cliente</span><strong id="sideClientStatus">—</strong></div>
         </div>
@@ -1123,7 +1136,7 @@
                 <h2>Intestazione e Dati Informativi</h2>
                 <p>Compila i seguenti campi con i dati informativi richiesti.</p>
               </div>
-              <button class="btn soft" type="button" data-go="ledwall">Vai al Ledwall →</button>
+              <button class="btn soft" type="button" data-go="ledwall">Vai ai Prodotti →</button>
             </div>
             <div class="form-grid">
               <div class="field"><label class="label" for="agentName">Nome agente</label><input id="agentName" placeholder="Es. Mario Rossi" /></div>
@@ -1144,41 +1157,47 @@
         </div>
       </section>
 
-      <section class="view" id="view-ledwall" data-title="Ledwall" data-subtitle="Configurazione impianto" data-icon="🖥️">
+      <section class="view" id="view-ledwall" data-title="Prodotti" data-subtitle="Configurazione preventivo" data-icon="🛍️">
         <div class="led-layout">
           <section class="card pad">
             <div class="card-head">
               <div>
-                <div class="section-kicker">Calcolatore Ledwall</div>
-                <h2>Parametri impianto</h2>
-                <p>Inserisci i dettagli dello schermo da realizzare. Le soluzioni si aggiornano in tempo reale in base a misure, installazione, provincia e configurazione mono-bifacciale.</p>
+                <div class="section-kicker">Configuratore Prodotti</div>
+                <h2 id="productConfigTitle">Parametri Ledwall</h2>
+                <p id="productConfigIntro">Inserisci i dettagli dello schermo da realizzare. Le soluzioni si aggiornano in tempo reale in base a misure, installazione, provincia e configurazione mono-bifacciale.</p>
               </div>
             </div>
-            <div class="quote-manager" aria-label="Gestione Ledwall multipli">
+            <div class="product-family-current">
+              <div><strong id="productFamilyCurrent">LEDWALL</strong><span id="productFamilyCurrentHelp">Calcolo Ledwall tradizionale con ricerca automatica della soluzione.</span></div>
+              <button class="btn soft" type="button" id="btnChooseProductFamily">Cambia categoria</button>
+            </div>
+            <div class="quote-manager" aria-label="Gestione prodotti multipli">
               <div class="quote-manager-top">
                 <div>
-                  <div class="label">Ledwall da quotare</div>
-                  <div class="help">Puoi configurare fino a 3 Ledwall nello stesso riepilogo.</div>
+                  <div class="label">Prodotti da quotare</div>
+                  <div class="help">Puoi configurare fino a 3 prodotti, anche di categorie diverse, nello stesso riepilogo.</div>
                 </div>
                 <div class="quote-actions">
-                  <button class="btn soft" type="button" id="btnAddLedQuote">+ Aggiungi Ledwall</button>
+                  <button class="btn soft" type="button" id="btnAddLedQuote">+ Aggiungi prodotto</button>
                   <button class="btn ghost" type="button" id="btnRemoveLedQuote">Rimuovi</button>
                 </div>
               </div>
               <div class="quote-tabs" id="ledQuoteTabs"></div>
-              <div class="help" id="ledQuoteHelp">Il primo Ledwall applica il 100% dell’installazione; il secondo aggiunge il 50%; il terzo aggiunge il 30%. Se scegli “Autonoma”, il valore inserito manualmente non subisce impatti aggiuntivi.</div>
+              <div class="help" id="ledQuoteHelp">Il primo prodotto installabile applica il 100% dell’installazione; il secondo aggiunge il 50%; il terzo aggiunge il 30%. Se scegli “Autonoma”, il valore inserito manualmente non subisce impatti aggiuntivi.</div>
             </div>
             <div class="form-grid">
-              <div class="field"><label class="label" for="ledBase">Base (cm)</label><input id="ledBase" type="number" min="0" step="1" placeholder="Es. 200" /></div>
-              <div class="field"><label class="label" for="ledHeight">Altezza (cm)</label><input id="ledHeight" type="number" min="0" step="1" placeholder="Es. 150" /></div>
-              <div class="field full">
+              <div class="field full product-config-field is-hidden" id="specialProductField"><label class="label" for="specialProductSelect">Prodotto</label><select id="specialProductSelect"></select><div class="help" id="specialProductHelp">Scegli il prodotto da quotare.</div></div>
+              <div class="field product-config-field" id="productBaseField"><label class="label" for="ledBase">Base (cm)</label><input id="ledBase" type="number" min="0" step="1" placeholder="Es. 200" /></div>
+              <div class="field product-config-field" id="productHeightField"><label class="label" for="ledHeight">Altezza (cm)</label><input id="ledHeight" type="number" min="0" step="1" placeholder="Es. 150" /></div>
+              <div class="field full product-config-field is-hidden" id="productQuantityField"><label class="label" for="productQuantity">Quantità</label><input id="productQuantity" type="number" min="1" step="1" value="1" /><div class="help">Inserisci il numero di pezzi da includere nel preventivo.</div></div>
+              <div class="field full product-config-field" id="productBifField">
                 <label class="label">Bifacciale</label>
                 <label style="display:flex;align-items:center;gap:10px;border:1px dashed var(--line-strong);border-radius:14px;padding:11px;background:#fff;">
                   <input id="ledBif" type="checkbox" />
                   <span><strong>Configurazione fronte/retro</strong><br/><span class="help">Raddoppia i cabinet e i valori del display.</span></span>
                 </label>
               </div>
-              <div class="field full"><label class="label" for="ledInstall">Installazione</label><select id="ledInstall"><option value="personalizza">Da personalizzare</option><option value="autonoma">Autonoma</option><option value="parete">A parete</option><option value="bandiera">A bandiera</option><option value="palo">Su palo</option><option value="vetrina">A vetrina</option></select><div class="help">Scegli “Autonoma” solo quando vuoi inserire manualmente il costo installazione.</div></div>
+              <div class="field full product-config-field" id="productInstallField"><label class="label" for="ledInstall">Installazione</label><select id="ledInstall"><option value="personalizza">Da personalizzare</option><option value="autonoma">Autonoma</option><option value="parete">A parete</option><option value="bandiera">A bandiera</option><option value="palo">Su palo</option><option value="vetrina">A vetrina</option></select><div class="help">Scegli “Autonoma” solo quando vuoi inserire manualmente il costo installazione.</div></div>
               <div class="field full manual-install-field" id="ledInstallCustomField"><label class="label" for="ledInstallCustom">Costo installazione autonoma</label><input id="ledInstallCustom" type="number" min="0" step="1" value="0" placeholder="Es. 800" /><div class="help">Valore libero: nel riepilogo sarà evidenziato come installazione autonoma inserita manualmente.</div></div>
               <div class="field full"><label class="label" for="ledProvince">Provincia installazione</label><select id="ledProvince"><option value="Catania">Catania (CT)</option><option value="Siracusa">Siracusa (SR)</option><option value="Enna">Enna (EN)</option><option value="Ragusa">Ragusa (RG)</option><option value="Messina">Messina (ME)</option><option value="Caltanissetta">Caltanissetta (CL)</option><option value="Agrigento">Agrigento (AG)</option><option value="Palermo">Palermo (PA)</option><option value="Trapani">Trapani (TP)</option></select><div class="help" id="provinceHelp">Trasferta: —</div></div>
               <div class="field full"><label class="label" for="ledCommission">Provvigione</label><input id="ledCommission" type="number" min="0" step="1" value="0" placeholder="Es. 300" /><div class="help">Imposta la tua provvigione. Verrà sommata automaticamente al totale dell'operazione.</div></div>
@@ -1195,7 +1214,7 @@
             <div class="result-toolbar">
               <div>
                 <div class="section-kicker">Soluzioni</div>
-                <h2 style="margin:0;font-size:18px;font-weight:950">Risultati Ledwall</h2>
+                <h2 id="productResultsTitle" style="margin:0;font-size:18px;font-weight:950">Risultati prodotti</h2>
               </div>
               <div class="small" id="resultsCount">Inserisci le misure</div>
             </div>
@@ -1215,11 +1234,11 @@
               <div class="form-row">
                 <div class="inv-label">Prezzo d'acquisto (IVA esclusa)</div>
                 <input id="grenkeAmount" class="input-inv" type="number" min="0" step="1" placeholder="Es. 5000" />
-                <div class="help" style="color:rgba(255,255,255,.68)" id="grenkeImportNote">Puoi inserirlo manualmente o importarlo dal calcolatore Ledwall.</div>
+                <div class="help" style="color:rgba(255,255,255,.68)" id="grenkeImportNote">Puoi inserirlo manualmente o importarlo dal configuratore Prodotti.</div>
               </div>
               <div class="actions" style="margin:14px 0 4px 0">
                 <button class="btn primary" id="btnGrenkeCalc" type="button">Calcola Grenke</button>
-                <button class="btn soft" id="btnImportAgain" type="button" disabled>Reimporta Ledwall</button>
+                <button class="btn soft" id="btnImportAgain" type="button" disabled>Reimporta Prodotti</button>
               </div>
               <div class="mode" role="toolbar" aria-label="Selezione frequenza">
                 <button class="mode-btn" id="modeMonthly" aria-pressed="true" type="button">Mensile</button>
@@ -1292,7 +1311,7 @@
               <div class="lite-hidden-note">Modalità Lite: sono visibili solo i campi principali. La stampa IFIS mantiene comunque tutti i dati necessari.</div>
               <div class="actions" style="margin-top:16px">
                 <button class="btn primary" id="btnIfisCalc" type="button">Calcola IFIS</button>
-                <button class="btn soft" id="btnIfisImportLed" type="button" disabled>Importa totale Ledwall</button>
+                <button class="btn soft" id="btnIfisImportLed" type="button" disabled>Importa totale Prodotti</button>
                 <button class="btn dark" id="btnIfisPrintInternal" type="button">STAMPA PREV. IFIS</button>
               </div>
             </div>
@@ -1320,7 +1339,7 @@
       <section class="view" id="view-summary" data-title="Riepilogo" data-subtitle="Ordine e stampa" data-icon="🧾">
         <div class="actions no-print" style="justify-content:flex-end;margin-bottom:14px">
           <button class="btn soft" type="button" data-go="anagrafica">Modifica dati</button>
-          <button class="btn soft" type="button" data-go="ledwall">Modifica Ledwall</button>
+          <button class="btn soft" type="button" data-go="ledwall">Modifica Prodotti</button>
           <button class="btn soft" type="button" data-go="grenke">Modifica Grenke</button>
           <button class="btn soft" type="button" data-go="ifis">Modifica IFIS</button>
           <button class="btn success" type="button" id="btnPrint">Stampa / Salva PDF</button>
@@ -1341,7 +1360,7 @@
           </div>
           <div class="print-option-row">
             <strong>Allegati</strong>
-            <label class="checkline"><input id="printShowConformity" type="checkbox" /> Allegare dichiarazione di conformità</label>
+            <label class="checkline"><input id="printShowConformity" type="checkbox" /> Allegare dichiarazione di conformità (solo Ledwall)</label>
           </div>
         </div>
         <article class="summary-paper quote-preview-shell" id="summaryPaper">
@@ -1368,11 +1387,11 @@
     <section class="draft-modal-panel practice-type-panel" role="dialog" aria-modal="true" aria-labelledby="practiceTypeTitle">
       <div class="draft-modal-head"><div><h3 id="practiceTypeTitle">INSERISCI PRATICA</h3><p>Scegli la tipologia commerciale da riportare nel gestionale.</p></div><button class="draft-close" type="button" data-close-practice-type aria-label="Chiudi">×</button></div>
       <div class="practice-type-grid">
-        <button class="practice-type-card" type="button" data-practice-type="ACQUISTO"><span>€</span><strong>Acquisto</strong><small>Vendita diretta del Ledwall</small></button>
+        <button class="practice-type-card" type="button" data-practice-type="ACQUISTO"><span>€</span><strong>Acquisto</strong><small>Vendita diretta dei prodotti</small></button>
         <button class="practice-type-card" type="button" data-practice-type="NOLEGGIO"><span>G</span><strong>Noleggio</strong><small>Pratica Grenke</small></button>
         <button class="practice-type-card" type="button" data-practice-type="LEASING"><span>IF</span><strong>Leasing</strong><small>Pratica IFIS</small></button>
       </div>
-      <div class="notice">Cliente, intestazione, valori, Ledwall e numero dei cabinet verranno trasferiti automaticamente.</div>
+      <div class="notice">Cliente, intestazione, valori, prodotti e quantità di magazzino verranno trasferiti automaticamente.</div>
     </section>
   </div>
 
@@ -1399,6 +1418,25 @@
         <div class="sqp-dialog-actions">
           <button class="btn ghost" type="button" id="btnSqpDialogCancel">Annulla</button>
           <button class="btn primary" type="button" id="btnSqpDialogConfirm">Conferma</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="sqp-dialog-layer product-family-layer hidden no-print" id="productFamilyLayer" aria-live="polite">
+    <div class="sqp-dialog-dim" data-close-product-family></div>
+    <section class="sqp-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="productFamilyTitle">
+      <div class="sqp-dialog-hero">
+        <button class="sqp-dialog-close" type="button" id="btnProductFamilyClose" aria-label="Chiudi selezione">×</button>
+        <div class="sqp-dialog-kicker">S.Q.P. · PRODOTTI</div>
+        <h3 id="productFamilyTitle">Cosa vuoi quotare?</h3>
+        <p>Scegli una categoria. Il preventivo, le soluzioni finanziarie, il salvataggio e la creazione pratica continueranno a funzionare nello stesso flusso.</p>
+      </div>
+      <div class="sqp-dialog-body">
+        <div class="product-family-grid">
+          <button class="product-family-card" type="button" data-product-family="LEDWALL"><span class="family-icon">🖥️</span><strong>LEDWALL</strong><span>Il calcolatore tradizionale con misure, cabinet e configurazione mono o bifacciale.</span></button>
+          <button class="product-family-card" type="button" data-product-family="EXTRA_LED"><span class="family-icon">✚</span><strong>CROCI E LED EXTRA</strong><span>Croci farmacia, Transparent Ledwall e Floor Led.</span></button>
+          <button class="product-family-card" type="button" data-product-family="LCD"><span class="family-icon">📺</span><strong>SCHERMI LCD</strong><span>Totem LCD Indoor a quantità, senza voce installazione.</span></button>
         </div>
       </div>
     </section>
@@ -1446,7 +1484,7 @@
     const APP_CONFIG = {
       get modeText(){ return admin ? 'Admin' : 'Agente'; },
       get priceLabel(){ return admin ? 'Prezzo cliente' : 'Prezzo totale'; },
-      get transferLabel(){ return admin ? 'Importo cliente trasferito da Ledwall' : 'Importo trasferito da Ledwall'; }
+      get transferLabel(){ return admin ? 'Importo cliente trasferito dai prodotti' : 'Importo trasferito dai prodotti'; }
     };
 
     // =============================
@@ -1462,9 +1500,24 @@
       { nome:'P3.91', cabX:50, cabY:100, prezzoAgente:550, prezzoCliente:650, prezzoCina:280, prezzoPromoAgenti:null, prezzoPromoClienti:null, infoAdmin:'Ledwall Display P3.91 | 0.50x1.00 | In/Out | COSTO CINA: 280€', infoAgenti:'Ledwall Display P3.91 | Misura Cabinet: 0.50x1.00 | Qualità Ottima da Medie e Lunghe Distanze. | Utilizzabile per Installazioni Indoor e Outdoor. | Adatto per Installazioni su Parete e a Bandiera.', icon:'🖥️' },
       { nome:'P3.91 - 0.50x0.50', cabX:50, cabY:50, prezzoAgente:295, prezzoCliente:335, prezzoCina:150, prezzoPromoAgenti:null, prezzoPromoClienti:null, infoAdmin:'Ledwall Display P3.91 | 0.50x0.50 | In/Out | COSTO CINA: 150€', infoAgenti:'Ledwall Display P3.91 | Misura Cabinet: 0.50x0.50 | Qualità Ottima da Medie e Lunghe Distanze. | Utilizzabile per Installazioni Indoor e Outdoor. | Adatto per Installazioni su Parete e a Bandiera.', icon:'🖥️' },
       { nome:'P4', cabX:96, cabY:96, prezzoAgente:860, prezzoCliente:1080, prezzoCina:580, prezzoPromoAgenti:null, prezzoPromoClienti:null, infoAdmin:'Ledwall Display P4 | 0.96x0.96 | Outdoor | COSTO CINA: 580€', infoAgenti:'Ledwall Display P4 | Misura Cabinet: 0.96x0.96 | Qualità Buona da Medie e Lunghe Distanze. | Utilizzabile prettamente per Installazioni Outdoor. | Adatto per Installazioni su Parete e a Bandiera.', icon:'🖥️' }
-    ].map(model => ({...model, prezzo:model.prezzoAgente, info:admin ? model.infoAdmin : model.infoAgenti}));
+    ].map(model => ({...model, productId:stockProductIdForItem(model), productFamily:'LEDWALL', tipoCalcolo:'MODULARE', unitaMagazzino:'CABINET', allowBif:true, prezzo:model.prezzoAgente, info:admin ? model.infoAdmin : model.infoAgenti}));
 
     const LOCAL_LED_DEFAULTS = ledwalls.map(model => ({...model}));
+
+    const extraLedProducts = [
+      {productId:'cross-p5-6464', nome:'Croce Farmacia P5 64×64', cabX:64, cabY:64, prezzoAgente:999, prezzoCliente:1099, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'64×64 cm', allowBif:false, icon:'✚'},
+      {productId:'cross-p10-9696', nome:'Croce Farmacia P10 96×96', cabX:96, cabY:96, prezzoAgente:1099, prezzoCliente:1299, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'96×96 cm', allowBif:false, icon:'✚'},
+      {productId:'cross-p10-128128', nome:'Croce Farmacia P10 128×128', cabX:128, cabY:128, prezzoAgente:1449, prezzoCliente:1799, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'128×128 cm', allowBif:false, icon:'✚'},
+      {productId:'transparent-led-100100', nome:'Transparent Led P3.91', cabX:100, cabY:100, prezzoAgente:1200, prezzoCliente:1500, prezzoCina:0, tipoCalcolo:'MODULARE_ESATTO', unitaMagazzino:'CABINET', formatoLabel:'100×100 cm', allowBif:true, icon:'🪟'},
+      {productId:'floor-led-50100', nome:'Floor Led P3.91', cabX:50, cabY:100, prezzoAgente:1800, prezzoCliente:2000, prezzoCina:0, tipoCalcolo:'MODULARE_ESATTO', unitaMagazzino:'CABINET', formatoLabel:'50×100 cm', allowBif:true, icon:'◫'}
+    ].map(model => ({...model, productFamily:'EXTRA_LED', prezzoPromoAgenti:null, prezzoPromoClienti:null, giacenzaAttuale:0, statoGiacenza:'NON DISPONIBILE', infoAdmin:'Prodotto Croci e LED Extra', infoAgenti:'Prodotto Croci e LED Extra', prezzo:model.prezzoAgente, info:admin ? model.infoAdmin : model.infoAgenti}));
+
+    const lcdProducts = [
+      {productId:'lcd-totem-smx-430-cp', nome:'Totem LCD Indoor', cabX:0, cabY:0, prezzoAgente:2000, prezzoCliente:2200, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'SMX 430-CP', allowBif:false, icon:'📺'}
+    ].map(model => ({...model, productFamily:'LCD', prezzoPromoAgenti:null, prezzoPromoClienti:null, giacenzaAttuale:0, statoGiacenza:'NON DISPONIBILE', infoAdmin:'Schermo LCD Indoor', infoAgenti:'Schermo LCD Indoor', prezzo:model.prezzoAgente, info:admin ? model.infoAdmin : model.infoAgenti}));
+
+    const LOCAL_SPECIAL_DEFAULTS = [...extraLedProducts, ...lcdProducts].map(model => ({...model}));
+    const LOCAL_PRODUCT_DEFAULTS = [...LOCAL_LED_DEFAULTS, ...LOCAL_SPECIAL_DEFAULTS];
 
     const PRODUCT_DESCRIPTIONS = {
       'P1.9':'Qualità elevata ma solo indoor.',
@@ -1473,7 +1526,13 @@
       'P3.91':'Prodotto standard e più richiesto, offre una buona qualità ad un ottimo prezzo.',
       'P3.91 - 0.50x0.50':'Versione quadrata del P3.91, ideale per composizioni unificate e layout più flessibili.',
       'P4':'Prodotto economico con una discreta qualità.',
-      'P3.91 Unificato':'Combinazione intelligente fra cabinet P3.91 0.50x1.00 e 0.50x0.50 per ottenere la misura richiesta con maggiore efficienza.'
+      'P3.91 Unificato':'Combinazione intelligente fra cabinet P3.91 0.50x1.00 e 0.50x0.50 per ottenere la misura richiesta con maggiore efficienza.',
+      'Croce Farmacia P5 64×64':'Croce farmacia Outdoor P5 nel formato fisso 0,64 × 0,64 m.',
+      'Croce Farmacia P10 96×96':'Croce farmacia Outdoor P10 nel formato fisso 0,96 × 0,96 m.',
+      'Croce Farmacia P10 128×128':'Croce farmacia Outdoor P10 nel formato fisso 1,28 × 1,28 m.',
+      'Transparent Led P3.91':'Transparent LED Indoor / Outdoor configurabile a multipli esatti di 1,00 × 1,00 m.',
+      'Floor Led P3.91':'Pavimento LED Indoor / Outdoor configurabile a multipli esatti di 0,50 × 1,00 m.',
+      'Totem LCD Indoor':'Totem LCD touch Indoor SMX 430-CP con Capacitive Touch e sistema operativo Android 10.'
     };
 
     const PIXEL_SPECS = {
@@ -1483,6 +1542,15 @@
       'P3.91': { b:128, h:256 },
       'P3.91 - 0.50x0.50': { b:128, h:128 },
       'P4': { b:240, h:240 }
+    };
+
+    const SPECIAL_PIXEL_SPECS = {
+      'cross-p5-6464':{b:128,h:128},
+      'cross-p10-9696':{b:96,h:96},
+      'cross-p10-128128':{b:128,h:128},
+      'transparent-led-100100':{b:256,h:256},
+      'floor-led-50100':{b:128,h:256},
+      'lcd-totem-smx-430-cp':{b:0,h:0}
     };
 
     // =============================
@@ -1501,7 +1569,13 @@
           'P3': ASSET_ROOT + 'catalog/p3.jpg',
           'P3.91': ASSET_ROOT + 'catalog/p391-50100.png',
           'P3.91 - 0.50x0.50': ASSET_ROOT + 'catalog/p391-5050.jpg',
-          'P4': ASSET_ROOT + 'catalog/p4-9696.jpg'
+          'P4': ASSET_ROOT + 'catalog/p4-9696.jpg',
+          'Croce Farmacia P5 64×64': ASSET_ROOT + 'catalog/croce-farmacia.jpg',
+          'Croce Farmacia P10 96×96': ASSET_ROOT + 'catalog/croce-farmacia.jpg',
+          'Croce Farmacia P10 128×128': ASSET_ROOT + 'catalog/croce-farmacia.jpg',
+          'Transparent Led P3.91': ASSET_ROOT + 'catalog/transparent-led.png',
+          'Floor Led P3.91': ASSET_ROOT + 'catalog/floor-led.jpg',
+          'Totem LCD Indoor': ASSET_ROOT + 'catalog/totem-lcd-indoor.png'
         };
         const TECH_SHEETS = {
           'P2.5': {
@@ -1592,8 +1666,18 @@
           }
         };
     
+        Object.assign(TECH_SHEETS, {
+          'Croce Farmacia P5 64×64':{description:'Croce farmacia P5 Outdoor ad alta luminosità nel formato fisso 0,64 × 0,64 m.',rows:[['🅿️ PIXEL PITCH','5'],['📥 MODALITÀ DI UTILIZZO','Outdoor'],['🔲 DENSITÀ PIXEL','16.384 pixel/m²'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CROCE','0,64×0,64 m'],['💧 VALORE IP','IP65'],['🔋 CONSUMO MEDIO','350W/m²'],['🪫 CONSUMO MASSIMO','700W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','5,00 m / 10 m'],['🔆 LUMINOSITÀ','>4500cd/m²']]},
+          'Croce Farmacia P10 96×96':{description:'Croce farmacia P10 Outdoor ad alta luminosità nel formato fisso 0,96 × 0,96 m.',rows:[['🅿️ PIXEL PITCH','10'],['📥 MODALITÀ DI UTILIZZO','Outdoor'],['🔲 DENSITÀ PIXEL','9.216 pixel/m²'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CROCE','0,96×0,96 m'],['💧 VALORE IP','IP65'],['🔋 CONSUMO MEDIO','350W/m²'],['🪫 CONSUMO MASSIMO','700W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','5,00 m / 10 m'],['🔆 LUMINOSITÀ','>4500cd/m²']]},
+          'Croce Farmacia P10 128×128':{description:'Croce farmacia P10 Outdoor ad alta luminosità nel formato fisso 1,28 × 1,28 m.',rows:[['🅿️ PIXEL PITCH','10'],['📥 MODALITÀ DI UTILIZZO','Outdoor'],['🔲 DENSITÀ PIXEL','16.384 pixel/m²'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CROCE','1,28×1,28 m'],['💧 VALORE IP','IP65'],['🔋 CONSUMO MEDIO','350W/m²'],['🪫 CONSUMO MASSIMO','700W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','5,00 m / 10 m'],['🔆 LUMINOSITÀ','>4500cd/m²']]},
+          'Transparent Led P3.91':{description:'Transparent LED P3.91 Indoor / Outdoor composto da cabinet modulari trasparenti 1,00 × 1,00 m.',rows:[['🅿️ PIXEL PITCH','3.91'],['📥 MODALITÀ DI UTILIZZO','Indoor / Outdoor'],['🔲 DENSITÀ PIXEL','65.536 pixel/m²'],['🟩 LED STANDARD','SMD1415'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CABINET','1,00×1,00 m'],['🔋 CONSUMO MEDIO','280W/m²'],['🪫 CONSUMO MASSIMO','800W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','3,00 m'],['🔆 LUMINOSITÀ','>4500cd/m²'],['🔄 FREQUENZA AGGIORNAMENTO','1920 - 3840 Hz']]},
+          'Floor Led P3.91':{description:'Floor Led P3.91 Indoor / Outdoor composto da cabinet modulari calpestabili 0,50 × 1,00 m.',rows:[['🅿️ PIXEL PITCH','3.91'],['📥 MODALITÀ DI UTILIZZO','Indoor / Outdoor'],['🔲 DENSITÀ PIXEL','65.536 pixel/m²'],['🟩 LED STANDARD','SMD1415'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CABINET','0,50×1,00 m'],['🔋 CONSUMO MEDIO','280W/m²'],['🪫 CONSUMO MASSIMO','800W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','3,00 m'],['🔆 LUMINOSITÀ','>4500cd/m²'],['🔄 FREQUENZA AGGIORNAMENTO','1920 - 3840 Hz']]},
+          'Totem LCD Indoor':{description:'SMX 430-CP è la soluzione Indoor touch, rapida, tecnologicamente avanzata e altamente personalizzabile.',rows:[['💡 RETROILLUMINAZIONE','LED, colori vividi e uniformi'],['🌡️ DISSIPAZIONE','Ottimizzata per funzionamento continuo'],['🖼️ DESIGN','Bordi sottili, elegante e robusto'],['🛡️ VETRO','Temperato rinforzato 4 mm con serigrafia'],['⏳ DURATA PANNELLO','Fino a 30.000 ore'],['💻 SISTEMI SUPPORTATI','Android e Windows, con opzioni a scelta'],['📡 CONNETTIVITÀ','Ingresso AC, Wi-Fi integrato e antenna Wi-Fi'],['👆 TOUCH','Capacitive Touch tattile e responsivo'],['⚙️ GESTIONE','Semplice da controllare e personalizzare'],['🤖 SISTEMA OPERATIVO','Android 10']]}
+        });
+
         function canonicalProductName(name){
           if(!name) return '';
+          if(TECH_SHEETS[name]) return name;
           if(name.indexOf('P3.91') === 0) return 'P3.91';
           return name;
         }
@@ -1707,7 +1791,7 @@
       view:'anagrafica',
       activeLedQuoteIndex:0,
       ledQuotes:[{
-        base:'', altezza:'', bif:false, install:'personalizza', installCustom:'0', province:'Catania', commission:'0',
+        productFamily:'LEDWALL', productId:'', quantity:'1', base:'', altezza:'', bif:false, install:'personalizza', installCustom:'0', province:'Catania', commission:'0',
         ledResults:[], allLedResults:[], showPotentialSolutions:false, selectedLedIndex:null
       }],
       ledResults:[],
@@ -1726,14 +1810,14 @@
 
     const views = [
       {id:'anagrafica', icon:'👤', title:'Dati', subtitle:'Agente e cliente'},
-      {id:'ledwall', icon:'🖥️', title:'Ledwall', subtitle:'Configurazione impianto'},
+      {id:'ledwall', icon:'🛍️', title:'Prodotti', subtitle:'Configurazione preventivo'},
       {id:'grenke', icon:'💶', title:'Grenke', subtitle:'Noleggio operativo'},
       {id:'ifis', icon:'🏦', title:'IFIS', subtitle:'Leasing'},
       {id:'summary', icon:'🧾', title:'Riepilogo', subtitle:'Ordine e stampa'}
     ];
 
-    const HASH_VIEW_MAP = {dati:'anagrafica', anagrafica:'anagrafica', ledwall:'ledwall', grenke:'grenke', ifis:'ifis', riepilogo:'summary', summary:'summary'};
-    const VIEW_HASH_MAP = {anagrafica:'dati', ledwall:'ledwall', grenke:'grenke', ifis:'ifis', summary:'riepilogo'};
+    const HASH_VIEW_MAP = {dati:'anagrafica', anagrafica:'anagrafica', prodotti:'ledwall', ledwall:'ledwall', grenke:'grenke', ifis:'ifis', riepilogo:'summary', summary:'summary'};
+    const VIEW_HASH_MAP = {anagrafica:'dati', ledwall:'prodotti', grenke:'grenke', ifis:'ifis', summary:'riepilogo'};
 
     const $ = (id) => document.getElementById(id);
     const fmtEuro = (value) => (value === null || value === undefined || Number.isNaN(value)) ? '—' : value.toLocaleString('it-IT',{style:'currency',currency:'EUR',maximumFractionDigits:2});
@@ -1887,15 +1971,17 @@
     }
 
     function localProductKey(model){
+      const productId = String((model && (model.productId || model.id)) || '').trim().toLowerCase();
+      if(productId) return 'id:' + productId;
       return [String(model.nome || '').toLowerCase().trim(), Number(model.cabX || 0), Number(model.cabY || 0)].join('|');
     }
 
     function applyDatabaseProducts(products){
       if(!Array.isArray(products) || !products.length) return false;
-      const defaultsByKey = new Map(LOCAL_LED_DEFAULTS.map(model => [localProductKey(model), model]));
+      const defaultsByKey = new Map(LOCAL_PRODUCT_DEFAULTS.map(model => [localProductKey(model), model]));
       const merged = [];
       products.forEach(row => {
-        const rowKey = localProductKey({nome:row.nome, cabX:row.cabX, cabY:row.cabY});
+        const rowKey = localProductKey({id:row.id, nome:row.nome, cabX:row.cabX, cabY:row.cabY});
         const base = defaultsByKey.get(rowKey);
         if(!base) return;
         const model = {...base};
@@ -1914,6 +2000,11 @@
         model.icon = dbText(row.icon, model.icon || '🖥️');
         model.productId = dbText(row.id, stockProductIdForItem(model));
         model.sku = dbText(row.sku, '');
+        model.tipoCalcolo = dbText(row.tipo_calcolo, model.tipoCalcolo || 'MODULARE').toUpperCase();
+        model.unitaMagazzino = dbText(row.unita_magazzino, model.unitaMagazzino || 'CABINET').toUpperCase();
+        model.formatoLabel = dbText(row.formato_label, model.formatoLabel || '');
+        const catalogTab = dbText(row.catalogo_tab, '').toUpperCase();
+        model.productFamily = catalogTab === 'LCD' ? 'LCD' : (catalogTab === 'ALTRI_LED' ? 'EXTRA_LED' : model.productFamily || 'LEDWALL');
         model.giacenzaAttuale = Math.max(0, dbNumber(row.giacenza_attuale, 0));
         model.statoGiacenza = dbText(row.stato_giacenza, model.giacenzaAttuale > 0 ? 'DISPONIBILE' : 'NON DISPONIBILE');
         const technicalSheet = TECH_SHEETS[canonicalProductName(model.nome)];
@@ -1936,7 +2027,11 @@
         merged.push(model);
       });
       if(!merged.length) return false;
-      ledwalls.splice(0, ledwalls.length, ...merged);
+      const defaultOrder = new Map(LOCAL_PRODUCT_DEFAULTS.map((model, index) => [String(model.productId || stockProductIdForItem(model)), index]));
+      const ordered = merged.slice().sort((a,b) => (defaultOrder.get(String(a.productId)) ?? 999) - (defaultOrder.get(String(b.productId)) ?? 999));
+      ledwalls.splice(0, ledwalls.length, ...ordered.filter(model => model.productFamily === 'LEDWALL'));
+      extraLedProducts.splice(0, extraLedProducts.length, ...ordered.filter(model => model.productFamily === 'EXTRA_LED'));
+      lcdProducts.splice(0, lcdProducts.length, ...ordered.filter(model => model.productFamily === 'LCD'));
       return true;
     }
 
@@ -1992,6 +2087,16 @@
     }
 
     function rebuildLedQuoteFromDatabase(q, index){
+      q.productFamily = normalizeProductFamily(q.productFamily);
+      if(q.productFamily !== 'LEDWALL'){
+        const model = quoteProductModel(q);
+        const result = buildSpecialProductResult(model, q, index);
+        q.showPotentialSolutions = false;
+        q.allLedResults = result ? [result] : [];
+        q.ledResults = result ? [result] : [];
+        q.selectedLedIndex = result ? 0 : null;
+        return;
+      }
       const base = Math.max(0, Number(q.base || 0));
       const altezza = Math.max(0, Number(q.altezza || 0));
       if(!base || !altezza){
@@ -2006,7 +2111,7 @@
       const extraKm = (PROVINCE_KM[q.province || 'Catania'] || 0) * COSTO_KM;
       const provvigione = Math.max(0, Number(q.commission || 0));
       const manualInstall = Math.max(0, Number(q.installCustom || 0));
-      const installMultiplier = tipoInst === 'autonoma' ? 1 : installImpactFactor(index);
+      const installMultiplier = tipoInst === 'autonoma' ? 1 : installImpactFactor(installSequenceIndex(index));
       let results = ledwalls.map(model => buildLedResult(model, base, altezza, bif, tipoInst, extraKm, provvigione, installMultiplier, manualInstall));
       const perfectMatches = results.filter(r => r.perfectMatch);
       const unified = buildUnifiedPlan(results, base, altezza, bif, tipoInst, extraKm, perfectMatches, provvigione, installMultiplier, manualInstall);
@@ -2100,7 +2205,7 @@
     // =============================
     const ONLINE_ARCHIVE = {
       enabled:true,
-      version:'database-archive-unificato-v5.3-admin-cross-account',
+      version:'database-archive-unificato-v5.4-multiprodotto',
       minPasswordLength:4
     };
 
@@ -2226,6 +2331,13 @@
 
     function stockProductIdForItem(item){
       if(!item) return '';
+      if(item.productId) return String(item.productId);
+      if(item.nome === 'Croce Farmacia P5 64×64') return 'cross-p5-6464';
+      if(item.nome === 'Croce Farmacia P10 96×96') return 'cross-p10-9696';
+      if(item.nome === 'Croce Farmacia P10 128×128') return 'cross-p10-128128';
+      if(item.nome === 'Transparent Led P3.91') return 'transparent-led-100100';
+      if(item.nome === 'Floor Led P3.91') return 'floor-led-50100';
+      if(item.nome === 'Totem LCD Indoor') return 'lcd-totem-smx-430-cp';
       if(item.nome === 'P1.9') return 'p19-50100';
       if(item.nome === 'P2.5') return 'p25-6464';
       if(item.nome === 'P3') return 'p3-5757';
@@ -2283,14 +2395,21 @@
         const row = {
           numero: idx + 1,
           prodotto: archiveText(item.nome),
+          product_id: stockProductIdForItem(item),
+          famiglia_prodotto: archiveText(item.productFamily || 'LEDWALL'),
+          catalogo_tab: item.productFamily === 'LCD' ? 'LCD' : (item.productFamily === 'EXTRA_LED' ? 'ALTRI_LED' : 'LEDWALL'),
+          tipo_calcolo: archiveText(item.tipoCalcolo || (item.unified ? 'UNIFICATO' : 'MODULARE')),
+          unita_magazzino: archiveText(item.unitaMagazzino || 'CABINET'),
+          formato_label: archiveText(item.formatoLabel || ''),
           modello_display: item.unified ? 'P3.91 UNIFICATO' : archiveText(item.nome),
-          misura_cm: archiveNumber(item.displayWidth) + 'x' + archiveNumber(item.displayHeight),
-          misura_m: (archiveNumber(item.displayWidth / 100) + 'x' + archiveNumber(item.displayHeight / 100)).replace('.', ','),
-          misura_display: archiveNumber(item.displayWidth / 100) + 'x' + archiveNumber(item.displayHeight / 100),
+          misura_cm: item.displayWidth && item.displayHeight ? archiveNumber(item.displayWidth) + 'x' + archiveNumber(item.displayHeight) + ' cm' : archiveText(item.formatoLabel),
+          misura_m: item.displayWidth && item.displayHeight ? (archiveNumber(item.displayWidth / 100) + 'x' + archiveNumber(item.displayHeight / 100)).replace('.', ',') : '',
+          misura_display: item.displayWidth && item.displayHeight ? archiveNumber(item.displayWidth / 100) + 'x' + archiveNumber(item.displayHeight / 100) : '',
           bifacciale: item.bifacciale ? 'SI' : 'NO',
           cabinet: archiveNumber(item.totalCab),
-          cabinet_layout: item.unified ? ('Rettangolari ' + archiveNumber(item.rectCab || 0) + ' + quadrati ' + archiveNumber(item.sqCab || 0)) : (archiveNumber(item.colsNeeded) + 'x' + archiveNumber(item.rowsNeeded)),
-          pixel: archiveNumber(item.pixelBase) + 'x' + archiveNumber(item.pixelHeight),
+          cabinet_layout: item.unified ? ('Rettangolari ' + archiveNumber(item.rectCab || 0) + ' + quadrati ' + archiveNumber(item.sqCab || 0)) : (item.tipoCalcolo === 'UNITA' ? archiveNumber(item.totalCab) + ' pezzi' : (archiveNumber(item.colsNeeded) + 'x' + archiveNumber(item.rowsNeeded))),
+          quantita_unita: item.tipoCalcolo === 'UNITA' ? archiveNumber(item.totalCab || 0) : '',
+          pixel: item.pixelBase && item.pixelHeight ? archiveNumber(item.pixelBase) + 'x' + archiveNumber(item.pixelHeight) : '',
           prezzo_unitario_agente: archiveNumber(item.prezzoAgenteUnitEff || item.prezzoAgente || ''),
           prezzo_unitario_cliente: archiveNumber(item.prezzoClienteUnitEff || item.prezzoCliente || ''),
           totale_agente: archiveNumber(item.prezzoAgenteTotale || 0),
@@ -2729,7 +2848,7 @@
       admin = nextAdmin;
       liteModeAllowed = false;
       sqpMode = 'advanced';
-      ledwalls.forEach(model => {
+      [...ledwalls, ...extraLedProducts, ...lcdProducts].forEach(model => {
         model.prezzo = model.prezzoAgente;
         model.info = admin ? model.infoAdmin : model.infoAgenti;
       });
@@ -3526,6 +3645,95 @@
       return true;
     }
 
+    const PRODUCT_FAMILY_META = {
+      LEDWALL:{label:'LEDWALL', icon:'🖥️', help:'Calcolo Ledwall tradizionale con ricerca automatica della soluzione.', title:'Parametri Ledwall', intro:'Inserisci i dettagli dello schermo da realizzare. Le soluzioni si aggiornano in tempo reale in base a misure, installazione, provincia e configurazione mono-bifacciale.'},
+      EXTRA_LED:{label:'CROCI E LED EXTRA', icon:'✚', help:'Croci farmacia a formato fisso, Transparent Ledwall e Floor Led modulari.', title:'Parametri Croci e LED Extra', intro:'Scegli il prodotto e configura quantità o dimensioni. I vincoli modulari vengono controllati automaticamente.'},
+      LCD:{label:'SCHERMI LCD', icon:'📺', help:'Totem LCD Indoor a quantità, senza costo di installazione.', title:'Parametri Schermi LCD', intro:'Scegli il Totem LCD e la quantità. Trasferta e provvigione restano sempre disponibili.'}
+    };
+
+    function normalizeProductFamily(value){
+      const family = String(value || 'LEDWALL').trim().toUpperCase();
+      return PRODUCT_FAMILY_META[family] ? family : 'LEDWALL';
+    }
+
+    function productsForFamily(family){
+      family = normalizeProductFamily(family);
+      if(family === 'EXTRA_LED') return extraLedProducts;
+      if(family === 'LCD') return lcdProducts;
+      return ledwalls;
+    }
+
+    function productById(productId, family){
+      const products = productsForFamily(family);
+      const requestedId = String(productId || '').trim();
+      if(!requestedId) return null;
+      return products.find(product => String(product.productId || stockProductIdForItem(product)) === requestedId) || null;
+    }
+
+    function quoteProductModel(q){
+      const family = normalizeProductFamily(q && q.productFamily);
+      return family === 'LEDWALL' ? null : productById(q && q.productId, family);
+    }
+
+    function quoteUsesQuantity(q){
+      const model = quoteProductModel(q);
+      return !!model && String(model.tipoCalcolo || '').toUpperCase() === 'UNITA';
+    }
+
+    function quoteSupportsInstallation(q){
+      return normalizeProductFamily(q && q.productFamily) !== 'LCD';
+    }
+
+    function quoteSupportsBifacial(q){
+      const family = normalizeProductFamily(q && q.productFamily);
+      if(family === 'LEDWALL') return true;
+      const model = quoteProductModel(q);
+      return !!(model && model.allowBif);
+    }
+
+    function closeProductFamilyModal(){
+      const layer = $('productFamilyLayer');
+      if(layer) layer.classList.add('hidden');
+    }
+
+    function openProductFamilyModal(){
+      const layer = $('productFamilyLayer');
+      if(layer) layer.classList.remove('hidden');
+    }
+
+    function selectProductFamily(family, options={}){
+      family = normalizeProductFamily(family);
+      if($('ledBase')) saveActiveLedQuoteFromForm();
+      const q = activeLedQuote();
+      if(normalizeProductFamily(q.productFamily) !== family){
+        q.productFamily = family;
+        q.productId = '';
+        q.quantity = '1';
+        q.base = '';
+        q.altezza = '';
+        q.bif = false;
+        q.ledResults = [];
+        q.allLedResults = [];
+        q.selectedLedIndex = null;
+      }
+      closeProductFamilyModal();
+      loadActiveLedQuoteToForm();
+      calcLedwall();
+      if(options.navigate !== false) setView('ledwall');
+      updateSideStatus();
+    }
+
+    function setupProductFamilyModal(){
+      const closeNodes = [$('btnProductFamilyClose'), ...document.querySelectorAll('[data-close-product-family]')].filter(Boolean);
+      closeNodes.forEach(node => node.addEventListener('click', closeProductFamilyModal));
+      document.querySelectorAll('[data-product-family]').forEach(node => node.addEventListener('click', () => selectProductFamily(node.dataset.productFamily)));
+      if($('btnChooseProductFamily')) $('btnChooseProductFamily').addEventListener('click', openProductFamilyModal);
+      document.addEventListener('keydown', event => {
+        const layer = $('productFamilyLayer');
+        if(event.key === 'Escape' && layer && !layer.classList.contains('hidden')) closeProductFamilyModal();
+      });
+    }
+
     function initNavigation(){
       const side = $('sideNav');
       const mobile = $('mobileTabs');
@@ -3534,7 +3742,10 @@
         : `<button class="nav-btn" type="button" data-go="${v.id}"><span class="nav-icon">${v.icon}</span><span class="nav-text"><strong>${v.title}</strong><span>${v.subtitle}</span></span></button>`;
       side.innerHTML = views.map(v => renderBtn(v)).join('');
       mobile.innerHTML = views.map(v => renderBtn(v,true)).join('');
-      document.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => setView(btn.dataset.go)));
+      document.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => {
+        if(btn.dataset.go === 'ledwall') openProductFamilyModal();
+        else setView(btn.dataset.go);
+      }));
       refreshNav();
     }
 
@@ -3596,7 +3807,7 @@
       if($('modePill')) $('modePill').textContent = currentSqpModeLabel() + ' attivo';
       $('sideClientStatus').textContent = val('clientCompany') || val('clientName') || '—';
       const selectedItems = selectedLedQuotes();
-      $('sideLedStatus').textContent = selectedItems.length ? `${selectedItems.length} Ledwall · ${fmtEuro0(totalLedAmount())}` : '—';
+      $('sideLedStatus').textContent = selectedItems.length ? `${selectedItems.length} prodott${selectedItems.length === 1 ? 'o' : 'i'} · ${fmtEuro0(totalLedAmount())}` : '—';
       const canone = currentCanone();
       const provider = state.financeProvider === 'ifis' ? 'IFIS' : (state.financeProvider === 'none' ? 'Nessuna finanza' : 'Grenke');
       $('sideGrenkeStatus').textContent = state.financeProvider === 'none' ? 'Non mostrata in stampa' : (canone ? `${provider} · ${fmtEuro(canone)}` : '—');
@@ -3607,8 +3818,10 @@
     // =============================
     const INSTALL_IMPACT_FACTORS = [1, 0.5, 0.3];
 
-    function createLedQuote(){
+    function createLedQuote(productFamily='LEDWALL'){
+      productFamily = normalizeProductFamily(productFamily);
       return {
+        productFamily, productId:'', quantity:'1',
         base:'', altezza:'', bif:false, install:'personalizza', installCustom:'0', province:'Catania', commission:'0',
         ledResults:[], allLedResults:[], showPotentialSolutions:false, selectedLedIndex:null
       };
@@ -3628,8 +3841,22 @@
       return index === 0 ? '100%' : (index === 1 ? '+50%' : '+30%');
     }
 
+    function installSequenceIndex(quoteIndex){
+      const count = state.ledQuotes.slice(0, Math.max(0, quoteIndex) + 1).filter(quote => quoteSupportsInstallation(quote)).length;
+      return Math.max(0, count - 1);
+    }
+
+    function installMultiplierLabel(multiplier){
+      if(Number(multiplier) >= 0.99) return '100%';
+      if(Number(multiplier) >= 0.49) return '+50%';
+      return '+30%';
+    }
+
     function saveActiveLedQuoteFromForm(){
       const q = activeLedQuote();
+      q.productFamily = normalizeProductFamily(q.productFamily);
+      q.productId = q.productFamily === 'LEDWALL' ? '' : (($('specialProductSelect') && $('specialProductSelect').value) || q.productId || '');
+      q.quantity = $('productQuantity') ? $('productQuantity').value : (q.quantity || '1');
       q.base = $('ledBase') ? $('ledBase').value : '';
       q.altezza = $('ledHeight') ? $('ledHeight').value : '';
       q.bif = $('ledBif') ? $('ledBif').checked : false;
@@ -3645,6 +3872,10 @@
 
     function loadActiveLedQuoteToForm(){
       const q = activeLedQuote();
+      q.productFamily = normalizeProductFamily(q.productFamily);
+      applyProductFamilyUi(q);
+      if($('specialProductSelect') && q.productFamily !== 'LEDWALL') $('specialProductSelect').value = q.productId || '';
+      if($('productQuantity')) $('productQuantity').value = q.quantity || '1';
       if($('ledBase')) $('ledBase').value = q.base || '';
       if($('ledHeight')) $('ledHeight').value = q.altezza || '';
       if($('ledBif')) $('ledBif').checked = !!q.bif;
@@ -3668,16 +3899,19 @@
       wrap.innerHTML = state.ledQuotes.map((q, i) => {
         const selected = q.selectedLedIndex !== null && q.ledResults && q.ledResults[q.selectedLedIndex];
         const active = i === state.activeLedQuoteIndex;
-        return `<button class="quote-tab ${active ? 'active' : ''} ${selected ? 'is-ready' : ''}" type="button" data-led-quote="${i}"><span class="q-status"></span>Ledwall ${i + 1}${selected ? ' · pronto' : ''}</button>`;
+        const family = PRODUCT_FAMILY_META[normalizeProductFamily(q.productFamily)];
+        return `<button class="quote-tab ${active ? 'active' : ''} ${selected ? 'is-ready' : ''}" type="button" data-led-quote="${i}"><span class="q-status"></span>${safe(family.icon)} Prodotto ${i + 1}${selected ? ' · pronto' : ''}</button>`;
       }).join('');
       document.querySelectorAll('[data-led-quote]').forEach(btn => btn.addEventListener('click', () => setActiveLedQuote(Number(btn.dataset.ledQuote))));
       if($('btnAddLedQuote')) $('btnAddLedQuote').disabled = state.ledQuotes.length >= 3;
       if($('btnRemoveLedQuote')) $('btnRemoveLedQuote').disabled = state.ledQuotes.length <= 1;
       if($('ledQuoteHelp')) {
         const q = activeLedQuote();
-        $('ledQuoteHelp').textContent = q.install === 'autonoma'
-          ? `Ledwall attivo: ${state.activeLedQuoteIndex + 1}. Installazione autonoma: nessun valore multi Ledwall applicato.`
-          : `Ledwall attivo: ${state.activeLedQuoteIndex + 1}. Valore installazione applicato: ${installImpactLabel(state.activeLedQuoteIndex)}.`;
+        $('ledQuoteHelp').textContent = !quoteSupportsInstallation(q)
+          ? `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. Per gli schermi LCD l'installazione non viene applicata.`
+          : q.install === 'autonoma'
+            ? `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. Installazione autonoma: nessun valore multiprodotto applicato.`
+            : `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. Valore installazione applicato: ${installImpactLabel(installSequenceIndex(state.activeLedQuoteIndex))}.`;
       }
     }
 
@@ -3691,16 +3925,17 @@
 
     function addLedQuote(){
       saveActiveLedQuoteFromForm();
-      if(state.ledQuotes.length >= 3){ sqpAlert('Puoi quotare al massimo 3 Ledwall nello stesso riepilogo.', {title:'Limite Ledwall'}); return; }
-      state.ledQuotes.push(createLedQuote());
+      if(state.ledQuotes.length >= 3){ sqpAlert('Puoi quotare al massimo 3 prodotti nello stesso riepilogo.', {title:'Limite prodotti'}); return; }
+      state.ledQuotes.push(createLedQuote(activeLedQuote().productFamily));
       state.activeLedQuoteIndex = state.ledQuotes.length - 1;
       loadActiveLedQuoteToForm();
+      openProductFamilyModal();
       updateSideStatus();
     }
 
     async function removeLedQuote(){
       if(state.ledQuotes.length <= 1) return;
-      const ok = await sqpConfirm('Vuoi rimuovere il Ledwall attuale dal preventivo?', {title:'Rimuovi Ledwall', confirmText:'Rimuovi', cancelText:'Annulla'});
+      const ok = await sqpConfirm('Vuoi rimuovere il prodotto attuale dal preventivo?', {title:'Rimuovi prodotto', confirmText:'Rimuovi', cancelText:'Annulla'});
       if(!ok) return;
       state.ledQuotes.splice(state.activeLedQuoteIndex, 1);
       state.activeLedQuoteIndex = Math.max(0, Math.min(state.activeLedQuoteIndex, state.ledQuotes.length - 1));
@@ -3721,8 +3956,71 @@
       return selectedLedQuotes().reduce((sum, item) => sum + (admin ? item.prezzoClienteTotale : item.prezzoAgenteTotale), 0);
     }
 
+    function setProductConfigFieldVisible(id, visible){
+      const node = $(id);
+      if(node) node.classList.toggle('is-hidden', !visible);
+    }
+
+    function applyProductFamilyUi(q=activeLedQuote()){
+      const family = normalizeProductFamily(q.productFamily);
+      const meta = PRODUCT_FAMILY_META[family];
+      q.productFamily = family;
+      if($('productFamilyCurrent')) $('productFamilyCurrent').textContent = `${meta.icon} ${meta.label}`;
+      if($('productFamilyCurrentHelp')) $('productFamilyCurrentHelp').textContent = meta.help;
+      if($('productConfigTitle')) $('productConfigTitle').textContent = meta.title;
+      if($('productConfigIntro')) $('productConfigIntro').textContent = meta.intro;
+
+      const special = family !== 'LEDWALL';
+      const select = $('specialProductSelect');
+      if(special && select){
+        const products = productsForFamily(family);
+        if(q.productId && !products.some(product => String(product.productId) === String(q.productId))) q.productId = '';
+        select.innerHTML = `<option value="">Seleziona un prodotto...</option>` + products.map(product => `<option value="${safe(product.productId)}">${safe(product.nome)}</option>`).join('');
+        select.value = q.productId || '';
+      }
+      const model = special ? quoteProductModel(q) : null;
+      const usesQuantity = !!model && String(model.tipoCalcolo || '').toUpperCase() === 'UNITA';
+      const usesDimensions = family === 'LEDWALL' || (!!model && !usesQuantity);
+      const supportsBif = quoteSupportsBifacial(q);
+      const supportsInstall = quoteSupportsInstallation(q);
+      setProductConfigFieldVisible('specialProductField', special);
+      setProductConfigFieldVisible('productBaseField', usesDimensions);
+      setProductConfigFieldVisible('productHeightField', usesDimensions);
+      setProductConfigFieldVisible('productQuantityField', usesQuantity);
+      setProductConfigFieldVisible('productBifField', supportsBif);
+      setProductConfigFieldVisible('productInstallField', supportsInstall);
+      if(!supportsBif){ q.bif = false; if($('ledBif')) $('ledBif').checked = false; }
+
+      if($('ledBase') && $('ledHeight')){
+        const stepX = model && model.tipoCalcolo === 'MODULARE_ESATTO' ? Number(model.cabX || 1) : 1;
+        const stepY = model && model.tipoCalcolo === 'MODULARE_ESATTO' ? Number(model.cabY || 1) : 1;
+        $('ledBase').step = String(stepX);
+        $('ledHeight').step = String(stepY);
+        $('ledBase').placeholder = model && model.tipoCalcolo === 'MODULARE_ESATTO' ? `Multipli di ${stepX} cm` : 'Es. 200';
+        $('ledHeight').placeholder = model && model.tipoCalcolo === 'MODULARE_ESATTO' ? `Multipli di ${stepY} cm` : 'Es. 150';
+      }
+      if($('specialProductHelp')){
+        $('specialProductHelp').textContent = model
+          ? (usesQuantity ? `Formato fisso ${model.formatoLabel || 'predefinito'} · indica il numero di pezzi.` : `Dimensioni consentite a multipli esatti del cabinet ${model.formatoLabel || `${model.cabX}×${model.cabY} cm`}.`)
+          : 'Scegli il prodotto da quotare.';
+      }
+      if($('productResultsTitle')) $('productResultsTitle').textContent = family === 'LEDWALL' ? 'Risultati Ledwall' : 'Prodotto configurato';
+      toggleCustomInstallField();
+    }
+
+    function snapSpecialDimensions(){
+      const q = activeLedQuote();
+      const model = quoteProductModel(q);
+      if(!model || model.tipoCalcolo !== 'MODULARE_ESATTO') return;
+      [['ledBase', Number(model.cabX || 1)], ['ledHeight', Number(model.cabY || 1)]].forEach(([id, step]) => {
+        const input = $(id);
+        const value = Number(input && input.value || 0);
+        if(input && value > 0) input.value = String(Math.ceil(value / step) * step);
+      });
+    }
+
     function toggleCustomInstallField(){
-      const isAutonoma = $('ledInstall') && $('ledInstall').value === 'autonoma';
+      const isAutonoma = quoteSupportsInstallation(activeLedQuote()) && $('ledInstall') && $('ledInstall').value === 'autonoma';
       const field = $('ledInstallCustomField');
       if(field) field.classList.toggle('is-visible', !!isAutonoma);
     }
@@ -3732,13 +4030,35 @@
         if($(id)) $(id).addEventListener('input', calcLedwall);
         if($(id)) $(id).addEventListener('change', calcLedwall);
       });
+      ['ledBase','ledHeight'].forEach(id => { if($(id)) $(id).addEventListener('change', () => { snapSpecialDimensions(); calcLedwall(); }); });
+      if($('productQuantity')){
+        $('productQuantity').addEventListener('input', calcLedwall);
+        $('productQuantity').addEventListener('change', () => {
+          $('productQuantity').value = String(Math.max(1, Math.floor(Number($('productQuantity').value) || 1)));
+          calcLedwall();
+        });
+      }
+      if($('specialProductSelect')) $('specialProductSelect').addEventListener('change', () => {
+        const q = activeLedQuote();
+        q.productId = $('specialProductSelect').value;
+        q.base = '';
+        q.altezza = '';
+        q.quantity = '1';
+        q.bif = false;
+        q.ledResults = [];
+        q.allLedResults = [];
+        q.selectedLedIndex = null;
+        loadActiveLedQuoteToForm();
+        calcLedwall();
+      });
       $('ledBif').addEventListener('change', calcLedwall);
       $('btnResetLed').addEventListener('click', () => {
         const q = activeLedQuote();
-        Object.assign(q, createLedQuote());
+        Object.assign(q, createLedQuote(q.productFamily));
         state.showPotentialSolutions=false;
         state.ledResults=[]; state.allLedResults=[]; state.selectedLedIndex=null;
         loadActiveLedQuoteToForm();
+        calcLedwall();
         updateSideStatus();
       });
       if($('btnAddLedQuote')) $('btnAddLedQuote').addEventListener('click', addLedQuote);
@@ -3761,6 +4081,11 @@
     function calcLedwall(){
       toggleCustomInstallField();
       updateProvinceHelp();
+      saveActiveLedQuoteFromForm();
+      if(normalizeProductFamily(activeLedQuote().productFamily) !== 'LEDWALL'){
+        calcSpecialProduct();
+        return;
+      }
       const base = num('ledBase');
       const altezza = num('ledHeight');
       const bif = $('ledBif').checked;
@@ -3768,10 +4093,8 @@
       const extraKm = (PROVINCE_KM[$('ledProvince').value] || 0) * COSTO_KM;
       const provvigione = Math.max(0, num('ledCommission') || 0);
       const manualInstall = Math.max(0, num('ledInstallCustom') || 0);
-      const installMultiplier = tipoInst === 'autonoma' ? 1 : installImpactFactor(state.activeLedQuoteIndex);
+      const installMultiplier = tipoInst === 'autonoma' ? 1 : installImpactFactor(installSequenceIndex(state.activeLedQuoteIndex));
       state.showPotentialSolutions = false;
-
-      saveActiveLedQuoteFromForm();
 
       if(!base || !altezza){
         state.ledResults = [];
@@ -3820,6 +4143,110 @@
         alertHtml += `<div class="notice warn" style="margin-top:8px"><strong>⚠️ Disponibilità di magazzino:</strong> ${insufficient.length === state.ledResults.length ? 'nessuna delle soluzioni visualizzate dispone attualmente di tutti i cabinet richiesti.' : insufficient.length + ' soluzione/i superano la giacenza disponibile.'} Il preventivo resta comunque realizzabile.</div>`;
       }
       $('ledAlert').innerHTML = alertHtml;
+      saveActiveLedQuoteFromForm();
+      renderLedwall();
+      updateSideStatus();
+    }
+
+    function isExactModuleMultiple(value, step){
+      value = Number(value || 0);
+      step = Number(step || 0);
+      return value > 0 && step > 0 && Math.abs(value / step - Math.round(value / step)) < 0.000001;
+    }
+
+    function buildSpecialProductResult(model, q, quoteIndex){
+      if(!model) return null;
+      const calculationMode = String(model.tipoCalcolo || 'UNITA').toUpperCase();
+      const usesQuantity = calculationMode === 'UNITA';
+      const quantity = Math.max(1, Math.floor(Number(q.quantity || 1)));
+      const base = usesQuantity ? Number(model.cabX || 0) : Number(q.base || 0);
+      const altezza = usesQuantity ? Number(model.cabY || 0) : Number(q.altezza || 0);
+      if(!usesQuantity && (!isExactModuleMultiple(base, model.cabX) || !isExactModuleMultiple(altezza, model.cabY))) return null;
+      const cols = usesQuantity ? 1 : Math.round(base / Number(model.cabX || 1));
+      const rows = usesQuantity ? 1 : Math.round(altezza / Number(model.cabY || 1));
+      const bif = !usesQuantity && !!model.allowBif && !!q.bif;
+      let totalCab = usesQuantity ? quantity : cols * rows;
+      if(bif) totalCab *= 2;
+      const displayWidth = base;
+      const displayHeight = altezza;
+      const areaMq = usesQuantity ? ((base / 100) * (altezza / 100) * quantity) : ((base / 100) * (altezza / 100));
+      const supportsInstall = normalizeProductFamily(q.productFamily) !== 'LCD';
+      const tipoInst = supportsInstall ? (q.install || 'personalizza') : 'nessuna';
+      const manualInstall = Math.max(0, Number(q.installCustom || 0));
+      const installMultiplier = tipoInst === 'autonoma' ? 1 : installImpactFactor(installSequenceIndex(quoteIndex));
+      const installationBase = supportsInstall ? installationBaseCost(areaMq, tipoInst, manualInstall) : 0;
+      const extraInstall = supportsInstall ? Math.round(installationBase * installMultiplier) : 0;
+      const extraKm = (PROVINCE_KM[q.province || 'Catania'] || 0) * COSTO_KM;
+      const provvigione = Math.max(0, Number(q.commission || 0));
+      const prezzoClienteUnitOriginal = Number(model.prezzoCliente || 0);
+      const prezzoAgenteUnitOriginal = Number(model.prezzoAgente || 0);
+      const prezzoClienteUnitEff = effectiveClientUnitPrice(model);
+      const prezzoAgenteUnitEff = effectiveAgentUnitPrice(model);
+      const prezzoClienteBaseOriginal = totalCab * prezzoClienteUnitOriginal;
+      const prezzoAgenteBaseOriginal = totalCab * prezzoAgenteUnitOriginal;
+      const prezzoClienteBase = totalCab * prezzoClienteUnitEff;
+      const prezzoAgenteBase = totalCab * prezzoAgenteUnitEff;
+      const costoCinaBase = totalCab * Number(model.prezzoCina || 0);
+      const pixelSpec = SPECIAL_PIXEL_SPECS[model.productId] || {b:0,h:0};
+      const pixelBase = usesQuantity ? pixelSpec.b : cols * pixelSpec.b;
+      const pixelHeight = usesQuantity ? pixelSpec.h : rows * pixelSpec.h;
+      return {
+        ...model,
+        productId:model.productId || stockProductIdForItem(model), productFamily:normalizeProductFamily(q.productFamily),
+        tipoCalcolo:calculationMode, unitaMagazzino:model.unitaMagazzino || (usesQuantity ? 'PEZZI' : 'CABINET'), formatoLabel:model.formatoLabel || '',
+        colsNeeded:cols, rowsNeeded:rows, totalCab, unitQuantity:quantity, displayWidth, displayHeight, areaMq,
+        prezzoClienteTotale:prezzoClienteBase + extraInstall + extraKm + provvigione,
+        prezzoAgenteTotale:prezzoAgenteBase + extraInstall + extraKm + provvigione,
+        prezzoClienteTotaleOriginal:prezzoClienteBaseOriginal + extraInstall + extraKm + provvigione,
+        prezzoAgenteTotaleOriginal:prezzoAgenteBaseOriginal + extraInstall + extraKm + provvigione,
+        promoClienteAttiva:hasClientPromo(model), promoAgenteAttiva:hasAgentPromo(model), promoAttiva:admin ? hasClientPromo(model) : hasAgentPromo(model),
+        prezzoClienteUnitOriginal, prezzoAgenteUnitOriginal, prezzoClienteUnitEff, prezzoAgenteUnitEff,
+        margineCliente:(prezzoClienteBase - costoCinaBase) + provvigione,
+        margineAgente:(prezzoAgenteBase - costoCinaBase) + provvigione,
+        margineInstallazione:extraInstall, installazioneBase:installationBase, installMultiplier,
+        installImpactLabel:!supportsInstall ? 'Non prevista' : (tipoInst === 'autonoma' ? 'Non applicato' : installMultiplierLabel(installMultiplier)),
+        installAutonoma:supportsInstall && tipoInst === 'autonoma', installManualValue:manualInstall,
+        installLabel:supportsInstall ? installLabelFromValue(tipoInst) : 'Non prevista',
+        margineKm:extraKm, provvigione, costoCinaBase,
+        perfectMatch:true, rotatedMatch:false, diff:0, bifacciale:bif, pixelBase, pixelHeight,
+        isBestPrice:true, index:0,
+        layout:usesQuantity ? null : {type:'standard', cols, rows, cabX:model.cabX, cabY:model.cabY, rotated:false, bif}
+      };
+    }
+
+    function calcSpecialProduct(){
+      const q = activeLedQuote();
+      const model = quoteProductModel(q);
+      if(!model){
+        state.ledResults = [];
+        state.allLedResults = [];
+        state.selectedLedIndex = null;
+        $('ledAlert').innerHTML = '<div class="notice">Seleziona manualmente il prodotto da includere nel preventivo.</div>';
+        saveActiveLedQuoteFromForm();
+        renderLedwall();
+        updateSideStatus();
+        return;
+      }
+      q.productId = model.productId;
+      q.quantity = String(Math.max(1, Math.floor(Number(q.quantity || 1))));
+      const result = buildSpecialProductResult(model, q, state.activeLedQuoteIndex);
+      if(!result){
+        state.ledResults = [];
+        state.allLedResults = [];
+        state.selectedLedIndex = null;
+        const format = model.formatoLabel || `${model.cabX}×${model.cabY} cm`;
+        $('ledAlert').innerHTML = `<div class="notice warn">Inserisci base e altezza come multipli esatti del modulo <strong>${safe(format)}</strong>. Usando le frecce del campo, il Planner avanza già con il passo corretto.</div>`;
+        saveActiveLedQuoteFromForm();
+        renderLedwall();
+        updateSideStatus();
+        return;
+      }
+      state.allLedResults = [result];
+      state.ledResults = [result];
+      state.selectedLedIndex = 0;
+      $('ledAlert').innerHTML = stockAvailabilityForResult(result).some(line => line.richiesti > line.disponibili)
+        ? '<div class="notice warn"><strong>⚠️ Disponibilità di magazzino insufficiente.</strong> Il preventivo resta comunque realizzabile.</div>'
+        : '';
       saveActiveLedQuoteFromForm();
       renderLedwall();
       updateSideStatus();
@@ -3913,7 +4340,7 @@
         margineCliente:(prezzoClienteBase - costoCinaBase) + provvigione,
         margineAgente:(prezzoAgenteBase - costoCinaBase) + provvigione,
         margineInstallazione:extraInstall, installazioneBase:baseInstall, installMultiplier,
-        installImpactLabel:tipoInst === 'autonoma' ? 'Non applicato' : installImpactLabel(state.activeLedQuoteIndex), installAutonoma:tipoInst === 'autonoma', installManualValue:manualInstall, installLabel:installLabelFromValue(tipoInst),
+        installImpactLabel:tipoInst === 'autonoma' ? 'Non applicato' : installMultiplierLabel(installMultiplier), installAutonoma:tipoInst === 'autonoma', installManualValue:manualInstall, installLabel:installLabelFromValue(tipoInst),
         margineKm:extraKm, provvigione, costoCinaBase,
         perfectMatch:perfect, rotatedMatch:exactRotated, diff, bifacciale:bif, pixelBase, pixelHeight,
         layout:{type:'standard', cols, rows, cabX:model.cabX, cabY:model.cabY, rotated, bif}
@@ -3945,7 +4372,7 @@
       const baseInstall = installationBaseCost(areaMq, tipoInst, manualInstall);
       const extraInstall = Math.round(baseInstall * installMultiplier);
       return {
-        nome:'P3.91 Unificato', icon:'🧩', cabX:50, cabY:100, info:PRODUCT_DESCRIPTIONS['P3.91 Unificato'], unified:true,
+        nome:'P3.91 Unificato', productId:'P391_UNIFIED', productFamily:'LEDWALL', tipoCalcolo:'UNIFICATO', unitaMagazzino:'CABINET', formatoLabel:'Composizione 50×100 + 50×50 cm', icon:'🧩', cabX:50, cabY:100, info:PRODUCT_DESCRIPTIONS['P3.91 Unificato'], unified:true,
         rectStock:Number(rectModel.giacenzaAttuale || 0), sqStock:Number(sqModel.giacenzaAttuale || 0),
         colsNeeded:colsU, rowsNeeded:rectRowsU + sqRowsU, totalCab:rectCab + sqCab,
         rectCab, sqCab, rectCabBase, sqCabBase, rectRows:rectRowsU, squareRows:sqRowsU,
@@ -3958,7 +4385,7 @@
         margineCliente:(displayCliente - displayCina) + provvigione,
         margineAgente:(displayAgente - displayCina) + provvigione,
         margineInstallazione:extraInstall, installazioneBase:baseInstall, installMultiplier,
-        installImpactLabel:tipoInst === 'autonoma' ? 'Non applicato' : installImpactLabel(state.activeLedQuoteIndex), installAutonoma:tipoInst === 'autonoma', installManualValue:manualInstall, installLabel:installLabelFromValue(tipoInst),
+        installImpactLabel:tipoInst === 'autonoma' ? 'Non applicato' : installMultiplierLabel(installMultiplier), installAutonoma:tipoInst === 'autonoma', installManualValue:manualInstall, installLabel:installLabelFromValue(tipoInst),
         margineKm:extraKm, provvigione, costoCinaBase:displayCina,
         perfectMatch:true, rotatedMatch:false, diff:0, bifacciale:bif,
         pixelBase:colsU * 128,
@@ -3988,30 +4415,39 @@
     function renderLedwall(){
       renderLedQuoteTabs();
       toggleCustomInstallField();
-      const hasDims = num('ledBase') && num('ledHeight');
+      const q = activeLedQuote();
+      const family = normalizeProductFamily(q.productFamily);
+      const familyMeta = PRODUCT_FAMILY_META[family];
+      const usesQuantity = quoteUsesQuantity(q);
+      const isReady = family === 'LEDWALL' ? !!(num('ledBase') && num('ledHeight')) : (usesQuantity ? num('productQuantity') >= 1 : !!(num('ledBase') && num('ledHeight')));
       const activeSelected = getSelectedLed();
       const selectedList = selectedLedQuotes();
       $('btnLedToGrenke').disabled = selectedList.length === 0;
       if($('btnLedToIfis')) $('btnLedToIfis').disabled = selectedList.length === 0;
       $('btnImportAgain').disabled = selectedList.length === 0;
       if($('btnIfisImportLed')) $('btnIfisImportLed').disabled = selectedList.length === 0;
-      if(!hasDims){
+      if(!isReady || !state.ledResults.length){
         const currentInstallMode = $('ledInstall') ? $('ledInstall').value : 'personalizza';
-        const installNoticeText = currentInstallMode === 'autonoma'
-          ? 'Installazione autonoma: nessun impatto multi Ledwall applicato.'
-          : `Impatto installazione: <strong>${installImpactLabel(state.activeLedQuoteIndex)}</strong>.`;
-        $('ledInputNotice').innerHTML = `<div class="notice">Stai configurando il <strong>Ledwall ${state.activeLedQuoteIndex + 1}</strong>. Inserisci i dettagli per visualizzare le soluzioni. ${installNoticeText}</div>`;
-        $('resultsCount').textContent = 'Inserisci le misure';
+        const installNoticeText = !quoteSupportsInstallation(q)
+          ? 'Installazione non prevista per gli schermi LCD.'
+          : currentInstallMode === 'autonoma'
+            ? 'Installazione autonoma: nessun impatto multiprodotto applicato.'
+            : `Impatto installazione: <strong>${installImpactLabel(installSequenceIndex(state.activeLedQuoteIndex))}</strong>.`;
+        const inputHint = usesQuantity ? 'Indica la quantità per visualizzare il prodotto.' : 'Inserisci le misure per visualizzare la soluzione.';
+        $('ledInputNotice').innerHTML = `<div class="notice">Stai configurando il <strong>Prodotto ${state.activeLedQuoteIndex + 1}</strong> · ${safe(familyMeta.label)}. ${inputHint} ${installNoticeText}</div>`;
+        $('resultsCount').textContent = usesQuantity ? 'Inserisci la quantità' : 'Inserisci le misure';
         $('ledResults').innerHTML = '<div class="notice" style="grid-column:1/-1">Nessun risultato da mostrare. Le soluzioni migliori appariranno qui dopo il primo calcolo.</div>';
-        $('ledAlert').innerHTML = '';
+        if(!isReady) $('ledAlert').innerHTML = '';
         return;
       }
-      const isAutonomaActive = $('ledInstall').value === 'autonoma';
-      const extraAutonoma = isAutonomaActive ? '<br/><strong>Installazione autonoma:</strong> il valore è stato inserito manualmente e sarà evidenziato in stampa. Nessun impatto multi Ledwall viene applicato.' : '';
-      $('ledInputNotice').innerHTML = isAutonomaActive
-        ? `<div class="notice">Ledwall ${state.activeLedQuoteIndex + 1}: installazione autonoma attiva, nessun impatto multi Ledwall applicato.${extraAutonoma}</div>`
-        : `<div class="notice">Ledwall ${state.activeLedQuoteIndex + 1}: impatto installazione applicato <strong>${installImpactLabel(state.activeLedQuoteIndex)}</strong>.</div>`;
-      $('resultsCount').textContent = state.allLedResults.length && state.ledResults.length !== state.allLedResults.length ? `${state.ledResults.length} di ${state.allLedResults.length} soluzioni` : `${state.ledResults.length} soluzioni`;
+      const isAutonomaActive = quoteSupportsInstallation(q) && $('ledInstall').value === 'autonoma';
+      const extraAutonoma = isAutonomaActive ? '<br/><strong>Installazione autonoma:</strong> il valore è stato inserito manualmente e sarà evidenziato in stampa. Nessun impatto multiprodotto viene applicato.' : '';
+      $('ledInputNotice').innerHTML = !quoteSupportsInstallation(q)
+        ? `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: schermo LCD configurato senza voce installazione. Trasferta e provvigione restano incluse.</div>`
+        : isAutonomaActive
+          ? `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: installazione autonoma attiva, nessun impatto multiprodotto applicato.${extraAutonoma}</div>`
+          : `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: impatto installazione applicato <strong>${installImpactLabel(installSequenceIndex(state.activeLedQuoteIndex))}</strong>.</div>`;
+      $('resultsCount').textContent = family === 'LEDWALL' && state.allLedResults.length !== state.ledResults.length ? `${state.ledResults.length} di ${state.allLedResults.length} soluzioni` : (state.ledResults.length === 1 ? '1 prodotto' : `${state.ledResults.length} soluzioni`);
       $('ledResults').innerHTML = state.ledResults.map((r,i) => productCardHtml(r,i)).join('');
       document.querySelectorAll('[data-select-led]').forEach(btn => btn.addEventListener('click', () => {state.selectedLedIndex = Number(btn.dataset.selectLed); saveActiveLedQuoteFromForm(); renderLedwall(); updateSideStatus();}));
       document.querySelectorAll('[data-transfer-led]').forEach(btn => btn.addEventListener('click', () => {state.selectedLedIndex = Number(btn.dataset.transferLed); saveActiveLedQuoteFromForm(); transferLedToGrenke();}));
@@ -4037,7 +4473,9 @@
 
     function productCardHtml(r,i){
       const selected = state.selectedLedIndex === i;
-      const status = r.unified ? ['Unificato','cyan'] : r.perfectMatch ? ['Misura perfetta','green'] : r.rotatedMatch ? ['Rotazione','yellow'] : ['Sconsigliato','red'];
+      const isSpecial = normalizeProductFamily(r.productFamily) !== 'LEDWALL';
+      const isUnit = String(r.tipoCalcolo || '').toUpperCase() === 'UNITA';
+      const status = isSpecial ? ['Prodotto configurato','green'] : r.unified ? ['Unificato','cyan'] : r.perfectMatch ? ['Misura perfetta','green'] : r.rotatedMatch ? ['Rotazione','yellow'] : ['Sconsigliato','red'];
       const price = admin ? r.prezzoClienteTotale : r.prezzoAgenteTotale;
       const originalPrice = admin ? (r.prezzoClienteTotaleOriginal ?? r.prezzoClienteTotale) : (r.prezzoAgenteTotaleOriginal ?? r.prezzoAgenteTotale);
       const promoVisible = admin ? !!(r.promoClienteAttiva || r.promoAgenteAttiva) : !!r.promoAgenteAttiva;
@@ -4054,6 +4492,14 @@
       const unifiedText = r.unified ? `<div class="notice success" style="margin:8px 0 11px">Cabinet 0.50x1.00: <strong>${r.rectCab}</strong> · Cabinet 0.50x0.50: <strong>${r.sqCab}</strong></div>` : '';
       const stockText = stockWarningHtml(r);
       const autonomaText = r.installAutonoma ? `<div class="autonoma-warning"><strong>Installazione autonoma:</strong> valore inserito manualmente. Base manuale ${fmtEuro0(r.installManualValue)} · valore applicato ${fmtEuro0(r.margineInstallazione)}.</div>` : '';
+      const specText = r.unified ? 'Cabinet misti P3.91' : isUnit ? `Formato ${r.formatoLabel || 'predefinito'}` : `Cabinet ${r.cabX} × ${r.cabY} cm`;
+      const quantityLabel = isUnit ? 'Numero pezzi' : 'Numero cabinet';
+      const measureMetric = r.displayWidth && r.displayHeight
+        ? `<div class="pm"><span>${isUnit ? 'Misura prodotto' : 'Misura realizzabile'}</span><strong>${r.displayWidth} × ${r.displayHeight} cm</strong></div>`
+        : `<div class="pm"><span>Formato</span><strong>${safe(r.formatoLabel || 'Predefinito')}</strong></div>`;
+      const pixelMetric = r.pixelBase && r.pixelHeight ? `<div class="pm"><span>Resa in pixel</span><strong>${r.pixelBase.toLocaleString('it-IT')} × ${r.pixelHeight.toLocaleString('it-IT')}</strong></div>` : '';
+      const installationMetric = normalizeProductFamily(r.productFamily) === 'LCD' ? '' : `<div class="pm"><span>Installazione</span><strong>${fmtEuro0(r.margineInstallazione)}</strong><small>${r.installAutonoma ? 'Valore autonomo inserito manualmente · nessun impatto applicato' : `Base ${fmtEuro0(r.installazioneBase)} · impatto ${r.installImpactLabel}`}</small></div>`;
+      const layoutDetails = r.layout ? `<details class="schema"><summary>Visualizza schema moduli</summary><div class="layout-box">${layoutHtml(r)}</div></details>` : '';
       return `
         <article class="product-card ${selected ? 'selected' : ''} ${r.unified ? 'unified' : ''} ${promoVisible ? 'has-promo' : ''}">
           <img class="product-thumb" src="${productImageFor(r.nome)}" alt="${safe(r.nome)}" />
@@ -4061,22 +4507,22 @@
             <div class="product-title"><div class="prod-icon">${r.icon}</div><div><span class="tag ${status[1]}">${status[0]}</span><h3>${safe(r.nome)}</h3></div></div>
             <div class="product-badges">${promoVisible ? '<span class="tag promo">🔥 IN SCONTO!</span>' : ''}${r.isBestPrice ? '<span class="tag green">Best price</span>' : ''}</div>
           </div>
-          <div class="prod-spec">${r.unified ? 'Cabinet misti P3.91' : `Cabinet ${r.cabX} × ${r.cabY} cm`}${r.bifacciale ? ' · Bifacciale' : ''}</div>
+          <div class="prod-spec">${specText}${r.bifacciale ? ' · Bifacciale' : ''}</div>
           <p class="prod-desc">${safe(PRODUCT_DESCRIPTIONS[r.nome] || r.info || '')}</p>
           ${unifiedText}
           ${stockText}
           ${autonomaText}
           <div class="product-metrics">
-            <div class="pm"><span>Numero cabinet</span><strong>${r.totalCab.toLocaleString('it-IT')}</strong></div>
+            <div class="pm"><span>${quantityLabel}</span><strong>${r.totalCab.toLocaleString('it-IT')}</strong></div>
             ${adminPriceMetrics}
-            <div class="pm"><span>Misura realizzabile</span><strong>${r.displayWidth} × ${r.displayHeight} cm</strong></div>
-            <div class="pm"><span>Resa in pixel</span><strong>${r.pixelBase.toLocaleString('it-IT')} × ${r.pixelHeight.toLocaleString('it-IT')}</strong></div>
-            <div class="pm"><span>Installazione</span><strong>${fmtEuro0(r.margineInstallazione)}</strong><small>${r.installAutonoma ? 'Valore autonomo inserito manualmente · nessun impatto applicato' : `Base ${fmtEuro0(r.installazioneBase)} · impatto ${r.installImpactLabel}`}</small></div>
+            ${measureMetric}
+            ${pixelMetric}
+            ${installationMetric}
             <div class="pm"><span>Trasferta</span><strong>${fmtEuro0(r.margineKm)}</strong></div>
             <div class="pm"><span>Provvigione</span><strong>${fmtEuro0(r.provvigione || 0)}</strong></div>
             ${detailsAdmin}
           </div>
-          <details class="schema"><summary>Visualizza schema moduli</summary><div class="layout-box">${layoutHtml(r)}</div></details>
+          ${layoutDetails}
           <div class="actions">
             <button class="btn ${selected ? 'dark' : 'ghost'}" type="button" data-select-led="${i}">${selected ? 'Selezionato' : 'Seleziona'}</button>
             <button class="btn primary" type="button" data-transfer-led="${i}">Importa totale in Grenke</button>
@@ -4113,7 +4559,7 @@
       const amount = totalLedAmount();
       state.importedLedAmount = amount;
       $('grenkeAmount').value = Math.round(amount);
-      const label = selectedItems.length === 1 ? selectedItems[0].nome : `${selectedItems.length} Ledwall selezionati`;
+      const label = selectedItems.length === 1 ? selectedItems[0].nome : `${selectedItems.length} prodotti selezionati`;
       $('grenkeImportNote').textContent = `${APP_CONFIG.transferLabel}: ${label} (${fmtEuro0(amount)}).`;
       state.financeProvider = 'grenke';
       syncLiteFinanceCheckboxes();
@@ -4584,7 +5030,7 @@
         const items = selectedLedQuotes();
         if(!items.length) return `<tbody><tr><td>${escIfis(ifisAssetName())}</td><td>1</td><td>Nuovo</td></tr></tbody>`;
         return '<tbody>' + items.map(item => {
-          const prefix = items.length > 1 ? `LEDWALL ${item.quoteNumber} - ` : '';
+          const prefix = items.length > 1 ? `PRODOTTO ${item.quoteNumber} - ` : '';
           return `<tr><td>${escIfis((prefix + ifisAssetNameForItem(item)).toUpperCase())}</td><td>1</td><td>Nuovo</td></tr>`;
         }).join('') + '</tbody>';
       }
@@ -4845,7 +5291,7 @@
           return;
         }
         if(!selectedLedQuotes().length){
-          const proceed = await sqpConfirm('Non hai selezionato nessun prodotto dalla schermata Ledwall, vuoi comunque stampare il preventivo?', {title:'Nessun Ledwall selezionato', confirmText:'Stampa comunque', cancelText:'Annulla'});
+          const proceed = await sqpConfirm('Non hai selezionato nessun prodotto, vuoi comunque stampare il preventivo?', {title:'Nessun prodotto selezionato', confirmText:'Stampa comunque', cancelText:'Annulla'});
           if(!proceed) return;
         }
         const printWindow = window.open('', '_blank', 'width=900,height=1100');
@@ -4882,7 +5328,7 @@
     }
 
     function openPracticeTypeModal(){
-      if(!selectedLedQuotes().length){ sqpAlert('Seleziona almeno una soluzione Ledwall prima di inserire la pratica.', {title:'Ledwall mancante'}); return; }
+      if(!selectedLedQuotes().length){ sqpAlert('Seleziona almeno un prodotto prima di inserire la pratica.', {title:'Prodotto mancante'}); return; }
       if(!agentLoggedIn()){
         sqpAlert('Per inviare la pratica al gestionale devi prima effettuare l’Accesso Agente nel S.Q.P.', {title:'Accesso richiesto'}).then(openAgentLoginModal);
         return;
@@ -4986,27 +5432,30 @@
       return m ? 'P' + m[1] : canonical;
     }
     function ledFaceLabel(item){ return item && item.bifacciale ? 'Bifacciale' : 'Monofacciale'; }
-    function ledMeasureLabel(item){ return item ? meterText(item.displayWidth) + 'x' + meterText(item.displayHeight) : ''; }
+    function ledMeasureLabel(item){ return item && item.displayWidth && item.displayHeight ? meterText(item.displayWidth) + 'x' + meterText(item.displayHeight) : ''; }
     function ledDisplayNameForDocs(item){
-      if(!item) return 'Ledwall Display';
+      if(!item) return 'Prodotto Seemax';
+      if(normalizeProductFamily(item.productFamily) !== 'LEDWALL') return item.nome || 'Prodotto Seemax';
       return 'Ledwall Display ' + productPitchLabel(item.nome);
     }
     function ifisAssetNameForItem(item){
-      if(!item) return 'LEDWALL DISPLAY';
-      return ledDisplayNameForDocs(item) + ' - ' + ledMeasureLabel(item) + ' - ' + ledFaceLabel(item);
+      if(!item) return 'PRODOTTO SEEMAX';
+      const details = [ledDisplayNameForDocs(item), ledMeasureLabel(item)];
+      if(normalizeProductFamily(item.productFamily) === 'LEDWALL' || item.bifacciale) details.push(ledFaceLabel(item));
+      return details.filter(Boolean).join(' - ');
     }
     function ifisAssetName(){
       const items = selectedLedQuotes();
-      if(!items || !items.length) return 'LEDWALL DISPLAY';
+      if(!items || !items.length) return 'PRODOTTI SEEMAX';
       return items.map((item) => ifisAssetNameForItem(item)).join(' + ').toUpperCase();
     }
     function suggestedPrintFileName(){
       const items = selectedLedQuotes();
       const item = items && items.length ? items[0] : null;
       const clientHeading = val('clientCompany') || val('clientName') || 'Cliente';
-      const ledName = item ? ledDisplayNameForDocs(item) : 'Ledwall Display';
+      const ledName = item ? ledDisplayNameForDocs(item) : 'Prodotto Seemax';
       const measure = item ? ledMeasureLabel(item) : '';
-      const face = item ? ledFaceLabel(item).toUpperCase() : '';
+      const face = item && (normalizeProductFamily(item.productFamily) === 'LEDWALL' || item.bifacciale) ? ledFaceLabel(item).toUpperCase() : '';
       const parts = ['Prev. n. ' + quoteNumberLabel(), 'del ' + quoteDateFile(), clientHeading, ledName, measure, face].filter(Boolean);
       return parts.join(' - ').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
     }
@@ -5174,14 +5623,14 @@
         const r = selectedItems[0];
         return `<div class="product-hero"><img src="${productImageFor(r.nome)}" alt="${safe(r.nome)}" /></div>`;
       }
-      return `<div class="product-hero"><div class="multi-product-strip">${selectedItems.map(r => `<figure><img src="${productImageFor(r.nome)}" alt="${safe(r.nome)}" /><figcaption>Ledwall ${r.quoteNumber}<br>${safe(r.nome)}</figcaption></figure>`).join('')}</div></div>`;
+      return `<div class="product-hero"><div class="multi-product-strip">${selectedItems.map(r => `<figure><img src="${productImageFor(r.nome)}" alt="${safe(r.nome)}" /><figcaption>Prodotto ${r.quoteNumber}<br>${safe(r.nome)}</figcaption></figure>`).join('')}</div></div>`;
     }
 
     function financialPrintHtml(provider){
       if(provider === 'ifis'){
         const r = window.SEEMAX_IFIS && window.SEEMAX_IFIS.getLastResult ? window.SEEMAX_IFIS.getLastResult() : null;
         if(!r){
-          return `<section class="print-page"><div class="finance-title">Soluzione finanziaria IFIS</div><div class="missing-config"><strong>Nessun calcolo IFIS disponibile.</strong><br/>Compila la scheda IFIS oppure importa il totale Ledwall prima di stampare.</div></section>`;
+          return `<section class="print-page"><div class="finance-title">Soluzione finanziaria IFIS</div><div class="missing-config"><strong>Nessun calcolo IFIS disponibile.</strong><br/>Compila la scheda IFIS oppure importa il totale prodotti prima di stampare.</div></section>`;
         }
         return (window.SEEMAX_IFIS && window.SEEMAX_IFIS.buildIfisPrintPagesHtml)
           ? window.SEEMAX_IFIS.buildIfisPrintPagesHtml(r)
@@ -5191,7 +5640,7 @@
       const imp = grenkeAmount();
       const canone = currentCanone();
       if(!imp || !canone){
-        return `<section class="print-page"><div class="finance-title">Soluzione finanziaria Grenke</div><div class="missing-config"><strong>Nessun calcolo Grenke disponibile.</strong><br/>Compila la scheda Grenke oppure importa il totale Ledwall prima di stampare.</div></section>`;
+        return `<section class="print-page"><div class="finance-title">Soluzione finanziaria Grenke</div><div class="missing-config"><strong>Nessun calcolo Grenke disponibile.</strong><br/>Compila la scheda Grenke oppure importa il totale prodotti prima di stampare.</div></section>`;
       }
       const printDurations = getGrenkePrintDurations();
       const canoneRows = printDurations.map(dur => {
@@ -5231,10 +5680,12 @@
           rows.push(`<tr><td><span>${safe(a[0])}</span><br>${safe(a[1])}</td>${b ? `<td><span>${safe(b[0])}</span><br>${safe(b[1])}</td>` : '<td></td>'}</tr>`);
         }
         const resolutionText = (item.pixelBase && item.pixelHeight) ? `${item.pixelBase.toLocaleString('it-IT')} × ${item.pixelHeight.toLocaleString('it-IT')} px` : '—';
-        rows.unshift(`<tr><td><span>🧩 RISOLUZIONE PIXEL</span><br>${safe(resolutionText)}</td><td><span>📐 MISURA CONFIGURATA</span><br>${safe(ledMeasureLabel(item))} mt</td></tr>`);
+        const configuredFormat = ledMeasureLabel(item) ? `${ledMeasureLabel(item)} mt` : (item.formatoLabel || 'Formato predefinito');
+        rows.unshift(`<tr><td><span>🧩 RISOLUZIONE PIXEL</span><br>${safe(resolutionText)}</td><td><span>📐 ${item.tipoCalcolo === 'UNITA' ? 'FORMATO PRODOTTO' : 'MISURA CONFIGURATA'}</span><br>${safe(configuredFormat)}</td></tr>`);
+        const resolutionSentence = item.pixelBase && item.pixelHeight ? ` La risoluzione in pixel per la realizzazione dei media/grafiche è di <strong>${safe(resolutionText)}</strong>, in base alla misura configurata.` : '';
         return `<section class="print-page technical-page">
           <div class="tech-title">Scheda tecnica ${safe(canonicalProductName(item.nome))}</div>
-          <p class="tech-description">${safe(sheet.description)} La risoluzione in pixel per la realizzazione dei media/grafiche è di <strong>${safe(resolutionText)}</strong>, in base alla misura configurata.</p>
+          <p class="tech-description">${safe(sheet.description)}${resolutionSentence}</p>
           <div class="tech-image-box"><h3>Immagine prodotto</h3><div class="tech-image-inner"><img src="${productImageFor(item.nome)}" alt="${safe(item.nome)}" /></div></div>
           <table class="features-table"><tbody>${rows.join('')}</tbody></table>
         </section>`;
@@ -5249,7 +5700,7 @@
     function buildConformityPages(selectedItems){
       const groups = [];
       const byPitch = new Map();
-      (selectedItems || []).forEach(item => {
+      (selectedItems || []).filter(item => normalizeProductFamily(item.productFamily) === 'LEDWALL').forEach(item => {
         const key = conformityPitchKey(item);
         if(!byPitch.has(key)){
           const group = {key, item, screens:[]};
@@ -5293,7 +5744,7 @@
       if($('printFinanceNone')) $('printFinanceNone').checked = provider === 'none';
 
       if(!selectedItems.length){
-        paper.innerHTML = `<div id="quotePrint" class="quote-document"><section class="print-page"><div class="quote-band"><img src="${BRAND_ASSETS.aifilLogo}" alt="AIFIL"><div class="brand-center"><img class="quote-logo-main" src="${BRAND_ASSETS.seemaxLogo}" alt="Seemax"><small>Display your vision</small></div><div style="text-align:center;font-weight:950">LED LAB<br/>COMPANY</div></div><div class="missing-config"><strong>Preventivo non ancora pronto.</strong><br/>Configura e seleziona almeno una soluzione Ledwall per generare il documento cliente.</div></section></div>`;
+        paper.innerHTML = `<div id="quotePrint" class="quote-document"><section class="print-page"><div class="quote-band"><img src="${BRAND_ASSETS.aifilLogo}" alt="AIFIL"><div class="brand-center"><img class="quote-logo-main" src="${BRAND_ASSETS.seemaxLogo}" alt="Seemax"><small>Display your vision</small></div><div style="text-align:center;font-weight:950">LED LAB<br/>COMPANY</div></div><div class="missing-config"><strong>Preventivo non ancora pronto.</strong><br/>Configura e seleziona almeno un prodotto per generare il documento cliente.</div></section></div>`;
         updateSideStatus();
         return;
       }
@@ -5324,23 +5775,24 @@
 
       const ledRows = selectedItems.map((item) => {
         const amount = admin ? item.prezzoClienteTotale : item.prezzoAgenteTotale;
+        const family = normalizeProductFamily(item.productFamily);
         const details = [
           `Modello: <strong>${safe(item.nome)}</strong>`,
-          `Misura: <strong>${item.displayWidth} × ${item.displayHeight} cm</strong>`,
-          `Cabinet: <strong>${item.totalCab.toLocaleString('it-IT')}</strong>`,
-          item.bifacciale ? '<strong>Bifacciale</strong>' : 'Monofacciale',
-          item.installAutonoma ? '<strong>Installazione Personalizzata</strong>' : `Installazione: ${safe(item.installLabel || '—')}`
-        ].join('<br>');
-        return quoteRow(`Ledwall ${item.quoteNumber} - ${details}`, fmtEuro0(amount));
+          item.displayWidth && item.displayHeight ? `Misura: <strong>${item.displayWidth} × ${item.displayHeight} cm</strong>` : `Formato: <strong>${safe(item.formatoLabel || 'Predefinito')}</strong>`,
+          `${item.tipoCalcolo === 'UNITA' ? 'Quantità' : 'Cabinet'}: <strong>${item.totalCab.toLocaleString('it-IT')}</strong>`,
+          family === 'LEDWALL' || item.bifacciale ? (item.bifacciale ? '<strong>Bifacciale</strong>' : 'Monofacciale') : '',
+          family === 'LCD' ? '' : (item.installAutonoma ? '<strong>Installazione Personalizzata</strong>' : `Installazione: ${safe(item.installLabel || '—')}`)
+        ].filter(Boolean).join('<br>');
+        return quoteRow(`Prodotto ${item.quoteNumber} - ${details}`, fmtEuro0(amount));
       }).join('');
 
       const installRows = selectedItems.map(item => {
         const bits = [];
-        if(showInstallCost) bits.push(`installazione ${fmtEuro0(item.margineInstallazione)}`);
+        if(showInstallCost && normalizeProductFamily(item.productFamily) !== 'LCD') bits.push(`installazione ${fmtEuro0(item.margineInstallazione)}`);
         if(showTransferCost) bits.push(`trasferta ${fmtEuro0(item.margineKm)}`);
         if(showCommissionCost) bits.push(`provvigione ${fmtEuro0(item.provvigione || 0)}`);
         if(!bits.length) return '';
-        return quoteRow(`Dettagli Ledwall ${item.quoteNumber}: ${bits.join(' · ')}`, 'Incluso nel totale');
+        return quoteRow(`Dettagli prodotto ${item.quoteNumber}: ${bits.join(' · ')}`, 'Incluso nel totale');
       }).filter(Boolean).join('');
 
       const notes = val('projectNotes');
@@ -5361,7 +5813,7 @@
             ${installRows}
             ${financeSummaryRow}
             ${quoteRow('IVA', ivaPct + '%')}
-            <tr class="grand-total"><td>Totale Ledwall cliente IVA inclusa</td><td class="amount">${fmtEuro0(ledTotalVatIncluded)}</td></tr>
+            <tr class="grand-total"><td>Totale prodotti cliente IVA inclusa</td><td class="amount">${fmtEuro0(ledTotalVatIncluded)}</td></tr>
           </tbody>
         </table>
         ${notes ? `<div class="quote-note"><strong>Note:</strong><br>${safe(notes).replace(/\n/g,'<br>')}</div>` : ''}
@@ -5428,12 +5880,12 @@
 
     function ledResultKey(r){
       if(!r) return '';
-      return [r.unified ? 'unified' : 'standard', r.nome, r.displayWidth, r.displayHeight, r.totalCab, r.bifacciale ? 'bif' : 'mono', Math.round(r.prezzoAgenteTotale || 0), Math.round(r.prezzoClienteTotale || 0)].join('|');
+      return [r.productFamily || 'LEDWALL', r.productId || '', r.unified ? 'unified' : 'standard', r.nome, r.displayWidth, r.displayHeight, r.totalCab, r.bifacciale ? 'bif' : 'mono', Math.round(r.prezzoAgenteTotale || 0), Math.round(r.prezzoClienteTotale || 0)].join('|');
     }
 
     function draftQuoteFromState(q){
       const selected = q && q.selectedLedIndex !== null && q.ledResults && q.ledResults[q.selectedLedIndex] ? q.ledResults[q.selectedLedIndex] : null;
-      return {base:q.base || '', altezza:q.altezza || '', bif:!!q.bif, install:q.install || 'personalizza', installCustom:q.installCustom || '0', province:q.province || 'Catania', commission:q.commission || '0', showPotentialSolutions:!!q.showPotentialSolutions, selectedResultKey:selected ? ledResultKey(selected) : null};
+      return {productFamily:normalizeProductFamily(q.productFamily), productId:q.productId || '', quantity:q.quantity || '1', base:q.base || '', altezza:q.altezza || '', bif:!!q.bif, install:q.install || 'personalizza', installCustom:q.installCustom || '0', province:q.province || 'Catania', commission:q.commission || '0', showPotentialSolutions:!!q.showPotentialSolutions, selectedResultKey:selected ? ledResultKey(selected) : null};
     }
 
     function collectDraftPayload(name, existingId){
@@ -5459,8 +5911,9 @@
     }
 
     function normalizeDraftQuote(q){
-      const base = createLedQuote();
-      return {...base, base:String(q && q.base || ''), altezza:String(q && q.altezza || ''), bif:!!(q && q.bif), install:(q && q.install) || 'personalizza', installCustom:String(q && q.installCustom || '0'), province:(q && q.province) || 'Catania', commission:String(q && q.commission || '0'), showPotentialSolutions:!!(q && q.showPotentialSolutions), selectedResultKey:(q && q.selectedResultKey) || null};
+      const family = normalizeProductFamily(q && q.productFamily);
+      const base = createLedQuote(family);
+      return {...base, productFamily:family, productId:(q && q.productId) || base.productId, quantity:String(q && q.quantity || '1'), base:String(q && q.base || ''), altezza:String(q && q.altezza || ''), bif:!!(q && q.bif), install:(q && q.install) || 'personalizza', installCustom:String(q && q.installCustom || '0'), province:(q && q.province) || 'Catania', commission:String(q && q.commission || '0'), showPotentialSolutions:!!(q && q.showPotentialSolutions), selectedResultKey:(q && q.selectedResultKey) || null};
     }
 
     function applyDraftPayload(draft){
@@ -5548,7 +6001,7 @@
       const slotsHtml = [0,1,2].map(i => {
         const d = drafts[i];
         if(!d) return `<div class="draft-slot is-empty"><div class="draft-slot-top"><div><div class="draft-slot-title">Slot ${i + 1} libero</div><div class="draft-slot-meta">Puoi salvare qui una nuova bozza.</div></div></div></div>`;
-        return `<div class="draft-slot" data-draft-id="${safe(d.id)}"><div class="draft-slot-top"><div><div class="draft-slot-title">${safe(d.name || 'Bozza senza nome')}</div><div class="draft-slot-meta">Cliente: ${safe(d.meta && d.meta.client || '—')} · Ledwall: ${safe(d.meta && d.meta.ledCount || 0)} · Totale: ${fmtEuro0(d.meta && d.meta.ledAmount || 0)}<br/>Ultimo salvataggio: ${safe(draftDateLabel(d.savedAt))}</div></div><div class="draft-slot-actions">${isSave ? `<button class="btn primary" type="button" data-draft-overwrite="${safe(d.id)}">Sovrascrivi</button>` : `<button class="btn primary" type="button" data-draft-load="${safe(d.id)}">Carica</button>`}<button class="btn ghost" type="button" data-draft-rename="${safe(d.id)}">Rinomina</button><button class="btn ghost" type="button" data-draft-delete="${safe(d.id)}">Elimina</button></div></div></div>`;
+        return `<div class="draft-slot" data-draft-id="${safe(d.id)}"><div class="draft-slot-top"><div><div class="draft-slot-title">${safe(d.name || 'Bozza senza nome')}</div><div class="draft-slot-meta">Cliente: ${safe(d.meta && d.meta.client || '—')} · Prodotti: ${safe(d.meta && d.meta.ledCount || 0)} · Totale: ${fmtEuro0(d.meta && d.meta.ledAmount || 0)}<br/>Ultimo salvataggio: ${safe(draftDateLabel(d.savedAt))}</div></div><div class="draft-slot-actions">${isSave ? `<button class="btn primary" type="button" data-draft-overwrite="${safe(d.id)}">Sovrascrivi</button>` : `<button class="btn primary" type="button" data-draft-load="${safe(d.id)}">Carica</button>`}<button class="btn ghost" type="button" data-draft-rename="${safe(d.id)}">Rinomina</button><button class="btn ghost" type="button" data-draft-delete="${safe(d.id)}">Elimina</button></div></div></div>`;
       }).join('');
       panel.innerHTML = `<div class="draft-modal-head"><div><h3>${isSave ? 'SALVA BOZZA PREVENTIVO' : 'Carica bozza preventivo'}</h3><p>${isSave ? 'Salva lo stato attuale del preventivo in uno dei 3 slot disponibili.' : 'Scegli una delle bozze salvate su questo dispositivo.'}</p></div><button class="draft-close" type="button" data-close-drafts aria-label="Chiudi">×</button></div><div class="draft-device-warning"><strong>Avviso importante:</strong> ${DEVICE_WARNING}</div>${isSave ? `<div class="draft-name-row"><label><span class="label">Nome bozza</span><input id="draftNameInput" value="${safe(current ? current.name : defaultDraftName())}" placeholder="Es. Farmacia Rossi - P3.91 esterno" /></label><button class="btn success" type="button" id="btnDraftSaveNew" ${drafts.length >= DRAFT_LIMIT ? 'disabled' : ''}>Salva nuova</button></div>${current ? '<button class="btn primary" type="button" id="btnDraftUpdateCurrent" style="width:100%;margin-bottom:10px">Aggiorna bozza corrente</button>' : ''}${drafts.length >= DRAFT_LIMIT ? '<div class="notice warn" style="margin-bottom:10px">Hai già 3 bozze salvate. Puoi sovrascrivere una delle bozze esistenti oppure eliminarne una.</div>' : ''}` : ''}<div class="draft-list">${slotsHtml}</div>`;
       bindDraftModalEvents(mode);
@@ -5614,21 +6067,24 @@
         {selector:'#btnSwitchMode, #btnSwitchModeMobile', title:'Modalità S.Q.P.', text:'Qui puoi passare da Modalità Lite a Modalità Avanzata. Il Planner salva l ultima modalità scelta su questo dispositivo e la ripristina alla prossima apertura.'}
       ],
       ledwall:[
-        {selector:'#ledQuoteTabs', title:'Ledwall attivi', text:'Da qui puoi passare da un Ledwall all’altro. Puoi aggiungere fino a 3 configurazioni nello stesso preventivo.'},
-        {selector:'#btnAddLedQuote', title:'Aggiungi Ledwall', text:'Usa questo pulsante per aggiungere un secondo o un terzo Ledwall al preventivo. Questo varierà automaticamente l’impatto del valore delle installazioni. L’installazione del secondo ledwall avrà un impatto del 50%, quella del terzo del 30%. Se scegli “Autonoma”, l’impatto non verrà applicato.'},
-        {selector:'#ledBase', title:'Base Ledwall', text:'Inserisci la base desiderata in centimetri. Il calcolatore confronterà anche l’altezza e ti fornirà le soluzione più adatte.'},
-        {selector:'#ledHeight', title:'Altezza Ledwall', text:'Inserisci l’altezza desiderata in centimetri. Il calcolatore confronterà anche la base e ti fornirà le soluzione più adatte.'},
+        {selector:'#btnChooseProductFamily', title:'Categoria prodotto', text:'Scegli tra LEDWALL, CROCI E LED EXTRA e SCHERMI LCD. Ogni categoria mantiene lo stesso flusso di preventivo.'},
+        {selector:'#ledQuoteTabs', title:'Prodotti attivi', text:'Da qui puoi passare da un prodotto all’altro. Puoi aggiungere fino a 3 configurazioni, anche di categorie diverse, nello stesso preventivo.'},
+        {selector:'#btnAddLedQuote', title:'Aggiungi prodotto', text:'Aggiungi un secondo o terzo prodotto. Per i prodotti installabili il valore dell’installazione viene modulato automaticamente.'},
+        {selector:'#specialProductSelect', title:'Selezione prodotto', text:'Per Croci, LED Extra e LCD scegli qui il modello esatto da quotare.'},
+        {selector:'#productQuantity', title:'Quantità', text:'Per Croci e Totem LCD inserisci il numero di pezzi desiderato.'},
+        {selector:'#ledBase', title:'Base prodotto', text:'Per Ledwall, Transparent e Floor Led inserisci la base in centimetri. I prodotti speciali avanzano con il passo modulare corretto.'},
+        {selector:'#ledHeight', title:'Altezza prodotto', text:'Inserisci l’altezza in centimetri. I vincoli dimensionali dei prodotti speciali vengono verificati automaticamente.'},
         {selector:'#ledBif', title:'Opzione bifacciale', text:'Attiva questa opzione solo quando il display deve essere visibile fronte e retro. Il sistema raddoppierà cabinet e valori.'},
         {selector:'#ledInstall', title:'Tipo di installazione', text:'Seleziona la modalità di installazione. Con “Autonoma” puoi inserire manualmente il costo installazione, che sarà evidenziato nel riepilogo.'},
         {selector:'#ledInstallCustomField', title:'Installazione autonoma', text:'Questo campo appare solo selezionando “Autonoma” e consente di indicare liberamente il valore installazione.'},
         {selector:'#ledProvince', title:'Provincia installazione', text:'Scegli la provincia. Se è prevista trasferta, il costo viene calcolato automaticamente.'},
-        {selector:'#ledCommission', title:'Provvigione', text:'Inserisci qui l’eventuale provvigione. Il valore viene caricato direttamente sul totale Ledwall e mostrato nella card.'},
-        {selector:'#ledResults', title:'Risultati Ledwall', text:'Qui trovi le soluzioni generate. Se esistono misure perfette, il sistema mostrerà prima solo quelle compatibili.'},
+        {selector:'#ledCommission', title:'Provvigione', text:'Inserisci qui l’eventuale provvigione. Il valore viene caricato direttamente sul totale prodotto e mostrato nella card.'},
+        {selector:'#ledResults', title:'Risultati prodotti', text:'Qui trovi la soluzione calcolata con prezzi, quantità, trasferta, provvigione e installazione quando prevista.'},
         {selector:'#btnLedToGrenke', title:'Usa Importo Totale su Grenke', text:'Dopo aver terminato i settaggi, questo pulsante trasferirà nel calcolatore Grenke il valore totale dell’intero preventivo.'},
         {selector:'#btnLedToIfis', title:'Usa Importo Totale su IFIS', text:'Dopo aver terminato i settaggi, questo pulsante trasferirà nel calcolatore Ifis il valore totale dell’intero preventivo.'}      
 	  ],
       grenke:[
-        {selector:'#grenkeAmount', title:'Importo noleggio', text:'Qui puoi inserire un importo manualmente oppure usare quello importato dal Ledwall.'},
+        {selector:'#grenkeAmount', title:'Importo noleggio', text:'Qui puoi inserire un importo manualmente oppure usare quello importato dai prodotti.'},
         {selector:'#btnGrenkeCalc', title:'Calcola Grenke', text:'Clicca questo pulsante per calcolare il canone in base a importo, frequenza e durata.'},
         {selector:'#grenkeAttachPrint', title:'Allega Grenke in stampa', text:'In Modalità Lite questa opzione allega Grenke alla stampa. Se la attivi, IFIS viene disattivato automaticamente.'},
         {selector:'#modeMonthly', title:'Frequenza mensile', text:'Seleziona la frequenza mensile per visualizzare il canone netto mensile.'},
@@ -5637,7 +6093,7 @@
         {selector:'#mainCanone', title:'Canone principale', text:'Questo è il canone netto calcolato per il cliente, in base alle condizioni impostate.'}
       ],
       ifis:[
-        {selector:'#ifisAssetValue', title:'Valore bene', text:'Qui puoi inserire il valore del bene IVA esclusa oppure importarlo automaticamente dal totale Ledwall.'},
+        {selector:'#ifisAssetValue', title:'Valore bene', text:'Qui puoi inserire il valore del bene IVA esclusa oppure importarlo automaticamente dal totale prodotti.'},
         {selector:'#ifisDurationButtons', title:'Durata IFIS', text:'Seleziona la durata del contratto leasing: 36, 42, 48, 54, 60, 66 o 72 mesi.'},
         {selector:'#ifisAdvanceButtons', title:'Anticipo / Maxicanone', text:'Scegli l’anticipo rapido oppure usa il campo personalizzato per un maxicanone specifico.'},
         {selector:'#ifisResidualButtons', title:'Valore residuo', text:'Scegli la percentuale di riscatto finale da applicare al calcolo.'},
@@ -5651,7 +6107,7 @@
       summary:[
         {selector:'.summary-options', title:'Opzioni di stampa', text:'In Modalità Lite resta visibile solo l allegato della dichiarazione di conformità. In Modalità Avanzata trovi anche le opzioni dettagliate di stampa e finanza.'},
         {selector:'#printShowConformity', title:'Dichiarazione di conformità', text:'Attiva questa opzione per allegare automaticamente una dichiarazione di conformità per ogni pixel pitch selezionato. Se due Ledwall hanno lo stesso pitch, viene generata una sola pagina valida per entrambi.'},
-        {selector:'#summaryPaper', title:'Riepilogo ordine', text:'Questa è l’anteprima del documento stampabile con dati cliente, Ledwall, Operazione finanziaria e informazioni aziendali.'},
+        {selector:'#summaryPaper', title:'Riepilogo ordine', text:'Questa è l’anteprima del documento stampabile con dati cliente, prodotti, operazione finanziaria e informazioni aziendali.'},
         {selector:'#btnPrint', title:'Stampa / Salva PDF', text:'Quando il riepilogo è completo, clicca qui per stampare o salvare il documento in PDF dal browser.'}
       ]
     };
@@ -5986,6 +6442,7 @@
       if(MANAGEMENT_FAST_MODE) document.body.classList.add('management-fast');
       applyRuntimeRole(agentSession && agentSession.role ? agentSession.role : 'AGENTE', {refresh:false});
       initNavigation();
+      setupProductFamilyModal();
       setupSqpDecisionModal();
       setupLiteFinanceAttach();
       setupAgentAccess();
