@@ -1,0 +1,25 @@
+SEEMAX MANAGEMENT SUITE 2.19.0
+QUOTATION PLANNER MULTIPRODOTTO
+
+NOVITA
+- tab LEDWALL rinominata PRODOTTI;
+- scelta guidata LEDWALL / CROCI E LED EXTRA / SCHERMI LCD;
+- calcolo Ledwall originale preservato;
+- tre Croci farmacia selezionabili a quantità e formato fisso;
+- Transparent Led configurabile a multipli di 1,00x1,00 m;
+- Floor Led configurabile a multipli di 0,50x1,00 m;
+- Totem LCD Indoor selezionabile a quantità;
+- listini agente e cliente completi;
+- installazione disponibile per Ledwall, Croci e LED Extra;
+- installazione esclusa dagli Schermi LCD;
+- trasferta e provvigione sempre disponibili;
+- salvataggio, archivio, PDF, Grenke, IFIS e creazione pratica multiprodotto.
+
+INSTALLAZIONE
+1. Pubblica il frontend 2.19.0 su GitHub Pages.
+2. Sostituisci Code.gs nel progetto Apps Script.
+3. Esegui upgradeSeemaxV2190().
+4. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+5. Esegui Ctrl+F5 oppure riapri la PWA.
+
+Guida completa: docs/AGGIORNAMENTO_V2.19.0.md

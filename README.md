@@ -39,6 +39,10 @@ Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets
 - Benvenuto Beta e Patch notes con modalità indipendenti Solo una volta o Sempre;
 - memoria delle comunicazioni per account, affiancata da cache locale e comando di ripubblicazione separato;
 - Quotation Planner montato nativamente nel gestionale, senza iframe;
+- tab `PRODOTTI` del Quotation Planner con scelta guidata tra Ledwall, Croci e LED Extra e Schermi LCD;
+- Croci a formato fisso, Transparent e Floor a multipli esatti e Totem LCD a quantità anche nei preventivi;
+- listini agente/cliente distinti per tutti i nuovi prodotti, con trasferta e provvigione sempre disponibili;
+- installazione mantenuta per Ledwall, Croci e LED Extra ed esclusa automaticamente dagli Schermi LCD;
 - sessione unica Management Suite/S.Q.P. senza un secondo accesso;
 - importazione dei clienti visibili nel Planner oppure compilazione manuale;
 - modalità demo locale;
@@ -88,7 +92,7 @@ I dati demo vengono salvati esclusivamente nel browser utilizzato.
 5. Imposta `demoMode: false`.
 6. Pubblica questa cartella in un repository GitHub Pages.
 
-Per aggiornare un'installazione 2.17.0 alla versione 2.18.0 segui [docs/AGGIORNAMENTO_V2.18.0.md](docs/AGGIORNAMENTO_V2.18.0.md). La release aggiunge le tre sezioni del Catalogo e rende le pratiche compatibili con prodotti modulari o a quantità. Per installazioni precedenti resta disponibile la guida [2.17.0](docs/AGGIORNAMENTO_V2.17.0.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+Per aggiornare un'installazione 2.18.0 alla versione 2.19.0 segui [docs/AGGIORNAMENTO_V2.19.0.md](docs/AGGIORNAMENTO_V2.19.0.md). La release porta Croci, LED Extra e Schermi LCD nel Quotation Planner senza modificare il calcolo Ledwall esistente. Per installazioni precedenti resta disponibile la guida [2.18.0](docs/AGGIORNAMENTO_V2.18.0.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
 
 ## Placeholder
 

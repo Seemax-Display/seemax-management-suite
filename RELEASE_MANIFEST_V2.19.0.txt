@@ -1,0 +1,48 @@
+SEEMAX MANAGEMENT SUITE 2.19.0 - RELEASE MANIFEST
+
+Versione frontend: 2.19.0
+Versione backend: seemax-management-suite-2.19.0
+Cache Service Worker: seemax-management-v2-19-0-quotation-products
+Funzione upgrade: upgradeSeemaxV2190
+
+QUOTATION PLANNER
+- tab PRODOTTI e selettore di categoria;
+- LEDWALL con comportamento storico invariato;
+- CROCI E LED EXTRA con cinque prodotti;
+- SCHERMI LCD con Totem LCD Indoor;
+- scelta manuale obbligatoria del prodotto speciale;
+- listini agente/cliente distinti;
+- calcolo a quantità o cabinet esatti;
+- installazione nascosta e azzerata per LCD;
+- trasferta e provvigione mantenute per tutti;
+- preventivi misti fino a tre prodotti;
+- schede tecniche, PDF, bozze, archivio e pratiche compatibili.
+
+FILE NUOVI
+- scripts/test-release-v2.19.0.js
+- docs/AGGIORNAMENTO_V2.19.0.md
+- apps-script/INSTALLAZIONE_V2.19.0.txt
+- LEGGIMI_PRIMA_V2.19.0.txt
+- TEST_RILASCIO_V2.19.0.txt
+- VERIFICA_V2.19.0.txt
+- FILE_CHECKSUMS_V2.19.0.txt
+
+FILE MODIFICATI
+- quotation-planner/index.html
+- assets/js/app.js
+- assets/js/config.js
+- assets/js/planner-native.js
+- apps-script/Code.gs
+- sw.js
+- README.md
+
+COMPATIBILITA PRESERVATA
+- calcolo Ledwall e P3.91 unificato;
+- salvataggi e upload in background senza refresh;
+- archivio preventivi e permessi ADMIN;
+- PDF con nome dinamico;
+- Grenke e IFIS;
+- creazione pratica e righe di magazzino;
+- ScriptLock, record_version e request_token;
+- pubblicazione Patch Notes;
+- bridge nativo e fallback POST.

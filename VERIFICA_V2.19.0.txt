@@ -1,0 +1,35 @@
+SEEMAX MANAGEMENT SUITE 2.19.0 - VERIFICA DI CONSEGNA
+
+[OK] Frontend 2.19.0
+[OK] Backend seemax-management-suite-2.19.0
+[OK] Service Worker seemax-management-v2-19-0-quotation-products
+[OK] Funzione upgradeSeemaxV2190
+[OK] Tab Planner rinominata PRODOTTI
+[OK] Selettore LEDWALL / CROCI E LED EXTRA / SCHERMI LCD
+[OK] Nessun prodotto speciale preselezionato implicitamente
+[OK] Calcolo Ledwall originale preservato
+[OK] Tre Croci a formato fisso e quantità
+[OK] Transparent vincolato a 1,00x1,00 m
+[OK] Floor vincolato a 0,50x1,00 m
+[OK] Totem LCD a quantità
+[OK] Prezzi agente e cliente richiesti
+[OK] Installazione mantenuta per Croci e LED Extra
+[OK] Installazione esclusa e azzerata per LCD
+[OK] Trasferta e provvigione mantenute per ogni categoria
+[OK] Preventivi misti fino a tre prodotti
+[OK] Grenke e IFIS compatibili
+[OK] Bozze e archivio online compatibili
+[OK] PDF e schede tecniche multiprodotto
+[OK] Creazione pratica con ID prodotto esatto
+[OK] Lock, versionamento e idempotenza preservati
+[OK] Nessuna cancellazione o modifica automatica dei dati esistenti
+
+COLLAUDO POST-PUBBLICAZIONE
+1. Eseguire upgradeSeemaxV2190 dal Foglio operativo.
+2. Pubblicare una nuova versione della Web App.
+3. Pubblicare l'intero frontend 2.19.0.
+4. Eseguire Ctrl+F5 o riaprire la PWA.
+5. Verificare le tre categorie con account ADMIN e AGENTE.
+6. Salvare e riaprire un preventivo misto.
+7. Stampare il PDF e verificare le schede tecniche.
+8. Creare una pratica e controllare le righe in PRODOTTI_LED.

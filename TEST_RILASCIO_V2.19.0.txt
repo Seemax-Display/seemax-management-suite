@@ -1,0 +1,36 @@
+SEEMAX MANAGEMENT SUITE 2.19.0 - ESITO TEST
+
+Data verifica: 15/09/2026
+
+TEST PRINCIPALE
+Comando: node scripts/test-release-v2.19.0.js
+Esito: OK - 146 controlli superati
+
+REGRESSIONE BACKEND
+Comando: node scripts/test-backend-optimizations-v2.15.2.js
+Esito: OK - 32 controlli superati
+
+AMBITI VERIFICATI
+- sintassi JavaScript frontend, backend, Service Worker e Planner;
+- corrispondenza versione frontend/backend/cache;
+- funzione upgrade 2.19.0;
+- prezzi agente e cliente dei sei prodotti;
+- selettore delle tre categorie e scelta manuale del prodotto;
+- calcolo Croci a quantità e formati fissi;
+- Transparent a multipli esatti di 1,00x1,00 m;
+- Floor a multipli esatti di 0,50x1,00 m;
+- Totem LCD a quantità, senza installazione;
+- trasferta e provvigione per gli LCD;
+- identità prodotto in bozze e archivio;
+- righe di magazzino corrette nella pratica;
+- PDF e schede tecniche multiprodotto;
+- conformità automatica limitata ai Ledwall;
+- integrazione della nuova modale nel ponte nativo;
+- cache PWA delle immagini prodotto;
+- documenti operativi e commessa d'ordine;
+- preventivi ADMIN, upload e operazioni in background;
+- ScriptLock, record_version, request_token e prefissi pratica univoci.
+
+Il collaudo finale sul Foglio Google operativo deve essere eseguito dopo il
+deployment, perché autorizzazioni, prezzi personalizzati e giacenze reali non
+sono replicati nell'ambiente di sviluppo.
