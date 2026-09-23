@@ -1,0 +1,22 @@
+SEEMAX MANAGEMENT SUITE 2.20.0 - TEST RILASCIO
+
+Comando:
+node scripts/test-release-v2.20.0.js
+
+Esito:
+OK - 64 controlli release v2.20.0 superati.
+
+Ambiti verificati:
+- sintassi frontend, backend, Service Worker e Planner;
+- allineamento versione 2.20.0;
+- tre nuovi prodotti LCD e relativi listini;
+- giacenze iniziali pari a zero;
+- immagini catalogo disponibili;
+- ID canonici e migrazione senza duplicati;
+- opzioni POSIZIONATO A TERRA, SOLO FORNITURA e A PARETE;
+- costo Wall Board a parete pari a 350 euro;
+- calcolo quantità, trasferta e provvigione;
+- esclusione degli LCD dagli scaglioni installazione 100/50/30;
+- visualizzazione della posa nel riepilogo e nel PDF;
+- lock, record_version, request_token e archivio preventivi preservati;
+- assenza di marcatori di conflitto.

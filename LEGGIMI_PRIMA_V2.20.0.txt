@@ -1,0 +1,25 @@
+SEEMAX MANAGEMENT SUITE 2.20.0
+NUOVI SCHERMI LCD E POSA DEDICATA
+
+NOVITA
+- Window Shop LCD nel Catalogo e nel Quotation Planner;
+- LCD Rotating Display 32 pollici nel Catalogo e nel Planner;
+- LCD Wall Board nel Catalogo e nel Planner;
+- immagini prodotto ottimizzate;
+- schede tecniche dedicate;
+- listini Cina/agente/cliente configurati;
+- nuovi prodotti con giacenza zero;
+- POSIZIONATO A TERRA a 0 euro per Totem, Window Shop e Rotating Display;
+- SOLO FORNITURA a 0 euro o A PARETE a 350 euro per Wall Board;
+- trasferta e provvigione preservate;
+- LCD esclusi dalla progressione installazione multiprodotto 100/50/30;
+- posa riportata nel riepilogo e nel PDF.
+
+INSTALLAZIONE
+1. Pubblica il frontend 2.20.0 su GitHub Pages.
+2. Sostituisci Code.gs nel progetto Apps Script.
+3. Esegui upgradeSeemaxV2200().
+4. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+5. Esegui Ctrl+F5 oppure riapri la PWA.
+
+Guida completa: docs/AGGIORNAMENTO_V2.20.0.md

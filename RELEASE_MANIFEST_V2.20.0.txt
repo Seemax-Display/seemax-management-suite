@@ -1,0 +1,52 @@
+SEEMAX MANAGEMENT SUITE 2.20.0 - RELEASE MANIFEST
+
+Versione frontend: 2.20.0
+Versione backend: seemax-management-suite-2.20.0
+Cache Service Worker: seemax-management-v2-20-0-lcd-products
+Funzione upgrade: upgradeSeemaxV2200
+
+CATALOGO E QUOTATION PLANNER
+- Window Shop LCD: Cina 1000, agente 1500, cliente 1800;
+- LCD Rotating Display: agente 1300, cliente 1500;
+- LCD Wall Board: agente 1800, cliente 2300;
+- immagini e schede tecniche dedicate;
+- quantità a pezzi e giacenza iniziale zero;
+- posa specifica per singolo LCD;
+- Totem, Window Shop e Rotating Display: POSIZIONATO A TERRA, 0 euro;
+- Wall Board: SOLO FORNITURA 0 euro o A PARETE 350 euro;
+- costi LCD esclusi dagli scaglioni multiprodotto 100/50/30;
+- trasferta e provvigione mantenute;
+- PDF, bozze, archivio e pratiche compatibili.
+
+FILE NUOVI
+- assets/catalog/window-shop-lcd.webp
+- assets/catalog/lcd-rotating-display.webp
+- assets/catalog/lcd-wall-board.webp
+- scripts/test-release-v2.20.0.js
+- docs/AGGIORNAMENTO_V2.20.0.md
+- apps-script/INSTALLAZIONE_V2.20.0.txt
+- LEGGIMI_PRIMA_V2.20.0.txt
+- TEST_RILASCIO_V2.20.0.txt
+- VERIFICA_V2.20.0.txt
+- FILE_CHECKSUMS_V2.20.0.txt
+
+FILE MODIFICATI
+- apps-script/Code.gs
+- quotation-planner/index.html
+- assets/js/app.js
+- assets/js/config.js
+- assets/js/seed.js
+- sw.js
+- README.md
+
+COMPATIBILITA PRESERVATA
+- calcolo Ledwall e P3.91 unificato;
+- Croci, Floor Led e Transparent Led;
+- salvataggi e upload in background senza refresh;
+- archivio preventivi e permessi ADMIN;
+- PDF con nome dinamico;
+- Grenke e IFIS;
+- creazione pratica e righe di magazzino;
+- ScriptLock, record_version e request_token;
+- pubblicazione Patch Notes;
+- bridge nativo e fallback POST.

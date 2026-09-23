@@ -1,0 +1,16 @@
+SHA-256 - SEEMAX MANAGEMENT SUITE 2.20.0
+
+384ac610f8f67d7bd0ef560336f693e25e2b01f863e5a3eb9fe459fd2f30fb79  apps-script/Code.gs
+f2654cff2a002d4981bb6140734af75fd4790a68ded472dad82cc7d7cf977458  quotation-planner/index.html
+e9fea9dececd8134b7c11a7ee00d201891655a53a2a52875688d2ba07afd9c2f  assets/js/app.js
+58483734096eeb8c05111c10912f3cfce772f2348faaee9331861ac95aa24186  assets/js/seed.js
+37edbb80aa676dd5afb0a230a29e75e09459ae3442545585ec90103e5b500048  assets/js/config.js
+68726dd86c7860bfeb6b816b85df51a301526ae96f3225482eabc51ca4b11fd3  sw.js
+2ead6983b6e23d3c2871b47a589163a64799e8623ac70e96b553ddff9871edac  assets/catalog/window-shop-lcd.webp
+841534466dffef933f7c57290ad0dd87b471ac37a2a382aa5ca603bcf5884810  assets/catalog/lcd-rotating-display.webp
+7632e83e65790649eba458d31f1fbe21e6ef2ab33e92ba36390fe3da5f1d6f0a  assets/catalog/lcd-wall-board.webp
+6a02ec13967e05cc68f2b334436ccf3035f9c13f79de8b7b75bfd4bdec7ed7ee  scripts/test-release-v2.20.0.js
+b9b358c628aed0c06d56440a76a3de05c51581a49d3e9b276533af0508acff29  docs/AGGIORNAMENTO_V2.20.0.md
+
+Il file Code-v2.20.0.gs consegnato separatamente è identico ad apps-script/Code.gs:
+384ac610f8f67d7bd0ef560336f693e25e2b01f863e5a3eb9fe459fd2f30fb79

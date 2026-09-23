@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-19-0-quotation-products";
+const CACHE = "seemax-management-v2-20-0-lcd-products";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
@@ -7,6 +7,8 @@ const CORE = [
   "./quotation-planner/index.html",
   "./assets/catalog/croce-farmacia.jpg", "./assets/catalog/floor-led.jpg",
   "./assets/catalog/transparent-led.png", "./assets/catalog/totem-lcd-indoor.png",
+  "./assets/catalog/window-shop-lcd.webp", "./assets/catalog/lcd-rotating-display.webp",
+  "./assets/catalog/lcd-wall-board.webp",
   "./assets/conformity/p19-1.png", "./assets/conformity/p19-2.png",
   "./assets/conformity/p25-1.png", "./assets/conformity/p25-2.png",
   "./assets/conformity/p3-1.png", "./assets/conformity/p3-2.png",

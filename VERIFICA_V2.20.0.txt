@@ -1,0 +1,28 @@
+VERIFICA RELEASE SEEMAX 2.20.0
+
+[OK] Frontend 2.20.0
+[OK] Backend seemax-management-suite-2.20.0
+[OK] Service Worker seemax-management-v2-20-0-lcd-products
+[OK] upgradeSeemaxV2200 presente
+[OK] Window Shop LCD importato
+[OK] LCD Rotating Display importato
+[OK] LCD Wall Board importato
+[OK] Giacenze nuovi prodotti = 0
+[OK] Prezzi Cina/agente/cliente verificati
+[OK] Immagini WebP integrate
+[OK] Schede tecniche integrate
+[OK] POSIZIONATO A TERRA = 0 euro
+[OK] SOLO FORNITURA = 0 euro
+[OK] A PARETE = 350 euro
+[OK] Trasferta e provvigione preservate
+[OK] LCD esclusi da progressione 100/50/30
+[OK] Foglio PRODOTTI_LED verificato dopo la scrittura
+[OK] Totem esistente mantenuto a giacenza 100
+[OK] Tre nuovi LCD a giacenza 0
+[OK] Test automatici: 64/64
+
+Da collaudare dopo la pubblicazione:
+- cache GitHub Pages/PWA aggiornata;
+- nuovo deployment Apps Script raggiungibile;
+- anteprima grafica sui browser effettivamente utilizzati;
+- salvataggio e riapertura di un preventivo LCD reale.
