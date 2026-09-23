@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2190().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2200().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.19.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.20.0";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -58,7 +58,7 @@ var ENTITY_SHEETS = {
 
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "prefisso_pratica", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "trofei_reset_il", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
-  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "catalogo_tab", "tipo_calcolo", "unita_magazzino", "formato_label", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_misura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
+  PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "catalogo_tab", "tipo_calcolo", "unita_magazzino", "formato_label", "installazione_opzioni_json", "installazione_predefinita", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_misura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   CLIENTI: ["id", "ragioneSociale", "referente", "piva", "codice_fiscale", "sdi", "pec", "piva_formalmente_valida", "piva_vies_valida", "piva_vies_nome", "piva_vies_esito", "piva_verifica_ade", "piva_verifica_ade_data", "iban", "iban_valido", "email", "telefono", "telefono_paese", "telefono_prefisso", "telefono_valido", "regione", "provincia", "comune", "cap", "localita", "indirizzo", "civico", "citta", "condiviso", "creato_da_username", "creato_da_nome", "condiviso_il", "note", "creatoIl", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRATICHE: ["id", "numero", "clientId", "cliente", "titolo", "stato", "finanziaria", "tipo_pratica", "destinatario_ordine", "intestatario_nome", "intestatario_email", "intestatario_telefono", "valore", "valore_provvigione", "numero_rate", "periodicita_pagamento", "indirizzo_installazione_tipo", "installazione_regione", "installazione_provincia", "installazione_comune", "installazione_cap", "installazione_localita", "installazione_indirizzo", "installazione_civico", "gestione_ledwall", "sim_richiesta", "predisposizione_elettrica", "cloud_username", "cloud_password", "documenti_richiesti_json", "documenti_caricati_json", "agente", "agent_username", "scadenza", "prossimoPasso", "note", "preventivo_id", "origine", "modelli_display", "misure_display", "bifacciale", "cabinet_da_sottrarre", "righe_magazzino_json", "ledwall_configurazioni_json", "p391_unificato", "p391_cabinet_50100", "p391_cabinet_5050", "righe_json", "avviso_giacenza", "giacenza_insufficiente", "dettaglio_giacenza", "magazzino_applicato", "magazzino_in_attesa", "magazzino_applicato_il", "magazzino_stornato_il", "archiviata", "archiviata_il", "completataIl", "aggiornatoIl", "creatoIl", "record_version", "request_token", "aggiornato_da"],
   DOCUMENTI: ["id", "practiceId", "pratica", "cliente", "nome", "tipo", "tipo_pratica_documento", "url", "file_id", "file_name", "file_type", "file_size", "data", "note", "agent_username", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -117,7 +117,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.19.0 configurato: catalogo multiprodotto e Quotation Planner Prodotti attivi.";
+  return "DATABASE SEEMAX 2.20.0 configurato: nuovi LCD e installazioni dedicate nel Quotation Planner attivi.";
 }
 
 
@@ -415,6 +415,28 @@ function upgradeSeemaxV2190() {
     styleSheets_();
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.19.0 configurato: Planner Prodotti, nuovi prezzi cliente e creazione pratiche multiprodotto attivi.";
+  });
+}
+
+function upgradeSeemaxV2200() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    /* Aggiunge i tre nuovi LCD senza sovrascrivere prezzi, promozioni o
+       giacenze eventualmente già personalizzati. Le modalità di posa sono
+       proprietà del singolo prodotto e vengono lette dal Quotation Planner. */
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento v2.20.0 · Window Shop LCD, LCD Rotating Display e LCD Wall Board con modalità di installazione dedicate.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.20.0 configurato: tre nuovi LCD a giacenza zero e installazioni POSIZIONATO A TERRA, SOLO FORNITURA e A PARETE attive nel Planner.";
   });
 }
 
@@ -2456,7 +2478,10 @@ function inventoryDefaultValue_(productId, field) {
     "cross-p10-128128": { giacenza_iniziale: 0, giacenza_attuale: 0 },
     "floor-led-50100": { giacenza_iniziale: 0, giacenza_attuale: 0 },
     "transparent-led-100100": { giacenza_iniziale: 0, giacenza_attuale: 0 },
-    "lcd-totem-smx-430-cp": { giacenza_iniziale: 0, giacenza_attuale: 0 }
+    "lcd-totem-smx-430-cp": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "lcd-window-shop-high-brightness": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "lcd-rotating-display-32": { giacenza_iniziale: 0, giacenza_attuale: 0 },
+    "lcd-wall-board": { giacenza_iniziale: 0, giacenza_attuale: 0 }
   };
   var product = defaults[String(productId || "")] || {};
   return Object.prototype.hasOwnProperty.call(product, field) ? product[field] : null;
@@ -2620,6 +2645,9 @@ function canonicalProductId_(value, cabX, cabY) {
      prodotto unificato 50x100/50x50. */
   if (/floor-led-50100|floor\s*led|dance\s*floor/.test(raw)) return "floor-led-50100";
   if (/transparent-led-100100|transparent\s*led/.test(raw)) return "transparent-led-100100";
+  if (/lcd-window-shop-high-brightness|window\s*shop\s*lcd|lcd\s*window\s*shop/.test(raw)) return "lcd-window-shop-high-brightness";
+  if (/lcd-rotating-display-32|lcd\s*rotating\s*display|rotating\s*display/.test(raw)) return "lcd-rotating-display-32";
+  if (/lcd-wall-board|lcd\s*wall\s*board|wall\s*board/.test(raw)) return "lcd-wall-board";
   if (/lcd-totem-smx-430-cp|smx[\s-]*430[\s-]*cp|totem\s*lcd/.test(raw)) return "lcd-totem-smx-430-cp";
   if (/cross-p5-6464|croce.*p5/.test(raw)) return "cross-p5-6464";
   if (/cross-p10-128128|croce.*p10.*(128x128|1\.28x1\.28)/.test(raw) || (/croce.*p10/.test(raw) && Number(cabX) === 128)) return "cross-p10-128128";
@@ -4562,10 +4590,58 @@ function productDefaultsV2180_() {
     {
       id: "lcd-totem-smx-430-cp", sku: "SMX-430-CP", nome: "Totem LCD Indoor", categoria: "Schermo LCD Indoor", catalogo_tab: "LCD", tipo_calcolo: "UNITA", unita_magazzino: "PEZZI", formato_label: "SMX 430-CP",
       cabX: 100, cabY: 100, prezzoAgente: 2000, prezzoCliente: 2200, giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "DA CONFIGURARE", promo_attiva: "NO", attivo: "SI",
+      installazione_opzioni_json: '[{"value":"floor","label":"POSIZIONATO A TERRA","cost":0}]', installazione_predefinita: "floor",
       immagine_url: "assets/catalog/totem-lcd-indoor.png", descrizione: "Totem LCD touch Indoor SMX 430-CP con sistema operativo Android 10.",
       infoAgenti: "SMX 430-CP è la soluzione INDOOR pensata per chi ricerca un dispositivo di rapida risposta e tecnologicamente avanzato. | Capacitive Touch tattile e altamente responsivo, con esperienza paragonabile ai dispositivi cellulari. | Retroilluminazione LED per migliore uniformità e colori più vividi. | Dissipazione del calore ottimizzata e lunga durata in funzionamento continuo. | Design con bordi sottili, elegante e robusto. | Vetro temperato rinforzato da 4 mm con serigrafia. | Pannello con durata fino a 30.000 ore. | Supporto Android e Windows, con opzioni a scelta. | Connettività: ingresso AC, modulo Wi-Fi integrato, antenna Wi-Fi e altre opzioni. | Semplice da controllare, gestire e personalizzare. | Sistema operativo Android 10.",
       infoAdmin: "Nuovo prodotto v2.18.0 | Prezzo di listino agente: 2000 euro | Giacenza iniziale: 0"
     }
+  ];
+}
+
+function productDefaultsV2200_() {
+  var floorOptions = '[{"value":"floor","label":"POSIZIONATO A TERRA","cost":0}]';
+  var wallOptions = '[{"value":"supply","label":"SOLO FORNITURA","cost":0},{"value":"wall_lcd","label":"A PARETE","cost":350}]';
+  var common = {
+    categoria: "Schermo LCD Indoor", catalogo_tab: "LCD", tipo_calcolo: "UNITA", unita_magazzino: "PEZZI",
+    giacenza_iniziale: 0, giacenza_attuale: 0, stato_giacenza: "DA CONFIGURARE", promo_attiva: "NO", attivo: "SI", icon: "📺"
+  };
+  function lcd(overrides) {
+    var row = {};
+    Object.keys(common).forEach(function (key) { row[key] = common[key]; });
+    Object.keys(overrides).forEach(function (key) { row[key] = overrides[key]; });
+    return row;
+  }
+  return [
+    lcd({
+      id: "lcd-window-shop-high-brightness", sku: "SMX-LCD-WINDOW-SHOP", nome: "Window Shop LCD", formato_label: "65×176 cm", cabX: 65, cabY: 176,
+      prezzoCina: 1000, prezzoAgente: 1500, prezzoCliente: 1800,
+      installazione_opzioni_json: floorOptions, installazione_predefinita: "floor",
+      immagine_url: "assets/catalog/window-shop-lcd.webp",
+      descrizione: "LCD Full HD ad alta luminosità progettato per vetrine e spazi retail.",
+      tech_utilizzo: "Indoor · vetrine e retail", tech_luminosita: "2000 cd/m²", tech_misura: "65 × 176 × 7 cm · area schermo 112 cm · base 44 cm",
+      infoAgenti: "Qualità Full HD | Sistema operativo Android | Luminosità 2000 candele | Larghezza totale 65 cm | Altezza totale 176 cm | Area schermo 112 cm | Base 44 cm | Spessore 7 cm | Ideale per vetrine, negozi, showroom e brand",
+      infoAdmin: "Nuovo prodotto v2.20.0 | Costo Cina: 1000 euro | Prezzo agente: 1500 euro + IVA | Prezzo cliente: 1800 euro + IVA | Giacenza iniziale: 0"
+    }),
+    lcd({
+      id: "lcd-rotating-display-32", sku: "SMX-LCD-ROTATING-32", nome: "LCD Rotating Display", formato_label: "32 pollici", cabX: 0, cabY: 0,
+      prezzoAgente: 1300, prezzoCliente: 1500,
+      installazione_opzioni_json: floorOptions, installazione_predefinita: "floor",
+      immagine_url: "assets/catalog/lcd-rotating-display.webp",
+      descrizione: "Display LCD touch Full HD da 32 pollici con orientamento verticale/orizzontale, base mobile e batteria integrata.",
+      tech_utilizzo: "Indoor", tech_misura: "Display touch 32 pollici · orientamento verticale/orizzontale",
+      infoAgenti: "Display touch Full HD da 32 pollici | Schermo ruotabile in verticale e orizzontale | Sistema operativo Android 13 | 8 GB RAM | 128 GB di memoria | Batteria integrata per utilizzo senza collegamento continuo alla rete | Base circolare con ruote per uno spostamento semplice | Esperienza touch fluida e immediata",
+      infoAdmin: "Nuovo prodotto v2.20.0 | Prezzo agente: 1300 euro + IVA | Prezzo cliente: 1500 euro + IVA | Costo Cina non comunicato | Giacenza iniziale: 0"
+    }),
+    lcd({
+      id: "lcd-wall-board", sku: "SMX-LCD-WALL-BOARD", nome: "LCD Wall Board", formato_label: "Display interattivo touch", cabX: 0, cabY: 0,
+      prezzoAgente: 1800, prezzoCliente: 2300,
+      installazione_opzioni_json: wallOptions, installazione_predefinita: "supply",
+      immagine_url: "assets/catalog/lcd-wall-board.webp",
+      descrizione: "Display interattivo a parete per scuole, sale riunioni e ambienti informativi, con doppio sistema Android e Windows.",
+      tech_utilizzo: "Indoor · scuole, sale riunioni e ambienti informativi", tech_misura: "Formato non comunicato",
+      infoAgenti: "Display interattivo touch a parete | Passaggio tra Android 13 e Windows 10 Pro 64 bit 22H2 | Processore Intel Core i7-8550U fino a circa 2,0 GHz | 16 GB RAM | Grafica Intel UHD Graphics 620 | DirectX 12 | Supporto touch fino a 20 punti | Connessioni frontali USB Touch, HDMI, tre USB e USB-C | Adatto a didattica, riunioni, presentazioni e comunicazione informativa",
+      infoAdmin: "Nuovo prodotto v2.20.0 | Prezzo agente: 1800 euro + IVA | Prezzo cliente: 2300 euro + IVA | Costo Cina non comunicato | Giacenza iniziale: 0"
+    })
   ];
 }
 
@@ -4580,7 +4656,7 @@ function seedProducts_() {
     { id: "p391-5050", sku: "SMX-P391-5050", nome: "P3.91 - 0.50x0.50", categoria: "Ledwall Indoor/Outdoor", cabX: 50, cabY: 50, prezzoAgente: 295, prezzoCliente: 335, prezzoCina: 150, attivo: "SI", immagine_url: "assets/catalog/p391-5050.jpg" },
     { id: "p4-9696", sku: "SMX-P4-9696", nome: "P4", categoria: "Ledwall Outdoor", cabX: 96, cabY: 96, prezzoAgente: 860, prezzoCliente: 1080, prezzoCina: 580, attivo: "SI", immagine_url: "assets/catalog/p4-9696.jpg" }
   ];
-  products.concat(productDefaultsV2180_()).forEach(function (product) { upsertObject_("PRODOTTI_LED", "id", product.id, product); });
+  products.concat(productDefaultsV2180_(), productDefaultsV2200_()).forEach(function (product) { upsertObject_("PRODOTTI_LED", "id", product.id, product); });
 }
 
 function initializeInventoryV11_() {
@@ -4598,7 +4674,7 @@ function initializeInventoryV11_() {
     entry.unita_magazzino = entry.unita_magazzino || "CABINET";
     entry.formato_label = entry.formato_label || String(entry.cabX) + "×" + String(entry.cabY) + " cm";
     return entry;
-  }).concat(productDefaultsV2180_());
+  }).concat(productDefaultsV2180_(), productDefaultsV2200_());
   defaults.forEach(function (entry) { consolidateProductRows_(entry); });
 }
 

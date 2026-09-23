@@ -1,0 +1,24 @@
+SEEMAX MANAGEMENT SUITE 2.20.0 - NUOVI SCHERMI LCD
+
+1. Apri il progetto Apps Script collegato al database operativo.
+2. Sostituisci Code.gs con il file della versione 2.20.0.
+3. Salva il progetto.
+4. Esegui una volta upgradeSeemaxV2200().
+5. Autorizza lo script, se richiesto.
+6. Pubblica una nuova versione della Web App mantenendo lo stesso URL /exec.
+7. Pubblica su GitHub Pages l'intero frontend 2.20.0.
+8. Esegui Ctrl+F5 oppure riavvia la PWA.
+
+L'UPGRADE NON CANCELLA E NON RESETTA I DATI ESISTENTI.
+
+I tre nuovi prodotti vengono creati con giacenza zero. Se sono già presenti,
+la procedura li consolida senza duplicarli e conserva i valori operativi.
+
+CONTROLLO RAPIDO
+- Catalogo > Schermi LCD: quattro prodotti visibili;
+- Window Shop LCD: POSIZIONATO A TERRA, costo 0 euro;
+- LCD Rotating Display: POSIZIONATO A TERRA, costo 0 euro;
+- LCD Wall Board: SOLO FORNITURA 0 euro oppure A PARETE 350 euro;
+- trasferta e provvigione disponibili per tutti;
+- gli LCD non modificano gli scaglioni 100/50/30 dei prodotti installabili;
+- PDF e pratica conservano prodotto, quantità e modalità di posa.
