@@ -1197,7 +1197,7 @@
                   <span><strong>Configurazione fronte/retro</strong><br/><span class="help">Raddoppia i cabinet e i valori del display.</span></span>
                 </label>
               </div>
-              <div class="field full product-config-field" id="productInstallField"><label class="label" for="ledInstall">Installazione</label><select id="ledInstall"><option value="personalizza">Da personalizzare</option><option value="autonoma">Autonoma</option><option value="parete">A parete</option><option value="bandiera">A bandiera</option><option value="palo">Su palo</option><option value="vetrina">A vetrina</option></select><div class="help">Scegli “Autonoma” solo quando vuoi inserire manualmente il costo installazione.</div></div>
+              <div class="field full product-config-field" id="productInstallField"><label class="label" for="ledInstall">Installazione</label><select id="ledInstall"><option value="personalizza">Da personalizzare</option><option value="autonoma">Autonoma</option><option value="parete">A parete</option><option value="bandiera">A bandiera</option><option value="palo">Su palo</option><option value="vetrina">A vetrina</option></select><div class="help" id="productInstallHelp">Scegli “Autonoma” solo quando vuoi inserire manualmente il costo installazione.</div></div>
               <div class="field full manual-install-field" id="ledInstallCustomField"><label class="label" for="ledInstallCustom">Costo installazione autonoma</label><input id="ledInstallCustom" type="number" min="0" step="1" value="0" placeholder="Es. 800" /><div class="help">Valore libero: nel riepilogo sarà evidenziato come installazione autonoma inserita manualmente.</div></div>
               <div class="field full"><label class="label" for="ledProvince">Provincia installazione</label><select id="ledProvince"><option value="Catania">Catania (CT)</option><option value="Siracusa">Siracusa (SR)</option><option value="Enna">Enna (EN)</option><option value="Ragusa">Ragusa (RG)</option><option value="Messina">Messina (ME)</option><option value="Caltanissetta">Caltanissetta (CL)</option><option value="Agrigento">Agrigento (AG)</option><option value="Palermo">Palermo (PA)</option><option value="Trapani">Trapani (TP)</option></select><div class="help" id="provinceHelp">Trasferta: —</div></div>
               <div class="field full"><label class="label" for="ledCommission">Provvigione</label><input id="ledCommission" type="number" min="0" step="1" value="0" placeholder="Es. 300" /><div class="help">Imposta la tua provvigione. Verrà sommata automaticamente al totale dell'operazione.</div></div>
@@ -1436,7 +1436,7 @@
         <div class="product-family-grid">
           <button class="product-family-card" type="button" data-product-family="LEDWALL"><span class="family-icon">🖥️</span><strong>LEDWALL</strong><span>Il calcolatore tradizionale con misure, cabinet e configurazione mono o bifacciale.</span></button>
           <button class="product-family-card" type="button" data-product-family="EXTRA_LED"><span class="family-icon">✚</span><strong>CROCI E LED EXTRA</strong><span>Croci farmacia, Transparent Ledwall e Floor Led.</span></button>
-          <button class="product-family-card" type="button" data-product-family="LCD"><span class="family-icon">📺</span><strong>SCHERMI LCD</strong><span>Totem LCD Indoor a quantità, senza voce installazione.</span></button>
+          <button class="product-family-card" type="button" data-product-family="LCD"><span class="family-icon">📺</span><strong>SCHERMI LCD</strong><span>Totem, Window Shop, Rotating Display e Wall Board con posa dedicata.</span></button>
         </div>
       </div>
     </section>
@@ -1513,7 +1513,10 @@
     ].map(model => ({...model, productFamily:'EXTRA_LED', prezzoPromoAgenti:null, prezzoPromoClienti:null, giacenzaAttuale:0, statoGiacenza:'NON DISPONIBILE', infoAdmin:'Prodotto Croci e LED Extra', infoAgenti:'Prodotto Croci e LED Extra', prezzo:model.prezzoAgente, info:admin ? model.infoAdmin : model.infoAgenti}));
 
     const lcdProducts = [
-      {productId:'lcd-totem-smx-430-cp', nome:'Totem LCD Indoor', cabX:0, cabY:0, prezzoAgente:2000, prezzoCliente:2200, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'SMX 430-CP', allowBif:false, icon:'📺'}
+      {productId:'lcd-totem-smx-430-cp', nome:'Totem LCD Indoor', cabX:100, cabY:100, prezzoAgente:2000, prezzoCliente:2200, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'SMX 430-CP', allowBif:false, installationOptions:[{value:'floor',label:'POSIZIONATO A TERRA',cost:0}], installationDefault:'floor', icon:'📺'},
+      {productId:'lcd-window-shop-high-brightness', nome:'Window Shop LCD', cabX:65, cabY:176, prezzoAgente:1500, prezzoCliente:1800, prezzoCina:1000, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'65×176 cm', allowBif:false, installationOptions:[{value:'floor',label:'POSIZIONATO A TERRA',cost:0}], installationDefault:'floor', icon:'🪟'},
+      {productId:'lcd-rotating-display-32', nome:'LCD Rotating Display', cabX:0, cabY:0, prezzoAgente:1300, prezzoCliente:1500, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'32 pollici', allowBif:false, installationOptions:[{value:'floor',label:'POSIZIONATO A TERRA',cost:0}], installationDefault:'floor', icon:'🔄'},
+      {productId:'lcd-wall-board', nome:'LCD Wall Board', cabX:0, cabY:0, prezzoAgente:1800, prezzoCliente:2300, prezzoCina:0, tipoCalcolo:'UNITA', unitaMagazzino:'PEZZI', formatoLabel:'Display interattivo touch', allowBif:false, installationOptions:[{value:'supply',label:'SOLO FORNITURA',cost:0},{value:'wall_lcd',label:'A PARETE',cost:350}], installationDefault:'supply', icon:'🧑‍🏫'}
     ].map(model => ({...model, productFamily:'LCD', prezzoPromoAgenti:null, prezzoPromoClienti:null, giacenzaAttuale:0, statoGiacenza:'NON DISPONIBILE', infoAdmin:'Schermo LCD Indoor', infoAgenti:'Schermo LCD Indoor', prezzo:model.prezzoAgente, info:admin ? model.infoAdmin : model.infoAgenti}));
 
     const LOCAL_SPECIAL_DEFAULTS = [...extraLedProducts, ...lcdProducts].map(model => ({...model}));
@@ -1532,7 +1535,10 @@
       'Croce Farmacia P10 128×128':'Croce farmacia Outdoor P10 nel formato fisso 1,28 × 1,28 m.',
       'Transparent Led P3.91':'Transparent LED Indoor / Outdoor configurabile a multipli esatti di 1,00 × 1,00 m.',
       'Floor Led P3.91':'Pavimento LED Indoor / Outdoor configurabile a multipli esatti di 0,50 × 1,00 m.',
-      'Totem LCD Indoor':'Totem LCD touch Indoor SMX 430-CP con Capacitive Touch e sistema operativo Android 10.'
+      'Totem LCD Indoor':'Totem LCD touch Indoor SMX 430-CP con Capacitive Touch e sistema operativo Android 10.',
+      'Window Shop LCD':'LCD Full HD ad alta luminosità da 2000 cd/m², progettato per vetrine e spazi retail.',
+      'LCD Rotating Display':'Display touch Full HD da 32 pollici, ruotabile in verticale e orizzontale, con Android 13 e batteria integrata.',
+      'LCD Wall Board':'Display interattivo a parete per scuole e sale riunioni, con doppio ambiente Android e Windows.'
     };
 
     const PIXEL_SPECS = {
@@ -1550,7 +1556,10 @@
       'cross-p10-128128':{b:128,h:128},
       'transparent-led-100100':{b:256,h:256},
       'floor-led-50100':{b:128,h:256},
-      'lcd-totem-smx-430-cp':{b:0,h:0}
+      'lcd-totem-smx-430-cp':{b:0,h:0},
+      'lcd-window-shop-high-brightness':{b:0,h:0},
+      'lcd-rotating-display-32':{b:0,h:0},
+      'lcd-wall-board':{b:0,h:0}
     };
 
     // =============================
@@ -1575,7 +1584,10 @@
           'Croce Farmacia P10 128×128': ASSET_ROOT + 'catalog/croce-farmacia.jpg',
           'Transparent Led P3.91': ASSET_ROOT + 'catalog/transparent-led.png',
           'Floor Led P3.91': ASSET_ROOT + 'catalog/floor-led.jpg',
-          'Totem LCD Indoor': ASSET_ROOT + 'catalog/totem-lcd-indoor.png'
+          'Totem LCD Indoor': ASSET_ROOT + 'catalog/totem-lcd-indoor.png',
+          'Window Shop LCD': ASSET_ROOT + 'catalog/window-shop-lcd.webp',
+          'LCD Rotating Display': ASSET_ROOT + 'catalog/lcd-rotating-display.webp',
+          'LCD Wall Board': ASSET_ROOT + 'catalog/lcd-wall-board.webp'
         };
         const TECH_SHEETS = {
           'P2.5': {
@@ -1672,7 +1684,10 @@
           'Croce Farmacia P10 128×128':{description:'Croce farmacia P10 Outdoor ad alta luminosità nel formato fisso 1,28 × 1,28 m.',rows:[['🅿️ PIXEL PITCH','10'],['📥 MODALITÀ DI UTILIZZO','Outdoor'],['🔲 DENSITÀ PIXEL','16.384 pixel/m²'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CROCE','1,28×1,28 m'],['💧 VALORE IP','IP65'],['🔋 CONSUMO MEDIO','350W/m²'],['🪫 CONSUMO MASSIMO','700W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','5,00 m / 10 m'],['🔆 LUMINOSITÀ','>4500cd/m²']]},
           'Transparent Led P3.91':{description:'Transparent LED P3.91 Indoor / Outdoor composto da cabinet modulari trasparenti 1,00 × 1,00 m.',rows:[['🅿️ PIXEL PITCH','3.91'],['📥 MODALITÀ DI UTILIZZO','Indoor / Outdoor'],['🔲 DENSITÀ PIXEL','65.536 pixel/m²'],['🟩 LED STANDARD','SMD1415'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CABINET','1,00×1,00 m'],['🔋 CONSUMO MEDIO','280W/m²'],['🪫 CONSUMO MASSIMO','800W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','3,00 m'],['🔆 LUMINOSITÀ','>4500cd/m²'],['🔄 FREQUENZA AGGIORNAMENTO','1920 - 3840 Hz']]},
           'Floor Led P3.91':{description:'Floor Led P3.91 Indoor / Outdoor composto da cabinet modulari calpestabili 0,50 × 1,00 m.',rows:[['🅿️ PIXEL PITCH','3.91'],['📥 MODALITÀ DI UTILIZZO','Indoor / Outdoor'],['🔲 DENSITÀ PIXEL','65.536 pixel/m²'],['🟩 LED STANDARD','SMD1415'],['🔘 SCALA DI GRIGI','16348'],['🌡️ TEMPERATURA OPERATIVA','dai -20° a +60°'],['📐 MISURA CABINET','0,50×1,00 m'],['🔋 CONSUMO MEDIO','280W/m²'],['🪫 CONSUMO MASSIMO','800W/m²'],['⏳ VITA MEDIA (ORE)','> 100.000'],['♻️ CERTIFICAZIONE','CCC/CE/ROHS'],['🛣️ VISIBILITÀ','3,00 m'],['🔆 LUMINOSITÀ','>4500cd/m²'],['🔄 FREQUENZA AGGIORNAMENTO','1920 - 3840 Hz']]},
-          'Totem LCD Indoor':{description:'SMX 430-CP è la soluzione Indoor touch, rapida, tecnologicamente avanzata e altamente personalizzabile.',rows:[['💡 RETROILLUMINAZIONE','LED, colori vividi e uniformi'],['🌡️ DISSIPAZIONE','Ottimizzata per funzionamento continuo'],['🖼️ DESIGN','Bordi sottili, elegante e robusto'],['🛡️ VETRO','Temperato rinforzato 4 mm con serigrafia'],['⏳ DURATA PANNELLO','Fino a 30.000 ore'],['💻 SISTEMI SUPPORTATI','Android e Windows, con opzioni a scelta'],['📡 CONNETTIVITÀ','Ingresso AC, Wi-Fi integrato e antenna Wi-Fi'],['👆 TOUCH','Capacitive Touch tattile e responsivo'],['⚙️ GESTIONE','Semplice da controllare e personalizzare'],['🤖 SISTEMA OPERATIVO','Android 10']]}
+          'Totem LCD Indoor':{description:'SMX 430-CP è la soluzione Indoor touch, rapida, tecnologicamente avanzata e altamente personalizzabile.',rows:[['💡 RETROILLUMINAZIONE','LED, colori vividi e uniformi'],['🌡️ DISSIPAZIONE','Ottimizzata per funzionamento continuo'],['🖼️ DESIGN','Bordi sottili, elegante e robusto'],['🛡️ VETRO','Temperato rinforzato 4 mm con serigrafia'],['⏳ DURATA PANNELLO','Fino a 30.000 ore'],['💻 SISTEMI SUPPORTATI','Android e Windows, con opzioni a scelta'],['📡 CONNETTIVITÀ','Ingresso AC, Wi-Fi integrato e antenna Wi-Fi'],['👆 TOUCH','Capacitive Touch tattile e responsivo'],['⚙️ GESTIONE','Semplice da controllare e personalizzare'],['🤖 SISTEMA OPERATIVO','Android 10']]},
+          'Window Shop LCD':{description:'LCD ad alta luminosità pensato per vetrine, negozi, showroom e comunicazione retail.',rows:[['🖥️ QUALITÀ VIDEO','Full HD'],['🤖 SISTEMA OPERATIVO','Android'],['🔆 LUMINOSITÀ','2000 cd/m²'],['↔️ LARGHEZZA TOTALE','65 cm'],['↕️ ALTEZZA TOTALE','176 cm'],['📺 AREA SCHERMO','112 cm'],['▰ BASE','44 cm'],['📏 SPESSORE','7 cm'],['📍 POSIZIONAMENTO','A terra · costo 0 €']]},
+          'LCD Rotating Display':{description:'Display touch mobile progettato per adattarsi allo spazio e ai contenuti in orientamento verticale o orizzontale.',rows:[['📺 DISPLAY','Touch Full HD 32 pollici'],['🔄 ORIENTAMENTO','Verticale e orizzontale'],['🤖 SISTEMA OPERATIVO','Android 13'],['🧠 MEMORIA RAM','8 GB'],['💾 ARCHIVIAZIONE','128 GB'],['🔋 ALIMENTAZIONE','Batteria integrata'],['🛞 MOBILITÀ','Base circolare con ruote'],['📍 POSIZIONAMENTO','A terra · costo 0 €']]},
+          'LCD Wall Board':{description:'Display interattivo professionale per didattica, riunioni e comunicazione informativa, installabile a parete.',rows:[['🔁 SISTEMI','Android 13 e Windows 10 Pro 64 bit 22H2'],['⚙️ PROCESSORE','Intel Core i7-8550U @ 1,80 GHz'],['🧠 MEMORIA RAM','16 GB'],['🎞️ GRAFICA','Intel UHD Graphics 620'],['🧩 DIRECTX','DirectX 12'],['👆 TOUCH','Fino a 20 punti'],['🔌 CONNESSIONI FRONTALI','USB Touch, HDMI, 3× USB, USB-C'],['📍 INSTALLAZIONE','Solo fornitura 0 € oppure a parete 350 €']]}
         });
 
         function canonicalProductName(name){
@@ -1976,6 +1991,27 @@
       return [String(model.nome || '').toLowerCase().trim(), Number(model.cabX || 0), Number(model.cabY || 0)].join('|');
     }
 
+    function parseInstallationOptions(value, fallback){
+      let parsed = value;
+      if(typeof parsed === 'string' && parsed.trim()){
+        try{ parsed = JSON.parse(parsed); }catch(error){ parsed = null; }
+      }
+      const source = Array.isArray(parsed) ? parsed : (Array.isArray(fallback) ? fallback : []);
+      return source.map((option, index) => ({
+        value:String(option && option.value || `option_${index + 1}`).trim(),
+        label:String(option && option.label || option && option.value || `Opzione ${index + 1}`).trim(),
+        cost:Math.max(0, dbNumber(option && option.cost, 0))
+      })).filter(option => option.value && option.label);
+    }
+
+    function catalogAssetUrl(value){
+      const source = String(value || '').trim();
+      if(!source) return '';
+      if(/^(?:https?:|data:|blob:|\/)/i.test(source)) return source;
+      if(source.indexOf('assets/') === 0) return ASSET_ROOT + source.slice(7);
+      return ASSET_ROOT + source.replace(/^\.\//, '');
+    }
+
     function applyDatabaseProducts(products){
       if(!Array.isArray(products) || !products.length) return false;
       const defaultsByKey = new Map(LOCAL_PRODUCT_DEFAULTS.map(model => [localProductKey(model), model]));
@@ -1985,6 +2021,7 @@
         const base = defaultsByKey.get(rowKey);
         if(!base) return;
         const model = {...base};
+        const baseName = model.nome;
         const priceAgent = dbNumber(row.prezzoAgente, null);
         const priceClient = dbNumber(row.prezzoCliente, null);
         const priceChina = dbNumber(row.prezzoCina, null);
@@ -1999,20 +2036,28 @@
         model.infoAgenti = dbText(row.infoAgenti, model.infoAgenti);
         model.icon = dbText(row.icon, model.icon || '🖥️');
         model.productId = dbText(row.id, stockProductIdForItem(model));
+        model.nome = dbText(row.nome, model.nome);
+        model.descrizione = dbText(row.descrizione, model.descrizione || PRODUCT_DESCRIPTIONS[baseName] || '');
+        model.imageUrl = catalogAssetUrl(dbText(row.immagine_url, '')) || PRODUCT_IMAGES[baseName] || '';
         model.sku = dbText(row.sku, '');
         model.tipoCalcolo = dbText(row.tipo_calcolo, model.tipoCalcolo || 'MODULARE').toUpperCase();
         model.unitaMagazzino = dbText(row.unita_magazzino, model.unitaMagazzino || 'CABINET').toUpperCase();
         model.formatoLabel = dbText(row.formato_label, model.formatoLabel || '');
+        model.installationOptions = parseInstallationOptions(row.installazione_opzioni_json, model.installationOptions);
+        model.installationDefault = dbText(row.installazione_predefinita, model.installationDefault || (model.installationOptions[0] && model.installationOptions[0].value) || '');
         const catalogTab = dbText(row.catalogo_tab, '').toUpperCase();
         model.productFamily = catalogTab === 'LCD' ? 'LCD' : (catalogTab === 'ALTRI_LED' ? 'EXTRA_LED' : model.productFamily || 'LEDWALL');
         model.giacenzaAttuale = Math.max(0, dbNumber(row.giacenza_attuale, 0));
         model.statoGiacenza = dbText(row.stato_giacenza, model.giacenzaAttuale > 0 ? 'DISPONIBILE' : 'NON DISPONIBILE');
-        const technicalSheet = TECH_SHEETS[canonicalProductName(model.nome)];
+        if(model.imageUrl) PRODUCT_IMAGES[model.nome] = model.imageUrl;
+        if(model.descrizione) PRODUCT_DESCRIPTIONS[model.nome] = model.descrizione;
+        if(model.nome !== baseName && TECH_SHEETS[baseName] && !TECH_SHEETS[model.nome]) TECH_SHEETS[model.nome] = TECH_SHEETS[baseName];
+        const technicalSheet = TECH_SHEETS[canonicalProductName(model.nome)] || TECH_SHEETS[baseName];
         if(technicalSheet){
           const techFields = [
             ['pixel pitch','tech_pixel_pitch'],['certificazione','tech_certificazione'],['modalità','tech_utilizzo'],['densità pixel','tech_densita_pixel'],
             ['led standard','tech_led_standard'],['materiale cabinet','tech_materiale_cabinet'],['peso cabinet','tech_peso_cabinet'],['scala di grigi','tech_scala_grigi'],
-            ['temperatura','tech_temperatura'],['valore ip','tech_ip'],['consumo medio','tech_consumo_medio'],['consumo massimo','tech_consumo_massimo'],
+            ['temperatura','tech_temperatura'],['misura','tech_misura'],['dimensioni','tech_misura'],['valore ip','tech_ip'],['consumo medio','tech_consumo_medio'],['consumo massimo','tech_consumo_massimo'],
             ['vita media','tech_vita_media'],['visibilità','tech_visibilita'],['luminosità','tech_luminosita'],['frequenza aggiornamento','tech_refresh']
           ];
           techFields.forEach(([keyword, fieldName]) => {
@@ -2338,6 +2383,9 @@
       if(item.nome === 'Transparent Led P3.91') return 'transparent-led-100100';
       if(item.nome === 'Floor Led P3.91') return 'floor-led-50100';
       if(item.nome === 'Totem LCD Indoor') return 'lcd-totem-smx-430-cp';
+      if(item.nome === 'Window Shop LCD') return 'lcd-window-shop-high-brightness';
+      if(item.nome === 'LCD Rotating Display') return 'lcd-rotating-display-32';
+      if(item.nome === 'LCD Wall Board') return 'lcd-wall-board';
       if(item.nome === 'P1.9') return 'p19-50100';
       if(item.nome === 'P2.5') return 'p25-6464';
       if(item.nome === 'P3') return 'p3-5757';
@@ -3648,7 +3696,7 @@
     const PRODUCT_FAMILY_META = {
       LEDWALL:{label:'LEDWALL', icon:'🖥️', help:'Calcolo Ledwall tradizionale con ricerca automatica della soluzione.', title:'Parametri Ledwall', intro:'Inserisci i dettagli dello schermo da realizzare. Le soluzioni si aggiornano in tempo reale in base a misure, installazione, provincia e configurazione mono-bifacciale.'},
       EXTRA_LED:{label:'CROCI E LED EXTRA', icon:'✚', help:'Croci farmacia a formato fisso, Transparent Ledwall e Floor Led modulari.', title:'Parametri Croci e LED Extra', intro:'Scegli il prodotto e configura quantità o dimensioni. I vincoli modulari vengono controllati automaticamente.'},
-      LCD:{label:'SCHERMI LCD', icon:'📺', help:'Totem LCD Indoor a quantità, senza costo di installazione.', title:'Parametri Schermi LCD', intro:'Scegli il Totem LCD e la quantità. Trasferta e provvigione restano sempre disponibili.'}
+      LCD:{label:'SCHERMI LCD', icon:'📺', help:'LCD a quantità con modalità di posa specifica per modello.', title:'Parametri Schermi LCD', intro:'Scegli il prodotto e la quantità. Il Planner applica automaticamente il posizionamento a terra oppure, per il Wall Board, consente solo fornitura o montaggio a parete.'}
     };
 
     function normalizeProductFamily(value){
@@ -3680,8 +3728,34 @@
       return !!model && String(model.tipoCalcolo || '').toUpperCase() === 'UNITA';
     }
 
-    function quoteSupportsInstallation(q){
+    const STANDARD_INSTALLATION_OPTIONS = [
+      {value:'personalizza',label:'Da personalizzare',cost:null},
+      {value:'autonoma',label:'Autonoma',cost:null},
+      {value:'parete',label:'A parete',cost:null},
+      {value:'bandiera',label:'A bandiera',cost:null},
+      {value:'palo',label:'Su palo',cost:null},
+      {value:'vetrina',label:'A vetrina',cost:null}
+    ];
+
+    function quoteUsesStandardInstallation(q){
       return normalizeProductFamily(q && q.productFamily) !== 'LCD';
+    }
+
+    function quoteInstallationOptions(q){
+      if(quoteUsesStandardInstallation(q)) return STANDARD_INSTALLATION_OPTIONS;
+      const model = quoteProductModel(q);
+      return model ? parseInstallationOptions(model.installationOptions, []) : [];
+    }
+
+    function quoteInstallationOption(q, value){
+      const options = quoteInstallationOptions(q);
+      const model = quoteProductModel(q);
+      const preferred = String(value || (model && model.installationDefault) || '').trim();
+      return options.find(option => option.value === preferred) || options[0] || null;
+    }
+
+    function quoteSupportsInstallation(q){
+      return quoteUsesStandardInstallation(q) || quoteInstallationOptions(q).length > 0;
     }
 
     function quoteSupportsBifacial(q){
@@ -3842,7 +3916,7 @@
     }
 
     function installSequenceIndex(quoteIndex){
-      const count = state.ledQuotes.slice(0, Math.max(0, quoteIndex) + 1).filter(quote => quoteSupportsInstallation(quote)).length;
+      const count = state.ledQuotes.slice(0, Math.max(0, quoteIndex) + 1).filter(quote => quoteUsesStandardInstallation(quote)).length;
       return Math.max(0, count - 1);
     }
 
@@ -3907,8 +3981,11 @@
       if($('btnRemoveLedQuote')) $('btnRemoveLedQuote').disabled = state.ledQuotes.length <= 1;
       if($('ledQuoteHelp')) {
         const q = activeLedQuote();
+        const fixedOption = !quoteUsesStandardInstallation(q) ? quoteInstallationOption(q, q.install) : null;
         $('ledQuoteHelp').textContent = !quoteSupportsInstallation(q)
-          ? `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. Per gli schermi LCD l'installazione non viene applicata.`
+          ? `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. Seleziona un modello per visualizzare la posa disponibile.`
+          : fixedOption
+            ? `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. ${fixedOption.label}: ${fmtEuro0(fixedOption.cost)}.`
           : q.install === 'autonoma'
             ? `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. Installazione autonoma: nessun valore multiprodotto applicato.`
             : `Prodotto attivo: ${state.activeLedQuoteIndex + 1}. Valore installazione applicato: ${installImpactLabel(installSequenceIndex(state.activeLedQuoteIndex))}.`;
@@ -3961,6 +4038,28 @@
       if(node) node.classList.toggle('is-hidden', !visible);
     }
 
+    function configureInstallationSelect(q){
+      const select = $('ledInstall');
+      if(!select) return;
+      const standard = quoteUsesStandardInstallation(q);
+      const options = quoteInstallationOptions(q);
+      if(!options.length){
+        select.innerHTML = '';
+        select.disabled = true;
+        return;
+      }
+      const selected = quoteInstallationOption(q, q.install);
+      q.install = selected ? selected.value : options[0].value;
+      select.innerHTML = options.map(option => `<option value="${safe(option.value)}">${safe(option.label)}${option.cost !== null && option.cost !== undefined ? ` · ${fmtEuro0(option.cost)}` : ''}</option>`).join('');
+      select.value = q.install;
+      select.disabled = !standard && options.length === 1;
+      if($('productInstallHelp')) $('productInstallHelp').textContent = standard
+        ? 'Scegli “Autonoma” solo quando vuoi inserire manualmente il costo installazione.'
+        : options.length === 1
+          ? `${options[0].label} · costo ${fmtEuro0(options[0].cost)}.`
+          : 'Scegli la modalità prevista per questo LCD. Il costo viene applicato senza scaglioni multiprodotto.';
+    }
+
     function applyProductFamilyUi(q=activeLedQuote()){
       const family = normalizeProductFamily(q.productFamily);
       const meta = PRODUCT_FAMILY_META[family];
@@ -3982,6 +4081,7 @@
       const usesQuantity = !!model && String(model.tipoCalcolo || '').toUpperCase() === 'UNITA';
       const usesDimensions = family === 'LEDWALL' || (!!model && !usesQuantity);
       const supportsBif = quoteSupportsBifacial(q);
+      configureInstallationSelect(q);
       const supportsInstall = quoteSupportsInstallation(q);
       setProductConfigFieldVisible('specialProductField', special);
       setProductConfigFieldVisible('productBaseField', usesDimensions);
@@ -4020,7 +4120,7 @@
     }
 
     function toggleCustomInstallField(){
-      const isAutonoma = quoteSupportsInstallation(activeLedQuote()) && $('ledInstall') && $('ledInstall').value === 'autonoma';
+      const isAutonoma = quoteUsesStandardInstallation(activeLedQuote()) && $('ledInstall') && $('ledInstall').value === 'autonoma';
       const field = $('ledInstallCustomField');
       if(field) field.classList.toggle('is-visible', !!isAutonoma);
     }
@@ -4170,11 +4270,13 @@
       const displayWidth = base;
       const displayHeight = altezza;
       const areaMq = usesQuantity ? ((base / 100) * (altezza / 100) * quantity) : ((base / 100) * (altezza / 100));
-      const supportsInstall = normalizeProductFamily(q.productFamily) !== 'LCD';
-      const tipoInst = supportsInstall ? (q.install || 'personalizza') : 'nessuna';
+      const usesStandardInstall = quoteUsesStandardInstallation(q);
+      const fixedInstallOption = usesStandardInstall ? null : quoteInstallationOption(q, q.install);
+      const supportsInstall = usesStandardInstall || !!fixedInstallOption;
+      const tipoInst = usesStandardInstall ? (q.install || 'personalizza') : (fixedInstallOption ? fixedInstallOption.value : 'nessuna');
       const manualInstall = Math.max(0, Number(q.installCustom || 0));
-      const installMultiplier = tipoInst === 'autonoma' ? 1 : installImpactFactor(installSequenceIndex(quoteIndex));
-      const installationBase = supportsInstall ? installationBaseCost(areaMq, tipoInst, manualInstall) : 0;
+      const installMultiplier = usesStandardInstall && tipoInst !== 'autonoma' ? installImpactFactor(installSequenceIndex(quoteIndex)) : 1;
+      const installationBase = usesStandardInstall ? installationBaseCost(areaMq, tipoInst, manualInstall) : Math.max(0, Number(fixedInstallOption && fixedInstallOption.cost || 0));
       const extraInstall = supportsInstall ? Math.round(installationBase * installMultiplier) : 0;
       const extraKm = (PROVINCE_KM[q.province || 'Catania'] || 0) * COSTO_KM;
       const provvigione = Math.max(0, Number(q.commission || 0));
@@ -4204,9 +4306,10 @@
         margineCliente:(prezzoClienteBase - costoCinaBase) + provvigione,
         margineAgente:(prezzoAgenteBase - costoCinaBase) + provvigione,
         margineInstallazione:extraInstall, installazioneBase:installationBase, installMultiplier,
-        installImpactLabel:!supportsInstall ? 'Non prevista' : (tipoInst === 'autonoma' ? 'Non applicato' : installMultiplierLabel(installMultiplier)),
-        installAutonoma:supportsInstall && tipoInst === 'autonoma', installManualValue:manualInstall,
-        installLabel:supportsInstall ? installLabelFromValue(tipoInst) : 'Non prevista',
+        installImpactLabel:!supportsInstall ? 'Non prevista' : (!usesStandardInstall ? 'Costo fisso' : (tipoInst === 'autonoma' ? 'Non applicato' : installMultiplierLabel(installMultiplier))),
+        installAutonoma:usesStandardInstall && tipoInst === 'autonoma', installManualValue:manualInstall,
+        installationFixed:!usesStandardInstall && !!fixedInstallOption,
+        installLabel:supportsInstall ? (usesStandardInstall ? installLabelFromValue(tipoInst) : fixedInstallOption.label) : 'Non prevista',
         margineKm:extraKm, provvigione, costoCinaBase,
         perfectMatch:true, rotatedMatch:false, diff:0, bifacciale:bif, pixelBase, pixelHeight,
         isBestPrice:true, index:0,
@@ -4428,8 +4531,11 @@
       if($('btnIfisImportLed')) $('btnIfisImportLed').disabled = selectedList.length === 0;
       if(!isReady || !state.ledResults.length){
         const currentInstallMode = $('ledInstall') ? $('ledInstall').value : 'personalizza';
+        const fixedInstallOption = !quoteUsesStandardInstallation(q) ? quoteInstallationOption(q, currentInstallMode) : null;
         const installNoticeText = !quoteSupportsInstallation(q)
-          ? 'Installazione non prevista per gli schermi LCD.'
+          ? 'Seleziona il modello per visualizzare la posa disponibile.'
+          : fixedInstallOption
+            ? `Modalità: <strong>${safe(fixedInstallOption.label)}</strong> (${fmtEuro0(fixedInstallOption.cost)}).`
           : currentInstallMode === 'autonoma'
             ? 'Installazione autonoma: nessun impatto multiprodotto applicato.'
             : `Impatto installazione: <strong>${installImpactLabel(installSequenceIndex(state.activeLedQuoteIndex))}</strong>.`;
@@ -4440,10 +4546,13 @@
         if(!isReady) $('ledAlert').innerHTML = '';
         return;
       }
-      const isAutonomaActive = quoteSupportsInstallation(q) && $('ledInstall').value === 'autonoma';
+      const fixedInstallOption = !quoteUsesStandardInstallation(q) ? quoteInstallationOption(q, $('ledInstall') && $('ledInstall').value) : null;
+      const isAutonomaActive = quoteUsesStandardInstallation(q) && $('ledInstall').value === 'autonoma';
       const extraAutonoma = isAutonomaActive ? '<br/><strong>Installazione autonoma:</strong> il valore è stato inserito manualmente e sarà evidenziato in stampa. Nessun impatto multiprodotto viene applicato.' : '';
       $('ledInputNotice').innerHTML = !quoteSupportsInstallation(q)
-        ? `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: schermo LCD configurato senza voce installazione. Trasferta e provvigione restano incluse.</div>`
+        ? `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: nessuna modalità di posa disponibile. Trasferta e provvigione restano incluse.</div>`
+        : fixedInstallOption
+          ? `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: <strong>${safe(fixedInstallOption.label)}</strong> · ${fmtEuro0(fixedInstallOption.cost)}. Il valore è fisso e non subisce gli scaglioni multiprodotto.</div>`
         : isAutonomaActive
           ? `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: installazione autonoma attiva, nessun impatto multiprodotto applicato.${extraAutonoma}</div>`
           : `<div class="notice">Prodotto ${state.activeLedQuoteIndex + 1}: impatto installazione applicato <strong>${installImpactLabel(installSequenceIndex(state.activeLedQuoteIndex))}</strong>.</div>`;
@@ -4498,7 +4607,7 @@
         ? `<div class="pm"><span>${isUnit ? 'Misura prodotto' : 'Misura realizzabile'}</span><strong>${r.displayWidth} × ${r.displayHeight} cm</strong></div>`
         : `<div class="pm"><span>Formato</span><strong>${safe(r.formatoLabel || 'Predefinito')}</strong></div>`;
       const pixelMetric = r.pixelBase && r.pixelHeight ? `<div class="pm"><span>Resa in pixel</span><strong>${r.pixelBase.toLocaleString('it-IT')} × ${r.pixelHeight.toLocaleString('it-IT')}</strong></div>` : '';
-      const installationMetric = normalizeProductFamily(r.productFamily) === 'LCD' ? '' : `<div class="pm"><span>Installazione</span><strong>${fmtEuro0(r.margineInstallazione)}</strong><small>${r.installAutonoma ? 'Valore autonomo inserito manualmente · nessun impatto applicato' : `Base ${fmtEuro0(r.installazioneBase)} · impatto ${r.installImpactLabel}`}</small></div>`;
+      const installationMetric = `<div class="pm"><span>Installazione</span><strong>${fmtEuro0(r.margineInstallazione)}</strong><small>${r.installationFixed ? safe(r.installLabel) + ' · costo fisso' : (r.installAutonoma ? 'Valore autonomo inserito manualmente · nessun impatto applicato' : `Base ${fmtEuro0(r.installazioneBase)} · impatto ${r.installImpactLabel}`)}</small></div>`;
       const layoutDetails = r.layout ? `<details class="schema"><summary>Visualizza schema moduli</summary><div class="layout-box">${layoutHtml(r)}</div></details>` : '';
       return `
         <article class="product-card ${selected ? 'selected' : ''} ${r.unified ? 'unified' : ''} ${promoVisible ? 'has-promo' : ''}">
@@ -5781,14 +5890,14 @@
           item.displayWidth && item.displayHeight ? `Misura: <strong>${item.displayWidth} × ${item.displayHeight} cm</strong>` : `Formato: <strong>${safe(item.formatoLabel || 'Predefinito')}</strong>`,
           `${item.tipoCalcolo === 'UNITA' ? 'Quantità' : 'Cabinet'}: <strong>${item.totalCab.toLocaleString('it-IT')}</strong>`,
           family === 'LEDWALL' || item.bifacciale ? (item.bifacciale ? '<strong>Bifacciale</strong>' : 'Monofacciale') : '',
-          family === 'LCD' ? '' : (item.installAutonoma ? '<strong>Installazione Personalizzata</strong>' : `Installazione: ${safe(item.installLabel || '—')}`)
+          item.installAutonoma ? '<strong>Installazione Personalizzata</strong>' : `Installazione: ${safe(item.installLabel || '—')}`
         ].filter(Boolean).join('<br>');
         return quoteRow(`Prodotto ${item.quoteNumber} - ${details}`, fmtEuro0(amount));
       }).join('');
 
       const installRows = selectedItems.map(item => {
         const bits = [];
-        if(showInstallCost && normalizeProductFamily(item.productFamily) !== 'LCD') bits.push(`installazione ${fmtEuro0(item.margineInstallazione)}`);
+        if(showInstallCost) bits.push(`${safe(item.installLabel || 'Installazione')} ${fmtEuro0(item.margineInstallazione)}`);
         if(showTransferCost) bits.push(`trasferta ${fmtEuro0(item.margineKm)}`);
         if(showCommissionCost) bits.push(`provvigione ${fmtEuro0(item.provvigione || 0)}`);
         if(!bits.length) return '';
@@ -6071,11 +6180,11 @@
         {selector:'#ledQuoteTabs', title:'Prodotti attivi', text:'Da qui puoi passare da un prodotto all’altro. Puoi aggiungere fino a 3 configurazioni, anche di categorie diverse, nello stesso preventivo.'},
         {selector:'#btnAddLedQuote', title:'Aggiungi prodotto', text:'Aggiungi un secondo o terzo prodotto. Per i prodotti installabili il valore dell’installazione viene modulato automaticamente.'},
         {selector:'#specialProductSelect', title:'Selezione prodotto', text:'Per Croci, LED Extra e LCD scegli qui il modello esatto da quotare.'},
-        {selector:'#productQuantity', title:'Quantità', text:'Per Croci e Totem LCD inserisci il numero di pezzi desiderato.'},
+        {selector:'#productQuantity', title:'Quantità', text:'Per Croci e Schermi LCD inserisci il numero di pezzi desiderato.'},
         {selector:'#ledBase', title:'Base prodotto', text:'Per Ledwall, Transparent e Floor Led inserisci la base in centimetri. I prodotti speciali avanzano con il passo modulare corretto.'},
         {selector:'#ledHeight', title:'Altezza prodotto', text:'Inserisci l’altezza in centimetri. I vincoli dimensionali dei prodotti speciali vengono verificati automaticamente.'},
         {selector:'#ledBif', title:'Opzione bifacciale', text:'Attiva questa opzione solo quando il display deve essere visibile fronte e retro. Il sistema raddoppierà cabinet e valori.'},
-        {selector:'#ledInstall', title:'Tipo di installazione', text:'Seleziona la modalità di installazione. Con “Autonoma” puoi inserire manualmente il costo installazione, che sarà evidenziato nel riepilogo.'},
+        {selector:'#ledInstall', title:'Tipo di installazione', text:'Seleziona la modalità di installazione. Gli LCD a terra e la sola fornitura hanno costo zero; il Wall Board a parete applica 350 €. Per Ledwall e LED Extra resta disponibile anche il costo autonomo.'},
         {selector:'#ledInstallCustomField', title:'Installazione autonoma', text:'Questo campo appare solo selezionando “Autonoma” e consente di indicare liberamente il valore installazione.'},
         {selector:'#ledProvince', title:'Provincia installazione', text:'Scegli la provincia. Se è prevista trasferta, il costo viene calcolato automaticamente.'},
         {selector:'#ledCommission', title:'Provvigione', text:'Inserisci qui l’eventuale provvigione. Il valore viene caricato direttamente sul totale prodotto e mostrato nella card.'},
