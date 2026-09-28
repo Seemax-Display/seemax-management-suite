@@ -19,6 +19,10 @@
   let pendingPatchNotesMessage = false;
   let pendingMessageAcknowledgement = null;
   let profileBoardDraft = [];
+  let deferredRouteRender = false;
+  let loadingProgressTimer = 0;
+  let loadingProgressHideTimer = 0;
+  let loadingProgressValue = 0;
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -216,11 +220,55 @@
     return "";
   }
 
-  function setLoading(active, text) {
-    state.loading = active;
-    $("loadingLayer").classList.toggle("is-hidden", !active);
-    const label = $("loadingLayer").querySelector("strong");
-    if (label && text) label.textContent = text;
+  function paintLoadingProgress(value, detail) {
+    const percent = Math.max(0, Math.min(100, Math.round(Number(value || 0))));
+    const layer = $("loadingLayer");
+    const bar = $("loadingProgressBar");
+    const number = $("loadingProgressPercent");
+    const detailNode = $("loadingProgressDetail");
+    loadingProgressValue = percent;
+    if (bar) bar.style.width = `${percent}%`;
+    if (number) number.textContent = `${percent}%`;
+    if (detailNode && detail) detailNode.textContent = detail;
+    if (layer) layer.setAttribute("aria-valuenow", String(percent));
+  }
+
+  function loadingPhase(value) {
+    if (value < 22) return "Preparazione della sessione…";
+    if (value < 48) return "Collegamento al database condiviso…";
+    if (value < 72) return "Lettura di clienti, pratiche e catalogo…";
+    if (value < 91) return "Preparazione dell’interfaccia…";
+    return "Ultimi controlli…";
+  }
+
+  function setLoading(active, text, progress) {
+    const layer = $("loadingLayer");
+    if (!layer) return;
+    clearTimeout(loadingProgressHideTimer);
+    const label = $("loadingProgressTitle") || layer.querySelector("strong");
+    if (active) {
+      const wasActive = state.loading;
+      state.loading = true;
+      layer.classList.remove("is-hidden");
+      if (label && text) label.textContent = text;
+      if (!wasActive) paintLoadingProgress(progress === undefined ? 7 : progress, loadingPhase(progress === undefined ? 7 : progress));
+      else if (progress !== undefined) paintLoadingProgress(progress, loadingPhase(progress));
+      if (!loadingProgressTimer) {
+        loadingProgressTimer = window.setInterval(() => {
+          if (!state.loading || loadingProgressValue >= 92) return;
+          const increment = loadingProgressValue < 45 ? 3 : loadingProgressValue < 75 ? 2 : 1;
+          paintLoadingProgress(Math.min(92, loadingProgressValue + increment), loadingPhase(loadingProgressValue + increment));
+        }, 420);
+      }
+      return;
+    }
+    state.loading = false;
+    clearInterval(loadingProgressTimer);
+    loadingProgressTimer = 0;
+    paintLoadingProgress(100, "Operazione completata");
+    loadingProgressHideTimer = window.setTimeout(() => {
+      if (!state.loading) layer.classList.add("is-hidden");
+    }, 180);
   }
 
   function toast(message, tone = "success") {
@@ -651,9 +699,13 @@
   }
 
   async function loadAll(showLoader = true, options = {}) {
-    if (showLoader) setLoading(true, "Caricamento database…");
+    if (showLoader) setLoading(true, "Caricamento database…", 12);
     try {
-      state.data = await api.bootstrap(options);
+      state.data = await api.bootstrap({
+        ...options,
+        onProgress: showLoader ? (value, detail) => paintLoadingProgress(value, detail) : options.onProgress
+      });
+      if (showLoader) paintLoadingProgress(94, "Dati ricevuti: preparazione dell’area di lavoro…");
       if (api.isFastMode()) updateLocalDashboard();
       applyChampionTheme();
       updateNotificationBell();
@@ -1258,7 +1310,10 @@
        momentaneo di Apps Script non deve lasciare l'utente davanti a una
        schermata vuota. */
     const fallbackCached = !config.demoMode && api.cachedBootstrap ? api.cachedBootstrap() : null;
-    const cached = options.forceFresh ? null : fallbackCached;
+    /* La cache validata viene mostrata subito anche dopo F5. Il refresh reale
+       prosegue in background e non blocca l'accesso né ricostruisce un modulo
+       che l'utente abbia già iniziato a compilare. */
+    const cached = fallbackCached;
     try {
       if (!cached) {
         await loadAll(true, { force: !!options.forceFresh });
@@ -1268,13 +1323,16 @@
         if (api.isFastMode()) updateLocalDashboard();
         applyChampionTheme(); updateNotificationBell(); setConnectionState();
         go(location.hash.replace("#", "") || "dashboard", false);
-        try {
-          await loadAll(false);
-          renderRoute();
-        } catch (refreshError) {
+        /* Non attendiamo il bootstrap remoto: la schermata di accesso puo
+           chiudersi subito usando la cache validata. La sincronizzazione
+           prosegue davvero in background e aggiorna la vista soltanto quando
+           non esiste un modulo attivo. */
+        void loadAll(false, { force: !!options.forceFresh }).then(() => {
+          requestRouteRender();
+        }).catch(() => {
           setConnectionState();
           toast("Dati locali disponibili. Il database verrà aggiornato al prossimo collegamento.", "warning");
-        }
+        });
       }
       scheduleStartupExperience();
     } catch (error) {
@@ -1286,7 +1344,7 @@
         toast(`Database temporaneamente non raggiungibile. Stai visualizzando l'ultima copia locale: ${error.message}`, "warning");
       } else {
         toast(error.message, "danger");
-        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Pubblica Code.gs 2.14.0 come nuova versione del deployment Apps Script, quindi ricarica la pagina." : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
+        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? `Pubblica Code.gs ${esc(config.version)} come nuova versione del deployment Apps Script, quindi ricarica la pagina.` : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
       }
     }
   }
@@ -2046,7 +2104,27 @@
     pendingMessageAcknowledgement = null;
     $("modalRoot").innerHTML = "";
     document.body.classList.remove("modal-open");
+    if (deferredRouteRender) window.setTimeout(() => requestRouteRender({ force: true }), 0);
     if (pendingWelcomeMessage || pendingPatchNotesMessage) setTimeout(showNextStartupMessage, 280);
+  }
+
+  function hasActiveEditor() {
+    const root = $("modalRoot");
+    return !!(root && root.querySelector("form")) || document.body.classList.contains("planner-modal-open");
+  }
+
+  function requestRouteRender(options = {}) {
+    if (!options.force && hasActiveEditor()) {
+      deferredRouteRender = true;
+      return false;
+    }
+    deferredRouteRender = false;
+    renderRoute();
+    return true;
+  }
+
+  function closeSubmittedForm(form) {
+    if (form && form.isConnected && form.closest("#modalRoot")) closeModal();
   }
 
   function acknowledgeMessage() {
@@ -2294,11 +2372,13 @@
     openModal(`Pratica ${record.numero}`, body, { wide: true, panelClass: "completed-practice-modal", kicker: "Archivio pratiche concluse", subtitle: "Consultazione definitiva · sola lettura" });
   }
 
-  function openPractice(id, clientId, selectedType) {
+  async function openPractice(id, clientId, selectedType) {
     const record = state.data.practices.find((p) => p.id === id) || {};
     const isDraftNew = record.__sync_new_record === true;
     const isNewForm = !record.id || isDraftNew;
     if (!isNewForm && isCompletedPractice(record)) { openCompletedPractice(record); return; }
+    try { await ensureClientTools(); }
+    catch (error) { toast(`Impossibile preparare il modulo pratica: ${error.message}`, "danger"); return; }
     const client = state.data.clients.find((c) => c.id === (clientId || record.clientId));
     const session = api.getSession() || {};
     const assignees = practiceAssignees();
@@ -2504,7 +2584,8 @@
     bindPracticeConditionalFields(practiceType);
     bindPracticeCalculator(logicalProducts, productOptions, initialLedwalls);
     bindPracticeTabsAndClientCompletion(practiceType);
-    window.SeemaxClientTools.bindLocationFields(document.querySelector(".entity-form[data-entity='practices']"), record, "installazione_").catch((error) => toast(error.message, "danger"));
+    const practiceForm = document.querySelector(".entity-form[data-entity='practices']");
+    if (window.SeemaxClientTools && practiceForm) window.SeemaxClientTools.bindLocationFields(practiceForm, record, "installazione_").catch((error) => toast(error.message, "danger"));
   }
 
   function bindPracticeConditionalFields(practiceType) {
@@ -2704,7 +2785,7 @@
         const prefix = `ledwall_${index}_`;
         const locationRecord = {};
         ["regione", "provincia", "comune", "cap"].forEach((key) => { locationRecord[prefix + key] = item["installazione_" + key] || ""; });
-        window.SeemaxClientTools.bindLocationFields(form, locationRecord, prefix).catch((error) => toast(error.message, "danger"));
+        if (window.SeemaxClientTools) window.SeemaxClientTools.bindLocationFields(form, locationRecord, prefix).catch((error) => toast(error.message, "danger"));
       });
       updateAddressRequirements();
       calculateAll();
@@ -3059,6 +3140,7 @@
   }
 
   function replaceLocalEntity(entity, row) {
+    row = row && row.__sync_state ? { ...row } : stripBrowserOnlyFields(row);
     const rows = state.data[entity] || (state.data[entity] = []);
     const requestToken = String(row.request_token || "");
     const index = rows.findIndex((item) =>
@@ -3082,6 +3164,12 @@
     } else rows.unshift(row);
     updateLocalDashboard();
     scheduleBootstrapCache();
+  }
+
+  function stripBrowserOnlyFields(source) {
+    const clean = { ...(source || {}) };
+    ["__notifications", "__sync_state", "__sync_started_at", "__sync_new_record", "__sync_error", "nuova_pratica", "recovery_request_token", "cliente_display", "agente_display"].forEach((field) => delete clean[field]);
+    return clean;
   }
 
   function markLocalEntitySyncFailed(entity, pendingRow, error) {
@@ -3219,11 +3307,13 @@
         return;
       }
     }
-    const record = { ...current, ...serializeForm(form) };
+    const recoveryRequestToken = current.__sync_new_record === true ? String(current.request_token || "") : "";
+    const record = { ...stripBrowserOnlyFields(current), ...serializeForm(form) };
     let backgroundSaveNotice = false;
     let saveProgressId = "";
     record.expected_record_version = Number(form.dataset.recordVersion || 0);
-    record.request_token = (current.__sync_new_record && current.request_token) || form.dataset.requestToken || newRequestToken();
+    record.request_token = form.dataset.requestToken || newRequestToken();
+    if (recoveryRequestToken) record.recovery_request_token = recoveryRequestToken;
     Object.keys(record).filter((key) => key.startsWith("practice_file_")).forEach((key) => delete record[key]);
     delete record.cabinet_calculated;
     delete record.display_width;
@@ -3340,11 +3430,17 @@
           if (!["clients", "practices", "documents"].includes(entity)) return;
           const visiblePending = { ...pending };
           delete visiblePending.file_base64;
+          delete visiblePending.recovery_request_token;
+          /* Una pratica realmente presente nel Foglio puo essere arrivata al
+             browser con i vecchi marcatori locali di v2.20. Durante il retry
+             manteniamo il suo ID reale nella sola vista ottimistica: cosi la
+             riga viene sostituita e non affiancata da un duplicato TMP. */
+          if (recoveryRequestToken && current.id && !String(current.id).startsWith("TMP-")) visiblePending.id = current.id;
           optimisticRow = { ...visiblePending, __sync_new_record: isNewRecord };
           optimisticVisible = true;
           replaceLocalEntity(entity, optimisticRow);
-          closeModal();
-          renderRoute();
+          closeSubmittedForm(form);
+          requestRouteRender();
           updateSaveProgress(saveProgressId, entity === "documents" ? "Caricamento in background…" : "Salvataggio in background…");
         },
         onProgress: (phase) => updateSaveProgress(saveProgressId, phase)
@@ -3354,8 +3450,7 @@
         const uploadBatchId = startUploadBatch(saved, practiceAttachments);
         activeUploadBatchId = uploadBatchId;
         replaceLocalEntity(entity, saved);
-        closeModal();
-        renderRoute();
+        requestRouteRender();
         if (!backgroundSaveNotice) setLoading(false);
         celebrationShown = celebrateSavedEntity(entity, saved, current);
         toast(`Pratica salvata. Caricamento di ${practiceAttachments.length} documenti in background: non chiudere la pagina.`, "info");
@@ -3404,8 +3499,7 @@
         if (failedUploads.length) {
           replaceLocalEntity(entity, saved);
           setConnectionState();
-          closeModal();
-          renderRoute();
+          requestRouteRender();
           toast(`Pratica salvata. Non è stato possibile caricare: ${failedUploads.map((result) => result.attachment.label).join(", ")}. Riapri la pratica per riprovare.`, "danger");
           return;
         }
@@ -3420,8 +3514,8 @@
       }
       replaceLocalEntity(entity, saved);
       setConnectionState();
-      closeModal();
-      renderRoute();
+      closeSubmittedForm(form);
+      requestRouteRender();
       if (!backgroundSaveNotice) setLoading(false);
       if (!celebrationShown) celebrationShown = celebrateSavedEntity(entity, saved, current);
       if (!celebrationShown) toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
@@ -3434,11 +3528,11 @@
       }
       if (String(error.message || "").includes("CONFLICT_RECORD")) {
         toast("Questo elemento è stato modificato da un altro utente. I dati sono stati aggiornati: riaprilo e applica nuovamente la modifica.", "danger");
-        closeModal();
-        try { await loadAll(false); renderRoute(); } catch (refreshError) { /* conserva i dati già visibili */ }
+        closeSubmittedForm(form);
+        try { await loadAll(false); requestRouteRender(); } catch (refreshError) { /* conserva i dati già visibili */ }
       } else if (optimisticVisible && optimisticRow) {
         markLocalEntitySyncFailed(entity, optimisticRow, error);
-        renderRoute();
+        requestRouteRender();
         toast(`${error.message} I dati inseriti sono conservati: riapri l'elemento “Da verificare” per correggerli.`, "danger");
       } else toast(error.message, "danger");
     }
@@ -3505,13 +3599,13 @@
       completeBackgroundProgress(deleteProgressId, existing || { id });
       state.data[entity] = (state.data[entity] || []).filter((item) => String(item.id || item.username) !== String(id));
       if (entity === "documents") { const library = documentLibrary(); delete library.placements[id]; saveDocumentLibrary(library); }
-      updateLocalDashboard(); scheduleBootstrapCache(); renderRoute(); toast(`${label} eliminato.`);
+      updateLocalDashboard(); scheduleBootstrapCache(); requestRouteRender(); toast(`${label} eliminato.`);
     }
     catch (error) {
       failBackgroundProgress(deleteProgressId, existing || { id }, error);
       if (String(error.message || "").includes("CONFLICT_RECORD")) {
         toast("L'elemento è cambiato prima dell'eliminazione. I dati sono stati aggiornati e nulla è stato cancellato.", "danger");
-        try { await loadAll(false); renderRoute(); } catch (refreshError) { /* mantiene la vista corrente */ }
+        try { await loadAll(false); requestRouteRender(); } catch (refreshError) { /* mantiene la vista corrente */ }
       } else toast(error.message, "danger");
     }
     finally { if (!backgroundDeleteNotice) setLoading(false); }
@@ -3652,13 +3746,13 @@
           const saved = await api.setPracticeStockWarning(practice, visible);
           replaceLocalEntity("practices", saved);
           closeModal();
-          renderRoute();
-          if (isCompletedPractice(saved)) openCompletedPractice(saved); else openPractice(saved.id);
+          requestRouteRender({ force: true });
+          if (isCompletedPractice(saved)) openCompletedPractice(saved); else await openPractice(saved.id);
           toast(visible ? "Avviso giacenza reso visibile sulla pratica." : "Avviso giacenza nascosto sulla pratica.");
         } catch (error) {
           if (String(error.message || "").includes("CONFLICT_RECORD")) {
             toast("La pratica è stata aggiornata da un altro utente. Ricarico i dati prima di riprovare.", "danger");
-            try { await loadAll(false, { force: true }); renderRoute(); } catch (refreshError) { /* mantiene i dati visibili */ }
+            try { await loadAll(false, { force: true }); requestRouteRender(); } catch (refreshError) { /* mantiene i dati visibili */ }
           } else toast(error.message, "danger");
         } finally { setLoading(false); }
       },
@@ -3902,7 +3996,7 @@
       event.preventDefault();
       $("loginError").textContent = "";
       setLoading(true, "Verifica accesso…");
-      try { await api.login($("loginUsername").value, $("loginKey").value); await showApp({ forceFresh: true }); }
+      try { await api.login($("loginUsername").value, $("loginKey").value); await showApp({ forceFresh: false }); }
       catch (error) { $("loginError").textContent = error.message; }
       finally { setLoading(false); }
       return;
@@ -3945,7 +4039,7 @@
           state.data.movements.sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")));
           state.data.movements = state.data.movements.slice(0, 100);
         }
-        renderRoute();
+        requestRouteRender();
         celebrateSuccess(payload.operazione === "CARICO" ? "📥" : "📤", payload.operazione === "CARICO" ? "Carico registrato" : "Scarico registrato", `${Number(payload.quantita || 0)} ${productInventoryUnit(savedInventoryProduct, payload.quantita)} · ${String(payload.descrizione || "").trim()}`);
       } catch (error) {
         failBackgroundProgress(inventoryProgressId, { ...payload, product_name: (product || {}).nome }, error);
@@ -4039,12 +4133,12 @@
   window.addEventListener("hashchange", () => { if (api.getSession()) go(location.hash.replace("#", "") || "dashboard", false); });
   window.addEventListener("online", async () => {
     if (!api.getSession() || api.isFastMode() || state.loading) return;
-    try { await loadAll(false, { force: true }); renderRoute(); toast("Connessione al database ripristinata.", "info"); }
+    try { await loadAll(false, { force: true }); requestRouteRender(); toast("Connessione al database ripristinata.", "info"); }
     catch (error) { setConnectionState(); }
   });
   window.addEventListener("pageshow", async (event) => {
     if (!event.persisted || !api.getSession() || api.isFastMode()) return;
-    try { await loadAll(false, { force: true }); renderRoute(); } catch (error) { setConnectionState(); }
+    try { await loadAll(false, { force: true }); requestRouteRender(); } catch (error) { setConnectionState(); }
   });
   window.addEventListener("seemax:practice-created", async (event) => {
     await loadAll();

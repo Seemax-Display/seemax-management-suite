@@ -7,6 +7,7 @@
   const FAST_QUEUE_KEY = "SEEMAX_MANAGEMENT_FAST_QUEUE_V1";
   const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
   const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_";
+  const BOOTSTRAP_LATEST_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_LATEST_";
   const DEMO_FIRST_ACCESS_PREFIX = "SEEMAX_MANAGEMENT_DEMO_ACCESSED_V1_";
   const POST_MESSAGE_GRACE_MS = 2600;
   const MUTATION_POST_GRACE_MS = 700;
@@ -369,13 +370,46 @@
   function bootstrapCacheKey() {
     return BOOTSTRAP_CACHE_PREFIX + String(config.version || "unknown") + "_" + String((session || {}).username || "anonymous");
   }
+  function bootstrapLatestCacheKey() {
+    return BOOTSTRAP_LATEST_PREFIX + String((session || {}).username || "anonymous");
+  }
+  function stripPersistedTransportFields(data) {
+    const copy = { ...(data || {}) };
+    const fields = ["__notifications", "__sync_state", "__sync_started_at", "__sync_new_record", "__sync_error", "nuova_pratica", "recovery_request_token", "cliente_display", "agente_display"];
+    ["clients", "practices", "documents", "products", "users"].forEach((entity) => {
+      if (!Array.isArray(copy[entity])) return;
+      copy[entity] = copy[entity].map((source) => {
+        const row = { ...(source || {}) };
+        fields.forEach((field) => delete row[field]);
+        return row;
+      });
+    });
+    return copy;
+  }
+  function newestCompatibleBootstrapCache() {
+    const username = String((session || {}).username || "anonymous");
+    const candidates = [readLocal(bootstrapCacheKey(), null), readLocal(bootstrapLatestCacheKey(), null)];
+    try {
+      const suffix = `_${username}`;
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index) || "";
+        if (key.startsWith(BOOTSTRAP_CACHE_PREFIX) && key.endsWith(suffix)) candidates.push(readLocal(key, null));
+      }
+    } catch (error) { /* l'accesso alla cache può essere limitato dal browser */ }
+    return candidates.filter((item) => item && item.data).sort((left, right) => Number(right.savedAt || 0) - Number(left.savedAt || 0))[0] || null;
+  }
   function cachedBootstrap(maxAgeMs = 12 * 60 * 60 * 1000) {
-    const cached = readLocal(bootstrapCacheKey(), null);
+    const cached = newestCompatibleBootstrapCache();
     if (!cached || !cached.data || Date.now() - Number(cached.savedAt || 0) > maxAgeMs) return null;
-    return applyPending(cached.data);
+    return applyPending(stripPersistedTransportFields(cached.data));
   }
   function saveBootstrapCache(data) {
-    try { writeLocal(bootstrapCacheKey(), { savedAt: Date.now(), data }); } catch (error) { /* cache opzionale */ }
+    const clean = stripPersistedTransportFields(data);
+    const entry = { savedAt: Date.now(), data: clean };
+    try {
+      writeLocal(bootstrapCacheKey(), entry);
+      writeLocal(bootstrapLatestCacheKey(), entry);
+    } catch (error) { /* cache opzionale */ }
     return data;
   }
 
@@ -421,6 +455,7 @@
   }
 
   async function bootstrap(options = {}) {
+    if (typeof options.onProgress === "function") options.onProgress(10, "Preparazione della richiesta…");
     if (config.demoMode) {
       const data = demo.bootstrap();
       const communications = demoAdminContent();
@@ -429,18 +464,21 @@
       if (isAdmin()) data.adminContent = communications;
       const local = localActivities();
       if (local.length) data.activities = local; else setLocalActivities(data.activities || []);
+      if (typeof options.onProgress === "function") options.onProgress(100, "Dati dimostrativi pronti");
       return applyPending(data);
     }
     if (bootstrapPromise && !options.force) return bootstrapPromise;
     const request = (async () => {
+      if (typeof options.onProgress === "function") options.onProgress(24, "Connessione a Google Apps Script…");
       const response = await retryRead((attempt) => jsonp("management_bootstrap", authParams(), attempt ? 90000 : 55000), 2);
+      if (typeof options.onProgress === "function") options.onProgress(82, "Risposta ricevuta dal database…");
       serverVersion = String(response.version || serverVersion || "");
       if (serverVersion && !serverVersion.includes(String(config.version))) {
         const versionError = new Error(`Backend non aggiornato: atteso ${config.version}, ricevuto ${serverVersion}.`);
         versionError.code = "BACKEND_VERSION_MISMATCH";
         throw versionError;
       }
-      const data = response.data;
+      const data = stripPersistedTransportFields(response.data);
       if (response.user && session) {
         session = { ...session, ...response.user, key: session.key };
         demo.setSession(session);
@@ -449,6 +487,7 @@
       const local = localActivities();
       data.activities = local.length ? local : [];
       saveBootstrapCache(data);
+      if (typeof options.onProgress === "function") options.onProgress(96, "Preparazione dell’interfaccia…");
       return applyPending(data);
     })();
     bootstrapPromise = request;

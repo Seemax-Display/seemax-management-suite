@@ -109,7 +109,14 @@
     </button>
     <section id="uploadCenterDetails" class="upload-center-details is-hidden"><header><strong>Trasferimenti documenti</strong><button type="button" data-action="dismiss-upload-center" aria-label="Nascondi">×</button></header><div id="uploadCenterList"></div><p>Non chiudere o ricaricare la pagina finché i trasferimenti non sono terminati.</p></section>
   </aside>
-  <div id="loadingLayer" class="loading-layer is-hidden" aria-live="assertive"><div class="spinner"></div><strong>Operazione in corso…</strong></div>
+  <div id="loadingLayer" class="loading-layer is-hidden" role="progressbar" aria-live="polite" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <section class="loading-progress-card">
+      <div class="loading-progress-brand"><span>S</span><div><small>SEEMAX MANAGEMENT</small><strong id="loadingProgressTitle">Operazione in corso…</strong></div><em id="loadingProgressPercent">0%</em></div>
+      <div class="loading-progress-track"><b id="loadingProgressBar"></b></div>
+      <p id="loadingProgressDetail">Preparazione della sessione…</p>
+      <small class="loading-progress-estimate">Avanzamento stimato · i dati già disponibili vengono mostrati appena possibile</small>
+    </section>
+  </div>
   <div id="syncLayer" class="sync-layer is-hidden" aria-live="assertive">
     <section><span class="section-kicker">Sincronizzazione database</span><h2>SALVA TUTTO</h2><div class="sync-progress"><i id="syncProgressBar"></i></div><strong id="syncProgressText">Preparazione…</strong><p id="syncCurrentItem">Attendi mentre trasferiamo il lavoro locale.</p></section>
   </div>
