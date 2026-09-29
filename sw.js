@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-21-0-practice-recovery";
+const CACHE = "seemax-management-v2-21-1-mobile-resume";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",

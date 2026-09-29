@@ -8,6 +8,7 @@
   const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
   const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_";
   const BOOTSTRAP_LATEST_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_LATEST_";
+  const BOOTSTRAP_CACHE_STALE_AFTER_MS = 12 * 60 * 60 * 1000;
   const DEMO_FIRST_ACCESS_PREFIX = "SEEMAX_MANAGEMENT_DEMO_ACCESSED_V1_";
   const POST_MESSAGE_GRACE_MS = 2600;
   const MUTATION_POST_GRACE_MS = 700;
@@ -19,6 +20,8 @@
   const MANAGEMENT_BRIDGE_RETRY_DELAY_MS = 60000;
   let session = demo.getSession();
   let online = !!config.demoMode;
+  let lastConnectionSuccessAt = config.demoMode ? Date.now() : 0;
+  let lastConnectionFailureAt = 0;
   let serverVersion = "";
   let bootstrapPromise = null;
   let lastPerformance = null;
@@ -144,6 +147,19 @@
     ensureManagementBridge().catch(() => {});
   }
 
+  function resumeConnectivity(reason) {
+    if (config.demoMode || !isConfigured()) return;
+    /* Gli iframe cross-origin possono restare formalmente connessi ma non più
+       rispondere dopo la sospensione della scheda su Android/iOS. Ricreare il
+       ponte al risveglio è sicuro: le mutazioni già inviate vengono recuperate
+       tramite lo stesso requestId idempotente prima di qualsiasi fallback. */
+    if (managementBridge.iframe || managementBridge.readyPromise || managementBridge.pending.size) {
+      resetManagementBridge(bridgeFailure(`Ponte riattivato${reason ? `: ${reason}` : "."}`, "BRIDGE_RESUME", true), false);
+    }
+    managementBridge.disabledUntil = 0;
+    if (typeof navigator === "undefined" || navigator.onLine !== false) warmManagementBridge();
+  }
+
   async function callManagementBridge(action, values, requestId, timeoutMs) {
     await ensureManagementBridge();
     const started = Date.now();
@@ -264,6 +280,19 @@
 
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+  function markConnectionSuccess() {
+    lastConnectionSuccessAt = Date.now();
+    online = true;
+  }
+
+  function markConnectionFailure(requestStartedAt) {
+    lastConnectionFailureAt = Date.now();
+    /* Una richiesta avviata prima di un collegamento riuscito non deve poter
+       riportare l'intera applicazione offline quando termina in ritardo dopo
+       la sospensione del browser mobile. */
+    if (!lastConnectionSuccessAt || lastConnectionSuccessAt <= Number(requestStartedAt || 0)) online = false;
+  }
+
   function captureMutationPerformance(action, result, clientStarted, error = null, transport = {}) {
     const backend = result && result.performance ? result.performance : null;
     const clientTotalMs = Math.max(0, Date.now() - Number(clientStarted || Date.now()));
@@ -340,6 +369,7 @@
   function jsonp(action, params = {}, timeout = 45000) {
     return new Promise((resolve, reject) => {
       if (!isConfigured()) return reject(new Error("URL Apps Script non configurato."));
+      const requestStartedAt = Date.now();
       const callback = "__SEEMAX_MGMT_CB_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
       const script = document.createElement("script");
       const query = new URLSearchParams({ action, callback, t: String(Date.now()) });
@@ -351,13 +381,14 @@
         delete window[callback];
         script.remove();
       };
-      const timer = setTimeout(() => { cleanup(); online = false; reject(transportError("Il database non ha risposto in tempo.", "TIMEOUT")); }, timeout);
+      const timer = setTimeout(() => { cleanup(); markConnectionFailure(requestStartedAt); reject(transportError("Il database non ha risposto in tempo.", "TIMEOUT")); }, timeout);
       window[callback] = (response) => {
         cleanup();
-        if (response && response.ok !== false) { online = true; resolve(response); }
+        markConnectionSuccess();
+        if (response && response.ok !== false) resolve(response);
         else reject(new Error((response && response.error) || "Operazione non riuscita."));
       };
-      script.onerror = () => { cleanup(); online = false; reject(transportError("Impossibile raggiungere Google Apps Script.", "NETWORK_ERROR")); };
+      script.onerror = () => { cleanup(); markConnectionFailure(requestStartedAt); reject(transportError("Impossibile raggiungere Google Apps Script.", "NETWORK_ERROR")); };
       script.src = config.appsScriptUrl + "?" + query.toString();
       document.head.appendChild(script);
     });
@@ -398,10 +429,26 @@
     } catch (error) { /* l'accesso alla cache può essere limitato dal browser */ }
     return candidates.filter((item) => item && item.data).sort((left, right) => Number(right.savedAt || 0) - Number(left.savedAt || 0))[0] || null;
   }
-  function cachedBootstrap(maxAgeMs = 12 * 60 * 60 * 1000) {
+  function bootstrapCacheInfo() {
     const cached = newestCompatibleBootstrapCache();
-    if (!cached || !cached.data || Date.now() - Number(cached.savedAt || 0) > maxAgeMs) return null;
-    return applyPending(stripPersistedTransportFields(cached.data));
+    if (!cached || !cached.data) return { data: null, savedAt: 0, ageMs: Infinity, stale: true };
+    const savedAt = Number(cached.savedAt || 0);
+    const ageMs = Math.max(0, Date.now() - savedAt);
+    return {
+      data: applyPending(stripPersistedTransportFields(cached.data)),
+      savedAt,
+      ageMs,
+      stale: ageMs > BOOTSTRAP_CACHE_STALE_AFTER_MS
+    };
+  }
+  function cachedBootstrap(maxAgeMs) {
+    const cached = bootstrapCacheInfo();
+    if (!cached.data) return null;
+    /* Senza un limite esplicito restituiamo anche una copia datata: serve
+       esclusivamente come rete di sicurezza mentre il collegamento mobile si
+       riattiva. Il bootstrap remoto parte comunque immediatamente. */
+    if (Number.isFinite(Number(maxAgeMs)) && cached.ageMs > Number(maxAgeMs)) return null;
+    return cached.data;
   }
   function saveBootstrapCache(data) {
     const clean = stripPersistedTransportFields(data);
@@ -442,7 +489,7 @@
     if (config.demoMode) return { ok: true, mode: "demo" };
     const response = await retryRead((attempt) => jsonp("ping", {}, attempt ? 60000 : 30000), 2);
     serverVersion = String(response.version || serverVersion || "");
-    online = !!response.ok;
+    if (response.ok) markConnectionSuccess();
     return response;
   }
 
@@ -450,7 +497,7 @@
     if (config.demoMode) return { ok: true, mode: "demo", version: config.version, elapsed_ms: 0 };
     const response = await retryRead((attempt) => jsonp("management_health", authParams(), attempt ? 90000 : 55000), 2);
     serverVersion = String(response.version || serverVersion || "");
-    online = !!response.ok;
+    if (response.ok) markConnectionSuccess();
     return response;
   }
 
@@ -467,10 +514,19 @@
       if (typeof options.onProgress === "function") options.onProgress(100, "Dati dimostrativi pronti");
       return applyPending(data);
     }
-    if (bootstrapPromise && !options.force) return bootstrapPromise;
+    /* Anche un refresh forzato si accoda alla richiesta già attiva. Due
+       bootstrap simultanei, frequenti al ritorno da background, consumano
+       inutilmente Apps Script e possono completarsi in ordine inverso. */
+    if (bootstrapPromise) return bootstrapPromise;
     const request = (async () => {
       if (typeof options.onProgress === "function") options.onProgress(24, "Connessione a Google Apps Script…");
-      const response = await retryRead((attempt) => jsonp("management_bootstrap", authParams(), attempt ? 90000 : 55000), 2);
+      /* Durante la ripresa mobile usiamo un tentativo breve. Se la radio di
+         rete non è ancora pronta, l'interfaccia conserva la cache e programma
+         un nuovo controllo: non lascia il pulsante Riprova bloccato per oltre
+         due minuti su due timeout consecutivi. */
+      const response = options.recovery === true
+        ? await jsonp("management_bootstrap", authParams(), 22000)
+        : await retryRead((attempt) => jsonp("management_bootstrap", authParams(), attempt ? 90000 : 55000), 2);
       if (typeof options.onProgress === "function") options.onProgress(82, "Risposta ricevuta dal database…");
       serverVersion = String(response.version || serverVersion || "");
       if (serverVersion && !serverVersion.includes(String(config.version))) {
@@ -1007,7 +1063,7 @@ async function getAdminContent() {
         const bridgeResponse = await callManagementBridge(action, requestValues, mutationRequestId, Math.min(Number(options.maxWait || 120000), 90000));
         transport = { ...(bridgeResponse.__seemax_transport || {}) };
         delete bridgeResponse.__seemax_transport;
-        online = true;
+        markConnectionSuccess();
         captureMutationPerformance(action, bridgeResponse, clientStarted, null, transport);
         return bridgeResponse;
       } catch (bridgeError) {
@@ -1025,7 +1081,7 @@ async function getAdminContent() {
           try {
             const recovered = await waitForMutation(mutationRequestId, { ...options, maxWait: 18000, skipFallback: true });
             transport = { ...transport, ...recovered.transport, mode: "native_bridge_status_recovery", bridge_fallback: true };
-            online = true;
+            markConnectionSuccess();
             captureMutationPerformance(action, recovered.result, clientStarted, null, transport);
             return recovered.result;
           } catch (recoveryError) {
@@ -1040,7 +1096,7 @@ async function getAdminContent() {
         bridge_fallback: true,
         fallback_triggered: true
       };
-      online = true;
+      markConnectionSuccess();
       captureMutationPerformance(action, legacy.result, clientStarted, null, transport);
       return legacy.result;
     } catch (error) {
@@ -1141,7 +1197,7 @@ async function getAdminContent() {
     try {
       const response = await callManagementBridge("nextquote", { quote_scope: quoteScope }, requestId, 30000);
       delete response.__seemax_transport;
-      online = true;
+      markConnectionSuccess();
       return response;
     } catch (bridgeError) {
       return retryRead((attempt) => jsonp("nextquote", { quote_scope: quoteScope }, attempt ? 50000 : 30000), 2);
@@ -1171,7 +1227,7 @@ async function getAdminContent() {
     try {
       const response = await callManagementBridge("listquotes", {}, requestId, 45000);
       delete response.__seemax_transport;
-      online = true;
+      markConnectionSuccess();
       return response;
     } catch (bridgeError) {
       if (bridgeError && bridgeError.code === "BRIDGE_SERVER_ERROR") throw bridgeError;
@@ -1186,7 +1242,7 @@ async function getAdminContent() {
     try {
       const response = await callManagementBridge("loadquote_agent", values, requestId, 45000);
       delete response.__seemax_transport;
-      online = true;
+      markConnectionSuccess();
       return response;
     } catch (bridgeError) {
       if (bridgeError && bridgeError.code === "BRIDGE_SERVER_ERROR") throw bridgeError;
@@ -1295,16 +1351,23 @@ async function getAdminContent() {
   }
   function isAdmin() { return !!session && String(session.role || "").toUpperCase() === "ADMIN"; }
   function status() {
+    const cached = newestCompatibleBootstrapCache();
+    const cacheSavedAt = Number(cached && cached.savedAt || 0);
     return {
       demo: config.demoMode,
       configured: isConfigured(),
-      online,
+      online: online && (typeof navigator === "undefined" || navigator.onLine !== false),
       fast: isFastMode(),
       pending: pendingOperations().length,
       serverVersion,
+      lastConnectionSuccessAt,
+      lastConnectionFailureAt,
+      cacheSavedAt,
+      cacheAgeMs: cacheSavedAt ? Math.max(0, Date.now() - cacheSavedAt) : Infinity,
+      cacheStale: !cacheSavedAt || Date.now() - cacheSavedAt > BOOTSTRAP_CACHE_STALE_AFTER_MS,
       lastPerformance: getLastPerformance()
     };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, saveBootstrapCache, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, listQuotations, loadQuotation, deleteQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, bootstrapCacheInfo, saveBootstrapCache, resumeConnectivity, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, listQuotations, loadQuotation, deleteQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
 })();

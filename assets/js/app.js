@@ -23,6 +23,13 @@
   let loadingProgressTimer = 0;
   let loadingProgressHideTimer = 0;
   let loadingProgressValue = 0;
+  const CONNECTION_RETRY_DELAYS_MS = [1200, 3500, 8000, 20000, 60000];
+  let pageHiddenAt = 0;
+  let resumeSyncPromise = null;
+  let resumeRetryTimer = 0;
+  let resumeRetryAttempt = 0;
+  let lastResumeSyncAt = 0;
+  let connectionRecoveryActive = false;
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -682,16 +689,22 @@
 
   function setConnectionState() {
     const status = api.status();
-    $("databaseLabel").textContent = status.fast ? `Modalità Rapida · ${status.pending} in attesa` : (status.demo ? "Modalità demo locale" : (status.online ? "Database online" : "Database non raggiungibile"));
+    $("databaseLabel").textContent = status.fast ? `Modalità Rapida · ${status.pending} in attesa` : (status.demo ? "Modalità demo locale" : (connectionRecoveryActive ? "Aggiornamento dati…" : status.online ? "Database online" : "Riconnessione in corso"));
     $("databaseDot").className = status.online ? "online" : "offline";
     updateModeControls();
     const banner = $("connectionBanner");
     if (status.demo) {
       banner.className = "connection-banner demo";
       banner.innerHTML = `<strong>Modalità demo attiva.</strong> I dati sono salvati soltanto in questo browser. Configura Apps Script per usare il database condiviso. <button data-route="settings">Configura</button>`;
+    } else if (connectionRecoveryActive) {
+      banner.className = "connection-banner recovering";
+      banner.innerHTML = `<strong>Aggiornamento in corso.</strong> Sto riallineando automaticamente i dati dopo la riapertura dell’app.`;
     } else if (!status.online) {
-      banner.className = "connection-banner danger";
-      banner.innerHTML = `<strong>Database non disponibile.</strong> Controlla l’URL Apps Script e la pubblicazione della Web App.`;
+      const cachedAt = status.cacheSavedAt ? ` Ultima copia locale: ${esc(new Date(status.cacheSavedAt).toLocaleString("it-IT"))}.` : "";
+      banner.className = state.data ? "connection-banner recovering" : "connection-banner danger";
+      banner.innerHTML = state.data
+        ? `<strong>Connessione temporaneamente interrotta.</strong> I dati restano disponibili e verranno riallineati automaticamente.${cachedAt}<button data-action="reload">Riconnetti ora</button>`
+        : `<strong>Connessione al database in ripristino.</strong> Il sistema riproverà automaticamente.<button data-action="reload">Riprova ora</button>`;
     } else if (status.serverVersion && !String(status.serverVersion).includes(String(config.version))) {
       banner.className = "connection-banner danger";
       banner.innerHTML = `<strong>Backend non aggiornato.</strong> Il sito usa la versione ${esc(config.version)}, mentre Apps Script risponde con ${esc(status.serverVersion)}. Pubblica una nuova versione del deployment.`;
@@ -714,6 +727,78 @@
       setConnectionState();
       throw error;
     } finally { if (showLoader) setLoading(false); }
+  }
+
+  function applyWorkspaceSnapshot(snapshot) {
+    state.data = snapshot;
+    if (api.isFastMode()) updateLocalDashboard();
+    applyChampionTheme();
+    updateNotificationBell();
+    setConnectionState();
+  }
+
+  function clearConnectionRetry() {
+    clearTimeout(resumeRetryTimer);
+    resumeRetryTimer = 0;
+  }
+
+  function scheduleConnectionRetry(delayOverride) {
+    if (!api.getSession() || api.isFastMode() || config.demoMode) return;
+    clearConnectionRetry();
+    const index = Math.min(resumeRetryAttempt, CONNECTION_RETRY_DELAYS_MS.length - 1);
+    const delay = Math.max(250, Number(delayOverride || CONNECTION_RETRY_DELAYS_MS[index]));
+    resumeRetryAttempt = Math.min(resumeRetryAttempt + 1, CONNECTION_RETRY_DELAYS_MS.length - 1);
+    resumeRetryTimer = window.setTimeout(() => {
+      resumeRetryTimer = 0;
+      if (document.hidden || (typeof navigator !== "undefined" && navigator.onLine === false)) {
+        scheduleConnectionRetry();
+        return;
+      }
+      void refreshSharedData({ reason: "tentativo automatico" });
+    }, delay);
+  }
+
+  async function refreshSharedData(options = {}) {
+    const interactive = options.interactive === true;
+    if (!api.getSession() || api.isFastMode() || config.demoMode) return false;
+    if (!interactive && (document.hidden || hasActiveUploads() || hasActiveDatabaseOperations())) {
+      scheduleConnectionRetry(1800);
+      return false;
+    }
+    if (resumeSyncPromise) return resumeSyncPromise;
+    clearConnectionRetry();
+    const wasOnline = api.status().online;
+    connectionRecoveryActive = true;
+    setConnectionState();
+    if (typeof api.resumeConnectivity === "function") api.resumeConnectivity(options.reason || "ripresa applicazione");
+    const run = (async () => {
+      try {
+        await loadAll(interactive, { force: true, recovery: true });
+        resumeRetryAttempt = 0;
+        lastResumeSyncAt = Date.now();
+        requestRouteRender();
+        if (options.announce === true || !wasOnline) toast("Dati aggiornati e connessione ripristinata.", "info");
+        return true;
+      } catch (error) {
+        const cached = state.data || (api.cachedBootstrap ? api.cachedBootstrap() : null);
+        if (!state.data && cached) {
+          applyWorkspaceSnapshot(cached);
+          go(location.hash.replace("#", "") || "dashboard", false);
+        }
+        if (!state.data) {
+          $("viewContainer").innerHTML = emptyState("Connessione in ripristino", "La rete mobile o Google Apps Script non hanno ancora risposto. Il sistema riproverà automaticamente senza richiedere un refresh della pagina.", "Riprova ora", "reload");
+        }
+        scheduleConnectionRetry();
+        if (interactive) toast("Collegamento non ancora disponibile. I dati presenti restano al sicuro e il prossimo tentativo sarà automatico.", "warning");
+        return false;
+      } finally {
+        connectionRecoveryActive = false;
+        setConnectionState();
+      }
+    })();
+    resumeSyncPromise = run;
+    try { return await run; }
+    finally { if (resumeSyncPromise === run) resumeSyncPromise = null; }
   }
 
   function setUser() {
@@ -1319,15 +1404,13 @@
         await loadAll(true, { force: !!options.forceFresh });
         go(location.hash.replace("#", "") || "dashboard", false);
       } else {
-        state.data = cached;
-        if (api.isFastMode()) updateLocalDashboard();
-        applyChampionTheme(); updateNotificationBell(); setConnectionState();
+        applyWorkspaceSnapshot(cached);
         go(location.hash.replace("#", "") || "dashboard", false);
         /* Non attendiamo il bootstrap remoto: la schermata di accesso puo
            chiudersi subito usando la cache validata. La sincronizzazione
            prosegue davvero in background e aggiorna la vista soltanto quando
            non esiste un modulo attivo. */
-        void loadAll(false, { force: !!options.forceFresh }).then(() => {
+        void loadAll(false, { force: !!options.forceFresh, recovery: true }).then(() => {
           requestRouteRender();
         }).catch(() => {
           setConnectionState();
@@ -1337,14 +1420,14 @@
       scheduleStartupExperience();
     } catch (error) {
       if (fallbackCached && String(error.code || "") !== "BACKEND_VERSION_MISMATCH") {
-        state.data = fallbackCached;
-        if (api.isFastMode()) updateLocalDashboard();
-        applyChampionTheme(); updateNotificationBell(); setConnectionState();
+        applyWorkspaceSnapshot(fallbackCached);
         go(location.hash.replace("#", "") || "dashboard", false);
         toast(`Database temporaneamente non raggiungibile. Stai visualizzando l'ultima copia locale: ${error.message}`, "warning");
       } else {
         toast(error.message, "danger");
-        $("viewContainer").innerHTML = emptyState(String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? "Backend da aggiornare" : "Database non disponibile", String(error.code || "") === "BACKEND_VERSION_MISMATCH" ? `Pubblica Code.gs ${esc(config.version)} come nuova versione del deployment Apps Script, quindi ricarica la pagina.` : "Controlla la configurazione di Google Apps Script e riprova.", "Riprova", "reload");
+        const versionMismatch = String(error.code || "") === "BACKEND_VERSION_MISMATCH";
+        $("viewContainer").innerHTML = emptyState(versionMismatch ? "Backend da aggiornare" : "Connessione in ripristino", versionMismatch ? `Pubblica Code.gs ${esc(config.version)} come nuova versione del deployment Apps Script, quindi ricarica la pagina.` : "La rete mobile o Google Apps Script non hanno ancora risposto. Il sistema riproverà automaticamente senza richiedere un refresh della pagina.", versionMismatch ? "Ricarica" : "Riprova ora", "reload");
+        if (!versionMismatch) scheduleConnectionRetry();
       }
     }
   }
@@ -3813,7 +3896,7 @@
       "confirm-fast-mode": enableFastMode,
       "disable-fast-mode": disableFastMode,
       "sync-all": syncAll,
-      "reload": async () => { await loadAll(true, { force: true }); renderRoute(); },
+      "reload": async () => { await refreshSharedData({ interactive: true, announce: true, reason: "richiesta manuale" }); },
       "reload-planner": () => { if (state.route === "planner") renderRoute(); },
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.health(); setConnectionState(); toast(response.ok ? `Database collegato · ${response.elapsed_ms || 0} ms.` : `Database incompleto: ${(response.missing_sheets || []).join(", ")}.`, response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
@@ -4131,14 +4214,36 @@
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { if (tutorialState.active) stopTutorial(false); else closeModal(); $("sidebar").classList.remove("open"); } if (tutorialState.active && event.key === "ArrowRight") moveTutorial(1); if (tutorialState.active && event.key === "ArrowLeft") moveTutorial(-1); });
   window.addEventListener("resize", () => { if (tutorialState.active) positionTutorialSpotlight(tutorialState.steps[tutorialState.index].selector); });
   window.addEventListener("hashchange", () => { if (api.getSession()) go(location.hash.replace("#", "") || "dashboard", false); });
-  window.addEventListener("online", async () => {
-    if (!api.getSession() || api.isFastMode() || state.loading) return;
-    try { await loadAll(false, { force: true }); requestRouteRender(); toast("Connessione al database ripristinata.", "info"); }
-    catch (error) { setConnectionState(); }
+  window.addEventListener("online", () => {
+    if (!api.getSession() || api.isFastMode()) return;
+    window.setTimeout(() => { void refreshSharedData({ reason: "rete nuovamente disponibile", announce: true }); }, 350);
   });
-  window.addEventListener("pageshow", async (event) => {
+  window.addEventListener("offline", () => {
+    clearConnectionRetry();
+    setConnectionState();
+  });
+  window.addEventListener("pagehide", () => {
+    pageHiddenAt = Date.now();
+    clearConnectionRetry();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      pageHiddenAt = Date.now();
+      clearConnectionRetry();
+      return;
+    }
+    if (!api.getSession() || api.isFastMode()) return;
+    const hiddenFor = pageHiddenAt ? Date.now() - pageHiddenAt : 0;
+    pageHiddenAt = 0;
+    /* Il piccolo ritardo consente a Wi-Fi/4G/5G di riattivarsi prima della
+       richiesta. Il rendering resta differito se l'utente ha un modulo aperto. */
+    if (hiddenFor >= 2500 || Date.now() - lastResumeSyncAt > 60000) {
+      window.setTimeout(() => { void refreshSharedData({ reason: "ritorno dal background" }); }, 700);
+    }
+  });
+  window.addEventListener("pageshow", (event) => {
     if (!event.persisted || !api.getSession() || api.isFastMode()) return;
-    try { await loadAll(false, { force: true }); requestRouteRender(); } catch (error) { setConnectionState(); }
+    window.setTimeout(() => { void refreshSharedData({ reason: "ripristino pagina dalla memoria" }); }, 450);
   });
   window.addEventListener("seemax:practice-created", async (event) => {
     await loadAll();
