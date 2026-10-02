@@ -1072,10 +1072,13 @@
     body.integrated-suite .sidebar{display:none!important}
     body.integrated-suite .mobile-tabs{display:flex!important;position:sticky;top:0;z-index:70}
     body.integrated-suite .main{padding:18px 20px 28px}
-    body.management-fast #btnOnlineArchiveSave,
-    body.management-fast #btnOnlineArchiveLoad{opacity:.48;cursor:not-allowed;filter:grayscale(.35)}
-    .management-fast-archive-note{margin:0 0 12px;border:1px solid #fcd34d;border-radius:14px;padding:11px 13px;color:#92400e;background:#fffbeb;font-size:13px;line-height:1.45}
-    .management-fast-archive-note strong{display:block;margin-bottom:3px}
+    .admin-quote-number-help{display:none}.role-admin .admin-quote-number-help{display:block}.role-admin #quoteNumber:not([readonly]){border-color:#60a5fa;background:#eff6ff;font-weight:900}
+    .product-mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 16px;border:1px solid var(--line);border-radius:18px;padding:7px;background:#edf3fa}.product-mode-switch button{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"icon title" "icon copy";gap:2px 10px;align-items:center;min-height:62px;border:1px solid transparent;border-radius:13px;padding:10px 12px;color:#52677f;background:transparent;text-align:left;transition:.18s ease}.product-mode-switch button>span{grid-area:icon;display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#dcecff;font-size:18px}.product-mode-switch button strong{grid-area:title;font-size:12px}.product-mode-switch button small{grid-area:copy;color:#73849a;font-size:9px;line-height:1.3}.product-mode-switch button:hover{border-color:#bdd8f5;background:#f7fbff}.product-mode-switch button.active{border-color:#a9cff8;color:#0d4f98;background:#fff;box-shadow:0 5px 15px rgba(23,74,128,.09)}.product-mode-switch button.active>span{color:#fff;background:linear-gradient(145deg,#2184eb,#0e5eb9)}
+    .quick-product-panel{margin:0 0 16px;border:1px solid #93c5fd;border-radius:19px;padding:16px;background:radial-gradient(circle at 94% -20%,rgba(56,189,248,.2),transparent 32%),linear-gradient(125deg,#eff6ff,#fff)}.quick-product-panel.is-hidden{display:none}.quick-product-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:13px}.quick-product-heading h3{margin:4px 0;font-size:18px}.quick-product-heading p{margin:0;color:#61758e;font-size:10px;line-height:1.45}.quick-product-heading>span{display:grid;place-items:center;flex:0 0 45px;width:45px;height:45px;border-radius:14px;color:#fff;background:linear-gradient(145deg,#2563eb,#38bdf8);font-size:23px}.quick-commercial-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}.quick-commercial-values article{border:1px solid #d7e4f3;border-radius:13px;padding:11px;background:rgba(255,255,255,.88)}.quick-commercial-values small,.quick-commercial-values strong,.quick-commercial-values span{display:block}.quick-commercial-values small{color:#718197;font-size:8px;font-weight:900;text-transform:uppercase}.quick-commercial-values strong{margin:4px 0;color:#143f75;font-size:17px}.quick-commercial-values span{color:#047857;font-size:8px;font-weight:900}.product-mode-quick .product-family-current,.product-mode-quick .quote-manager,.product-mode-quick #specialProductField{display:none!important}
+    .commercial-operation-shell{display:grid;gap:16px}.commercial-operation-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;border-radius:23px;padding:24px 26px;color:#fff;background:radial-gradient(circle at 88% -30%,rgba(56,189,248,.42),transparent 35%),linear-gradient(135deg,#071d38,#0d56a5);box-shadow:0 18px 40px rgba(10,53,112,.18)}.commercial-operation-hero h2{margin:5px 0;font-size:27px}.commercial-operation-hero p{margin:0;color:rgba(255,255,255,.72);font-size:12px}.commercial-operation-hero .section-kicker{color:#bfdbfe}.commercial-operation-hero>span{display:grid;place-items:center;flex:0 0 66px;width:66px;height:66px;border-radius:21px;background:rgba(255,255,255,.13);font-size:32px}.commercial-operation-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.commercial-operation-grid button{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"icon title" "icon copy";gap:4px 12px;align-items:center;min-height:100px;border:1px solid #dce5ef;border-radius:18px;padding:16px;color:#173f68;background:#fff;text-align:left;box-shadow:0 8px 22px rgba(15,23,42,.055);transition:.18s ease}.commercial-operation-grid button:hover{transform:translateY(-3px);border-color:#7dbcf2;box-shadow:0 14px 32px rgba(20,83,145,.14)}.commercial-operation-grid button>span{grid-area:icon;display:grid;place-items:center;width:48px;height:48px;border-radius:15px;color:#fff;background:linear-gradient(145deg,#1d73c8,#34b5ef);font-size:17px;font-weight:950}.commercial-operation-grid button strong{grid-area:title;font-size:15px}.commercial-operation-grid button small{grid-area:copy;color:#6b7d93;font-size:10px;line-height:1.4}.commercial-purchase-panel{border:1px solid #dce5ef;border-radius:21px;padding:19px;background:#fff;box-shadow:0 10px 28px rgba(15,23,42,.06)}.commercial-purchase-head{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:13px}.commercial-purchase-head h3{margin:4px 0 0}.commercial-purchase-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.commercial-purchase-summary article{border-radius:13px;padding:12px;background:#f1f5f9}.commercial-purchase-summary small,.commercial-purchase-summary strong{display:block}.commercial-purchase-summary small{color:#708198;font-size:8px;font-weight:900;text-transform:uppercase}.commercial-purchase-summary strong{margin-top:5px;color:#173f68;font-size:15px}.commercial-purchase-summary article.total{color:#fff;background:linear-gradient(145deg,#0d4c92,#1d77c9)}.commercial-purchase-summary article.total small,.commercial-purchase-summary article.total strong{color:#fff}.commercial-cabinet-graphic{margin-top:13px;border:1px solid #dbe6f1;border-radius:16px;padding:14px;background:#f8fafc}.commercial-cabinet-graphic:empty{display:none}.commercial-cabinet-graphic header h3{margin:4px 0 12px}.commercial-cabinet-graphic>div{display:grid;gap:9px}.commercial-cabinet-graphic article{display:grid;grid-template-columns:minmax(190px,.75fr) minmax(0,1.25fr);gap:13px;align-items:center;border-radius:13px;padding:11px;background:#fff}.commercial-cabinet-graphic article strong,.commercial-cabinet-graphic article small{display:block}.commercial-cabinet-graphic article small{margin-top:4px;color:#708198;font-size:9px}.commercial-cabinet-graphic .module-grid{justify-self:end;max-width:100%;overflow:auto}.commercial-unit-icon{justify-self:end;font-size:32px}.commercial-empty{grid-column:1/-1;display:grid;place-items:center;min-height:150px;border:1px dashed #bfdbfe;border-radius:15px;text-align:center;background:#f8fbff}.commercial-empty>span{font-size:29px}.commercial-empty strong{margin-top:5px}.commercial-empty p{margin:4px 0 12px;color:#6b7d93;font-size:10px}
+    .assistance-cost-badge{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-top:10px;border:1px solid #6ee7b7;border-radius:13px;padding:10px 11px;color:#064e3b;background:#ecfdf5}.assistance-cost-badge.hidden{display:none}.assistance-cost-badge strong,.assistance-cost-badge span{display:block}.assistance-cost-badge strong{font-size:9px;letter-spacing:.06em}.assistance-cost-badge span{margin-top:3px;font-size:9px;line-height:1.35}.assistance-cost-badge button{border:1px solid #6ee7b7;border-radius:9px;padding:7px 9px;color:#047857;background:#fff;font-size:8px;font-weight:900;white-space:nowrap}
+    @media(max-width:820px){.quick-commercial-values,.commercial-operation-grid{grid-template-columns:1fr}.commercial-purchase-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.commercial-purchase-summary article.total{grid-column:1/-1}.commercial-cabinet-graphic article{grid-template-columns:1fr}.commercial-cabinet-graphic .module-grid,.commercial-unit-icon{justify-self:start}.commercial-operation-hero{align-items:flex-start}.product-mode-switch{grid-template-columns:1fr}}
+    @media(max-width:520px){.commercial-operation-hero{padding:19px}.commercial-operation-hero h2{font-size:22px}.commercial-operation-hero>span{width:50px;height:50px;flex-basis:50px;font-size:25px}.commercial-purchase-head{align-items:stretch;flex-direction:column}.commercial-purchase-summary{grid-template-columns:1fr}.commercial-purchase-summary article.total{grid-column:auto}.assistance-cost-badge{grid-template-columns:1fr}.assistance-cost-badge button{width:100%}}
 </style>
 </head>
 <body>
@@ -1141,7 +1144,7 @@
             <div class="form-grid">
               <div class="field"><label class="label" for="agentName">Nome agente</label><input id="agentName" placeholder="Es. Mario Rossi" /></div>
               <div class="field"><label class="label" for="agentCompany">Azienda / Brand</label><input id="agentCompany" value="LED LAB COMPANY - SEEMAX DISPLAY" readonly aria-readonly="true" /></div>
-              <div class="field"><label class="label" for="quoteNumber">Numero preventivo</label><input id="quoteNumber" readonly aria-readonly="true" placeholder="Recupero dal database..." /></div>
+              <div class="field"><label class="label" for="quoteNumber">Numero preventivo</label><input id="quoteNumber" readonly aria-readonly="true" inputmode="numeric" placeholder="Recupero dal database..." /><div class="help admin-quote-number-help">Gli amministratori possono impostare un numero libero; il valore iniziale resta il successivo disponibile.</div></div>
               <div class="field"><label class="label" for="agentEmail">Email agente</label><input id="agentEmail" type="email" placeholder="email@agente.it" /></div>
               <div class="field"><label class="label" for="agentPhone">Telefono agente</label><input id="agentPhone" placeholder="+39 ..." /></div>
               <div class="field"><label class="label" for="clientCompany">Azienda cliente</label><input id="clientCompany" placeholder="Ragione sociale cliente" /></div>
@@ -1167,6 +1170,19 @@
                 <p id="productConfigIntro">Inserisci i dettagli dello schermo da realizzare. Le soluzioni si aggiornano in tempo reale in base a misure, installazione, provincia e configurazione mono-bifacciale.</p>
               </div>
             </div>
+            <div class="product-mode-switch" role="group" aria-label="Modalità configuratore prodotti">
+              <button type="button" class="active" data-product-mode="classic"><span>⚙️</span><strong>Modalità classica</strong><small>Configurazione completa e confronto tra soluzioni</small></button>
+              <button type="button" data-product-mode="quick"><span>⚡</span><strong>Modalità rapida</strong><small>Prodotto diretto, misure e valori commerciali</small></button>
+            </div>
+            <section id="quickProductPanel" class="quick-product-panel is-hidden">
+              <div class="quick-product-heading"><div><span class="section-kicker">Configurazione immediata</span><h3>Scegli direttamente il prodotto</h3><p>Misure, installazione, trasferta e provvigione restano modificabili con gli stessi calcoli della modalità classica.</p></div><span>⚡</span></div>
+              <label class="field full"><span class="label">Prodotto da quotare</span><select id="quickProductSelect"></select></label>
+              <div class="quick-commercial-values">
+                <article><small>Potenziale acquisto</small><strong id="quickPurchaseValue">—</strong></article>
+                <article><small>Potenziale noleggio</small><strong id="quickRentalValue">—</strong><span>Assistenza inclusa</span></article>
+                <article><small>Potenziale leasing</small><strong id="quickLeasingValue">—</strong><span>Assistenza inclusa</span></article>
+              </div>
+            </section>
             <div class="product-family-current">
               <div><strong id="productFamilyCurrent">LEDWALL</strong><span id="productFamilyCurrentHelp">Calcolo Ledwall tradizionale con ricerca automatica della soluzione.</span></div>
               <button class="btn soft" type="button" id="btnChooseProductFamily">Cambia categoria</button>
@@ -1203,8 +1219,8 @@
               <div class="field full"><label class="label" for="ledCommission">Provvigione</label><input id="ledCommission" type="number" min="0" step="1" value="0" placeholder="Es. 300" /><div class="help">Imposta la tua provvigione. Verrà sommata automaticamente al totale dell'operazione.</div></div>
             </div>
             <div class="actions">
-              <button class="btn primary" type="button" id="btnLedToGrenke" disabled>Usa importo totale per Grenke</button>
-              <button class="btn soft" type="button" id="btnLedToIfis" disabled>Usa importo totale per IFIS</button>
+              <button class="btn primary" type="button" id="btnLedToGrenke" disabled>Calcola noleggio</button>
+              <button class="btn soft" type="button" id="btnLedToIfis" disabled>Calcola leasing</button>
               <button class="btn ghost" type="button" id="btnResetLed">Ripristina tutto</button>
             </div>
             <div id="ledInputNotice" style="margin-top:14px"></div>
@@ -1224,8 +1240,24 @@
         </div>
       </section>
 
+      <section class="view" id="view-commercial" data-title="Operazione commerciale" data-subtitle="Acquisto, noleggio o leasing" data-icon="🤝">
+        <div class="commercial-operation-shell">
+          <header class="commercial-operation-hero"><div><span class="section-kicker">Operazione commerciale</span><h2>Come vuoi proporre la soluzione?</h2><p>Il prodotto configurato resta invariato. Scegli la formula commerciale da analizzare.</p></div><span>🤝</span></header>
+          <div class="commercial-operation-grid">
+            <button type="button" data-commercial-operation="purchase"><span>€</span><strong>Acquisto</strong><small>Prezzo prodotto, posa, trasferta, provvigione e schema cabinet.</small></button>
+            <button type="button" data-commercial-operation="rental"><span>G</span><strong>Noleggio</strong><small>Simulazione Grenke con assistenza integrata negli importi provenienti dai prodotti.</small></button>
+            <button type="button" data-commercial-operation="leasing"><span>IF</span><strong>Leasing</strong><small>Simulazione IFIS con assistenza integrata negli importi provenienti dai prodotti.</small></button>
+          </div>
+          <section id="commercialPurchasePanel" class="commercial-purchase-panel">
+            <div class="commercial-purchase-head"><div><span class="section-kicker">Acquisto diretto</span><h3>Riepilogo della fornitura</h3></div><button class="btn soft" type="button" data-go="ledwall">Modifica prodotti</button></div>
+            <div id="commercialPurchaseSummary" class="commercial-purchase-summary"></div>
+            <div id="commercialCabinetGraphic" class="commercial-cabinet-graphic"></div>
+          </section>
+        </div>
+      </section>
+
       <section class="view" id="view-grenke" data-title="Grenke" data-subtitle="Noleggio operativo" data-icon="💶">
-        <div class="finance-switch no-print"><span class="finance-provider-badge">Provider finanziario: Grenke</span><button class="btn soft" type="button" data-go="ifis">Passa a IFIS Leasing</button></div>
+        <div class="finance-switch no-print"><span class="finance-provider-badge">Noleggio operativo · Grenke</span><button class="btn soft" type="button" data-go="commercial">← Operazione commerciale</button></div>
         <div class="lite-finance-attach no-print"><label class="checkline"><input id="grenkeAttachPrint" type="checkbox" /> Allega Grenke in stampa</label></div>
         <div class="grenke-shell">
           <section class="grenke-panel">
@@ -1235,6 +1267,7 @@
                 <div class="inv-label">Prezzo d'acquisto (IVA esclusa)</div>
                 <input id="grenkeAmount" class="input-inv" type="number" min="0" step="1" placeholder="Es. 5000" />
                 <div class="help" style="color:rgba(255,255,255,.68)" id="grenkeImportNote">Puoi inserirlo manualmente o importarlo dal configuratore Prodotti.</div>
+                <div id="grenkeAssistanceBadge" class="assistance-cost-badge hidden"><div><strong>COSTI DI ASSISTENZA INTEGRATI</strong><span></span></div><button id="btnGrenkeFreeAmount" type="button">Nuova simulazione libera</button></div>
               </div>
               <div class="actions" style="margin:14px 0 4px 0">
                 <button class="btn primary" id="btnGrenkeCalc" type="button">Calcola Grenke</button>
@@ -1284,7 +1317,7 @@
 
 
       <section class="view" id="view-ifis" data-title="IFIS" data-subtitle="Leasing" data-icon="🏦">
-        <div class="finance-switch no-print"><span class="finance-provider-badge">Provider finanziario: IFIS Leasing</span><button class="btn soft" type="button" data-go="grenke">Passa a Grenke</button></div>
+        <div class="finance-switch no-print"><span class="finance-provider-badge">Leasing · IFIS</span><button class="btn soft" type="button" data-go="commercial">← Operazione commerciale</button></div>
         <div class="lite-finance-attach no-print"><label class="checkline"><input id="ifisAttachPrint" type="checkbox" /> Allega IFIS Leasing in stampa</label></div>
         <div class="ifis-shell">
           <section class="ifis-panel">
@@ -1297,7 +1330,7 @@
                 <div class="ifis-result-card"><span>Coefficiente</span><strong id="ifisCoeffMain">—</strong></div>
               </div>
               <div class="ifis-form-grid">
-                <div class="ifis-field"><div class="ifis-label">Valore bene IVA esclusa</div><input id="ifisAssetValue" class="input-inv" type="number" min="0" step="10" value="10000" /></div>
+                <div class="ifis-field"><div class="ifis-label">Valore bene IVA esclusa</div><input id="ifisAssetValue" class="input-inv" type="number" min="0" step="10" value="10000" /><div id="ifisAssistanceBadge" class="assistance-cost-badge hidden"><div><strong>COSTI DI ASSISTENZA INTEGRATI</strong><span></span></div><button id="btnIfisFreeAmount" type="button">Nuova simulazione libera</button></div></div>
                 <div class="ifis-field"><div class="ifis-label">Tipo piano</div><div class="ifis-static-pill">Posticipata</div></div>
                 <div class="ifis-field full"><div class="ifis-label">Durata contratto (mesi)</div><div class="ifis-btn-group" id="ifisDurationButtons"><button class="ifis-choice" type="button" data-value="36">36</button><button class="ifis-choice" type="button" data-value="42">42</button><button class="ifis-choice" type="button" data-value="48">48</button><button class="ifis-choice" type="button" data-value="54">54</button><button class="ifis-choice active" type="button" data-value="60">60</button><button class="ifis-choice" type="button" data-value="66">66</button><button class="ifis-choice" type="button" data-value="72">72</button></div></div>
                 <div class="ifis-field full"><div class="ifis-label">Anticipo / Maxicanone</div><div class="ifis-btn-group" id="ifisAdvanceButtons"><button class="ifis-choice active" type="button" data-value="0">NO</button><button class="ifis-choice" type="button" data-value="5">5%</button><button class="ifis-choice" type="button" data-value="10">10%</button><button class="ifis-choice" type="button" data-value="15">15%</button><button class="ifis-choice" type="button" data-value="20">20%</button></div><div class="ifis-custom-row"><span>Anticipo personalizzato</span><input id="ifisAdvanceCustomPct" class="input-inv" type="number" min="0" max="90" step="0.0001" placeholder="es. 1,9570" /><strong>%</strong></div><div class="ifis-mini-note">Usa i valori rapidi o indica una percentuale personalizzata.</div></div>
@@ -1340,8 +1373,7 @@
         <div class="actions no-print" style="justify-content:flex-end;margin-bottom:14px">
           <button class="btn soft" type="button" data-go="anagrafica">Modifica dati</button>
           <button class="btn soft" type="button" data-go="ledwall">Modifica Prodotti</button>
-          <button class="btn soft" type="button" data-go="grenke">Modifica Grenke</button>
-          <button class="btn soft" type="button" data-go="ifis">Modifica IFIS</button>
+          <button class="btn soft" type="button" data-go="commercial">Operazione commerciale</button>
           <button class="btn success" type="button" id="btnPrint">Stampa / Salva PDF</button>
           <button class="btn primary" type="button" id="btnInsertPractice">Inserisci Pratica</button>
         </div>
@@ -1473,7 +1505,6 @@
     // CONFIGURAZIONE GENERALE
     // =============================
     let admin = false; // Determinato dinamicamente dal ruolo ADMIN / AGENTE restituito dal DATABASE SEEMAX
-    const MANAGEMENT_FAST_MODE = new URLSearchParams(location.search).get('fast') === '1';
 
     const SQP_MODE_STORAGE_KEY = 'SEEMAX_QUOTATION_PLANNER_MODE';
     const SQP_MODE_DEFAULT = 'advanced';
@@ -1815,6 +1846,13 @@
       selectedLedIndex:null,
       importedLedAmount:null,
       currentDraftId:null,
+      currentOnlineQuoteId:null,
+      currentOnlineQuoteToken:null,
+      quoteNumberManual:false,
+      productMode:'classic',
+      assistanceImported:false,
+      assistanceMinimum:0,
+      assistanceCost:0,
       grenkeMode:'mensile',
       grenkeCalculated:false,
       grenkeDirty:false,
@@ -1826,13 +1864,14 @@
     const views = [
       {id:'anagrafica', icon:'👤', title:'Dati', subtitle:'Agente e cliente'},
       {id:'ledwall', icon:'🛍️', title:'Prodotti', subtitle:'Configurazione preventivo'},
-      {id:'grenke', icon:'💶', title:'Grenke', subtitle:'Noleggio operativo'},
-      {id:'ifis', icon:'🏦', title:'IFIS', subtitle:'Leasing'},
+      {id:'commercial', icon:'🤝', title:'Operazione commerciale', subtitle:'Acquisto, noleggio o leasing'},
+      {id:'grenke', icon:'💶', title:'Grenke', subtitle:'Noleggio operativo', hidden:true},
+      {id:'ifis', icon:'🏦', title:'IFIS', subtitle:'Leasing', hidden:true},
       {id:'summary', icon:'🧾', title:'Riepilogo', subtitle:'Ordine e stampa'}
     ];
 
-    const HASH_VIEW_MAP = {dati:'anagrafica', anagrafica:'anagrafica', prodotti:'ledwall', ledwall:'ledwall', grenke:'grenke', ifis:'ifis', riepilogo:'summary', summary:'summary'};
-    const VIEW_HASH_MAP = {anagrafica:'dati', ledwall:'prodotti', grenke:'grenke', ifis:'ifis', summary:'riepilogo'};
+    const HASH_VIEW_MAP = {dati:'anagrafica', anagrafica:'anagrafica', prodotti:'ledwall', ledwall:'ledwall', operazione:'commercial', commerciale:'commercial', grenke:'grenke', ifis:'ifis', riepilogo:'summary', summary:'summary'};
+    const VIEW_HASH_MAP = {anagrafica:'dati', ledwall:'prodotti', commercial:'operazione', grenke:'operazione', ifis:'operazione', summary:'riepilogo'};
 
     const $ = (id) => document.getElementById(id);
     const fmtEuro = (value) => (value === null || value === undefined || Number.isNaN(value)) ? '—' : value.toLocaleString('it-IT',{style:'currency',currency:'EUR',maximumFractionDigits:2});
@@ -2250,7 +2289,7 @@
     // =============================
     const ONLINE_ARCHIVE = {
       enabled:true,
-      version:'database-archive-unificato-v5.4-multiprodotto',
+      version:'database-archive-unificato-v6.0-commerciale',
       minPasswordLength:4
     };
 
@@ -2527,6 +2566,9 @@
         cliente_localita: archiveText(a.clientCity),
         note_preventivo: archiveText(a.projectNotes),
         finanziaria_selezionata: selectedFinance === 'none' ? 'NESSUNA' : selectedFinance.toUpperCase(),
+        assistenza_integrata: state.assistanceImported ? 'SI' : 'NO',
+        costo_assistenza_integrato: archiveNumber(state.assistanceImported ? state.assistanceCost : 0),
+        valore_minimo_finanziato: archiveNumber(state.assistanceImported ? state.assistanceMinimum : 0),
         prodotto_principale: archiveText(firstLed.prodotto),
         misura_principale_cm: archiveText(firstLed.misura_cm),
         cabinet_principale: archiveText(firstLed.cabinet),
@@ -2548,7 +2590,6 @@
     }
 
     function openOnlineArchiveModal(mode){
-      if(MANAGEMENT_FAST_MODE){ sqpAlert('Il salvataggio e il caricamento dei preventivi dall’archivio online non sono disponibili in Modalità Rapida.', {title:'Archivio preventivi sospeso', theme:'lite'}); return; }
       const layer = $('onlineArchiveModalLayer');
       const panel = $('onlineArchiveModalPanel');
       if(!layer || !panel) return;
@@ -2769,7 +2810,6 @@
     }
 
     async function saveQuoteOnline(){
-      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il salvataggio dei preventivi online è disabilitato in Modalità Rapida.', {title:'Salvataggio non disponibile', theme:'lite'}); return; }
       const valid = validateArchiveFields(true);
       if(!valid) return;
       let progressId = '';
@@ -2821,6 +2861,10 @@
         hideCalcLoading();
         failQuotationBackgroundProgress(progressId, progressRecord, err);
         const response = err && err.payload ? err.payload : null;
+        if(response && response.error_code === 'QUOTE_UPDATED'){
+          await sqpAlert('Il preventivo è stato modificato da un altro utente dopo il caricamento. Riaprilo dall’archivio prima di salvare nuovamente.', {title:'Preventivo aggiornato altrove'});
+          return;
+        }
         if(response && response.error_code === 'QUOTE_NUMBER_CHANGED'){
           if($('quoteNumber') && response.next_num) $('quoteNumber').value = String(response.next_num);
           await sqpAlert('Sembra che il numero del preventivo sia variato. Il campo verrà aggiornato automaticamente.', {title:'Numero preventivo aggiornato'});
@@ -2833,7 +2877,6 @@
     }
 
     async function loadQuoteOnline(){
-      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il caricamento dei preventivi online è disabilitato in Modalità Rapida.', {title:'Caricamento non disponibile', theme:'lite'}); return; }
       const valid = validateArchiveFields(false);
       if(!valid) return;
       const proceedLoad = await sqpConfirm('Caricare questo preventivo online? I dati attualmente compilati verranno sostituiti.', {title:'Carica preventivo online', confirmText:'Carica', cancelText:'Annulla'});
@@ -2904,6 +2947,11 @@
         document.body.classList.toggle('role-admin', admin);
         document.body.classList.toggle('role-agent', !admin);
       }
+      const quoteNumberInput = $('quoteNumber');
+      if(quoteNumberInput){
+        quoteNumberInput.readOnly = !admin;
+        quoteNumberInput.setAttribute('aria-readonly', String(!admin));
+      }
       if(options.refresh !== false){
         applySqpMode();
         updateAgentAccessUi();
@@ -2952,7 +3000,7 @@
     async function loadNextQuoteNumber(options){
       const opts = options || {};
       const input = $('quoteNumber');
-      if(input){ input.readOnly = true; input.setAttribute('aria-readonly','true'); }
+      if(input){ input.readOnly = !admin; input.setAttribute('aria-readonly', String(!admin)); }
       if(!SQP_DATABASE.endpoint) return null;
       try{
         const nativeNumberLoader = window.SEEMAX_NATIVE_API && typeof window.SEEMAX_NATIVE_API.nextQuoteNumber === 'function'
@@ -2978,6 +3026,9 @@
     async function ensureFreshQuoteNumberBeforeSave(){
       const input = $('quoteNumber');
       const before = input ? String(input.value || '').trim() : '';
+      const currentId = archiveDefaultId();
+      if(state.currentOnlineQuoteId && String(state.currentOnlineQuoteId) === String(currentId)) return true;
+      if(admin && state.quoteNumberManual) return true;
       const res = await loadNextQuoteNumber({silent:true, updateIfDifferent:false});
       if(res && res.next_num){
         const nextNum = String(res.next_num || '').trim();
@@ -3093,14 +3144,14 @@
     }
 
     async function saveQuoteOnlineAgent(){
-      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il salvataggio dei preventivi online è disabilitato in Modalità Rapida.', {title:'Salvataggio non disponibile', theme:'lite'}); return; }
       if(!agentLoggedIn()){ openAgentLoginModal(); return; }
       if(!onlineArchiveAvailable()){ await sqpAlert('Questo browser non supporta la crittografia necessaria per l archivio online.', {title:'Browser non compatibile'}); return; }
       const id = archiveDefaultId();
       const roleLabel = admin ? 'ADMIN' : 'AGENTE';
-      const ok = await sqpConfirm('Salvare questo preventivo nell’archivio online? Codice preventivo: ' + id, {
-        title:'Salva Preventivo',
-        confirmText:'Salva preventivo',
+      const overwriting = !!(state.currentOnlineQuoteId && String(state.currentOnlineQuoteId) === String(id) && state.currentOnlineQuoteToken);
+      const ok = await sqpConfirm((overwriting ? 'Sovrascrivere il preventivo caricato' : 'Salvare questo preventivo nell’archivio online') + '? Codice preventivo: ' + id, {
+        title:overwriting ? 'Aggiorna Preventivo' : 'Salva Preventivo',
+        confirmText:overwriting ? 'Sovrascrivi preventivo' : 'Salva preventivo',
         cancelText:'Annulla',
         items:[{emoji:admin ? '🛡️' : '👤', title:'Profilo collegato', text:(agentSession.displayName || agentSession.username) + ' · ' + roleLabel},{emoji:'🔐', title:'Nessuna chiave manuale', text:'Il preventivo verrà protetto usando il tuo accesso S.Q.P.'}]
       });
@@ -3139,6 +3190,8 @@
           saved_by_login:'SI',
           login_enabled:'SI',
           sequence_protected:'SI',
+          overwrite_existing:overwriting ? 'SI' : 'NO',
+          expected_existing_token:overwriting ? state.currentOnlineQuoteToken : '',
           save_request_token:saveRequestToken,
           quote_scope:currentQuoteScope(),
           ...buildArchiveDatabaseFields(payload, 'ACCESSO_' + roleLabel, id)
@@ -3149,15 +3202,22 @@
           updateQuotationBackgroundProgress(progressId, 'Invio protetto del preventivo…');
           hideCalcLoading();
         }else setCalcLoadingText('Registrazione preventivo', 'Invio dei dati al DATABASE SEEMAX...');
-        await saveQuotationWithConfirmation(fields, id, saveRequestToken, true);
+        const saveResponse = await saveQuotationWithConfirmation(fields, id, saveRequestToken, true);
+        state.currentOnlineQuoteId = id;
+        state.currentOnlineQuoteToken = String((saveResponse && saveResponse.save_request_token) || saveRequestToken);
+        state.quoteNumberManual = false;
         completeQuotationBackgroundProgress(progressId, progressRecord);
         hideCalcLoading();
-        loadNextQuoteNumber({silent:true, force:true}).catch(() => {});
-        showDraftToast('✅ PREVENTIVO SALVATO NELL’ARCHIVIO ' + roleLabel + ' · Codice ' + id + '.');
+        if(!overwriting) loadNextQuoteNumber({silent:true, force:false}).catch(() => {});
+        showDraftToast(`✅ PREVENTIVO ${overwriting ? 'AGGIORNATO' : 'SALVATO'} NELL’ARCHIVIO ${roleLabel} · Codice ${id}.`);
       }catch(err){
         hideCalcLoading();
         failQuotationBackgroundProgress(progressId, progressRecord, err);
         const response = err && err.payload ? err.payload : null;
+        if(response && response.error_code === 'QUOTE_UPDATED'){
+          await sqpAlert('Il preventivo è stato modificato da un altro utente dopo il caricamento. Riaprilo dall’archivio prima di salvare nuovamente.', {title:'Preventivo aggiornato altrove'});
+          return;
+        }
         if(response && response.error_code === 'QUOTE_NUMBER_CHANGED'){
           if($('quoteNumber') && response.next_num) $('quoteNumber').value = String(response.next_num);
           await sqpAlert('Sembra che il numero del preventivo sia variato. Il campo verrà aggiornato automaticamente.', {title:'Numero preventivo aggiornato'});
@@ -3272,7 +3332,6 @@
     }
 
     async function openAgentQuoteListModal(){
-      if(MANAGEMENT_FAST_MODE){ await sqpAlert('Il caricamento dei preventivi online è disabilitato in Modalità Rapida.', {title:'Caricamento non disponibile', theme:'lite'}); return; }
       if(!agentLoggedIn()){ openAgentLoginModal(); return; }
       const layer = $('onlineArchiveModalLayer');
       const panel = $('onlineArchiveModalPanel');
@@ -3347,6 +3406,9 @@
         }
         hideCalcLoading();
         applyDraftPayload(draft);
+        state.currentOnlineQuoteId = String(record.id_preventivo || id);
+        state.currentOnlineQuoteToken = String(record.save_request_token || '');
+        state.quoteNumberManual = false;
         closeAgentModal();
         const sourceLabel = record.foreign_quote && selectedQuote ? 'DALL’ARCHIVIO DI ' + quoteArchiveOwnerLabel(selectedQuote).toUpperCase() : 'DAL TUO ARCHIVIO';
         showDraftToast('✅ FILE CARICATO ' + sourceLabel + ' · Codice ' + id + '.');
@@ -3367,16 +3429,6 @@
     function setupOnlineArchive(){
       const btnSave = $('btnOnlineArchiveSave');
       const btnLoad = $('btnOnlineArchiveLoad');
-      if(MANAGEMENT_FAST_MODE){
-        [btnSave, btnLoad].forEach(btn => { if(btn){ btn.disabled = true; btn.title = 'Non disponibile in Modalità Rapida'; } });
-        const card = document.querySelector('.db-status-global');
-        if(card){
-          const note = document.createElement('div');
-          note.className = 'management-fast-archive-note';
-          note.innerHTML = '<strong>Modalità Rapida attiva</strong>Il calcolatore è completamente utilizzabile. Sono sospesi soltanto il salvataggio e il caricamento dei preventivi dall’archivio online.';
-          card.insertAdjacentElement('afterend', note);
-        }
-      }
       if(btnSave) btnSave.addEventListener('click', async () => {
         if(btnSave.classList.contains('is-busy')) return;
         setActionButtonBusy(btnSave, true, 'Comando ricevuto...');
@@ -3775,24 +3827,43 @@
       if(layer) layer.classList.remove('hidden');
     }
 
+    function openProductsView(){
+      if(state.productMode === 'quick'){
+        setView('ledwall');
+        populateQuickProductSelect();
+        return;
+      }
+      openProductFamilyModal();
+    }
+
     function selectProductFamily(family, options={}){
       family = normalizeProductFamily(family);
       if($('ledBase')) saveActiveLedQuoteFromForm();
       const q = activeLedQuote();
-      if(normalizeProductFamily(q.productFamily) !== family){
-        q.productFamily = family;
-        q.productId = '';
-        q.quantity = '1';
-        q.base = '';
-        q.altezza = '';
-        q.bif = false;
-        q.ledResults = [];
-        q.allLedResults = [];
-        q.selectedLedIndex = null;
+      const previousFamily = normalizeProductFamily(q.productFamily);
+      if(previousFamily !== family){
+        q.familyDrafts = q.familyDrafts || {};
+        q.familyDrafts[previousFamily] = {
+          productId:q.productId || '', quickProductId:q.quickProductId || '', quantity:q.quantity || '1', base:q.base || '', altezza:q.altezza || '', bif:!!q.bif,
+          install:q.install || 'personalizza', installCustom:q.installCustom || '0', province:q.province || 'Catania', commission:q.commission || '0',
+          ledResults:q.ledResults || [], allLedResults:q.allLedResults || [], selectedLedIndex:Number.isInteger(q.selectedLedIndex) ? q.selectedLedIndex : null, showPotentialSolutions:!!q.showPotentialSolutions,
+          selectedResultKey:Number.isInteger(q.selectedLedIndex) && q.ledResults && q.ledResults[q.selectedLedIndex] ? ledResultKey(q.ledResults[q.selectedLedIndex]) : null
+        };
+        const familyDrafts = q.familyDrafts;
+        const restored = familyDrafts[family] || {};
+        Object.assign(q, createLedQuote(family), restored, {productFamily:family, familyDrafts});
       }
       closeProductFamilyModal();
       loadActiveLedQuoteToForm();
       calcLedwall();
+      if(q.selectedResultKey){
+        let restoredIndex = state.ledResults.findIndex(result => ledResultKey(result) === q.selectedResultKey);
+        if(restoredIndex < 0 && state.allLedResults.length){
+          state.ledResults = state.allLedResults;
+          restoredIndex = state.ledResults.findIndex(result => ledResultKey(result) === q.selectedResultKey);
+        }
+        if(restoredIndex >= 0){ state.selectedLedIndex = restoredIndex; saveActiveLedQuoteFromForm(); renderLedwall(); }
+      }
       if(options.navigate !== false) setView('ledwall');
       updateSideStatus();
     }
@@ -3814,10 +3885,10 @@
       const renderBtn = (v, compact=false) => compact
         ? `<button type="button" data-go="${v.id}">${v.icon} ${v.title}</button>`
         : `<button class="nav-btn" type="button" data-go="${v.id}"><span class="nav-icon">${v.icon}</span><span class="nav-text"><strong>${v.title}</strong><span>${v.subtitle}</span></span></button>`;
-      side.innerHTML = views.map(v => renderBtn(v)).join('');
-      mobile.innerHTML = views.map(v => renderBtn(v,true)).join('');
+      side.innerHTML = views.filter(v => !v.hidden).map(v => renderBtn(v)).join('');
+      mobile.innerHTML = views.filter(v => !v.hidden).map(v => renderBtn(v,true)).join('');
       document.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => {
-        if(btn.dataset.go === 'ledwall') openProductFamilyModal();
+        if(btn.dataset.go === 'ledwall') openProductsView();
         else setView(btn.dataset.go);
       }));
       refreshNav();
@@ -3851,6 +3922,7 @@
       document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + id));
       refreshNav();
       if(id === 'summary') updateSummary();
+      if(id === 'commercial') renderCommercialOperation();
       if(!opts.skipHash) updateHashForView(id);
       if(!opts.noScroll) window.scrollTo({top:0,behavior: opts.instant ? 'auto' : 'smooth'});
     }
@@ -3868,7 +3940,19 @@
 
     function setupDataInputs(){
       if($('agentCompany')) $('agentCompany').value = 'LED LAB COMPANY - SEEMAX DISPLAY';
-      if($('quoteNumber')){ $('quoteNumber').readOnly = true; $('quoteNumber').setAttribute('aria-readonly','true'); }
+      if($('quoteNumber')){
+        $('quoteNumber').readOnly = !admin;
+        $('quoteNumber').setAttribute('aria-readonly', String(!admin));
+        $('quoteNumber').addEventListener('input', () => {
+          if(!admin) return;
+          state.quoteNumberManual = true;
+          if(state.currentOnlineQuoteId && archiveDefaultId() !== state.currentOnlineQuoteId){
+            state.currentOnlineQuoteId = null;
+            state.currentOnlineQuoteToken = null;
+          }
+          updateSideStatus();
+        });
+      }
       ['agentName','agentCompany','agentEmail','agentPhone','clientCompany','clientVat','clientName','clientEmail','clientPhone','clientCity','projectNotes'].forEach(id => {
         const node = $(id);
         if(node) node.addEventListener('input', () => {updateSideStatus(); if(state.view === 'summary') updateSummary();});
@@ -3895,7 +3979,7 @@
     function createLedQuote(productFamily='LEDWALL'){
       productFamily = normalizeProductFamily(productFamily);
       return {
-        productFamily, productId:'', quantity:'1',
+        productFamily, productId:'', quickProductId:'', quantity:'1', familyDrafts:{},
         base:'', altezza:'', bif:false, install:'personalizza', installCustom:'0', province:'Catania', commission:'0',
         ledResults:[], allLedResults:[], showPotentialSolutions:false, selectedLedIndex:null
       };
@@ -3965,6 +4049,8 @@
       updateProvinceHelp();
       renderLedQuoteTabs();
       renderLedwall();
+      populateQuickProductSelect();
+      updateQuickCommercialValues();
     }
 
     function renderLedQuoteTabs(){
@@ -4031,6 +4117,132 @@
 
     function totalLedAmount(){
       return selectedLedQuotes().reduce((sum, item) => sum + (admin ? item.prezzoClienteTotale : item.prezzoAgenteTotale), 0);
+    }
+
+    function commercialAmountBreakdown(){
+      const items = selectedLedQuotes();
+      const totals = items.reduce((result, item) => {
+        result.total += Number(admin ? item.prezzoClienteTotale : item.prezzoAgenteTotale) || 0;
+        result.installation += Number(item.margineInstallazione || 0);
+        result.travel += Number(item.margineKm || 0);
+        result.commission += Number(item.provvigione || 0);
+        result.cabinets += Number(item.totalCab || 0);
+        return result;
+      }, {total:0, installation:0, travel:0, commission:0, cabinets:0});
+      totals.products = Math.max(0, totals.total - totals.installation - totals.travel - totals.commission);
+      totals.assistanceBase = Math.max(0, totals.total - totals.commission);
+      totals.assistance = totals.assistanceBase > 0 ? Math.max(500, Math.round(totals.assistanceBase * 0.25)) : 0;
+      totals.financed = totals.total + totals.assistance;
+      totals.items = items;
+      return totals;
+    }
+
+    function renderCommercialOperation(){
+      const summary = $('commercialPurchaseSummary');
+      const graphic = $('commercialCabinetGraphic');
+      if(!summary || !graphic) return;
+      const totals = commercialAmountBreakdown();
+      if(!totals.items.length){
+        summary.innerHTML = '<div class="commercial-empty"><span>🛍️</span><strong>Nessun prodotto configurato</strong><p>Seleziona almeno una soluzione nella scheda Prodotti.</p><button class="btn primary" type="button" data-go="ledwall">Configura prodotti</button></div>';
+        graphic.innerHTML = '';
+        bindDynamicGoButtons(summary);
+        return;
+      }
+      summary.innerHTML = `<article><small>Prodotti</small><strong>${fmtEuro0(totals.products)}</strong></article><article><small>Installazione</small><strong>${fmtEuro0(totals.installation)}</strong></article><article><small>Trasferta</small><strong>${fmtEuro0(totals.travel)}</strong></article><article><small>Provvigione</small><strong>${fmtEuro0(totals.commission)}</strong></article><article class="total"><small>Totale acquisto</small><strong>${fmtEuro0(totals.total)}</strong></article>`;
+      graphic.innerHTML = `<header><div><span class="section-kicker">Composizione tecnica</span><h3>${totals.cabinets} ${totals.cabinets === 1 ? 'unità' : 'unità / cabinet'} complessivi</h3></div></header><div>${totals.items.map(item => `<article><div><strong>Prodotto ${item.quoteNumber} · ${safe(item.nome)}</strong><small>${item.displayWidth || '—'} × ${item.displayHeight || '—'} cm · ${item.totalCab || 0} unità${item.bifacciale ? ' · bifacciale' : ''}</small></div>${layoutHtml(item) || `<span class="commercial-unit-icon">${safe(item.icon || '📦')}</span>`}</article>`).join('')}</div>`;
+    }
+
+    function bindDynamicGoButtons(root){
+      (root || document).querySelectorAll('[data-go]').forEach(button => {
+        if(button.dataset.goBound === '1') return;
+        button.dataset.goBound = '1';
+        button.addEventListener('click', () => button.dataset.go === 'ledwall' ? openProductsView() : setView(button.dataset.go));
+      });
+    }
+
+    function assistanceImportValues(){
+      const totals = commercialAmountBreakdown();
+      return {base:totals.assistanceBase, cost:totals.assistance, minimum:totals.financed, purchase:totals.total};
+    }
+
+    function updateAssistanceBadges(){
+      [['grenkeAssistanceBadge','grenkeAmount'],['ifisAssistanceBadge','ifisAssetValue']].forEach(([badgeId]) => {
+        const badge = $(badgeId);
+        if(!badge) return;
+        badge.classList.toggle('hidden', !state.assistanceImported);
+        const detail = badge.querySelector('span');
+        if(detail) detail.textContent = state.assistanceImported ? `Maggiorazione ${fmtEuro0(state.assistanceCost)} · valore minimo finanziabile ${fmtEuro0(state.assistanceMinimum)}.` : '';
+      });
+    }
+
+    function clearAssistanceImportLock(){
+      state.assistanceImported = false;
+      state.assistanceMinimum = 0;
+      state.assistanceCost = 0;
+      state.importedLedAmount = null;
+      updateAssistanceBadges();
+    }
+
+    function enforceAssistanceMinimum(input){
+      if(!input || !state.assistanceImported) return;
+      const value = Number(input.value || 0);
+      if(value + 0.001 >= Number(state.assistanceMinimum || 0)) return;
+      input.value = String(Math.round(state.assistanceMinimum));
+      showDraftToast(`Il valore importato non può scendere sotto ${fmtEuro0(state.assistanceMinimum)} perché include i costi di assistenza.`);
+    }
+
+    function allQuickProducts(){
+      return [
+        ...ledwalls.map(product => ({family:'LEDWALL', product})),
+        ...extraLedProducts.map(product => ({family:'EXTRA_LED', product})),
+        ...lcdProducts.map(product => ({family:'LCD', product}))
+      ];
+    }
+
+    function quickProductValue(family, product){
+      return `${family}::${product.productId || stockProductIdForItem(product)}`;
+    }
+
+    function populateQuickProductSelect(){
+      const select = $('quickProductSelect');
+      if(!select) return;
+      const q = activeLedQuote();
+      const currentId = q.productFamily === 'LEDWALL' ? q.quickProductId : q.productId;
+      select.innerHTML = '<option value="">Seleziona il prodotto...</option>' + Object.keys(PRODUCT_FAMILY_META).map(family => {
+        const products = productsForFamily(family);
+        return `<optgroup label="${safe(PRODUCT_FAMILY_META[family].label)}">${products.map(product => `<option value="${safe(quickProductValue(family, product))}" ${family === q.productFamily && String(product.productId || stockProductIdForItem(product)) === String(currentId || '') ? 'selected' : ''}>${safe(product.nome)}</option>`).join('')}</optgroup>`;
+      }).join('');
+    }
+
+    function updateQuickCommercialValues(){
+      const totals = commercialAmountBreakdown();
+      if($('quickPurchaseValue')) $('quickPurchaseValue').textContent = totals.items.length ? fmtEuro0(totals.total) : '—';
+      if($('quickRentalValue')) $('quickRentalValue').textContent = totals.items.length ? fmtEuro0(totals.financed) : '—';
+      if($('quickLeasingValue')) $('quickLeasingValue').textContent = totals.items.length ? fmtEuro0(totals.financed) : '—';
+    }
+
+    function applyProductMode(mode){
+      state.productMode = mode === 'quick' ? 'quick' : 'classic';
+      const view = $('view-ledwall');
+      if(view) view.classList.toggle('product-mode-quick', state.productMode === 'quick');
+      document.querySelectorAll('[data-product-mode]').forEach(button => button.classList.toggle('active', button.dataset.productMode === state.productMode));
+      if($('quickProductPanel')) $('quickProductPanel').classList.toggle('is-hidden', state.productMode !== 'quick');
+      populateQuickProductSelect();
+      updateQuickCommercialValues();
+    }
+
+    function selectQuickProduct(value){
+      const parts = String(value || '').split('::');
+      const family = normalizeProductFamily(parts[0]);
+      const productId = parts.slice(1).join('::');
+      if(!productId) return;
+      selectProductFamily(family, {navigate:false});
+      const q = activeLedQuote();
+      if(family === 'LEDWALL') q.quickProductId = productId;
+      else q.productId = productId;
+      loadActiveLedQuoteToForm();
+      calcLedwall();
+      updateQuickCommercialValues();
     }
 
     function setProductConfigFieldVisible(id, visible){
@@ -4169,6 +4381,34 @@
       loadActiveLedQuoteToForm();
     }
 
+    function setupProductModes(){
+      document.querySelectorAll('[data-product-mode]').forEach(button => button.addEventListener('click', () => applyProductMode(button.dataset.productMode)));
+      if($('quickProductSelect')) $('quickProductSelect').addEventListener('change', event => selectQuickProduct(event.target.value));
+      applyProductMode(state.productMode);
+    }
+
+    function setupCommercialOperation(){
+      document.querySelectorAll('[data-commercial-operation]').forEach(button => button.addEventListener('click', () => {
+        const operation = button.dataset.commercialOperation;
+        if(operation === 'purchase'){
+          state.financeProvider = 'none';
+          syncLiteFinanceCheckboxes();
+          renderCommercialOperation();
+          return;
+        }
+        const hasProducts = selectedLedQuotes().length > 0;
+        if(operation === 'rental'){
+          if(hasProducts) transferLedToGrenke();
+          else { clearAssistanceImportLock(); state.financeProvider = 'grenke'; setView('grenke'); }
+          return;
+        }
+        if(operation === 'leasing'){
+          if(hasProducts) transferLedToIfis();
+          else { clearAssistanceImportLock(); state.financeProvider = 'ifis'; setView('ifis'); }
+        }
+      }));
+    }
+
     function updateProvinceHelp(){
       const prov = $('ledProvince').value;
       const km = PROVINCE_KM[prov] || 0;
@@ -4206,7 +4446,11 @@
         return;
       }
 
-      let results = ledwalls.map(model => buildLedResult(model, base, altezza, bif, tipoInst, extraKm, provvigione, installMultiplier, manualInstall));
+      let sourceModels = ledwalls;
+      const quickModelId = state.productMode === 'quick' ? String(activeLedQuote().quickProductId || '') : '';
+      if(quickModelId) sourceModels = ledwalls.filter(model => String(model.productId || stockProductIdForItem(model)) === quickModelId);
+      if(!sourceModels.length) sourceModels = ledwalls;
+      let results = sourceModels.map(model => buildLedResult(model, base, altezza, bif, tipoInst, extraKm, provvigione, installMultiplier, manualInstall));
       const perfectMatches = results.filter(r => r.perfectMatch);
       const rotatedMatches = results.filter(r => r.rotatedMatch);
       const bestMatch = results.reduce((prev,curr) => curr.diff < prev.diff ? curr : prev, results[0]);
@@ -4544,6 +4788,7 @@
         $('resultsCount').textContent = usesQuantity ? 'Inserisci la quantità' : 'Inserisci le misure';
         $('ledResults').innerHTML = '<div class="notice" style="grid-column:1/-1">Nessun risultato da mostrare. Le soluzioni migliori appariranno qui dopo il primo calcolo.</div>';
         if(!isReady) $('ledAlert').innerHTML = '';
+        updateQuickCommercialValues();
         return;
       }
       const fixedInstallOption = !quoteUsesStandardInstallation(q) ? quoteInstallationOption(q, $('ledInstall') && $('ledInstall').value) : null;
@@ -4578,6 +4823,7 @@
           updateSideStatus();
         };
       });
+      updateQuickCommercialValues();
     }
 
     function productCardHtml(r,i){
@@ -4634,7 +4880,7 @@
           ${layoutDetails}
           <div class="actions">
             <button class="btn ${selected ? 'dark' : 'ghost'}" type="button" data-select-led="${i}">${selected ? 'Selezionato' : 'Seleziona'}</button>
-            <button class="btn primary" type="button" data-transfer-led="${i}">Importa totale in Grenke</button>
+            <button class="btn primary" type="button" data-transfer-led="${i}">Valuta noleggio</button>
           </div>
         </article>`;
     }
@@ -4665,11 +4911,16 @@
       saveActiveLedQuoteFromForm();
       const selectedItems = selectedLedQuotes();
       if(!selectedItems.length) return;
-      const amount = totalLedAmount();
-      state.importedLedAmount = amount;
+      const assistance = assistanceImportValues();
+      const amount = assistance.minimum;
+      state.importedLedAmount = assistance.purchase;
+      state.assistanceImported = true;
+      state.assistanceMinimum = amount;
+      state.assistanceCost = assistance.cost;
       $('grenkeAmount').value = Math.round(amount);
       const label = selectedItems.length === 1 ? selectedItems[0].nome : `${selectedItems.length} prodotti selezionati`;
-      $('grenkeImportNote').textContent = `${APP_CONFIG.transferLabel}: ${label} (${fmtEuro0(amount)}).`;
+      $('grenkeImportNote').textContent = `${APP_CONFIG.transferLabel}: ${label} · acquisto ${fmtEuro0(assistance.purchase)} + assistenza ${fmtEuro0(assistance.cost)}.`;
+      updateAssistanceBadges();
       state.financeProvider = 'grenke';
       syncLiteFinanceCheckboxes();
       markGrenkeNeedsRecalc();
@@ -4680,13 +4931,18 @@
       saveActiveLedQuoteFromForm();
       const selectedItems = selectedLedQuotes();
       if(!selectedItems.length) return;
-      const amount = totalLedAmount();
-      state.importedLedAmount = amount;
+      const assistance = assistanceImportValues();
+      const amount = assistance.minimum;
+      state.importedLedAmount = assistance.purchase;
+      state.assistanceImported = true;
+      state.assistanceMinimum = amount;
+      state.assistanceCost = assistance.cost;
       state.financeProvider = 'ifis';
       syncLiteFinanceCheckboxes();
       if(window.SEEMAX_IFIS && typeof window.SEEMAX_IFIS.importAmount === 'function'){
         window.SEEMAX_IFIS.importAmount(Math.round(amount));
       }
+      updateAssistanceBadges();
       setView('ifis');
     }
 
@@ -4697,6 +4953,8 @@
     function setupGrenke(){
       $('btnGrenkeCalc').addEventListener('click', () => requestGrenkeCalculation(false));
       $('grenkeAmount').addEventListener('input', () => markGrenkeNeedsRecalc());
+      $('grenkeAmount').addEventListener('change', () => { enforceAssistanceMinimum($('grenkeAmount')); markGrenkeNeedsRecalc(); });
+      if($('btnGrenkeFreeAmount')) $('btnGrenkeFreeAmount').addEventListener('click', () => { clearAssistanceImportLock(); $('grenkeImportNote').textContent = 'Simulazione libera: puoi inserire qualsiasi valore.'; $('grenkeAmount').focus(); });
       $('modeMonthly').addEventListener('click', () => setGrenkeMode('mensile'));
       $('modeQuarterly').addEventListener('click', () => setGrenkeMode('trimestrale'));
       setupGrenkePrintDurationSelectors();
@@ -5416,6 +5674,9 @@
       function setup(){
         attachButtons('DurationButtons', 'duration'); attachButtons('AdvanceButtons', 'advancePct'); attachButtons('ResidualButtons', 'residualPct'); attachButtons('PeriodicityButtons', 'periodicity'); attachButtons('IstruttoriaButtons', 'istruttoria');
         ['AssetValue','SpreadInput'].forEach(id => { const el = ie(id); if(el) el.addEventListener('input', () => markIfisDirty(el)); });
+        const assetValue = ie('AssetValue');
+        if(assetValue) assetValue.addEventListener('change', () => { enforceAssistanceMinimum(assetValue); markIfisDirty(assetValue); });
+        if($('btnIfisFreeAmount')) $('btnIfisFreeAmount').addEventListener('click', () => { clearAssistanceImportLock(); if(assetValue) assetValue.focus(); });
         const gest = ie('GestioneBeneSelect'); if(gest) gest.addEventListener('change', e => { ifisState.gestioneBene = n(e.target.value); markIfisDirty(gest); });
         const custom = ie('AdvanceCustomPct');
         if(custom){ custom.addEventListener('input', () => { const raw = custom.value.trim(); if(raw === ''){ ifisState.advancePct = 0; setActive('AdvanceButtons',0); } else { ifisState.advancePct = Math.max(0, Math.min(90, n(raw))); setActive('AdvanceButtons', ifisState.advancePct); } markIfisDirty(custom); }); }
@@ -5497,6 +5758,11 @@
             });
         if(!response || response.ok === false) throw new Error((response && response.error) || 'Inserimento non riuscito.');
         hideCalcLoading();
+        if(response.local_only){
+          await sqpAlert("La tua pratica è stata salvata ma non è possibile inviarla in quanto l'anagrafica principale non è completa.", {title:'Pratica salvata localmente', theme:'lite'});
+          window.dispatchEvent(new CustomEvent('seemax:practice-created', {detail:{practice:response.practice, existing:false, localOnly:true}}));
+          return;
+        }
         const label = response.existing ? 'già presente' : 'creata correttamente';
         await sqpAlert(`La pratica ${safe(response.practice.numero)} è ${label} nel gestionale.`, {title:'Pratica inserita'});
         window.dispatchEvent(new CustomEvent('seemax:practice-created', {detail:{practice:response.practice, existing:!!response.existing}}));
@@ -5994,7 +6260,13 @@
 
     function draftQuoteFromState(q){
       const selected = q && q.selectedLedIndex !== null && q.ledResults && q.ledResults[q.selectedLedIndex] ? q.ledResults[q.selectedLedIndex] : null;
-      return {productFamily:normalizeProductFamily(q.productFamily), productId:q.productId || '', quantity:q.quantity || '1', base:q.base || '', altezza:q.altezza || '', bif:!!q.bif, install:q.install || 'personalizza', installCustom:q.installCustom || '0', province:q.province || 'Catania', commission:q.commission || '0', showPotentialSolutions:!!q.showPotentialSolutions, selectedResultKey:selected ? ledResultKey(selected) : null};
+      const familyDrafts = {};
+      Object.keys(q.familyDrafts || {}).forEach(family => {
+        const item = q.familyDrafts[family] || {};
+        const picked = item.selectedLedIndex !== null && item.ledResults && item.ledResults[item.selectedLedIndex] ? item.ledResults[item.selectedLedIndex] : null;
+        familyDrafts[family] = {productId:item.productId || '', quickProductId:item.quickProductId || '', quantity:item.quantity || '1', base:item.base || '', altezza:item.altezza || '', bif:!!item.bif, install:item.install || 'personalizza', installCustom:item.installCustom || '0', province:item.province || 'Catania', commission:item.commission || '0', selectedResultKey:picked ? ledResultKey(picked) : (item.selectedResultKey || null)};
+      });
+      return {productFamily:normalizeProductFamily(q.productFamily), productId:q.productId || '', quickProductId:q.quickProductId || '', quantity:q.quantity || '1', base:q.base || '', altezza:q.altezza || '', bif:!!q.bif, install:q.install || 'personalizza', installCustom:q.installCustom || '0', province:q.province || 'Catania', commission:q.commission || '0', showPotentialSolutions:!!q.showPotentialSolutions, selectedResultKey:selected ? ledResultKey(selected) : null, familyDrafts};
     }
 
     function collectDraftPayload(name, existingId){
@@ -6010,8 +6282,9 @@
         data:{
           view:state.view,
           anagrafica:{agentName:val('agentName'), agentCompany:val('agentCompany'), quoteNumber:val('quoteNumber'), agentEmail:val('agentEmail'), agentPhone:val('agentPhone'), clientCompany:val('clientCompany'), clientVat:val('clientVat'), clientName:val('clientName'), clientEmail:val('clientEmail'), clientPhone:val('clientPhone'), clientCity:val('clientCity'), projectNotes:val('projectNotes')},
-          led:{activeLedQuoteIndex:state.activeLedQuoteIndex, quotes:state.ledQuotes.map(draftQuoteFromState), importedLedAmount:state.importedLedAmount},
+          led:{activeLedQuoteIndex:state.activeLedQuoteIndex, quotes:state.ledQuotes.map(draftQuoteFromState), importedLedAmount:state.importedLedAmount, productMode:state.productMode},
           financeProvider:state.financeProvider,
+          assistance:{imported:!!state.assistanceImported, minimum:state.assistanceMinimum || 0, cost:state.assistanceCost || 0},
           grenke:{amount:$('grenkeAmount') ? $('grenkeAmount').value : '', mode:state.grenkeMode, duration:selectedDuration(), printDurations:getGrenkePrintDurations(), calculated:!!state.grenkeCalculated, dirty:!!state.grenkeDirty},
           ifis:(window.SEEMAX_IFIS && window.SEEMAX_IFIS.collectDraft) ? window.SEEMAX_IFIS.collectDraft() : null,
           print:{showInstall:$('printShowInstall') ? $('printShowInstall').checked : true, showTransfer:$('printShowTransfer') ? $('printShowTransfer').checked : true, showCommission:$('printShowCommission') ? $('printShowCommission').checked : true, showConformity:$('printShowConformity') ? $('printShowConformity').checked : false}
@@ -6022,7 +6295,9 @@
     function normalizeDraftQuote(q){
       const family = normalizeProductFamily(q && q.productFamily);
       const base = createLedQuote(family);
-      return {...base, productFamily:family, productId:(q && q.productId) || base.productId, quantity:String(q && q.quantity || '1'), base:String(q && q.base || ''), altezza:String(q && q.altezza || ''), bif:!!(q && q.bif), install:(q && q.install) || 'personalizza', installCustom:String(q && q.installCustom || '0'), province:(q && q.province) || 'Catania', commission:String(q && q.commission || '0'), showPotentialSolutions:!!(q && q.showPotentialSolutions), selectedResultKey:(q && q.selectedResultKey) || null};
+      const familyDrafts = {};
+      Object.keys(q && q.familyDrafts || {}).forEach(key => { familyDrafts[key] = {...(q.familyDrafts[key] || {})}; });
+      return {...base, productFamily:family, productId:(q && q.productId) || base.productId, quickProductId:(q && q.quickProductId) || '', quantity:String(q && q.quantity || '1'), base:String(q && q.base || ''), altezza:String(q && q.altezza || ''), bif:!!(q && q.bif), install:(q && q.install) || 'personalizza', installCustom:String(q && q.installCustom || '0'), province:(q && q.province) || 'Catania', commission:String(q && q.commission || '0'), showPotentialSolutions:!!(q && q.showPotentialSolutions), selectedResultKey:(q && q.selectedResultKey) || null, familyDrafts};
     }
 
     function applyDraftPayload(draft){
@@ -6034,6 +6309,7 @@
       const draftQuotes = data.led && Array.isArray(data.led.quotes) && data.led.quotes.length ? data.led.quotes.slice(0,3) : [createLedQuote()];
       state.ledQuotes = draftQuotes.map(normalizeDraftQuote);
       state.importedLedAmount = data.led ? data.led.importedLedAmount : null;
+      state.productMode = data.led && data.led.productMode === 'quick' ? 'quick' : 'classic';
       const restoreIndex = Math.max(0, Math.min(Number(data.led && data.led.activeLedQuoteIndex) || 0, state.ledQuotes.length - 1));
       const savedKeys = state.ledQuotes.map(q => q.selectedResultKey || null);
       state.ledQuotes.forEach((q, index) => {
@@ -6067,6 +6343,12 @@
       state.grenkeDirty = !!g.dirty && !state.grenkeCalculated;
       if(state.grenkeCalculated) calcGrenke(true); else updateGrenkePreview();
       if(window.SEEMAX_IFIS && window.SEEMAX_IFIS.applyDraft) window.SEEMAX_IFIS.applyDraft(data.ifis || null);
+      const assistance = data.assistance || {};
+      state.assistanceImported = !!assistance.imported;
+      state.assistanceMinimum = Number(assistance.minimum || 0);
+      state.assistanceCost = Number(assistance.cost || 0);
+      updateAssistanceBadges();
+      applyProductMode(state.productMode);
       state.financeProvider = data.financeProvider || state.financeProvider || 'grenke';
       const pr = data.print || {};
       if($('printShowInstall')) $('printShowInstall').checked = pr.showInstall !== false;
@@ -6548,7 +6830,6 @@
 
     function boot(){
       if(new URLSearchParams(location.search).get('integrated') === '1') document.body.classList.add('integrated-suite');
-      if(MANAGEMENT_FAST_MODE) document.body.classList.add('management-fast');
       applyRuntimeRole(agentSession && agentSession.role ? agentSession.role : 'AGENTE', {refresh:false});
       initNavigation();
       setupProductFamilyModal();
@@ -6563,6 +6844,8 @@
       applyAgentProfileToData();
       setTimeout(() => loadNextQuoteNumber({silent:true, force:!val('quoteNumber')}), 180);
       setupLedwall();
+      setupProductModes();
+      setupCommercialOperation();
       setupGrenke();
       if(window.SEEMAX_IFIS && window.SEEMAX_IFIS.setup) window.SEEMAX_IFIS.setup();
       setupSummary();

@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2200().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2220().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.20.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.22.0";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -56,6 +56,21 @@ var ENTITY_SHEETS = {
   movements: "MOVIMENTI_MAGAZZINO"
 };
 
+/* Campi esclusivamente locali/di trasporto. Non devono mai diventare colonne
+   del database: in v2.20.0 alcuni di essi venivano aggiunti automaticamente
+   a PRATICHE e facevano riapparire lo stato "Da verificare" dopo il bootstrap. */
+var SEEMAX_TRANSIENT_RECORD_FIELDS_ = {
+  __notifications: true,
+  __sync_state: true,
+  __sync_started_at: true,
+  __sync_new_record: true,
+  __sync_error: true,
+  nuova_pratica: true,
+  recovery_request_token: true,
+  cliente_display: true,
+  agente_display: true
+};
+
 var SHEET_SCHEMAS = {
   AGENTI: ["username", "chiave_id_agente", "nome_visualizzato", "prefisso_pratica", "email", "telefono", "stato", "ruolo", "data_creazione", "ultimo_accesso", "note", "nome_profilo", "descrizione_profilo", "tema_profilo", "colore_profilo", "icona_profilo", "bacheca_trofei_json", "trofei_reset_il", "welcome_seen_revision", "patch_seen_revision", "id", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
   PRODOTTI_LED: ["nome", "cabX", "cabY", "prezzoAgente", "prezzoCliente", "prezzoCina", "prezzoPromoAgenti", "prezzoPromoClienti", "infoAdmin", "infoAgenti", "icon", "attivo", "id", "sku", "categoria", "catalogo_tab", "tipo_calcolo", "unita_magazzino", "formato_label", "installazione_opzioni_json", "installazione_predefinita", "descrizione", "immagine_url", "scheda_url", "giacenza_iniziale", "giacenza_attuale", "stato_giacenza", "promo_attiva", "tech_pixel_pitch", "tech_certificazione", "tech_utilizzo", "tech_densita_pixel", "tech_led_standard", "tech_materiale_cabinet", "tech_peso_cabinet", "tech_scala_grigi", "tech_temperatura", "tech_misura", "tech_ip", "tech_consumo_medio", "tech_consumo_massimo", "tech_vita_media", "tech_visibilita", "tech_luminosita", "tech_refresh", "aggiornatoIl", "record_version", "request_token", "aggiornato_da"],
@@ -65,7 +80,7 @@ var SHEET_SCHEMAS = {
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
-  ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
+  ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "assistenza_integrata", "costo_assistenza_integrato", "valore_minimo_finanziato", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
   MOVIMENTI_MAGAZZINO: ["id", "data", "practiceId", "numero_pratica", "cliente", "product_id", "sku", "prodotto", "quantita", "tipo_movimento", "giacenza_prima", "giacenza_dopo", "username", "note", "request_token"],
   NOTIFICHE: ["id", "data", "recipient_username", "recipient_name", "practiceId", "numero_pratica", "stato_precedente", "nuovo_stato", "titolo", "messaggio", "letta", "letta_il", "actor_username"],
   EMAIL_CODA: ["id", "created_at", "status", "attempts", "next_attempt_at", "to", "subject", "sender_name", "body", "html_body", "notification_id", "actor_username", "last_error", "sent_at"],
@@ -117,7 +132,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.20.0 configurato: nuovi LCD e installazioni dedicate nel Quotation Planner attivi.";
+  return "DATABASE SEEMAX 2.22.0 configurato: agenda locale, classifiche, importazioni S.Q.P. guidate e Planner commerciale attivi.";
 }
 
 
@@ -438,6 +453,90 @@ function upgradeSeemaxV2200() {
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.20.0 configurato: tre nuovi LCD a giacenza zero e installazioni POSIZIONATO A TERRA, SOLO FORNITURA e A PARETE attive nel Planner.";
   });
+}
+
+function upgradeSeemaxV2210() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    var cleanup = removeTransientPracticeColumnsV2210_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento correttivo v2.21.0 · recupero pratiche, campi di sincronizzazione locali, caricamento progressivo e interfaccia mobile.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.21.0 configurato: " + cleanup.columns + " colonne tecniche rimosse (" + cleanup.cells + " valori locali); pratiche, caricamento e aggiornamenti non distruttivi attivi.";
+  });
+}
+
+function upgradeSeemaxV2211() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    var cleanup = removeTransientPracticeColumnsV2210_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento correttivo v2.21.1 · ripresa mobile automatica, cache resiliente e riconnessione non distruttiva.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.21.1 configurato: ripresa mobile automatica attiva; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
+  });
+}
+
+function upgradeSeemaxV2220() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    var cleanup = removeTransientPracticeColumnsV2210_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Aggiornamento v2.22.0 · attività locali, classifiche utenti, pratiche S.Q.P. guidate e Quotation Planner commerciale persistente.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.22.0 configurato: agenda locale, classifiche, importazione S.Q.P. controllata e Planner commerciale attivi; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
+  });
+}
+
+function removeTransientPracticeColumnsV2210_() {
+  var sheet = sheet_("PRATICHE");
+  var headers = sheetHeaders_(sheet);
+  var lastRow = sheet.getLastRow();
+  var removable = [];
+  var populatedCells = 0;
+  Object.keys(SEEMAX_TRANSIENT_RECORD_FIELDS_).forEach(function (field) {
+    var columnIndex = headers.indexOf(field);
+    if (columnIndex < 0) return;
+    if (lastRow > 1) {
+      populatedCells += sheet.getRange(2, columnIndex + 1, lastRow - 1, 1).getDisplayValues().reduce(function (count, row) {
+        return count + (String(row[0] || "").trim() ? 1 : 0);
+      }, 0);
+    }
+    removable.push(columnIndex + 1);
+  });
+  /* Si eliminano da destra verso sinistra per non invalidare gli indici
+     successivi. Sono campi locali duplicati o tecnici, mai dati aziendali. */
+  removable.sort(function (left, right) { return right - left; }).forEach(function (column) { sheet.deleteColumn(column); });
+  invalidateTable_("PRATICHE");
+  delete RUNTIME_HEADER_CACHE_.PRATICHE;
+  return { columns: removable.length, cells: populatedCells };
 }
 
 function clearArchivedQuoteKeysV2161_() {
@@ -854,7 +953,7 @@ function managementBootstrap_(p) {
   /* Lettura diretta ad ogni bootstrap: nessuna cache persistente puo
      sostituire giacenza_attuale del foglio PRODOTTI_LED. */
   var products = inventoryProductsForRead_();
-  var allPractices = rowsToObjects_(sheet_("PRATICHE"));
+  var allPractices = rowsToObjects_(sheet_("PRATICHE")).map(stripTransientRecordFields_);
   var allClients = rowsToObjects_(sheet_("CLIENTI"));
   var allUsers = rowsToObjects_(sheet_("AGENTI"));
   /* authenticate_ puo usare una cache breve. Per le revisioni dei messaggi
@@ -876,7 +975,7 @@ function managementBootstrap_(p) {
   var settings = getSettings_(true);
   var notifications = listNotificationsForUser_(user);
   var movements = isAdmin_(user) ? rowsToObjects_(sheet_("MOVIMENTI_MAGAZZINO")).sort(function (a, b) { return String(b.data || "").localeCompare(String(a.data || "")); }).slice(0, 100) : [];
-  var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, movements: movements, settings: settings, notifications: notifications };
+  var data = { products: products, clients: clients, practices: practices, documents: documents, activities: activities, users: users, rankings: managementRankings_(allUsers, allPractices, allClients), movements: movements, settings: settings, notifications: notifications };
   /* Le patch notes pubbliche vengono caricate anche nella shell principale,
      così la regola Una volta/Sempre vale all'apertura dell'intero sistema e
      non soltanto quando si entra nel Quotation Planner. */
@@ -948,6 +1047,22 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
   assertWritePermission_(entity, user);
   var payload = preparedPayload || parseJson_(p.payload, {});
   if (!payload || typeof payload !== "object") throw new Error("Dati non validi.");
+  /* Se il browser conserva una nuova pratica dopo un timeout, il token della
+     prima creazione identifica la riga eventualmente già registrata. La nuova
+     richiesta diventa quindi un normale aggiornamento versionato, invece di
+     essere ignorata come duplicato della creazione originaria. */
+  var recoveryRequestToken = entity === "practices" ? String(payload.recovery_request_token || "").trim() : "";
+  if (recoveryRequestToken) {
+    var recoveredPractice = findRowObject_("PRATICHE", "request_token", recoveryRequestToken);
+    if (recoveredPractice) {
+      if (!isAdmin_(user) && String(recoveredPractice.agent_username || "") !== String(user.username || "")) throw new Error("Record non autorizzato.");
+      payload.id = recoveredPractice.id;
+      payload.numero = recoveredPractice.numero;
+      payload.expected_record_version = Number(recoveredPractice.record_version || 0);
+      delete payload.nuova_pratica;
+    }
+  }
+  delete payload.recovery_request_token;
   var earlyRequestToken = String(payload.request_token || "").trim();
   if (earlyRequestToken && ENTITY_SHEETS[entity]) {
     var earlyDuplicate = findRowObject_(ENTITY_SHEETS[entity], "request_token", earlyRequestToken);
@@ -956,7 +1071,7 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
       if (entity === "clients" && !canEditClient_(earlyDuplicate, user)) throw new Error("Record non autorizzato.");
       return {
         ok: true,
-        row: entity === "users" ? publicUser_(earlyDuplicate) : earlyDuplicate,
+        row: entity === "users" ? publicUser_(earlyDuplicate) : stripTransientRecordFields_(earlyDuplicate),
         duplicate: true
       };
     }
@@ -1015,7 +1130,7 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
     /* Le notifiche non vengono rilette dopo ogni salvataggio: il bootstrap e
        la campanella restano le fonti dedicate. Questo elimina una lettura
        completa di NOTIFICHE dal percorso critico della pratica. */
-    return { ok: true, row: practiceRow };
+    return { ok: true, row: stripTransientRecordFields_(practiceRow) };
   }
   if (entity === "clients") {
     var existingClient = payload.id ? findRowObject_("CLIENTI", "id", payload.id) : null;
@@ -1069,7 +1184,7 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
   var row = upsertEntity_(entity, payload, user);
   if (entity === "clients") logRoutineUpsert_(user, entity, row.id || "", "Salvataggio da Management Suite");
   else log_(user, "UPSERT", entity, row.id || row.username || "", "Salvataggio da Management Suite");
-  return { ok: true, row: entity === "users" ? publicUser_(row) : row };
+  return { ok: true, row: entity === "users" ? publicUser_(row) : stripTransientRecordFields_(row) };
 }
 
 
@@ -1837,6 +1952,10 @@ function findClientForQuote_(payload, user) {
   var selectedId = String(payload.cliente_id_gestionale || "").trim();
   var selected = selectedId ? findRowObject_("CLIENTI", "id", selectedId) : null;
   if (selected && !canAccessClient_(selected, user)) selected = null;
+  /* Nel percorso integrato l'anagrafica è già stata validata e salvata dal
+     Management Suite. Non sovrascriviamo quindi i dati completi con i pochi
+     campi presenti nel preventivo. */
+  if (selected) return selected;
   var vat = normalizeKey_(payload.cliente_piva_cf);
   var email = normalizeKey_(payload.cliente_email);
   var company = normalizeKey_(payload.cliente_azienda || payload.cliente_referente);
@@ -3064,6 +3183,51 @@ function removeEntity_(entity, id, user) {
   return true;
 }
 
+function managementRankings_(userRows, practiceRows, clientRows) {
+  var users = (userRows || []).filter(function (user) { return String(user.stato || "ATTIVO").toUpperCase() === "ATTIVO"; });
+  var practices = practiceRows || [];
+  var clients = clientRows || [];
+  return users.map(function (user) {
+    var username = String(user.username || "");
+    var own = practices.filter(function (practice) { return String(practice.agent_username || "") === username; });
+    var completed = own.filter(function (practice) { return String(practice.stato || "") === "Completata" && practiceCompletionDate_(practice); });
+    var monthly = {};
+    completed.forEach(function (practice) {
+      var key = monthKey_(practiceCompletionDate_(practice));
+      monthly[key] = Number(monthly[key] || 0) + Number(practice.valore || 0);
+    });
+    var bestPeriod = Object.keys(monthly).sort(function (left, right) { return Number(monthly[right] || 0) - Number(monthly[left] || 0) || String(right).localeCompare(String(left)); })[0] || "";
+    var latest = own.slice().sort(function (left, right) {
+      return String(right.creatoIl || right.aggiornatoIl || "").localeCompare(String(left.creatoIl || left.aggiornatoIl || ""));
+    })[0] || {};
+    var publicProfile = publicUser_(user);
+    /* La classifica è visibile a tutti gli utenti, ma non deve trasformarsi
+       in una rubrica: contatti, note tecniche e revisioni interne restano
+       esclusi dal profilo pubblico. */
+    delete publicProfile.email;
+    delete publicProfile.telefono;
+    delete publicProfile.note;
+    delete publicProfile.welcome_seen_revision;
+    delete publicProfile.patch_seen_revision;
+    delete publicProfile.record_version;
+    delete publicProfile.aggiornato_da;
+    var achievementData = agentOfMonth_(practices, clients, user, users);
+    publicProfile.nome = publicProfile.nome_visualizzato;
+    publicProfile.miglior_fatturato = bestPeriod ? Number(monthly[bestPeriod] || 0) : 0;
+    publicProfile.miglior_periodo = bestPeriod ? monthLabel_(bestPeriod) : "Nessun periodo completato";
+    publicProfile.ultima_pratica_data = latest.creatoIl || latest.aggiornatoIl || "";
+    publicProfile.ultima_pratica_numero = latest.numero || latest.id || "";
+    publicProfile.achievements = (achievementData.achievements || []).map(function (achievement) {
+      if (!isAdmin_(user)) return achievement;
+      var adminAchievement = {}; Object.keys(achievement).forEach(function (key) { adminAchievement[key] = achievement[key]; });
+      adminAchievement.current = Math.max(Number(adminAchievement.current || 0), Number(adminAchievement.target || 0));
+      adminAchievement.unlocked = true;
+      return adminAchievement;
+    });
+    return publicProfile;
+  });
+}
+
 function dashboard_(data, user, allPracticeRows, allClientRows, allUserRows) {
   var practices = data.practices || [];
   var activities = data.activities || [];
@@ -3322,6 +3486,7 @@ function saveQuotation_(p) {
 
 function saveQuotationLocked_(p) {
   var savedByLogin = String(p.saved_by_login || "").toUpperCase() === "SI";
+  var allowOverwrite = String(p.overwrite_existing || "").toUpperCase() === "SI";
   var user = null;
   if (savedByLogin) user = authenticate_(p.agent_username, p.agent_key);
   var id = String(p.id_preventivo || p.id_preventivo_visibile || "");
@@ -3334,7 +3499,15 @@ function saveQuotationLocked_(p) {
     rememberQuoteCounter_(p.quote_scope, existing.numero_preventivo || existing.id_preventivo || id);
     return { ok: true, id_preventivo: id, save_request_token: requestToken, duplicate: true };
   }
-  if (existing && requestToken && existing.save_request_token && String(existing.save_request_token) !== requestToken) {
+  if (existing && allowOverwrite) {
+    if (!savedByLogin || !user) throw new Error("La sovrascrittura di un preventivo richiede un accesso autenticato.");
+    var existingOwner = String(existing.agent_username || "");
+    if (!isAdmin_(user) && existingOwner !== String(user.username || "")) throw new Error("Preventivo non autorizzato.");
+    var expectedExistingToken = String(p.expected_existing_token || "").trim();
+    if (!expectedExistingToken || expectedExistingToken !== String(existing.save_request_token || "")) {
+      return { ok: false, error: "Il preventivo è stato aggiornato da un altro utente. Ricaricalo prima di salvare.", error_code: "QUOTE_UPDATED" };
+    }
+  } else if (existing) {
     rememberQuoteCounter_(p.quote_scope, existing.numero_preventivo || existing.id_preventivo || id);
     var next = nextQuote_({ quote_scope: p.quote_scope });
     return { ok: false, error: "Numero preventivo già utilizzato.", error_code: "QUOTE_NUMBER_CHANGED", next_num: next.next_num, next_id: next.next_id };
@@ -3342,16 +3515,23 @@ function saveQuotationLocked_(p) {
   var record = {};
   /* agent_key autentica la richiesta ma non deve mai diventare un dato del
      preventivo né essere scritto nel Foglio. */
-  Object.keys(p).forEach(function (key) { if (["action", "requestId", "agent_key"].indexOf(key) < 0) record[key] = p[key]; });
+  Object.keys(p).forEach(function (key) {
+    if (["action", "requestId", "agent_key", "overwrite_existing", "expected_existing_token"].indexOf(key) < 0) record[key] = p[key];
+  });
   if (sheetHeaders_("ARCHIVIO_PREVENTIVI").indexOf("agent_key") >= 0) record.agent_key = "";
   record.id_preventivo = id;
   record.data_salvataggio = new Date().toISOString();
   record.agent_username = record.agent_username || (user ? user.username : "");
   record.agent_display_name = record.agent_display_name || (user ? user.nome_visualizzato : record.agente || "");
+  if (existing && allowOverwrite && isAdmin_(user) && String(existing.agent_username || "")) {
+    record.agent_username = existing.agent_username;
+    record.agent_display_name = existing.agent_display_name || existing.agente || existing.agent_username;
+    record.agente = existing.agente || record.agent_display_name;
+  }
   upsertObject_("ARCHIVIO_PREVENTIVI", "id_preventivo", id, record);
   rememberQuoteCounter_(record.quote_scope, record.numero_preventivo || id);
-  log_(user || { username: "ACCESSO_CON_CHIAVE", ruolo: "ESTERNO" }, "SAVE", "ARCHIVIO_PREVENTIVI", id, "Salvataggio preventivo S.Q.P.");
-  return { ok: true, id_preventivo: id, save_request_token: record.save_request_token || "" };
+  log_(user || { username: "ACCESSO_CON_CHIAVE", ruolo: "ESTERNO" }, allowOverwrite ? "UPDATE" : "SAVE", "ARCHIVIO_PREVENTIVI", id, allowOverwrite ? "Sovrascrittura controllata preventivo S.Q.P." : "Salvataggio preventivo S.Q.P.");
+  return { ok: true, id_preventivo: id, save_request_token: record.save_request_token || "", overwritten: !!allowOverwrite };
 }
 
 function listQuotes_(p) {
@@ -3776,6 +3956,12 @@ function cloneObject_(source) {
   return copy;
 }
 
+function stripTransientRecordFields_(source) {
+  var copy = cloneObject_(source || {});
+  Object.keys(SEEMAX_TRANSIENT_RECORD_FIELDS_).forEach(function (field) { delete copy[field]; });
+  return copy;
+}
+
 function objectFromValues_(headers, values) {
   var object = {};
   (headers || []).forEach(function (header, index) {
@@ -4024,7 +4210,7 @@ function invalidateTable_(sheetName) {
 function rowsToObjects_(sheet) {
   var table = tableData_(sheet);
   if (table.values.length < 2) return [];
-  return table.objects.map(cloneObject_);
+  return table.objects.map(stripTransientRecordFields_);
 }
 
 function serializable_(value) {
@@ -4045,7 +4231,14 @@ function updateTableCacheAfterWrite_(sheetName, rowIndex, headers, values) {
 function upsertObject_(sheetName, keyField, keyValue, record) {
   var sheet = sheet_(sheetName);
   var headers = sheetHeaders_(sheet);
-  var newHeaders = Object.keys(record).filter(function (key) { return headers.indexOf(key) < 0; });
+  var schema = SHEET_SCHEMAS[sheetName] || null;
+  var newHeaders = Object.keys(record).filter(function (key) {
+    if (SEEMAX_TRANSIENT_RECORD_FIELDS_[key]) return false;
+    if (headers.indexOf(key) >= 0) return false;
+    /* Per le tabelle ufficiali sono ammesse soltanto colonne dichiarate. Le
+       migrazioni aggiungono prima la colonna allo schema tramite ensureSheet_. */
+    return !schema || schema.indexOf(key) >= 0;
+  });
   if (newHeaders.length) {
     var startColumn = headers.length + 1;
     headers = headers.concat(newHeaders);
@@ -4061,6 +4254,7 @@ function upsertObject_(sheetName, keyField, keyValue, record) {
   var existingValues = existingRecord ? existingRecord.values : [];
   while (existingValues.length < headers.length) existingValues.push("");
   var values = headers.map(function (header, index) {
+    if (SEEMAX_TRANSIENT_RECORD_FIELDS_[header]) return "";
     if (record[header] !== undefined) return record[header];
     return existingValues[index] !== undefined ? existingValues[index] : "";
   });
@@ -4068,7 +4262,7 @@ function upsertObject_(sheetName, keyField, keyValue, record) {
   var writeStarted = new Date().getTime();
   sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
   performanceEvent_("write", sheetName + ".row", new Date().getTime() - writeStarted, { rows: 1, columns: headers.length, insert: !existingRecord });
-  var result = objectFromValues_(headers, values);
+  var result = stripTransientRecordFields_(objectFromValues_(headers, values));
   updateTableCacheAfterWrite_(sheetName, rowIndex, headers, values);
   invalidateLookupCache_(sheetName);
   var rowRecord = { rowIndex: rowIndex, values: values.slice(), object: result };
@@ -4262,7 +4456,12 @@ function validatePracticeRequiredFields_(practice) {
     if (field === "valore_provvigione" && type === "ACQUISTO" && String(practice.destinatario_ordine || "").toUpperCase() === "PER ME") return;
     if (field.indexOf("installazione_") === 0 && field !== "indirizzo_installazione_tipo" && String(practice.indirizzo_installazione_tipo || "").toUpperCase() === "COME INDIRIZZO CLIENTE") return;
     if ((field === "cloud_username" || field === "cloud_password") && String(practice.gestione_ledwall || "").toUpperCase() !== "IN CLOUD") return;
-    if (!String(practice[field] || "").trim()) throw new Error("Campo obbligatorio mancante: " + labels[field] + ".");
+    /* Lo zero e un valore numerico valido (per esempio provvigione pari a
+       zero) ed e accettato anche dal modulo HTML con min="0". Il precedente
+       uso di `value || ""` lo trasformava erroneamente in campo vuoto e
+       impediva il cambio stato di pratiche perfettamente compilate. */
+    var value = practice[field];
+    if (value === null || value === undefined || String(value).trim() === "") throw new Error("Campo obbligatorio mancante: " + labels[field] + ".");
   });
 }
 

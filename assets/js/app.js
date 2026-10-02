@@ -4,7 +4,7 @@
   const api = window.SeemaxApi;
   const config = window.SEEMAX_APP_CONFIG;
   const $ = (id) => document.getElementById(id);
-  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "", settingsTab: "general", catalogTab: "LEDWALL" };
+  const state = { route: "dashboard", data: null, loading: false, search: "", filterStatus: "", practiceQuery: "", practiceSort: "", practiceDirection: "desc", practicePage: 1, clientSort: "", clientDirection: "asc", clientPage: 1, practiceLayout: "", documentFolderId: "", settingsTab: "general", catalogTab: "LEDWALL", activityMonth: "", offlinePlannerOnly: false };
   let installPrompt = null;
   let heldDocumentId = "";
   let documentHoldTimer = null;
@@ -30,6 +30,8 @@
   let resumeRetryAttempt = 0;
   let lastResumeSyncAt = 0;
   let connectionRecoveryActive = false;
+  let pendingPlannerImport = null;
+  const LOCAL_SQP_PRACTICES_PREFIX = "SEEMAX_LOCAL_SQP_PRACTICES_V1_";
 
   const NAV = [
     { id: "dashboard", icon: "🏠", label: "Dashboard", sub: "Panoramica" },
@@ -39,6 +41,7 @@
     { id: "planner", icon: "🧮", label: "Quotation Planner", sub: "Preventivi multiprodotto" },
     { id: "documents", icon: "🗂️", label: "Documenti", sub: "PDF e allegati" },
     { id: "activities", icon: "✅", label: "Attività", sub: "Scadenze operative" },
+    { id: "rankings", icon: "🏆", label: "Classifiche", sub: "Risultati e profili" },
     { id: "users", icon: "👤", label: "Agenti", sub: "Accessi e ruoli", adminOnly: true },
     { id: "settings", icon: "⚙️", label: "Impostazioni", sub: "Azienda e database", adminOnly: true }
   ];
@@ -48,9 +51,10 @@
     practices: ["Pratiche", "Gestisci il percorso dal contatto all’installazione"],
     clients: ["Clienti", "Anagrafiche, contatti e storico commerciale"],
     catalog: ["Catalogo prodotti", "Ledwall, Croci, LED speciali e Schermi LCD"],
-    planner: ["Seemax Quotation Planner", "Prodotti, Grenke e IFIS"],
+    planner: ["Seemax Quotation Planner", "Prodotti e operazioni commerciali"],
     documents: ["Documenti", "Preventivi, contratti e allegati collegati"],
     activities: ["Attività", "Scadenze, telefonate e appuntamenti"],
+    rankings: ["Classifiche", "Risultati e profili degli utenti Seemax"],
     users: ["Agenti e accessi", "Profili, ruoli e stato degli account"],
     settings: ["Impostazioni", "Configurazione generale del gestionale"],
     profile: ["Il mio profilo", "Risultati, presentazione personale e bacheca trofei"]
@@ -181,6 +185,13 @@
     const raw = String((record || {}).creatoIl || (record || {}).aggiornatoIl || "").trim();
     const parsed = Date.parse(raw.length === 10 ? `${raw}T12:00:00` : raw);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function compactPagination(pageCount, currentPage, attribute) {
+    const pages = pageCount <= 4 ? Array.from({ length: pageCount }, (_, index) => index + 1) : [1, 2, 3, "ellipsis", pageCount];
+    return pages.map((page) => page === "ellipsis"
+      ? `<span class="pagination-ellipsis" aria-hidden="true">…</span>`
+      : `<button class="${page === currentPage ? "active" : ""}" ${attribute}="${page}" aria-label="Pagina ${page}">${page}</button>`).join("");
   }
 
   function resetListingStateForSession() {
@@ -678,7 +689,10 @@
     return clientToolsPromise;
   }
 
-  function visibleNav() { return NAV.filter((item) => !item.adminOnly || api.isAdmin()); }
+  function visibleNav() {
+    if (state.offlinePlannerOnly) return NAV.filter((item) => item.id === "planner");
+    return NAV.filter((item) => !item.adminOnly || api.isAdmin());
+  }
 
   function renderNav() {
     $("mainNav").innerHTML = visibleNav().map((item) => `
@@ -689,11 +703,13 @@
 
   function setConnectionState() {
     const status = api.status();
-    $("databaseLabel").textContent = status.fast ? `Modalità Rapida · ${status.pending} in attesa` : (status.demo ? "Modalità demo locale" : (connectionRecoveryActive ? "Aggiornamento dati…" : status.online ? "Database online" : "Riconnessione in corso"));
+    $("databaseLabel").textContent = state.offlinePlannerOnly ? "Planner offline" : (status.demo ? "Modalità demo locale" : (connectionRecoveryActive ? "Aggiornamento dati…" : status.online ? "Database online" : "Riconnessione in corso"));
     $("databaseDot").className = status.online ? "online" : "offline";
-    updateModeControls();
     const banner = $("connectionBanner");
-    if (status.demo) {
+    if (state.offlinePlannerOnly) {
+      banner.className = "connection-banner recovering";
+      banner.innerHTML = `<strong>Modalità offline.</strong> Puoi creare, salvare localmente ed esportare un preventivo. Database, archivio online e numerazione ufficiale saranno disponibili dopo l’accesso online.${typeof navigator !== "undefined" && navigator.onLine ? `<button data-action="offline-online-login">Accedi online</button>` : ""}`;
+    } else if (status.demo) {
       banner.className = "connection-banner demo";
       banner.innerHTML = `<strong>Modalità demo attiva.</strong> I dati sono salvati soltanto in questo browser. Configura Apps Script per usare il database condiviso. <button data-route="settings">Configura</button>`;
     } else if (connectionRecoveryActive) {
@@ -718,8 +734,9 @@
         ...options,
         onProgress: showLoader ? (value, detail) => paintLoadingProgress(value, detail) : options.onProgress
       });
+      mergeLocalPlannerPractices();
       if (showLoader) paintLoadingProgress(94, "Dati ricevuti: preparazione dell’area di lavoro…");
-      if (api.isFastMode()) updateLocalDashboard();
+      updateLocalDashboard();
       applyChampionTheme();
       updateNotificationBell();
       setConnectionState();
@@ -731,7 +748,9 @@
 
   function applyWorkspaceSnapshot(snapshot) {
     state.data = snapshot;
-    if (api.isFastMode()) updateLocalDashboard();
+    state.data.activities = api.localActivities ? api.localActivities() : (state.data.activities || []);
+    mergeLocalPlannerPractices();
+    updateLocalDashboard();
     applyChampionTheme();
     updateNotificationBell();
     setConnectionState();
@@ -743,7 +762,7 @@
   }
 
   function scheduleConnectionRetry(delayOverride) {
-    if (!api.getSession() || api.isFastMode() || config.demoMode) return;
+    if (!api.getSession() || state.offlinePlannerOnly || config.demoMode) return;
     clearConnectionRetry();
     const index = Math.min(resumeRetryAttempt, CONNECTION_RETRY_DELAYS_MS.length - 1);
     const delay = Math.max(250, Number(delayOverride || CONNECTION_RETRY_DELAYS_MS[index]));
@@ -760,7 +779,7 @@
 
   async function refreshSharedData(options = {}) {
     const interactive = options.interactive === true;
-    if (!api.getSession() || api.isFastMode() || config.demoMode) return false;
+    if (!api.getSession() || state.offlinePlannerOnly || config.demoMode) return false;
     if (!interactive && (document.hidden || hasActiveUploads() || hasActiveDatabaseOperations())) {
       scheduleConnectionRetry(1800);
       return false;
@@ -1114,23 +1133,20 @@
     return `<div class="publication-status"><div><span class="publication-status-icon">📣</span><div><small>Pubblicazione corrente</small><strong>${esc(published)}</strong><span>${author} · revisione ${revision}</span></div></div><code title="Chiave di pubblicazione">${esc(key ? key.slice(-22) : "—")}</code></div>`;
   }
 
-  function communicationActionsMarkup(type, fastMode) {
+  function communicationActionsMarkup(type) {
     const patchNotes = String(type || "").toLowerCase() === "patch";
-    const help = fastMode
-      ? "Passa alla Modalità Standard per modificare le comunicazioni condivise."
-      : patchNotes
-        ? "Il salvataggio pubblica automaticamente una nuova revisione visibile secondo la frequenza selezionata."
-        : "Salva modifica i contenuti senza disturbare chi li ha già letti. Salva e ripubblica crea una nuova pubblicazione visibile a tutti.";
+    const help = patchNotes
+      ? "Il salvataggio pubblica automaticamente una nuova revisione visibile secondo la frequenza selezionata."
+      : "Salva modifica i contenuti senza disturbare chi li ha già letti. Salva e ripubblica crea una nuova pubblicazione visibile a tutti.";
     const buttons = patchNotes
-      ? `<button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn primary" type="submit" value="republish" ${fastMode ? "disabled" : ""}>Salva e pubblica</button>`
-      : `<button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn soft" type="submit" value="save" ${fastMode ? "disabled" : ""}>Salva</button><button class="btn primary" type="submit" value="republish" ${fastMode ? "disabled" : ""}>Salva e ripubblica</button>`;
+      ? `<button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn primary" type="submit" value="republish">Salva e pubblica</button>`
+      : `<button class="btn ghost" type="button" data-action="preview-${esc(type)}-message">Anteprima</button><button class="btn soft" type="submit" value="save">Salva</button><button class="btn primary" type="submit" value="republish">Salva e ripubblica</button>`;
     return `<div class="message-editor-actions"><p>${help}</p><div>${buttons}</div></div>`;
   }
 
   function renderWelcomeSettingsTab() {
     const content = adminContentState();
     const welcome = content.welcome;
-    const fastMode = api.isFastMode();
     return `<form id="welcomeMessageForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel beta-welcome-editor-panel">
       <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Benvenuto Beta</h3><p>Modifica la finestra grafica “Benvenuto nella Beta” mostrata all’apertura del Management Suite. Non viene più creato un secondo messaggio di benvenuto.</p></div><label class="admin-enabled-toggle"><input name="welcome_enabled" type="checkbox" ${welcome.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
       ${messagePolicyMarkup("welcome", welcome.display_mode)}
@@ -1158,14 +1174,13 @@
           <label class="full">Testo pulsante<input name="welcome_primary_button" value="${esc(welcome.primary_button)}" maxlength="70" required></label>
         </div></section>
       </div>
-      ${communicationActionsMarkup("welcome", fastMode)}
+      ${communicationActionsMarkup("welcome")}
     </section></form>`;
   }
 
   function renderPatchNotesSettingsTab() {
     const content = adminContentState();
     const patch = content.patchNotes;
-    const fastMode = api.isFastMode();
     const itemMarkup = patch.items.map((item, index) => patchItemEditorMarkup(item, index, `patch-${index}`)).join("");
     return `<form id="patchNotesForm" class="message-editor-form" data-revision="${esc(content.revision)}"><section class="panel message-editor-panel">
       <div class="panel-head"><div><span class="section-kicker">Comunicazioni</span><h3>Patch notes</h3><p>Pubblica le novità nella schermata iniziale del Management Suite e nel Quotation Planner non integrato.</p></div><label class="admin-enabled-toggle"><input name="patch_enabled" type="checkbox" ${patch.enabled !== "NO" ? "checked" : ""}><span>Messaggio attivo</span></label></div>
@@ -1180,7 +1195,7 @@
       </div></div>
       <div class="patch-items-toolbar"><div><span class="section-kicker">Contenuto</span><h4>Voci delle patch notes</h4><p>Le voci disattivate restano salvate nell'editor ma non vengono mostrate agli utenti.</p></div><button class="btn soft" type="button" data-action="add-patch-item">+ Aggiungi voce</button></div>
       <div id="patchItemsEditor" class="patch-items-editor">${itemMarkup}<p class="patch-items-empty" data-patch-empty ${patch.items.length ? "hidden" : ""}>Non ci sono voci. Puoi pubblicare soltanto titolo e introduzione oppure aggiungere fino a 12 novità.</p></div>
-      ${communicationActionsMarkup("patch", fastMode)}
+      ${communicationActionsMarkup("patch")}
     </section></form>`;
   }
 
@@ -1250,7 +1265,6 @@
     const steps = [
       { chapter: "Per iniziare", route: "dashboard", selector: ".topbar", title: "La barra principale", text: "Da qui puoi cercare informazioni, cambiare modalità di lavoro, creare una pratica, consultare le notifiche e aprire il tuo profilo." },
       { chapter: "Per iniziare", selector: ".global-search", title: "Ricerca globale", text: "Cerca rapidamente una pratica tramite identificativo o intestazione e trova i clienti senza cambiare pagina." },
-      { chapter: "Per iniziare", selector: ".mode-controls", title: "Modalità Standard e Rapida", text: "La modalità Standard salva online ogni operazione. La modalità Rapida lavora localmente e ti permette di sincronizzare in seguito con SALVA TUTTO." },
       { chapter: "Per iniziare", selector: "#quickAddButton", title: "Nuova pratica", text: "Questo comando apre subito la scelta tra Acquisto, Noleggio e Leasing. Il modulo si adatta automaticamente alla tipologia selezionata." },
       { chapter: "Per iniziare", selector: "#notificationButton", title: "Centro notifiche", text: "Il pallino rosso segnala novità. Qui riceverai, tra le altre cose, gli aggiornamenti sullo stato delle pratiche di cui sei responsabile." },
       { chapter: "Per iniziare", selector: "#userMenuButton", title: "Profilo connesso", text: "Mostra l'utente attualmente connesso, il suo ruolo e l'eventuale emblema Agente del mese." },
@@ -1323,6 +1337,22 @@
       if (showMonthlyAwardIfNeeded()) return;
       showNextStartupMessage();
     }, 350);
+    setTimeout(showActivityReminders, 1300);
+  }
+
+  function showActivityReminders() {
+    if (state.offlinePlannerOnly || !state.data || $("modalRoot").children.length) return;
+    const now = Date.now();
+    const due = (state.data.activities || []).filter((item) => {
+      if (!item.promemoria || ["FATTO", "ANNULLATA"].includes(activityStatus(item))) return false;
+      const when = Date.parse(item.promemoria);
+      if (!Number.isFinite(when) || when > now + 15 * 60 * 1000) return false;
+      return localStorage.getItem(`SEEMAX_ACTIVITY_REMINDER_${item.id}_${item.promemoria}`) !== "1";
+    });
+    if (!due.length) return;
+    due.forEach((item) => localStorage.setItem(`SEEMAX_ACTIVITY_REMINDER_${item.id}_${item.promemoria}`, "1"));
+    const body = `<div class="activity-reminder-list">${due.map((item) => `<article><span>🔔</span><div><strong>${esc(item.titolo)}</strong><p>${esc(item.tipo || "Attività")} · scadenza ${dateIt(item.scadenza || item.data)}</p>${item.practiceLabel ? `<small>${esc(item.practiceLabel)}</small>` : ""}</div></article>`).join("")}</div><div class="form-actions"><button class="btn ghost" data-action="close-modal">Più tardi</button><button class="btn primary" data-action="open-activities">Apri agenda</button></div>`;
+    openModal(due.length === 1 ? "Promemoria attività" : `${due.length} promemoria attività`, body, { kicker: "Agenda personale" });
   }
 
   function startTutorial() {
@@ -1384,6 +1414,8 @@
   }
 
   async function showApp(options = {}) {
+    state.offlinePlannerOnly = false;
+    document.body.classList.remove("offline-planner-only");
     state.practiceLayout = "";
     resetListingStateForSession();
     $("loginScreen").classList.add("is-hidden");
@@ -1432,6 +1464,23 @@
     }
   }
 
+  function isInstalledApp() {
+    return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+  }
+
+  function openOfflinePlanner() {
+    state.offlinePlannerOnly = true;
+    document.body.classList.add("offline-planner-only");
+    const cached = api.cachedBootstrap ? api.cachedBootstrap() : null;
+    state.data = cached || { clients: [], practices: [], products: [], documents: [], activities: [], users: [], rankings: [], notifications: [], movements: [], settings: {}, patchNotes: {}, dashboard: { totals: {}, revenue: {}, pipeline: [], recentPractices: [], nextActivities: [] } };
+    state.data.activities = [];
+    $("loginScreen").classList.add("is-hidden");
+    $("app").classList.remove("is-hidden");
+    renderNav();
+    go("planner", false);
+    setConnectionState();
+  }
+
   function showLogin() {
     $("app").classList.add("is-hidden");
     $("loginScreen").classList.remove("is-hidden");
@@ -1451,7 +1500,7 @@
 
   function go(route, updateHash = true) {
     const allowed = route === "profile" || visibleNav().some((item) => item.id === route);
-    const nextRoute = allowed ? route : "dashboard";
+    const nextRoute = allowed ? route : (state.offlinePlannerOnly ? "planner" : "dashboard");
     const changed = state.route !== nextRoute;
     const applyRoute = () => {
       state.route = nextRoute;
@@ -1472,7 +1521,7 @@
 
   function renderRoute(animate = false) {
     if (!state.data && state.route !== "settings") return;
-    const renders = { dashboard: renderDashboard, practices: renderPractices, clients: renderClients, catalog: renderCatalog, planner: renderPlanner, documents: renderDocuments, activities: renderActivities, users: renderUsers, settings: renderSettings, profile: renderProfile };
+    const renders = { dashboard: renderDashboard, practices: renderPractices, clients: renderClients, catalog: renderCatalog, planner: renderPlanner, documents: renderDocuments, activities: renderActivities, rankings: renderRankings, users: renderUsers, settings: renderSettings, profile: renderProfile };
     $("viewContainer").innerHTML = renders[state.route]();
     if (state.route === "planner" && window.SeemaxNativePlanner) {
       window.SeemaxNativePlanner.mount($("nativePlannerRoot"), {
@@ -1482,7 +1531,7 @@
         settings: state.data.settings || {},
         patchNotes: state.data.patchNotes || {},
         version: config.version,
-        fastMode: api.isFastMode()
+        offlineOnly: state.offlinePlannerOnly
       });
     }
     if (animate) {
@@ -1836,6 +1885,129 @@
     return !isCompletedPractice(practice) && (origin.includes("QUOTATION PLANNER") || origin.includes("S.Q.P"));
   }
 
+  function isLocalPlannerPractice(practice) {
+    return String(practice && practice.__local_import || "").toUpperCase() === "SI";
+  }
+
+  function localPlannerPracticeKey() {
+    const session = api.getSession() || {};
+    return `${LOCAL_SQP_PRACTICES_PREFIX}${String(session.username || "offline")}`;
+  }
+
+  function readLocalPlannerPractices() {
+    try {
+      const rows = JSON.parse(localStorage.getItem(localPlannerPracticeKey()) || "[]");
+      return Array.isArray(rows) ? rows.filter(isLocalPlannerPractice) : [];
+    } catch (error) { return []; }
+  }
+
+  function writeLocalPlannerPractices(rows) {
+    localStorage.setItem(localPlannerPracticeKey(), JSON.stringify((rows || []).filter(isLocalPlannerPractice)));
+  }
+
+  function mergeLocalPlannerPractices() {
+    if (!state.data || state.offlinePlannerOnly) return;
+    const remote = (state.data.practices || []).filter((row) => !isLocalPlannerPractice(row));
+    const session = api.getSession() || {};
+    const local = readLocalPlannerPractices().filter((row) => {
+      const alreadyRemote = remote.some((serverRow) =>
+        (row.request_token && String(serverRow.request_token || "") === String(row.request_token)) ||
+        (row.preventivo_id && String(serverRow.preventivo_id || "") === String(row.preventivo_id) && String(serverRow.agent_username || "") === String(session.username || ""))
+      );
+      return !alreadyRemote;
+    });
+    writeLocalPlannerPractices(local);
+    state.data.practices = [...local, ...remote];
+  }
+
+  function saveLocalPlannerPractice(practice) {
+    const rows = readLocalPlannerPractices();
+    const index = rows.findIndex((row) => String(row.id) === String(practice.id));
+    if (index >= 0) rows[index] = practice;
+    else rows.unshift(practice);
+    writeLocalPlannerPractices(rows);
+    mergeLocalPlannerPractices();
+    updateLocalDashboard();
+    scheduleBootstrapCache();
+  }
+
+  function removeLocalPlannerPractice(id) {
+    writeLocalPlannerPractices(readLocalPlannerPractices().filter((row) => String(row.id) !== String(id)));
+    if (state.data) state.data.practices = (state.data.practices || []).filter((row) => String(row.id) !== String(id));
+    updateLocalDashboard();
+    scheduleBootstrapCache();
+  }
+
+  function plannerInventoryRows(items) {
+    const rows = [];
+    (items || []).forEach((item) => {
+      const source = Array.isArray(item.stock_lines) ? item.stock_lines : Array.isArray(item.righe_magazzino) ? item.righe_magazzino : [];
+      if (source.length) source.forEach((line) => rows.push({ product_id: line.product_id || line.id || "", quantita: Number(line.quantita || line.quantity || 0), descrizione: line.descrizione || item.prodotto || "Prodotto" }));
+      else if (item.product_id && Number(item.cabinet || item.quantita_unita || 0) > 0) rows.push({ product_id: item.product_id, quantita: Number(item.cabinet || item.quantita_unita || 0), descrizione: item.prodotto || item.modello_display || "Prodotto" });
+    });
+    return rows.filter((row) => row.product_id && row.quantita > 0);
+  }
+
+  function plannerConfigurations(items) {
+    return (items || []).map((item, index) => {
+      const measure = String(item.misura_display || item.misura_m || item.misura_cm || "").replace(/,/g, ".").match(/([\d.]+)\s*[x×]\s*([\d.]+)/i);
+      let width = measure ? Number(measure[1]) : 0;
+      let height = measure ? Number(measure[2]) : 0;
+      if (width > 20 || height > 20) { width /= 100; height /= 100; }
+      return {
+        id: `sqp-local-${index + 1}`,
+        product_id: item.product_id || "",
+        modello_display: item.modello_display || item.prodotto || "Prodotto S.Q.P.",
+        larghezza: width || "",
+        altezza: height || "",
+        bifacciale: String(item.bifacciale || "NO").toUpperCase() === "SI" ? "SI" : "NO",
+        quantita_unita: Number(item.quantita_unita || item.cabinet || 1),
+        tipo_calcolo: item.tipo_calcolo || "MODULARE",
+        unita_magazzino: item.unita_magazzino || "CABINET",
+        formato_label: item.formato_label || item.misura_cm || item.misura_m || "",
+        stock_lines: Array.isArray(item.stock_lines) ? item.stock_lines : []
+      };
+    });
+  }
+
+  function buildLocalPlannerPractice(payload) {
+    const session = api.getSession() || {};
+    const items = Array.isArray(payload.righe) ? payload.righe : [];
+    const createdAt = new Date().toISOString();
+    const localId = `LOCAL-SQP-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const type = String(payload.tipo_pratica || "ACQUISTO").toUpperCase();
+    return {
+      id: localId,
+      numero: `LOCALE-${String(payload.preventivo_id || Date.now().toString(36)).replace(/\s+/g, "-")}`,
+      clientId: "",
+      cliente: payload.cliente_azienda || payload.cliente_referente || "Cliente da completare",
+      titolo: items.map((item) => `${item.prodotto || item.modello_display || "Prodotto"} ${item.misura_m || item.misura_cm || ""}`.trim()).join(" + "),
+      stato: "Inserita",
+      finanziaria: type === "NOLEGGIO" ? "Grenke" : type === "LEASING" ? "IFIS" : "Acquisto diretto",
+      tipo_pratica: type,
+      valore: Number(payload.valore || 0),
+      valore_provvigione: Number(payload.valore_provvigione || 0),
+      numero_rate: payload.numero_rate || "",
+      periodicita_pagamento: payload.periodicita_pagamento || "",
+      agente: session.displayName || session.nome_visualizzato || session.username || "Utente locale",
+      agent_username: session.username || "",
+      note: payload.note || "",
+      preventivo_id: payload.preventivo_id || "",
+      origine: "SEEMAX QUOTATION PLANNER",
+      modelli_display: items.map((item) => item.modello_display || item.prodotto || "").filter(Boolean).join(" | "),
+      misure_display: items.map((item) => item.misura_display || item.misura_m || item.misura_cm || "").filter(Boolean).join(" | "),
+      bifacciale: items.some((item) => String(item.bifacciale || "NO").toUpperCase() === "SI") ? "SI" : "NO",
+      righe_json: JSON.stringify(items),
+      righe_magazzino_json: JSON.stringify(plannerInventoryRows(items)),
+      ledwall_configurazioni_json: JSON.stringify(plannerConfigurations(items)),
+      request_token: payload.request_token || newRequestToken(),
+      creatoIl: createdAt,
+      aggiornatoIl: createdAt,
+      __local_import: "SI",
+      __source_payload: { ...payload }
+    };
+  }
+
   function practiceStockWarning(practice) {
     if (String(practice.avviso_giacenza || "SI").toUpperCase() === "NO") return null;
     if (String(practice.magazzino_applicato || "NO").toUpperCase() === "SI") return null;
@@ -1891,7 +2063,10 @@
       const completed = isCompletedPractice(p);
       const stockWarning = practiceStockWarning(p);
       const syncing = String(p.__sync_state || "").toUpperCase() === "PENDING";
-      return `<tr class="practice-row practice-${slug(p.stato)} ${plannerPending ? "practice-planner-pending" : ""} ${stockWarning ? "practice-stock-shortage" : ""} ${syncing ? "record-sync-pending" : ""}"><td><strong>${esc(p.numero)}</strong>${recordSyncBadge(p)}${plannerPending ? `<span class="planner-practice-flag">✦ IMPORTATA · DA COMPLETARE</span>` : completed ? `<span class="completed-practice-flag">🔒 ARCHIVIO CONCLUSO</span>` : ""}${stockWarning ? `<span class="stock-practice-flag" title="${esc(stockWarning.detail)}">⚠ GIACENZA INSUFFICIENTE</span>` : ""}<small>${dateIt(completed ? p.completataIl || p.aggiornatoIl : p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td>${showAgent ? `<td>${esc(p.agente || p.agent_username || "—")}</td>` : ""}<td><button class="table-action ${completed ? "completed" : ""}" data-action="edit-practice" data-id="${esc(p.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi" : completed ? "Consulta" : "Apri"}</button>${compact || completed || syncing ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`;
+      const importedFlag = isLocalPlannerPractice(p)
+        ? `<span class="planner-practice-flag local" title="Pratica locale: completa l'anagrafica per inviarla">✦ IMPORTATA LOCALMENTE: ANAGRAFICA ASSENTE</span>`
+        : plannerPending ? `<span class="planner-practice-flag" title="Importata dal Seemax Quotation Planner">✦ S.Q.P.</span>` : "";
+      return `<tr class="practice-row practice-${slug(p.stato)} ${stockWarning ? "practice-stock-shortage" : ""} ${syncing ? "record-sync-pending" : ""}"><td><strong>${esc(p.numero)}</strong>${recordSyncBadge(p)}${importedFlag}${completed ? `<span class="completed-practice-flag">🔒 ARCHIVIO CONCLUSO</span>` : ""}${stockWarning ? `<span class="stock-practice-flag" title="${esc(stockWarning.detail)}">⚠ GIACENZA INSUFFICIENTE</span>` : ""}<small>${dateIt(completed ? p.completataIl || p.aggiornatoIl : p.aggiornatoIl)}</small></td><td>${esc(p.cliente)}</td><td>${esc(p.tipo_pratica || "—")}</td><td>${badge(p.stato)}</td><td>${esc(p.finanziaria)}</td><td><strong>${euros(p.valore)}</strong></td>${showAgent ? `<td>${esc(p.agente || p.agent_username || "—")}</td>` : ""}<td><button class="table-action ${completed ? "completed" : ""}" data-action="edit-practice" data-id="${esc(p.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi" : completed ? "Consulta" : "Apri"}</button>${compact || completed || syncing ? "" : `<button class="more-action" data-action="delete-practice" data-id="${esc(p.id)}" aria-label="Elimina">⋮</button>`}</td></tr>`;
     }).join("")}</tbody></table></div>`;
   }
 
@@ -1940,7 +2115,7 @@
     const layoutControls = `<div class="practice-layout-toolbar"><div><strong>Organizzazione pratiche</strong><span>Preferenza salvata soltanto su questo dispositivo</span></div><div class="practice-layout-switch"><button class="${layout === "table" ? "active" : ""}" data-action="set-practice-layout" data-layout="table" aria-label="Visualizza le pratiche in dettaglio">☷ IN DETTAGLIO</button><button class="${layout === "type" ? "active" : ""}" data-action="set-practice-layout" data-layout="type" aria-label="Visualizza le pratiche per tipologia">▦ PER TIPOLOGIA</button></div></div>`;
     const pagination = rows.length > pageSize ? `<nav class="practice-pagination" aria-label="Pagine pratiche">
       <button class="btn ghost" data-practice-page="${state.practicePage - 1}" ${state.practicePage === 1 ? "disabled" : ""}>← Precedente</button>
-      <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => `<button class="${page === state.practicePage ? "active" : ""}" data-practice-page="${page}" aria-label="Pagina ${page}">${page}</button>`).join("")}</div>
+      <div>${compactPagination(pageCount, state.practicePage, "data-practice-page")}</div>
       <button class="btn ghost" data-practice-page="${state.practicePage + 1}" ${state.practicePage === pageCount ? "disabled" : ""}>Successiva →</button>
     </nav>` : "";
     const range = rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} di ${rows.length} pratiche` : "0 pratiche";
@@ -1997,7 +2172,7 @@
     </div>`;
     const pagination = rows.length > pageSize ? `<nav class="practice-pagination" aria-label="Pagine clienti">
       <button class="btn ghost" data-client-page="${state.clientPage - 1}" ${state.clientPage === 1 ? "disabled" : ""}>← Precedente</button>
-      <div>${Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => `<button class="${page === state.clientPage ? "active" : ""}" data-client-page="${page}" aria-label="Pagina ${page}">${page}</button>`).join("")}</div>
+      <div>${compactPagination(pageCount, state.clientPage, "data-client-page")}</div>
       <button class="btn ghost" data-client-page="${state.clientPage + 1}" ${state.clientPage === pageCount ? "disabled" : ""}>Successiva →</button>
     </nav>` : "";
     const range = rows.length ? `${start + 1}–${Math.min(start + pageSize, rows.length)} di ${rows.length} clienti` : "0 clienti";
@@ -2037,7 +2212,7 @@
   }
 
   function renderPlanner() {
-    return `${api.isFastMode() ? `<div class="planner-fast-notice"><strong>Modalità Rapida attiva</strong><span>Il Planner resta utilizzabile. Salvataggio e caricamento dei preventivi online rimangono temporaneamente disabilitati.</span></div>` : ""}<div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
+    return `${state.offlinePlannerOnly ? `<div class="planner-fast-notice"><strong>Quotation Planner offline</strong><span>Calcoli, bozze locali ed esportazione PDF restano disponibili. Archivio online, database e pratiche sono disattivati finché non torna la connessione.</span></div>` : ""}<div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
   }
 
   function documentLibraryKey() {
@@ -2085,8 +2260,8 @@
     const currentFolder = library.folders.find((folder) => folder.id === state.documentFolderId);
     if (state.documentFolderId && !currentFolder) state.documentFolderId = "";
     const rows = allRows.filter((document) => String(library.placements[document.id] || "") === String(state.documentFolderId || ""));
-    const uploadNote = api.isFastMode() ? `<p class="toolbar-note fast-upload-note">Caricamento file non disponibile in Modalità Rapida. Passa alla Modalità Standard per aggiungere documenti.</p>` : `<p class="toolbar-note">Carica PDF, immagini o file Office direttamente nell’archivio Seemax</p>`;
-    const toolbar = `<div class="view-toolbar document-toolbar"><div>${uploadNote}</div><div class="document-toolbar-actions"><button class="btn ghost" data-action="new-document-folder">📁 Nuova cartella</button>${api.isFastMode() ? "" : `<button class="btn primary" data-action="new-document" data-folder-id="${esc(state.documentFolderId)}">＋ Carica documento</button>`}</div></div>`;
+    const uploadNote = `<p class="toolbar-note">Carica PDF, immagini o file Office direttamente nell’archivio Seemax</p>`;
+    const toolbar = `<div class="view-toolbar document-toolbar"><div>${uploadNote}</div><div class="document-toolbar-actions"><button class="btn ghost" data-action="new-document-folder">📁 Nuova cartella</button><button class="btn primary" data-action="new-document" data-folder-id="${esc(state.documentFolderId)}">＋ Carica documento</button></div></div>`;
     const breadcrumb = `<div class="document-breadcrumb"><button data-action="document-root" class="${state.documentFolderId ? "" : "active"}">🗂️ Documenti</button>${currentFolder ? `<span>›</span><strong>📁 ${esc(currentFolder.name)}</strong>` : ""}${heldDocumentId ? `<button class="cancel-document-move" data-action="cancel-document-move">✕ Annulla spostamento</button>` : `<small>Trascina con il mouse oppure premi per 2 secondi su smartphone.</small>`}</div>`;
     const folders = !state.documentFolderId ? `<div class="document-folder-grid">${library.folders.map((folder) => {
       const count = state.data.documents.filter((document) => library.placements[document.id] === folder.id).length;
@@ -2096,19 +2271,76 @@
     const list = rows.length ? rows.map((d) => {
       const syncing = !!d.__sync_state;
       return `<article class="document-row document-draggable ${heldDocumentId === d.id ? "picked-up" : ""} ${syncing ? "record-sync-pending" : ""}" draggable="${syncing ? "false" : "true"}" data-document-drag="${esc(d.id)}"><span class="file-icon document-emoji">${documentEmoji(d)}</span><div><strong>${esc(d.nome)} ${recordSyncBadge(d)}</strong><span>${esc(d.tipo)} · Pratica ${esc(d.pratica || "—")} · ${esc(d.cliente || "—")}</span><small>${dateIt(d.data)}${d.file_size ? ` · ${Math.round(Number(d.file_size) / 1024)} KB` : ""}${d.note ? " · " + esc(d.note) : ""}</small></div><div class="document-actions">${syncing ? `<span class="placeholder-pill">Caricamento in corso</span>` : documentActionMarkup(d)}<button class="btn ghost" data-action="edit-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>${syncing ? "Attendi" : "Modifica"}</button><button class="icon-btn danger" data-action="delete-document" data-id="${esc(d.id)}" ${syncing ? "disabled" : ""}>×</button></div></article>`;
-    }).join("") : emptyState("Cartella vuota", api.isFastMode() ? "Nessun documento presente." : "Carica o trascina qui il primo file.", api.isFastMode() ? "" : "Carica documento", "new-document");
+    }).join("") : emptyState("Cartella vuota", "Carica o trascina qui il primo file.", "Carica documento", "new-document");
     return `${toolbar}${breadcrumb}${folders}<section class="panel document-drop-zone" data-document-folder="${esc(state.documentFolderId)}">${rootDrop}<div class="document-list">${list}</div></section>`;
   }
 
   function renderActivities() {
-    const rows = filterRows(state.data.activities, ["titolo", "tipo", "stato", "assegnatoA"]);
-    const open = rows.filter((a) => a.stato !== "Completata");
-    const done = rows.filter((a) => a.stato === "Completata");
-    return `${viewToolbar("Nuova attività", "new-activity", `<p class="toolbar-note">${open.length} attività ancora aperte</p>`)}<div class="activity-columns"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Da fare</span><h3>Attività aperte</h3></div></div><div class="task-list">${open.length ? open.map(taskCard).join("") : emptyState("Tutto completato", "Non ci sono attività aperte.")}</div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Archivio</span><h3>Completate</h3></div></div><div class="task-list">${done.length ? done.map(taskCard).join("") : emptyState("Nessuna attività", "Le attività completate appariranno qui.")}</div></section></div>`;
+    const rows = filterRows(state.data.activities || [], ["titolo", "tipo", "stato", "practiceLabel"]);
+    const today = new Date();
+    if (!state.activityMonth) state.activityMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+    const [year, month] = state.activityMonth.split("-").map(Number);
+    const first = new Date(year, month - 1, 1);
+    const monthLabel = first.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+    const days = new Date(year, month, 0).getDate();
+    const lead = (first.getDay() + 6) % 7;
+    const cells = Array.from({ length: lead + days }, (_, index) => {
+      if (index < lead) return `<span class="agenda-day empty"></span>`;
+      const day = index - lead + 1;
+      const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const activities = rows.filter((item) => String(item.data || item.scadenza || "").slice(0, 10) === iso);
+      const isToday = iso === new Date().toISOString().slice(0, 10);
+      return `<button type="button" class="agenda-day ${isToday ? "today" : ""} ${activities.length ? "has-items" : ""}" data-action="new-activity-date" data-date="${iso}"><strong>${day}</strong>${activities.slice(0, 3).map((item) => `<i class="status-${slug(activityStatus(item))}" title="${esc(item.titolo)}"></i>`).join("")}${activities.length > 3 ? `<small>+${activities.length - 3}</small>` : ""}</button>`;
+    }).join("");
+    const active = rows.filter((item) => !["FATTO", "ANNULLATA"].includes(activityStatus(item))).sort((a, b) => String(a.scadenza || a.data || "").localeCompare(String(b.scadenza || b.data || "")));
+    const archived = rows.filter((item) => ["FATTO", "ANNULLATA"].includes(activityStatus(item))).sort((a, b) => String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || "")));
+    return `${viewToolbar("Nuova attività", "new-activity", `<p class="toolbar-note">Agenda privata · ${active.length} attività attive</p>`)}
+      <section class="agenda-layout"><article class="panel agenda-calendar"><header><button class="icon-btn" data-action="activity-month" data-direction="-1">←</button><div><span class="section-kicker">Calendario locale</span><h3>${esc(monthLabel)}</h3></div><button class="icon-btn" data-action="activity-month" data-direction="1">→</button></header><div class="agenda-weekdays">${["Lun","Mar","Mer","Gio","Ven","Sab","Dom"].map((day) => `<span>${day}</span>`).join("")}</div><div class="agenda-days">${cells}</div><p class="field-help">Tocca un giorno per pianificare rapidamente una nuova attività.</p></article>
+      <div class="agenda-lists"><section class="panel"><div class="panel-head"><div><span class="section-kicker">Da organizzare</span><h3>Attività personali</h3></div></div><div class="task-list">${active.length ? active.map(taskCard).join("") : emptyState("Agenda libera", "Non ci sono attività aperte.")}</div></section><section class="panel"><div class="panel-head"><div><span class="section-kicker">Storico locale</span><h3>Fatte e annullate</h3></div></div><div class="task-list compact">${archived.length ? archived.map(taskCard).join("") : emptyState("Nessuno storico", "Le attività concluse appariranno qui.")}</div></section></div></section>`;
+  }
+
+  function activityStatus(activity) {
+    const value = String((activity || {}).stato || "DA FARE").toUpperCase();
+    if (value === "COMPLETATA") return "FATTO";
+    if (value === "APERTA" || value === "IN CORSO") return "DA FARE";
+    return ["DA FARE", "FATTO", "SOSPESA", "ANNULLATA"].includes(value) ? value : "DA FARE";
   }
 
   function taskCard(a) {
-    return `<article class="task-card ${a.stato === "Completata" ? "done" : ""}"><button class="task-check" data-action="toggle-activity" data-id="${esc(a.id)}">${a.stato === "Completata" ? "✓" : ""}</button><div><strong>${esc(a.titolo)}</strong><span>${esc(a.tipo)} · ${dateIt(a.scadenza)}</span><small>${esc(a.assegnatoA || "Non assegnata")}</small></div><button class="more-action" data-action="edit-activity" data-id="${esc(a.id)}">⋮</button></article>`;
+    const status = activityStatus(a);
+    const linked = a.practiceLabel || ((state.data.practices || []).find((practice) => String(practice.id) === String(a.practiceId || "")) || {}).cliente || "";
+    return `<article class="task-card agenda-status-${slug(status)}"><div class="task-main"><span class="task-type">${status === "FATTO" ? "✓" : status === "SOSPESA" ? "Ⅱ" : status === "ANNULLATA" ? "×" : "○"}</span><div><strong>${esc(a.titolo)}</strong><span>${esc(a.tipo || "Attività")} · ${dateIt(a.data || a.scadenza)}${a.scadenza && a.scadenza !== a.data ? ` → ${dateIt(a.scadenza)}` : ""}</span>${linked ? `<small>Pratica: ${esc(linked)}</small>` : ""}${a.promemoria ? `<small>🔔 Promemoria ${dateIt(a.promemoria)}</small>` : ""}</div><button class="more-action" data-action="edit-activity" data-id="${esc(a.id)}">⋮</button></div><div class="task-status-actions"><button data-action="set-activity-status" data-id="${esc(a.id)}" data-status="FATTO">Fatto</button><button data-action="set-activity-status" data-id="${esc(a.id)}" data-status="SOSPESA">Sospesa</button><button data-action="set-activity-status" data-id="${esc(a.id)}" data-status="ANNULLATA">Annullata</button></div></article>`;
+  }
+
+  function shiftActivityMonth(direction) {
+    const [year, month] = String(state.activityMonth || new Date().toISOString().slice(0, 7)).split("-").map(Number);
+    const next = new Date(year, month - 1 + Number(direction || 0), 1);
+    state.activityMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    renderRoute();
+  }
+
+  function renderRankings() {
+    const rows = (state.data.rankings || []).slice().sort((a, b) => Number(b.miglior_fatturato || 0) - Number(a.miglior_fatturato || 0) || String(a.nome || a.username || "").localeCompare(String(b.nome || b.username || ""), "it"));
+    const cards = rows.map((row, index) => {
+      const appearance = profileAppearance(row);
+      const name = row.nome_profilo || row.nome || row.nome_visualizzato || row.username || "Utente";
+      return `<button class="ranking-card profile-theme-${appearance.theme}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}" data-action="open-ranking-profile" data-id="${esc(row.username)}"><span class="ranking-position">${index + 1}</span><span class="profile-avatar ${appearance.icon ? "uses-icon" : ""}">${esc(appearance.icon || initials(name))}</span><div><small>NOME UTENTE</small><h3>${esc(name)}</h3><p>@${esc(row.username || "utente")}</p></div><dl><div><dt>Miglior fatturato</dt><dd>${euros(row.miglior_fatturato || 0)}</dd></div><div><dt>Ultima pratica inserita</dt><dd>${dateIt(row.ultima_pratica_data)}</dd></div></dl><em>Apri profilo →</em></button>`;
+    }).join("");
+    return `<section class="ranking-intro"><span>🏆</span><div><span class="section-kicker">Community Seemax</span><h2>Classifiche e profili</h2><p>Consulta i risultati pubblici, le bacheche e i traguardi degli utenti del Management Suite.</p></div></section><div class="ranking-grid">${cards || emptyState("Classifica in preparazione", "I profili appariranno dopo il prossimo aggiornamento del database.")}</div>`;
+  }
+
+  function openRankingProfile(username) {
+    const row = (state.data.rankings || []).find((item) => String(item.username || "") === String(username || ""));
+    if (!row) { toast("Profilo non disponibile.", "danger"); return; }
+    const appearance = profileAppearance(row);
+    const name = row.nome_profilo || row.nome || row.nome_visualizzato || row.username || "Utente";
+    const achievements = Array.isArray(row.achievements) ? row.achievements : [];
+    const unlocked = new Set(achievements.filter((item) => item.unlocked).map((item) => item.id));
+    let boardIds = [];
+    try { boardIds = JSON.parse(row.bacheca_trofei_json || "[]"); } catch (error) { boardIds = []; }
+    const board = boardIds.filter((id) => unlocked.has(id)).map((id) => achievements.find((item) => item.id === id)).filter(Boolean).map((item) => `<article class="profile-trophy"><span>${esc(item.icon || "🏅")}</span><div><small>RICONOSCIMENTO</small><strong>${esc(item.title)}</strong><p>${esc(item.description)}</p></div></article>`).join("");
+    const body = `<div class="public-profile"><section class="profile-hero profile-theme-${appearance.theme}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}"><div class="profile-avatar ${appearance.icon ? "uses-icon" : ""}">${esc(appearance.icon || initials(name))}</div><div class="profile-identity"><span class="section-kicker">Profilo Seemax</span><h2>${esc(name)}</h2><p>${esc(row.descrizione_profilo || "Profilo professionale Seemax.")}</p><div>${badge(row.ruolo || "AGENTE")}</div></div></section><section class="profile-stats-grid"><article><span>💶</span><div><small>Miglior fatturato</small><strong>${euros(row.miglior_fatturato || 0)}</strong><p>${esc(row.miglior_periodo || "Miglior risultato mensile")}</p></div></article><article><span>📋</span><div><small>Ultima pratica inserita</small><strong>${dateIt(row.ultima_pratica_data)}</strong><p>${esc(row.ultima_pratica_numero || "Nessuna pratica")}</p></div></article></section><section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">Bacheca pubblica</span><h3>Trofei</h3></div></div><div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>✨</span><h3>Nessun trofeo in evidenza</h3><p>La bacheca di questo utente è ancora vuota.</p></div>`}</div></section></div>`;
+    openModal(name, body, { wide: true, kicker: "Profilo utente" });
   }
 
   function renderUsers() {
@@ -2153,7 +2385,7 @@
   function renderSystemSettingsTab() {
     const status = api.status();
     const meta = (state.data && state.data.database_meta) || {};
-    return `<div class="settings-grid"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.fast ? "Modalità Rapida" : status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.fast ? "Lavoro locale" : status.demo ? "Demo locale" : "Standard · Online"}</dd></div><div><dt>Elementi da salvare</dt><dd>${status.pending || 0}</dd></div><div><dt>Versione frontend</dt><dd>${esc(config.version)}</dd></div><div><dt>Fonte magazzino</dt><dd>${esc(meta.inventory_source || "PRODOTTI_LED")}</dd></div></dl><p>Le Attività restano locali. Le altre sezioni comunicano con Google Apps Script e con il Foglio condiviso.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Diagnostica</span><h3>Stato tecnico</h3></div></div><div class="config-summary"><dl><div><dt>Prodotti caricati</dt><dd>${Number(meta.products_count || (state.data.products || []).length)}</dd></div><div><dt>Ultimo caricamento</dt><dd>${meta.loaded_at ? esc(new Date(meta.loaded_at).toLocaleString("it-IT")) : "—"}</dd></div><div><dt>Comunicazioni</dt><dd>Revisioni per account</dd></div></dl><p>La modalità “Solo una volta” viene registrata nella riga dell’agente e affiancata da una cache locale: lo stesso account non rivede il messaggio neppure cambiando dispositivo. “Ripubblica” crea una nuova revisione per tutti.</p></div></section></div>`;
+    return `<div class="settings-grid"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.demo ? "Demo locale" : status.online ? "Online condivisa" : "Offline"}</dd></div><div><dt>Versione frontend</dt><dd>${esc(config.version)}</dd></div><div><dt>Fonte magazzino</dt><dd>${esc(meta.inventory_source || "PRODOTTI_LED")}</dd></div></dl><p>Le Attività restano locali. Le altre sezioni comunicano con Google Apps Script e con il Foglio condiviso.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Diagnostica</span><h3>Stato tecnico</h3></div></div><div class="config-summary"><dl><div><dt>Prodotti caricati</dt><dd>${Number(meta.products_count || (state.data.products || []).length)}</dd></div><div><dt>Ultimo caricamento</dt><dd>${meta.loaded_at ? esc(new Date(meta.loaded_at).toLocaleString("it-IT")) : "—"}</dd></div><div><dt>Comunicazioni</dt><dd>Revisioni per account</dd></div></dl><p>La modalità “Solo una volta” viene registrata nella riga dell’agente e affiancata da una cache locale: lo stesso account non rivede il messaggio neppure cambiando dispositivo. “Ripubblica” crea una nuova revisione per tutti.</p></div></section></div>`;
   }
 
   function renderSettings() {
@@ -2184,6 +2416,8 @@
   }
 
   function closeModal() {
+    const plannerImportModal = pendingPlannerImport && pendingPlannerImport.stage !== "sending" && $("modalRoot") && ($("modalRoot").querySelector(".planner-import-choice") || $("modalRoot").querySelector("form[data-planner-import='1']"));
+    if (plannerImportModal) rejectPendingPlannerImport("Inserimento pratica annullato.");
     pendingMessageAcknowledgement = null;
     $("modalRoot").innerHTML = "";
     document.body.classList.remove("modal-open");
@@ -2476,7 +2710,7 @@
     const selectedClient = state.data.clients.find((c) => c.id === selectedClientId);
     const clientIsRequired = practiceRequired(practiceType, "clientid");
     const clientField = !isNewForm
-      ? `${field("Cliente", "cliente_display", record.cliente || (selectedClient && selectedClient.ragioneSociale) || "", { readonly: true })}<input type="hidden" name="clientId" value="${esc(selectedClientId)}">`
+      ? `<div class="linked-client-field"><small>Cliente</small><button type="button" data-action="open-linked-client" data-id="${esc(selectedClientId)}" ${selectedClientId ? "" : "disabled"}><span>👤</span><strong>${esc(record.cliente || (selectedClient && selectedClient.ragioneSociale) || "Cliente non collegato")}</strong><em>${selectedClientId ? "Apri anagrafica →" : "Anagrafica assente"}</em></button></div><input type="hidden" name="cliente_display" value="${esc(record.cliente || "")}"><input type="hidden" name="clientId" value="${esc(selectedClientId)}">`
       : `<label>Cliente ${requiredMark(clientIsRequired)}<select name="clientId" ${clientIsRequired ? "required" : ""}><option value="">Seleziona cliente</option>${state.data.clients.map((c) => `<option value="${esc(c.id)}" ${c.id === selectedClientId ? "selected" : ""}>${esc(c.ragioneSociale)}</option>`).join("")}</select></label>`;
     let inventoryRows = [];
     try { inventoryRows = JSON.parse(record.righe_magazzino_json || "[]"); } catch (error) { inventoryRows = []; }
@@ -2633,14 +2867,12 @@
       : [];
     const uploadFields = (PRACTICE_DOCUMENTS[practiceType] || []).map(([key, label]) => {
       const existing = existingDocuments.find((doc) => String(doc.tipo_pratica_documento || "") === key || String(doc.tipo || "").toLowerCase() === label.toLowerCase());
-      const required = req(key) && !existing;
-      return `<label class="practice-upload">${esc(label)} ${requiredMark(req(key))}${existing ? `<small class="uploaded-file">✓ Già caricato: ${esc(existing.nome || existing.file_name)}</small>` : ""}<input type="file" name="practice_file_${esc(key)}" data-practice-document="${esc(key)}" data-document-label="${esc(label)}" ${required ? "required" : ""} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"></label>`;
+      const required = req(key) && !existing && String(record.stato || "Inserita") === "Inserita";
+      return `<label class="practice-upload">${esc(label)} <span data-document-required-mark>${requiredMark(required)}</span>${existing ? `<small class="uploaded-file">✓ Già caricato: ${esc(existing.nome || existing.file_name)}</small>` : ""}<input type="file" name="practice_file_${esc(key)}" data-practice-document="${esc(key)}" data-document-label="${esc(label)}" data-required-if-inserted="${req(key) && !existing ? "SI" : "NO"}" ${required ? "required" : ""} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"></label>`;
     }).join("");
-    const uploadControls = api.isFastMode()
-      ? `<div class="fast-upload-note">La consultazione resta disponibile. Per allegare nuovi documenti passa alla Modalità Standard.</div>`
-      : uploadFields
-        ? `<div class="practice-upload-grid">${uploadFields}</div>`
-        : `<div class="practice-upload-help"><span>＋</span><div><strong>Aggiungi altri allegati dalla sezione Documenti</strong><small>Seleziona questa pratica nel campo di collegamento: il file apparirà automaticamente in questo elenco.</small></div></div>`;
+    const uploadControls = uploadFields
+      ? `<div class="practice-upload-grid">${uploadFields}</div>`
+      : `<div class="practice-upload-help"><span>＋</span><div><strong>Aggiungi altri allegati dalla sezione Documenti</strong><small>Seleziona questa pratica nel campo di collegamento: il file apparirà automaticamente in questo elenco.</small></div></div>`;
     const uploads = `<fieldset class="practice-section full practice-documents-panel"><legend>Documentazione della pratica</legend>${practiceDocumentListMarkup(existingDocuments)}${uploadControls}</fieldset>`;
     const technicalFields = `<fieldset class="practice-configurator practice-multi-ledwall full"><legend>Prodotti della pratica</legend>
       <div class="multi-ledwall-intro"><span>🖥️</span><div><strong>Una sola pratica, più prodotti</strong><p>Aggiungi Ledwall, Croci, LED speciali o Schermi LCD. Quantità e disponibilità vengono calcolate e sommate automaticamente.</p></div></div>
@@ -2657,7 +2889,9 @@
     const tabContent = practiceType === "ACQUISTO"
       ? tabPanel("recipient", purchaseDestination + identityFields + personalData + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") })) + tabPanel("documents", uploads)
       : tabPanel("client", identityFields + customerData + clientCompletionFields, true) + tabPanel("product", technicalFields) + tabPanel("value", valueFields) + tabPanel("finance", financeFields) + tabPanel("address", addressFields) + tabPanel("technical", technicalManagement + field("Note / descrizione installazione", "note", record.note || "", { type: "textarea", full: true, required: req("note") })) + tabPanel("documents", uploads);
-    const plannerImportNotice = isPlannerPracticePending(record) ? `<div class="planner-practice-notice full"><span>✦</span><div><strong>Pratica importata dal Quotation Planner</strong><p>Completa e verifica i dati mancanti prima di proseguire con l’iter commerciale.</p></div></div>` : "";
+    const plannerImportNotice = isLocalPlannerPractice(record)
+      ? `<div class="planner-practice-notice local full"><span>✦</span><div><strong>IMPORTATA LOCALMENTE: ANAGRAFICA ASSENTE</strong><p>La pratica è visibile soltanto su questo dispositivo e non è stata inviata. Completa l'anagrafica per registrarla nel database.</p></div><button type="button" class="btn primary" data-action="complete-local-import" data-id="${esc(record.id)}">Completa anagrafica</button></div>`
+      : isPlannerPracticePending(record) ? `<div class="planner-practice-notice full"><span>✦</span><div><strong>Pratica importata dal Quotation Planner</strong><p>I colori seguono lo stato operativo; il simbolo viola identifica l'origine S.Q.P.</p></div></div>` : "";
     const workOrderAction = !isNewForm && api.isAdmin() && String(record.stato || "").trim().toUpperCase() === "ACCETTATA" ? `<section class="work-order-launch full"><span>🧾</span><div><small>STRUMENTO TECNICO LOCALE</small><strong>Commessa d’ordine</strong><p>Genera il documento A4 con cliente, agente e prodotti. Nessun dato aggiuntivo viene inviato al database.</p></div><button type="button" class="btn primary" data-action="generate-work-order" data-id="${esc(record.id)}">Genera commessa</button></section>` : "";
     const fields = plannerImportNotice + typeSummary + workOrderAction + practiceStockWarningAdminControl(record) + tabNavigation + tabContent +
       (record.preventivo_id ? field("Preventivo S.Q.P.", "preventivo_id", record.preventivo_id, { readonly: true }) + field("Origine", "origine", record.origine || "S.Q.P.", { readonly: true }) : "") +
@@ -2688,6 +2922,7 @@
         address = "PRESSO ALTRO INDIRIZZO";
       }
       const management = String(form.elements.gestione_ledwall?.value || "").toUpperCase();
+      const documentStageRequired = String(form.elements.stato?.value || "Inserita").toUpperCase() === "INSERITA";
       const selectedClient = state.data.clients.find((client) => String(client.id) === String(form.elements.clientId?.value || ""));
       const clientHasAddress = !!(selectedClient && [selectedClient.regione, selectedClient.provincia, hasStoredText(selectedClient.comune) ? selectedClient.comune : selectedClient.citta, selectedClient.cap, selectedClient.indirizzo, selectedClient.civico].every(hasStoredText));
       const needsClientAddress = address === "COME INDIRIZZO CLIENTE" && !clientHasAddress;
@@ -2742,6 +2977,12 @@
           } else if (input.dataset.wasRequired === "1") input.required = true;
         });
       });
+      form.querySelectorAll("[data-practice-document]").forEach((input) => {
+        const required = documentStageRequired && input.dataset.requiredIfInserted === "SI";
+        input.required = required;
+        const marker = input.closest("label") && input.closest("label").querySelector("[data-document-required-mark]");
+        if (marker) marker.innerHTML = requiredMark(required);
+      });
       const clientSelect = form.elements.clientId;
       if (clientSelect && practiceType === "ACQUISTO") {
         const personal = destination === "PER ME";
@@ -2757,7 +2998,7 @@
       }
     };
     form.addEventListener("change", (event) => {
-      if (["destinatario_ordine", "indirizzo_installazione_tipo", "gestione_ledwall", "clientId", "agent_username"].includes(event.target.name)) refresh();
+      if (["destinatario_ordine", "indirizzo_installazione_tipo", "gestione_ledwall", "clientId", "agent_username", "stato"].includes(event.target.name)) refresh();
     });
     refresh();
   }
@@ -3072,12 +3313,100 @@
     }
   }
 
-  async function openClient(id) {
+  function plannerClientSeed(payload) {
+    const fiscal = String(payload.cliente_piva_cf || "").replace(/\s+/g, "").toUpperCase();
+    const digitsOnly = fiscal.replace(/\D/g, "");
+    return {
+      ragioneSociale: payload.cliente_azienda || payload.cliente_referente || "",
+      referente: payload.cliente_referente || "",
+      piva: digitsOnly.length === 11 ? digitsOnly : "",
+      codice_fiscale: fiscal.length === 16 ? fiscal : "",
+      email: payload.cliente_email || "",
+      telefono: payload.cliente_telefono || "",
+      telefono_numero: payload.cliente_telefono || "",
+      comune: payload.cliente_localita || "",
+      citta: payload.cliente_localita || ""
+    };
+  }
+
+  function rejectPendingPlannerImport(message) {
+    const pending = pendingPlannerImport;
+    pendingPlannerImport = null;
+    if (pending && typeof pending.reject === "function") pending.reject(new Error(message || "Inserimento pratica annullato."));
+  }
+
+  async function completePlannerImportWithClient(client) {
+    const pending = pendingPlannerImport;
+    if (!pending || !client || !client.id) return null;
+    pending.stage = "sending";
+    const response = await api.createPracticeFromQuote({ ...pending.payload, cliente_id_gestionale: client.id });
+    if (pending.localPracticeId) removeLocalPlannerPractice(pending.localPracticeId);
+    if (response && response.practice) replaceLocalEntity("practices", response.practice);
+    pendingPlannerImport = null;
+    if (typeof pending.resolve === "function") pending.resolve(response);
+    requestRouteRender();
+    return response;
+  }
+
+  function createLocalPlannerImport() {
+    const pending = pendingPlannerImport;
+    if (!pending) return;
+    const localPractice = buildLocalPlannerPractice(pending.payload);
+    saveLocalPlannerPractice(localPractice);
+    pendingPlannerImport = null;
+    closeModal();
+    requestRouteRender();
+    pending.resolve({ ok: true, local_only: true, practice: localPractice });
+    toast("La tua pratica è stata salvata ma non è possibile inviarla in quanto l'anagrafica principale non è completa.", "warning");
+  }
+
+  async function continuePlannerImportWithAnagraphic() {
+    const pending = pendingPlannerImport;
+    if (!pending) return;
+    pending.stage = "client";
+    const existingId = String(pending.payload.cliente_id_gestionale || "");
+    const existing = (state.data.clients || []).find((client) => String(client.id) === existingId);
+    if (existing) {
+      const session = api.getSession() || {};
+      const owner = String(existing.creato_da_username || existing.agent_username || "");
+      const canEdit = api.isAdmin() || String(existing.puo_modificare || "NO").toUpperCase() === "SI" || owner === String(session.username || "");
+      if (!canEdit) {
+        try { await completePlannerImportWithClient(existing); }
+        catch (error) { rejectPendingPlannerImport(error.message); toast(error.message, "danger"); }
+        return;
+      }
+    }
+    await openClient(existing && existing.id, plannerClientSeed(pending.payload), { plannerImport: true });
+  }
+
+  function requestPracticeImport(payload) {
+    if (state.offlinePlannerOnly || !api.getSession()) return Promise.reject(new Error("In modalità offline puoi creare ed esportare il preventivo, ma non inviare una pratica al database."));
+    if (pendingPlannerImport) return Promise.reject(new Error("È già in corso l'inserimento di una pratica dal Quotation Planner."));
+    return new Promise((resolve, reject) => {
+      pendingPlannerImport = { payload: { ...(payload || {}), request_token: (payload && payload.request_token) || newRequestToken() }, resolve, reject, stage: "choice", localPracticeId: "" };
+      const body = `<div class="planner-import-choice"><span class="planner-import-symbol">✦</span><h3>Si sta tentando di inserire una pratica istantanea dal Seemax Quotation Planner.</h3><p>Devi prima completare l'anagrafica vuoi farlo ora?</p><div class="planner-import-outcomes"><article><strong>SÌ</strong><span>Apri l’anagrafica precompilata, completa i campi obbligatori e invia la pratica.</span></article><article><strong>NO</strong><span>Conserva la pratica soltanto su questo dispositivo finché l’anagrafica non sarà completata.</span></article></div><div class="form-actions"><button type="button" class="btn ghost" data-action="planner-import-no">No</button><button type="button" class="btn primary" data-action="planner-import-yes">Sì, completa ora</button></div></div>`;
+      openModal("Completa l’anagrafica cliente", body, { kicker: "Importazione S.Q.P.", subtitle: "La pratica viene inviata solo dopo la conferma dei dati cliente" });
+    });
+  }
+
+  async function completeLocalPlannerImport(id) {
+    const practice = (state.data.practices || []).find((row) => String(row.id) === String(id));
+    if (!practice || !isLocalPlannerPractice(practice)) return;
+    if (pendingPlannerImport) { toast("Concludi prima l'inserimento già aperto.", "danger"); return; }
+    const payload = { ...(practice.__source_payload || {}), request_token: practice.request_token || newRequestToken() };
+    pendingPlannerImport = { payload, resolve: () => {
+      celebrateSuccess("📋", "Pratica inviata", "L'anagrafica è completa e la pratica è ora disponibile nel database condiviso.");
+    }, reject: () => {}, stage: "client", localPracticeId: practice.id };
+    await openClient(null, plannerClientSeed(payload), { plannerImport: true });
+  }
+
+  async function openClient(id, seed = {}, options = {}) {
     setLoading(true, "Preparazione anagrafica cliente…");
     try { await ensureClientTools(); }
     catch (error) { toast(error.message, "danger"); return; }
     finally { setLoading(false); }
-    const r = state.data.clients.find((c) => c.id === id) || {};
+    const existing = state.data.clients.find((c) => c.id === id);
+    const r = existing || { ...(seed || {}) };
     const isDraftNew = r.__sync_new_record === true;
     const isNewForm = !r.id || isDraftNew;
     const session = api.getSession() || {};
@@ -3095,7 +3424,14 @@
     const fields = ownerAssignment + adminUnknownNotice + window.SeemaxClientTools.renderFields(r);
     openModal(isNewForm ? "Nuovo cliente" : (canEdit ? "Modifica cliente" : "Anagrafica condivisa"), formShell("clients", r.id, fields, canEdit ? "Salva cliente" : "Consultazione", r.record_version), { wide: true, kicker: canEdit ? "Anagrafica cliente" : "Cliente condiviso", subtitle: !canEdit ? `Creato da ${r.creato_da_nome || "un altro utente"}. Puoi utilizzarlo nelle tue pratiche, ma non modificarlo.` : "" });
     const form = document.querySelector(".entity-form[data-entity='clients']");
-    if (form) window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast, !canEdit);
+    if (form) {
+      if (options.plannerImport) {
+        form.dataset.plannerImport = "1";
+        const cancel = form.querySelector(".form-actions .btn.ghost");
+        if (cancel) cancel.dataset.action = "cancel-planner-import";
+      }
+      window.SeemaxClientTools.bind(form, r, state.data.clients, api, toast, !canEdit);
+    }
   }
 
   function openProduct(id) {
@@ -3116,10 +3452,6 @@
 
   function openInventoryAdjustment() {
     if (!api.isAdmin()) return;
-    if (api.isFastMode()) {
-      toast("Passa alla Modalità Standard per registrare movimenti condivisi di magazzino.", "danger");
-      return;
-    }
     const products = (state.data.products || []).filter((product) => String(product.attivo || "SI").toUpperCase() !== "NO");
     if (!products.length) { toast("Nessun prodotto disponibile in catalogo.", "danger"); return; }
     const recent = (state.data.movements || []).slice(0, 12);
@@ -3162,11 +3494,8 @@
 
   function openDocument(id, folderId = state.documentFolderId, droppedFile = null) {
     const r = state.data.documents.find((d) => d.id === id) || {};
-    if (!id && api.isFastMode()) { toast("Il caricamento dei file è disponibile soltanto in Modalità Standard.", "danger"); return; }
     if (!id) { pendingDocumentFolderId = folderId || ""; pendingDocumentFile = droppedFile || null; }
-    const fileField = api.isFastMode()
-      ? `<div class="full fast-upload-note">Il file non può essere sostituito mentre è attiva la Modalità Rapida.</div>`
-      : `<label class="full upload-field">File dal dispositivo${r.url ? `<small>Il file attuale resta invariato se non ne selezioni uno nuovo.</small>` : `<small>Massimo 8 MB. Il file sarà archiviato nel Drive Seemax.</small>`}<input name="document_file" type="file" ${r.url ? "" : "required"} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt"></label>`;
+    const fileField = `<label class="full upload-field">File dal dispositivo${r.url ? `<small>Il file attuale resta invariato se non ne selezioni uno nuovo.</small>` : `<small>Massimo 8 MB. Il file sarà archiviato nel Drive Seemax.</small>`}<input name="document_file" type="file" ${r.url ? "" : "required"} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt"></label>`;
     const fields = field("Nome documento", "nome", r.nome, { required: true, full: true }) + field("Tipo", "tipo", r.tipo || "Preventivo", { options: ["Preventivo", "Contratto", "Documento cliente", "Documento finanziaria", "Installazione", "Altro"] }) + field("Pratica", "practiceId", r.practiceId || "", { options: ["", ...state.data.practices.map((p) => p.id)] }) + fileField + field("Data", "data", r.data || new Date().toISOString().slice(0, 10), { type: "date" }) + field("Note", "note", r.note, { type: "textarea", full: true });
     openModal(r.id ? "Modifica documento" : "Nuovo documento", formShell("documents", r.id, fields, "Salva", r.record_version), { wide: true, kicker: "Archivio documentale" });
     if (!id && pendingDocumentFile) requestAnimationFrame(() => {
@@ -3180,9 +3509,11 @@
     });
   }
 
-  function openActivity(id) {
+  function openActivity(id, presetDate = "") {
     const r = state.data.activities.find((a) => a.id === id) || {};
-    const fields = field("Titolo attività", "titolo", r.titolo, { required: true, full: true }) + field("Tipo", "tipo", r.tipo || "Telefonata", { options: ["Telefonata", "Email", "Appuntamento", "Verifica", "Installazione", "Altro"] }) + field("Stato", "stato", r.stato || "Aperta", { options: ["Aperta", "In corso", "Completata"] }) + field("Scadenza", "scadenza", r.scadenza || new Date().toISOString().slice(0, 10), { type: "date" }) + field("Pratica collegata", "practiceId", r.practiceId || "", { options: ["", ...state.data.practices.map((p) => p.id)] }) + field("Assegnata a", "assegnatoA", r.assegnatoA || ((api.getSession() || {}).displayName || ""), { full: true });
+    const selectedDate = r.data || presetDate || new Date().toISOString().slice(0, 10);
+    const practiceOptions = `<label class="full">Pratica collegata<select name="practiceId"><option value="">Nessuna pratica</option>${(state.data.practices || []).filter((practice) => !isLocalPlannerPractice(practice)).map((practice) => `<option value="${esc(practice.id)}" ${String(practice.id) === String(r.practiceId || "") ? "selected" : ""}>${esc(practice.cliente || "Cliente")} · ${esc(practice.numero || practice.id)}</option>`).join("")}</select><small>Il collegamento viene mostrato usando la ragione sociale del cliente.</small></label>`;
+    const fields = field("Titolo attività", "titolo", r.titolo, { required: true, full: true }) + field("Tipo", "tipo", r.tipo || "Telefonata", { options: ["Fare preventivo", "Telefonata", "Email", "Appuntamento", "Verifica", "Installazione", "Altro"] }) + field("Stato", "stato", activityStatus(r), { options: ["DA FARE", "FATTO", "SOSPESA", "ANNULLATA"] }) + field("Data attività", "data", selectedDate, { type: "date", required: true }) + field("Scadenza", "scadenza", r.scadenza || selectedDate, { type: "date" }) + field("Promemoria", "promemoria", String(r.promemoria || "").slice(0, 16), { type: "datetime-local" }) + practiceOptions;
     openModal(r.id ? "Modifica attività" : "Nuova attività", formShell("activities", r.id, fields), { wide: true, kicker: "Agenda operativa" });
   }
 
@@ -3209,14 +3540,14 @@
     const completed = practices.filter((p) => p.stato === "Completata");
     const previousRevenue = (state.data.dashboard && state.data.dashboard.revenue) || {};
     state.data.dashboard = {
-      totals: { clients: (state.data.clients || []).length, practices: open.length, value: open.reduce((sum, p) => sum + Number(p.valore || 0), 0), activities: activities.filter((a) => a.stato !== "Completata").length },
+      totals: { clients: (state.data.clients || []).length, practices: open.length, value: open.reduce((sum, p) => sum + Number(p.valore || 0), 0), activities: activities.filter((a) => !["FATTO", "ANNULLATA"].includes(activityStatus(a))).length },
       revenue: {
         personal: completed.filter((p) => String(p.agent_username || "") === String(session.username || "") || (!p.agent_username && p.agente === (session.displayName || session.nome_visualizzato))).reduce((sum, p) => sum + Number(p.valore || 0), 0),
         company: api.isAdmin() ? completed.reduce((sum, p) => sum + Number(p.valore || 0), 0) : Number(previousRevenue.company || 0),
         target: Number((state.data.settings || {}).obiettivo_fatturato || previousRevenue.target || 0)
       },
       recentPractices: practices.slice().sort((a, b) => String(b.aggiornatoIl || "").localeCompare(String(a.aggiornatoIl || ""))).slice(0, 5),
-      nextActivities: activities.filter((a) => a.stato !== "Completata").sort((a, b) => String(a.scadenza || "").localeCompare(String(b.scadenza || ""))).slice(0, 6),
+      nextActivities: activities.filter((a) => !["FATTO", "ANNULLATA"].includes(activityStatus(a))).sort((a, b) => String(a.scadenza || "").localeCompare(String(b.scadenza || ""))).slice(0, 6),
       pipeline: STATUSES.map((status) => ({ status, count: practices.filter((p) => p.stato === status).length, value: practices.filter((p) => p.stato === status).reduce((sum, p) => sum + Number(p.valore || 0), 0) })),
       agentOfMonth: state.data.dashboard && state.data.dashboard.agentOfMonth
     };
@@ -3287,12 +3618,19 @@
     const entity = form.dataset.entity;
     const current = (state.data[entity] || []).find((item) => String(item.id) === String(form.dataset.id)) || {};
     const isNewRecord = !current.id || current.__sync_new_record === true;
+    const plannerImportClient = entity === "clients" && form.dataset.plannerImport === "1";
     const documentFolderAtSave = entity === "documents" ? pendingDocumentFolderId : "";
     const pendingDocumentFileAtSave = entity === "documents" ? pendingDocumentFile : null;
     if (entity === "practices" && isCompletedPractice(current)) {
       toast("La pratica è completata e può essere soltanto consultata nell’archivio.", "danger");
       closeModal();
       openCompletedPractice(current);
+      return;
+    }
+    if (entity === "practices" && isLocalPlannerPractice(current)) {
+      toast("Completa prima l'anagrafica: la pratica locale non può essere inviata come una normale modifica.", "warning");
+      closeModal();
+      await completeLocalPlannerImport(current.id);
       return;
     }
     const missing = Array.from(form.querySelectorAll("[required]")).find((element) => !String(element.value || "").trim());
@@ -3326,15 +3664,6 @@
         input
       }))
       : [];
-    if (entity === "practices" && api.isFastMode()) {
-      const type = String(form.elements.tipo_pratica?.value || "").toUpperCase();
-      const existingTypes = (state.data.documents || []).filter((doc) => String(doc.practiceId || "") === String(form.dataset.id || "")).map((doc) => doc.tipo_pratica_documento);
-      const missingRequiredDocument = (PRACTICE_DOCUMENTS[type] || []).find(([key]) => practiceRequired(type, key) && !existingTypes.includes(key));
-      if (missingRequiredDocument) {
-        toast("Questa pratica richiede documenti obbligatori. Passa alla Modalità Standard per allegarli.", "danger");
-        return;
-      }
-    }
     const oversizedAttachment = practiceAttachments.find((item) => item.file.size > (item.file.type.startsWith("image/") ? 20 : 8) * 1024 * 1024);
     if (oversizedAttachment) {
       toast(`${oversizedAttachment.label}: il file supera il limite di 8 MB.`, "danger");
@@ -3460,7 +3789,6 @@
       record.cliente = practice ? practice.cliente : "";
       const file = form.elements.document_file && form.elements.document_file.files[0];
       if (file) {
-        if (api.isFastMode()) { toast("Il caricamento dei file è disponibile soltanto in Modalità Standard.", "danger"); return; }
         if (file.size > (file.type.startsWith("image/") ? 20 : 8) * 1024 * 1024) { toast("Il file supera il limite consentito.", "danger"); return; }
         backgroundSaveNotice = true;
         saveProgressId = startDocumentUploadProgress({ ...record, nome: record.nome || file.name, file_name: file.name });
@@ -3488,12 +3816,18 @@
         updateSaveProgress(saveProgressId, "File pronto: avvio del trasferimento…");
       }
     }
+    if (entity === "activities") {
+      const linkedPractice = (state.data.practices || []).find((practice) => String(practice.id) === String(record.practiceId || ""));
+      record.practiceLabel = linkedPractice ? String(linkedPractice.cliente || linkedPractice.numero || "") : "";
+      record.stato = activityStatus(record);
+      delete record.assegnatoA;
+    }
     if (entity === "users") {
       record.id = record.id || record.username;
       if (!record.chiave_id_agente) delete record.chiave_id_agente;
     }
     if (!backgroundSaveNotice) {
-      backgroundSaveNotice = ["clients", "practices", "documents"].includes(entity) && !api.isFastMode();
+      backgroundSaveNotice = ["clients", "practices", "documents"].includes(entity);
       saveProgressId = backgroundSaveNotice ? startSaveProgress(entity, record) : "";
     }
     if (!backgroundSaveNotice) setLoading(true, `Salvataggio ${ENTITY_LABELS[entity] || "dato"}…`);
@@ -3528,6 +3862,10 @@
         },
         onProgress: (phase) => updateSaveProgress(saveProgressId, phase)
       });
+      if (plannerImportClient) {
+        updateSaveProgress(saveProgressId, "Anagrafica confermata: invio della pratica…");
+        await completePlannerImportWithClient(saved);
+      }
       completeSaveProgress(saveProgressId, saved);
       if (entity === "practices" && practiceAttachments.length) {
         const uploadBatchId = startUploadBatch(saved, practiceAttachments);
@@ -3603,6 +3941,7 @@
       if (!celebrationShown) celebrationShown = celebrateSavedEntity(entity, saved, current);
       if (!celebrationShown) toast(`${ENTITY_LABELS[entity] || "Elemento"} salvato correttamente.`);
     } catch (error) {
+      if (plannerImportClient && pendingPlannerImport) rejectPendingPlannerImport(error.message || "Inserimento pratica non riuscito.");
       failSaveProgress(saveProgressId, record, error);
       if (activeUploadBatchId) {
         const failedBatch = uploadState.batches.get(activeUploadBatchId);
@@ -3673,7 +4012,13 @@
     }
     const existing = (state.data[entity] || []).find((item) => String(item.id || item.username) === String(id));
     if (!confirm(`Eliminare definitivamente questo ${label}?`)) return;
-    const backgroundDeleteNotice = ["clients", "practices", "documents"].includes(entity) && !api.isFastMode();
+    if (entity === "practices" && isLocalPlannerPractice(existing)) {
+      removeLocalPlannerPractice(id);
+      requestRouteRender();
+      toast("Pratica locale eliminata dal dispositivo.");
+      return;
+    }
+    const backgroundDeleteNotice = ["clients", "practices", "documents"].includes(entity);
     const deleteProgressId = backgroundDeleteNotice ? startDeleteProgress(entity, existing || { id }) : "";
     if (!backgroundDeleteNotice) setLoading(true, "Eliminazione…");
     try {
@@ -3694,41 +4039,11 @@
     finally { if (!backgroundDeleteNotice) setLoading(false); }
   }
 
-  async function toggleActivity(id) {
+  async function setActivityStatus(id, status) {
     const record = state.data.activities.find((a) => a.id === id);
     if (!record) return;
-    const saved = await api.upsert("activities", { ...record, stato: record.stato === "Completata" ? "Aperta" : "Completata" });
+    const saved = await api.upsert("activities", { ...record, stato: ["FATTO", "SOSPESA", "ANNULLATA", "DA FARE"].includes(String(status || "").toUpperCase()) ? String(status).toUpperCase() : "DA FARE" });
     replaceLocalEntity("activities", saved); renderRoute(); toast("Attività aggiornata.");
-  }
-
-  function updateModeControls() {
-    const fast = api.isFastMode();
-    const count = api.pendingOperations().length;
-    const label = $("workModeLabel");
-    const switchButton = $("modeSwitchButton");
-    const saveButton = $("saveAllButton");
-    if (!label || !switchButton || !saveButton) return;
-    label.textContent = fast ? "MODALITÀ: RAPIDA" : "MODALITÀ: STANDARD";
-    label.className = `mode-indicator ${fast ? "fast" : "standard"}`;
-    switchButton.textContent = fast ? "Modalità Standard" : "Modalità Rapida";
-    switchButton.dataset.action = fast ? "disable-fast-mode" : "enable-fast-mode";
-    saveButton.classList.toggle("is-hidden", !fast);
-    $("pendingCount").textContent = count;
-    saveButton.disabled = count === 0;
-    const mobileLabel = $("mobileWorkModeLabel");
-    const mobileButton = $("mobileModeSwitchButton");
-    if (mobileLabel) mobileLabel.textContent = fast ? `⚡ Modalità Rapida${count ? ` · ${count} da salvare` : ""}` : "● Modalità Standard";
-    if (mobileButton) {
-      mobileButton.textContent = fast ? "Passa a Standard" : "Passa a Rapida";
-      mobileButton.dataset.action = fast ? "disable-fast-mode" : "enable-fast-mode";
-    }
-    const mobileSaveButton = $("mobileSaveAllButton");
-    const mobilePendingCount = $("mobilePendingCount");
-    if (mobileSaveButton) {
-      mobileSaveButton.classList.toggle("is-hidden", !fast);
-      mobileSaveButton.disabled = count === 0;
-    }
-    if (mobilePendingCount) mobilePendingCount.textContent = count;
   }
 
   function toggleLoginPassword() {
@@ -3743,65 +4058,6 @@
     input.focus({ preventScroll: true });
   }
 
-  function openFastModeWarning() {
-    const body = `<div class="fast-mode-warning"><span class="fast-bolt">⚡</span><h3>Lavoro locale ad alta velocità</h3><p>Il Management Suite non comunicherà costantemente con il Database. Tutti i dati saranno salvati localmente su questo dispositivo e dovranno essere caricati manualmente tramite <strong>SALVA TUTTO</strong>.</p><div class="warning-callout"><strong>Quotation Planner disponibile con archivio limitato</strong><span>Il calcolatore resterà utilizzabile, ma non sarà possibile salvare o caricare preventivi dall’archivio online. Anche il caricamento di documenti nel gestionale sarà temporaneamente disabilitato.</span></div><ul><li>Le modifiche restano su questo browser fino alla sincronizzazione.</li><li>Non cancellare dati del browser prima di usare SALVA TUTTO.</li><li>Le Attività restano locali in entrambe le modalità.</li></ul><div class="form-actions"><button class="btn ghost" data-action="close-modal">Annulla</button><button class="btn primary" data-action="confirm-fast-mode">Attiva Modalità Rapida</button></div></div>`;
-    openModal("Attivare la Modalità Rapida?", body, { kicker: "Avviso operativo" });
-  }
-
-  function enableFastMode() {
-    api.setFastMode(true);
-    closeModal();
-    updateModeControls();
-    setConnectionState();
-    renderRoute();
-    toast("Modalità Rapida attiva.");
-  }
-
-  function disableFastMode() {
-    const pending = api.pendingOperations().length;
-    if (pending) {
-      toast(`Prima usa SALVA TUTTO: ci sono ${pending} elementi da trasferire.`, "danger");
-      return;
-    }
-    api.setFastMode(false);
-    updateModeControls();
-    setConnectionState();
-    renderRoute();
-    toast("Modalità Standard attiva.");
-  }
-
-  function operationLabel(operation) {
-    if (!operation) return "Completamento sincronizzazione";
-    if (operation.type === "settings") return "Impostazioni generali";
-    const labels = { practices: "Pratica", clients: "Cliente", products: "Prodotto", documents: "Documento", users: "Agente" };
-    const record = operation.record || {};
-    return `${operation.type === "remove" ? "Eliminazione" : labels[operation.entity] || operation.entity}: ${record.numero || record.nome || record.ragioneSociale || record.username || operation.id || "elemento"}`;
-  }
-
-  async function syncAll() {
-    const total = api.pendingOperations().length;
-    if (!total) { toast("Non ci sono elementi da salvare."); return; }
-    const layer = $("syncLayer");
-    layer.classList.remove("is-hidden");
-    try {
-      await api.syncAll(({ index, total: count, operation, done }) => {
-        const percent = count ? Math.round((index / count) * 100) : 100;
-        $("syncProgressBar").style.width = `${done ? 100 : percent}%`;
-        $("syncProgressText").textContent = done ? `${count} elementi salvati` : `${index + 1} di ${count}`;
-        $("syncCurrentItem").textContent = done ? "Sincronizzazione completata." : operationLabel(operation);
-      });
-      await loadAll();
-      renderRoute();
-      toast("Tutto il lavoro locale è stato salvato nel database.");
-    } catch (error) {
-      toast(`Sincronizzazione interrotta: ${error.message}`, "danger");
-    } finally {
-      setTimeout(() => layer.classList.add("is-hidden"), 500);
-      updateModeControls();
-      setConnectionState();
-    }
-  }
-
   function searchEverywhere(query) {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return;
@@ -3814,6 +4070,11 @@
     const handlers = {
       "new-practice": () => openPracticeTypeChooser(), "edit-practice": () => openPractice(id), "delete-practice": () => removeEntity("practices", id),
       "new-client": () => openClient(), "edit-client": () => openClient(id), "delete-client": () => removeEntity("clients", id), "new-practice-client": () => openPracticeTypeChooser(id),
+      "open-linked-client": () => { closeModal(); return openClient(id); },
+      "complete-local-import": () => { closeModal(); return completeLocalPlannerImport(id); },
+      "planner-import-yes": continuePlannerImportWithAnagraphic,
+      "planner-import-no": createLocalPlannerImport,
+      "cancel-planner-import": () => { rejectPendingPlannerImport("Inserimento pratica annullato."); closeModal(); },
       "choose-practice-type": () => openPractice(null, data.clientId || "", data.type),
       "back-practice-types": () => openPracticeTypeChooser(),
       "generate-work-order": () => generateWorkOrder(id),
@@ -3865,7 +4126,10 @@
         Object.keys(library.placements).forEach((documentId) => { if (library.placements[documentId] === data.folderId) delete library.placements[documentId]; });
         saveDocumentLibrary(library); renderRoute(); toast("Cartella locale eliminata.");
       },
-      "new-activity": () => openActivity(), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id), "toggle-activity": () => toggleActivity(id),
+      "new-activity": () => openActivity(), "new-activity-date": () => openActivity(null, data.date || ""), "edit-activity": () => openActivity(id), "delete-activity": () => removeEntity("activities", id),
+      "set-activity-status": () => setActivityStatus(id, data.status), "activity-month": () => shiftActivityMonth(Number(data.direction || 0)),
+      "open-activities": () => { closeModal(); go("activities"); },
+      "open-ranking-profile": () => openRankingProfile(id),
       "new-user": () => openUser(), "edit-user": () => openUser(id), "delete-user": () => removeEntity("users", id),
       "settings-tab": () => { state.settingsTab = ["general", "practices", "welcome", "patch", "system"].includes(id) ? id : "general"; renderRoute(); },
       "preview-welcome-message": previewWelcomeMessage,
@@ -3892,11 +4156,8 @@
         Array.from(uploadState.batches.entries()).forEach(([batchId, batch]) => { if (batch.status !== "active") uploadState.batches.delete(batchId); });
         uploadState.expanded = false; renderUploadCenter();
       },
-      "enable-fast-mode": openFastModeWarning,
-      "confirm-fast-mode": enableFastMode,
-      "disable-fast-mode": disableFastMode,
-      "sync-all": syncAll,
       "reload": async () => { await refreshSharedData({ interactive: true, announce: true, reason: "richiesta manuale" }); },
+      "offline-online-login": () => window.location.reload(),
       "reload-planner": () => { if (state.route === "planner") renderRoute(); },
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.health(); setConnectionState(); toast(response.ok ? `Database collegato · ${response.elapsed_ms || 0} ms.` : `Database incompleto: ${(response.missing_sheets || []).join(", ")}.`, response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
@@ -4184,7 +4445,7 @@
         scheduleBootstrapCache();
         renderRoute();
         setConnectionState();
-        toast(api.isFastMode() ? "Impostazioni salvate localmente. Usa SALVA TUTTO." : "Impostazioni salvate.");
+        toast("Impostazioni salvate.");
       }
       catch (error) {
         if (String(error.message || "").includes("CONFLICT_RECORD")) {
@@ -4215,7 +4476,8 @@
   window.addEventListener("resize", () => { if (tutorialState.active) positionTutorialSpotlight(tutorialState.steps[tutorialState.index].selector); });
   window.addEventListener("hashchange", () => { if (api.getSession()) go(location.hash.replace("#", "") || "dashboard", false); });
   window.addEventListener("online", () => {
-    if (!api.getSession() || api.isFastMode()) return;
+    if (state.offlinePlannerOnly) { setConnectionState(); toast("Connessione ripristinata. Puoi continuare il preventivo oppure accedere al sistema online.", "info"); return; }
+    if (!api.getSession()) return;
     window.setTimeout(() => { void refreshSharedData({ reason: "rete nuovamente disponibile", announce: true }); }, 350);
   });
   window.addEventListener("offline", () => {
@@ -4232,7 +4494,7 @@
       clearConnectionRetry();
       return;
     }
-    if (!api.getSession() || api.isFastMode()) return;
+    if (!api.getSession()) return;
     const hiddenFor = pageHiddenAt ? Date.now() - pageHiddenAt : 0;
     pageHiddenAt = 0;
     /* Il piccolo ritardo consente a Wi-Fi/4G/5G di riattivarsi prima della
@@ -4242,22 +4504,29 @@
     }
   });
   window.addEventListener("pageshow", (event) => {
-    if (!event.persisted || !api.getSession() || api.isFastMode()) return;
+    if (!event.persisted || !api.getSession()) return;
     window.setTimeout(() => { void refreshSharedData({ reason: "ripristino pagina dalla memoria" }); }, 450);
   });
   window.addEventListener("seemax:practice-created", async (event) => {
-    await loadAll();
-    state.practiceQuery = String((event.detail && event.detail.practice && event.detail.practice.numero) || "");
+    const detail = event.detail || {};
+    const practice = detail.practice || null;
+    if (practice && !isLocalPlannerPractice(practice)) replaceLocalEntity("practices", practice);
+    if (practice) state.practiceQuery = String(practice.numero || "");
     state.practicePage = 1;
-    go("practices");
+    if (detail.localOnly || isLocalPlannerPractice(practice)) {
+      toast("Pratica conservata localmente: completa l'anagrafica per inviarla.", "warning");
+      return;
+    }
     celebrateSuccess("📋", "Pratica creata dal Planner", `${state.practiceQuery || "La nuova pratica"} è stata inserita e collegata al preventivo.`);
-    toast("Pratica inserita: elenco aggiornato automaticamente.");
+    toast("Pratica inserita nel database senza interrompere il preventivo in lavorazione.");
   });
   window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); installPrompt = event; $("installAppButton").classList.remove("is-hidden"); });
   $("installAppButton").addEventListener("click", async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $("installAppButton").classList.add("is-hidden"); });
 
   async function boot() {
     if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
+    window.SeemaxSuite = { requestPracticeImport };
+    if (isInstalledApp() && typeof navigator !== "undefined" && navigator.onLine === false) { openOfflinePlanner(); return; }
     const navigation = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
     const manualReload = navigation ? navigation.type === "reload" : !!(performance.navigation && performance.navigation.type === 1);
     if (api.getSession()) await showApp({ forceFresh: manualReload }); else showLogin();

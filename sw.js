@@ -1,14 +1,19 @@
-const CACHE = "seemax-management-v2-21-1-mobile-resume";
+const CACHE = "seemax-management-v2-22-0-offline-planner";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
   "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/js/planner-native.js", "./assets/js/work-order.js",
   "./assets/icons/icon.svg", "./manifest.webmanifest",
   "./quotation-planner/index.html",
+  "./assets/catalog/p19.png", "./assets/catalog/p25.png",
+  "./assets/catalog/p3.jpg", "./assets/catalog/p391-50100.png",
+  "./assets/catalog/p391-5050.jpg", "./assets/catalog/p4-9696.jpg",
   "./assets/catalog/croce-farmacia.jpg", "./assets/catalog/floor-led.jpg",
   "./assets/catalog/transparent-led.png", "./assets/catalog/totem-lcd-indoor.png",
   "./assets/catalog/window-shop-lcd.webp", "./assets/catalog/lcd-rotating-display.webp",
   "./assets/catalog/lcd-wall-board.webp",
+  "./assets/planner-media/planner-seemax-logo.png",
+  "./assets/planner-media/planner-aifil-logo.png",
   "./assets/conformity/p19-1.png", "./assets/conformity/p19-2.png",
   "./assets/conformity/p25-1.png", "./assets/conformity/p25-2.png",
   "./assets/conformity/p3-1.png", "./assets/conformity/p3-2.png",

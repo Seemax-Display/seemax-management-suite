@@ -1,120 +1,70 @@
-# Seemax Management Suite
+# Seemax Management Suite 2.22.0
 
-Webapp gestionale statica pensata per GitHub Pages e collegabile a Google Sheets tramite Google Apps Script.
+Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
 
-## Funzioni incluse
+## Installazione dell’aggiornamento
 
-- dashboard commerciale con indicatori e pipeline;
-- gestione clienti;
-- anagrafica clienti con controllo P.IVA, VIES, IBAN, telefono internazionale e località italiane collegate;
-- clienti privati o condivisi, con attribuzione al creatore e protezione dei clienti collegati a pratiche;
-- gestione pratiche e relativi stati;
-- creazione guidata con scelta iniziale Acquisto, Noleggio o Leasing e moduli dedicati;
-- destinatario ordine “Per Me” o “Per Cliente”, indirizzo installazione e gestione tecnica Ledwall;
-- documentazione finanziaria caricabile direttamente nella pratica;
-- obbligatorietà dei campi configurabile dagli admin o dal foglio `IMPOSTAZIONI`;
-- ricerca, ordinamento e paginazione di clienti e pratiche (6 risultati per pagina);
-- ordinamento amministrativo iniziale dal record più recente e assegnazione dei nuovi clienti agli agenti;
-- catalogo multiprodotto organizzato nelle tab `Ledwall`, `Croci ed Altri Led` e `Schermi LCD`, con immagini, schede tecniche, listini, promozioni e giacenze;
-- Croci farmacia P5/P10, Floor Led P3.91, Transparent Led P3.91 e gamma LCD già predisposti nel Catalogo;
-- inserimento diretto di pratiche Acquisto/Noleggio/Leasing dal riepilogo S.Q.P.;
-- scarico automatico e tracciato del magazzino allo stato Accettata;
-- carico/scarico manuale delle giacenze riservato agli ADMIN, con causale e storico;
-- pratiche inseribili anche con giacenza insufficiente, evidenziate da un avviso disattivabile sulla singola riga del Foglio Google;
-- più prodotti nella stessa pratica, con calcolo aggregato dei cabinet o dei pezzi e indirizzo unico o alternativo per ogni installazione aggiuntiva;
-- dimensioni vincolate ai moduli fisici per Floor e Transparent LED; il Transparent 1×1 cresce esclusivamente a multipli di un metro;
-- scarico magazzino non bloccante: se la disponibilità non basta la pratica viene salvata, resta segnalata e l'impegno viene mantenuto in attesa senza creare giacenze negative;
-- deroga ADMIN `0000` per registrare temporaneamente dati non disponibili, preservata come testo anche negli indirizzi importati nelle pratiche;
-- organizzazione delle pratiche nelle modalità `IN DETTAGLIO` e `PER TIPOLOGIA`, memorizzata localmente;
-- workflow pratiche semplificato: Inserita, Accettata, Sospesa, Bocciata e Completata;
-- notifiche interne con campanella ed email gratuita all'agente responsabile;
-- documenti e media caricati direttamente e archiviati su Google Drive;
-- documenti già caricati consultabili e scaricabili direttamente anche dalle pratiche operative Inserite e Accettate;
-- commessa d'ordine A4 generata interamente nel browser dagli ADMIN per le pratiche Accettate, senza nuove letture o scritture sul database;
-- cartelle documentali locali, trascinamento desktop e spostamento con pressione prolungata su smartphone;
-- attività, scadenze e appuntamenti;
-- gestione agenti e ruoli ADMIN/AGENTE;
-- Impostazioni ADMIN organizzate nelle schede Generali, Pratiche, Benvenuto Beta, Patch notes e Sistema;
-- editor collegato direttamente al popup grafico originario “Benvenuto nella Beta”, senza un secondo messaggio duplicato;
-- Benvenuto Beta e Patch notes con modalità indipendenti Solo una volta o Sempre;
-- memoria delle comunicazioni per account, affiancata da cache locale e comando di ripubblicazione separato;
-- Quotation Planner montato nativamente nel gestionale, senza iframe;
-- tab `PRODOTTI` del Quotation Planner con scelta guidata tra Ledwall, Croci e LED Extra e Schermi LCD;
-- Croci a formato fisso, Transparent e Floor a multipli esatti e quattro Schermi LCD a quantità anche nei preventivi;
-- listini agente/cliente distinti per tutti i nuovi prodotti, con trasferta e provvigione sempre disponibili;
-- modalità di posa LCD specifica per prodotto: `POSIZIONATO A TERRA` a €0, oppure per il Wall Board `SOLO FORNITURA` a €0 e `A PARETE` a €350;
-- sessione unica Management Suite/S.Q.P. senza un secondo accesso;
-- importazione dei clienti visibili nel Planner oppure compilazione manuale;
-- modalità demo locale;
-- PWA installabile da browser;
-- backend Apps Script già predisposto;
-- avvio accelerato con cache locale per utente e aggiornamento del database in background;
-- backend ottimizzato con lookup puntuali, scrittura della sola riga interessata e cache breve delle impostazioni;
-- Planner alleggerito di oltre il 90% separando immagini e codice;
-- protezione multiutente con coda delle scritture, versioni record e prevenzione dei duplicati;
-- rilevamento dei conflitti senza sovrascritture silenziose;
-- salvataggi POST idempotenti per clienti, pratiche e movimenti, con risposta iframe diretta, conferma parallela anticipata e recupero idempotente;
-- canale Apps Script persistente dopo il login, con riuso della connessione e fallback automatico al trasporto POST precedente;
-- conferma visiva immediata per nuovi clienti e pratiche, riconciliata con la risposta autorevole del server;
-- pannello non bloccante per eliminazioni di clienti, pratiche e documenti e per movimenti manuali di magazzino;
-- aggiornamento del magazzino dalla riga già verificata dal backend, senza rilettura completa del catalogo;
-- numero preventivo del Planner tramite ponte nativo e contatori persistenti distinti per ADMIN e agenti;
-- salvataggio dei preventivi tramite mutazione nativa confermata, in background e senza riletture ripetute dell'archivio;
-- archivio preventivi ADMIN completo: caricamento autorizzato dei preventivi degli agenti, filtro per autore, ordinamento per agente/data e attribuzione visibile su ogni scheda;
-- elenco, apertura ed eliminazione preventivi sul ponte persistente, con chiavi account escluse dai record e percorso pubblico limitato ai payload cifrati manuali;
-- upload manuale dei documenti con avanzamento non bloccante dalla preparazione locale fino alla conferma su Drive e nel database;
-- nome del PDF preventivo composto automaticamente da numero, data, intestazione cliente, prodotto, misura e configurazione mono/bifacciale;
-- coda email asincrona: le notifiche non trattengono più il lock delle operazioni principali;
-- giacenze del Catalogo lette e verificate direttamente in `PRODOTTI_LED.giacenza_attuale`;
-- controllo ADMIN dell'avviso giacenza per ogni pratica Inserita, Sospesa o Completata;
-- contatore pratiche nelle Proprietà script, senza scansione completa a ogni creazione;
-- struttura Google Sheets ripulita automaticamente con backup integrale preventivo e tabelle tecniche attive nascoste;
-- trofei e personalizzazioni degli agenti azzerati al punto di partenza ufficiale, senza modificare gli ADMIN;
-- conteggi delle schede clienti e pratiche calcolati in un solo passaggio per un rendering più rapido;
-- diagnostica dei tempi di salvataggio consultabile dalla console del browser;
-- refresh manuale con nuova lettura del database e fallback locale dichiarato in caso di disservizio.
+1. Nell’editor Apps Script sostituisci il contenuto del vecchio `Code.gs` con `apps-script/Code.gs`.
+2. Salva ed esegui una sola volta:
 
-## Prova immediata
+   ```javascript
+   upgradeSeemaxV2220()
+   ```
 
-Il pacchetto operativo è configurato con `demoMode: false`. Per una prova senza Google Sheets imposta temporaneamente `demoMode: true` in `assets/js/config.js`, quindi apri `index.html` oppure pubblicalo su GitHub Pages.
+3. Autorizza lo script se Google lo richiede.
+4. Crea una nuova versione del deployment Web App, mantenendo lo stesso URL `/exec`.
+5. Carica su GitHub il contenuto completo di questo pacchetto, conservando cartelle e nomi.
+6. Attendi la pubblicazione di GitHub Pages, quindi esegui `Ctrl+F5`.
+7. Se usi la PWA installata e appare ancora la vecchia interfaccia, chiudila completamente e riaprila online una volta.
 
-- ADMIN: `admin.demo` / `DEMO-ADMIN`
-- AGENTE: `agente.demo` / `DEMO-AGENTE`
+Frontend, backend e Service Worker devono riportare tutti la versione `2.22.0`.
 
-I dati demo vengono salvati esclusivamente nel browser utilizzato.
+## Novità principali
 
-## Prima configurazione reale
+- rimossa la vecchia Modalità Rapida globale;
+- PWA offline avviata direttamente nel Quotation Planner;
+- paginazione compatta `1 · 2 · 3 · … · ultima`;
+- cliente apribile direttamente dalle pratiche operative;
+- pratiche S.Q.P. con colore di stato standard e simbolo viola dedicato;
+- importazione S.Q.P. guidata con anagrafica precompilata o pratica locale privata;
+- documenti obbligatori soltanto quando la pratica resta `INSERITA`;
+- Agenda personale locale con calendario, promemoria e stati `FATTO`, `SOSPESA`, `ANNULLATA`;
+- nuova scheda Classifiche con profili, fatturato migliore, ultima pratica e trofei;
+- Quotation Planner con scelta unica `OPERAZIONE COMMERCIALE`;
+- modalità Classica e Rapida disponibili dentro la sola sezione Prodotti;
+- memoria delle configurazioni quando si cambia scheda o categoria;
+- caricamento e sovrascrittura controllata dei preventivi già registrati;
+- numero preventivo modificabile manualmente soltanto dagli ADMIN;
+- assistenza integrata per importi Noleggio/Leasing: `max(500 €, 25%)`, esclusa la provvigione;
+- aggiornamenti in background non distruttivi: i moduli aperti non vengono azzerati;
+- sincronizzazione automatica al ritorno da background su smartphone;
+- lock, versioni record, token idempotenti e controlli magazzino invariati.
 
-1. Segui [docs/GUIDA_COMPLETA.md](docs/GUIDA_COMPLETA.md).
-2. Installa `apps-script/Code.gs` nel Foglio Google.
-3. Pubblica Apps Script come Web App.
-4. Incolla l’URL `/exec` in `assets/js/config.js`.
-5. Imposta `demoMode: false`.
-6. Pubblica questa cartella in un repository GitHub Pages.
+## Modalità offline
 
-Per aggiornare un'installazione 2.19.0 alla versione 2.20.0 segui [docs/AGGIORNAMENTO_V2.20.0.md](docs/AGGIORNAMENTO_V2.20.0.md). La release aggiunge Window Shop LCD, LCD Rotating Display e LCD Wall Board, comprese immagini, schede tecniche e modalità di posa specifiche. Per installazioni precedenti resta disponibile la guida [2.19.0](docs/AGGIORNAMENTO_V2.19.0.md), oltre a [docs/PROTEZIONE_MULTIUTENTE.md](docs/PROTEZIONE_MULTIUTENTE.md) e al [rapporto prestazioni 2.14](docs/RAPPORTO_PRESTAZIONI_V2.14.0.md).
+La modalità offline si attiva soltanto quando il gestionale viene avviato come PWA installata senza rete. In tale condizione sono disponibili:
 
-## Placeholder
+- configurazione dei prodotti già memorizzati;
+- calcolo commerciale;
+- bozze locali;
+- esportazione del preventivo.
 
-Cerca nel progetto la parola `INSERISCI_`, `INCOLLA_` o `CAMBIA_` per trovare i valori ancora da completare. La lista è disponibile in [docs/PLACEHOLDER.md](docs/PLACEHOLDER.md).
+Archivio online, salvataggio nel Foglio e invio delle pratiche tornano disponibili alla riconnessione.
 
-## Struttura
+## Struttura essenziale
 
 ```text
 index.html                    Interfaccia principale
-assets/css/app.css            Grafica responsive
-assets/js/config.js           Configurazione da personalizzare
-assets/js/seed.js             Dati dimostrativi
-assets/js/store.js            Database locale demo
-assets/js/api.js              Collegamento Google Apps Script
-assets/js/app.js              Funzioni del gestionale
-assets/js/planner-native.js   Runtime nativo del Quotation Planner
-assets/js/work-order.js       Generatore locale della commessa d'ordine A4
-quotation-planner/index.html  Quotation Planner originale
-apps-script/Code.gs           Backend e setup Google Sheets
-docs/                         Guide operative
-manifest.webmanifest          Installazione come app
-sw.js                         Cache PWA
+assets/                       Codice, immagini e dati necessari
+quotation-planner/index.html  Quotation Planner
+apps-script/Code.gs           Backend Google Apps Script
+apps-script/appsscript.json   Manifest Apps Script
+manifest.webmanifest          Installazione PWA
+sw.js                         Cache offline
 ```
 
-Non sono necessari Node.js, npm o compilazioni: GitHub Pages pubblica direttamente i file della cartella.
+Non servono Node.js, npm o compilazioni per pubblicare il gestionale su GitHub Pages.
+
+## Collaudo
+
+La release è stata verificata con 126 controlli automatici su sintassi, versione, offline, pratiche, documenti, Agenda, Classifiche, Planner, assistenza, sovrascrittura preventivi, concorrenza e integrità delle risorse.

@@ -126,9 +126,9 @@
         @media(max-width:760px){.suite-client-choice{grid-template-columns:1fr}}
       </style><div class="sqp-native-body integrated-suite management-native">${parsed.body.innerHTML}</div>`;
       const body = shadow.querySelector(".sqp-native-body");
-      if (context.fastMode) body.classList.add("management-fast");
+      if (context.offlineOnly) body.classList.add("management-offline");
       const scopedDocument = documentProxy(shadow, body);
-      const locationState = { search: `?integrated=1${context.fastMode ? "&fast=1" : ""}`, hash: "", href: location.href, reload() {} };
+      const locationState = { search: `?integrated=1${context.offlineOnly ? "&offline=1" : ""}`, hash: "", href: location.href, reload() {} };
       const scopedHistory = { replaceState(_state, _title, url) { locationState.hash = String(url || "").replace(/^[^#]*#?/, "#"); } };
       const listeners = [];
       window.SEEMAX_NATIVE_CONTEXT = context;
@@ -136,12 +136,12 @@
          per pratiche e preventivi: niente payload estesi in una URL JSONP e
          nessun ciclo di rilettura dopo il salvataggio. */
       window.SEEMAX_NATIVE_API = {
-        createPracticeFromQuote: (payload) => window.SeemaxApi.createPracticeFromQuote(payload),
-        nextQuoteNumber: (scope) => window.SeemaxApi.nextQuoteNumber(scope),
-        saveQuotation: (fields) => window.SeemaxApi.saveQuotation(fields),
-        listQuotations: () => window.SeemaxApi.listQuotations(),
-        loadQuotation: (id) => window.SeemaxApi.loadQuotation(id),
-        deleteQuotation: (id) => window.SeemaxApi.deleteQuotation(id),
+        createPracticeFromQuote: (payload) => window.SeemaxSuite && window.SeemaxSuite.requestPracticeImport ? window.SeemaxSuite.requestPracticeImport(payload) : window.SeemaxApi.createPracticeFromQuote(payload),
+        nextQuoteNumber: (scope) => context.offlineOnly ? Promise.resolve({ ok: true, next_num: "OFFLINE", next_id: `OFFLINE-${new Date().toISOString().slice(0, 10)}` }) : window.SeemaxApi.nextQuoteNumber(scope),
+        saveQuotation: (fields) => context.offlineOnly ? Promise.reject(new Error("Archivio online non disponibile senza connessione.")) : window.SeemaxApi.saveQuotation(fields),
+        listQuotations: () => context.offlineOnly ? Promise.reject(new Error("Archivio online non disponibile senza connessione.")) : window.SeemaxApi.listQuotations(),
+        loadQuotation: (id) => context.offlineOnly ? Promise.reject(new Error("Archivio online non disponibile senza connessione.")) : window.SeemaxApi.loadQuotation(id),
+        deleteQuotation: (id) => context.offlineOnly ? Promise.reject(new Error("Archivio online non disponibile senza connessione.")) : window.SeemaxApi.deleteQuotation(id),
         startQuotationProgress: (record) => window.SeemaxBackgroundOperations && window.SeemaxBackgroundOperations.startQuotation(record),
         updateQuotationProgress: (id, phase) => window.SeemaxBackgroundOperations && window.SeemaxBackgroundOperations.update(id, phase),
         completeQuotationProgress: (id, record) => window.SeemaxBackgroundOperations && window.SeemaxBackgroundOperations.complete(id, record),
@@ -152,6 +152,17 @@
       ["btnDatabaseRefresh", "btnAgentLogin", "btnAgentLogout"].forEach((id) => {
         const control = shadow.getElementById(id); if (control) control.remove();
       });
+      if (context.offlineOnly) {
+        ["btnOnlineArchiveSave", "btnOnlineArchiveLoad", "btnInsertPractice"].forEach((id) => {
+          const control = shadow.getElementById(id); if (control) control.remove();
+        });
+        const title = shadow.getElementById("databaseStatusTitle");
+        const detail = shadow.getElementById("databaseStatusDetail");
+        const status = shadow.getElementById("databaseStatusText");
+        if (title) title.textContent = "Quotation Planner offline";
+        if (detail) detail.textContent = "Calcolo, bozze locali ed esportazione PDF disponibili. Archivio, pratiche e numerazione ufficiale sono sospesi.";
+        if (status) status.textContent = "Solo locale";
+      }
       const plannerLayers = ["draftModalLayer", "onlineArchiveModalLayer", "practiceTypeModalLayer", "calcLoadingLayer", "sqpDialogLayer", "productFamilyLayer", "patchNotesLayer", "tutorialLayer"]
         .map((id) => shadow.getElementById(id)).filter(Boolean);
       const syncPlannerLayerState = () => {

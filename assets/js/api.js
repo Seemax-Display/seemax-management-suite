@@ -3,9 +3,8 @@
 
   const config = window.SEEMAX_APP_CONFIG;
   const demo = window.SeemaxDemoStore;
-  const FAST_MODE_KEY = "SEEMAX_MANAGEMENT_FAST_MODE_V1";
-  const FAST_QUEUE_KEY = "SEEMAX_MANAGEMENT_FAST_QUEUE_V1";
-  const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
+  const LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V2";
+  const LEGACY_LOCAL_ACTIVITIES_KEY = "SEEMAX_MANAGEMENT_LOCAL_ACTIVITIES_V1";
   const BOOTSTRAP_CACHE_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_";
   const BOOTSTRAP_LATEST_PREFIX = "SEEMAX_MANAGEMENT_BOOTSTRAP_LATEST_";
   const BOOTSTRAP_CACHE_STALE_AFTER_MS = 12 * 60 * 60 * 1000;
@@ -216,28 +215,22 @@
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  function isFastMode() { return localStorage.getItem(FAST_MODE_KEY) === "1"; }
-  function setFastMode(active) {
-    if (active) localStorage.setItem(FAST_MODE_KEY, "1");
-    else localStorage.removeItem(FAST_MODE_KEY);
-    return isFastMode();
+  function localActivitiesKey() {
+    return `${LOCAL_ACTIVITIES_KEY}_${String((session || {}).username || "offline")}`;
   }
-  function pendingOperations() { return readLocal(FAST_QUEUE_KEY, []); }
-  function queueOperation(operation) {
-    const queue = pendingOperations();
-    if (operation.type === "upsert" && operation.record && operation.record.id) {
-      const index = queue.findIndex((item) => item.type === "upsert" && item.entity === operation.entity && item.record && String(item.record.id) === String(operation.record.id));
-      if (index >= 0) queue.splice(index, 1);
+  function localActivities() {
+    const key = localActivitiesKey();
+    const current = readLocal(key, null);
+    if (Array.isArray(current)) return current;
+    const legacy = readLocal(LEGACY_LOCAL_ACTIVITIES_KEY, []);
+    if (Array.isArray(legacy) && legacy.length) {
+      writeLocal(key, legacy);
+      localStorage.removeItem(LEGACY_LOCAL_ACTIVITIES_KEY);
+      return legacy;
     }
-    if (operation.type === "settings") {
-      for (let index = queue.length - 1; index >= 0; index -= 1) if (queue[index].type === "settings") queue.splice(index, 1);
-    }
-    queue.push({ ...operation, queueId: uid("sync"), queuedAt: new Date().toISOString() });
-    writeLocal(FAST_QUEUE_KEY, queue);
-    return queue.length;
+    return [];
   }
-  function localActivities() { return readLocal(LOCAL_ACTIVITIES_KEY, []); }
-  function setLocalActivities(rows) { return writeLocal(LOCAL_ACTIVITIES_KEY, rows || []); }
+  function setLocalActivities(rows) { return writeLocal(localActivitiesKey(), rows || []); }
   function upsertLocalActivity(record) {
     const rows = localActivities();
     const value = { ...record, id: record.id || uid("act"), aggiornatoIl: new Date().toISOString() };
@@ -252,20 +245,7 @@
     return { ok: true };
   }
 
-  function applyPending(data) {
-    const copy = data || {};
-    pendingOperations().forEach((op) => {
-      if (op.type === "settings") copy.settings = { ...(copy.settings || {}), ...(op.values || {}) };
-      if (!op.entity || !Array.isArray(copy[op.entity])) return;
-      if (op.type === "remove") copy[op.entity] = copy[op.entity].filter((row) => String(row.id || row.username) !== String(op.id));
-      if (op.type === "upsert") {
-        const row = op.record || {};
-        const index = copy[op.entity].findIndex((item) => String(item.id || item.username) === String(row.id || row.username));
-        if (index >= 0) copy[op.entity][index] = { ...copy[op.entity][index], ...row }; else copy[op.entity].unshift(row);
-      }
-    });
-    return copy;
-  }
+  function applyPending(data) { return data || {}; }
 
   function isConfigured() {
     return !config.demoMode && /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(config.appsScriptUrl || "");
@@ -560,10 +540,6 @@
   async function upsert(entity, record, options = {}) {
     if (entity === "activities") return upsertLocalActivity(record);
     const value = { ...record, id: record.id || uid(entity.slice(0, 3)), request_token: record.request_token || uid("save-req"), aggiornatoIl: new Date().toISOString() };
-    if (isFastMode()) {
-      queueOperation({ type: "upsert", entity, record: value });
-      return value;
-    }
     if (config.demoMode) return demo.upsert(entity, value);
     if (typeof options.onPending === "function") options.onPending({ ...value, __sync_state: "PENDING", __sync_started_at: new Date().toISOString() });
     return remoteUpsert(entity, value, options);
@@ -598,10 +574,6 @@
 
   async function remove(entity, id, expectedRecordVersion = 0) {
     if (entity === "activities") return removeLocalActivity(id);
-    if (isFastMode()) {
-      queueOperation({ type: "remove", entity, id, expectedRecordVersion });
-      return { ok: true, queued: true };
-    }
     if (config.demoMode) return demo.remove(entity, id);
     const requestToken = uid("remove");
     return postMutation("management_remove", { entity, id, expected_record_version: expectedRecordVersion }, { requestToken, maxWait: 90000 });
@@ -633,10 +605,6 @@
   }
 
   async function saveSettings(values) {
-    if (isFastMode()) {
-      queueOperation({ type: "settings", values });
-      return values;
-    }
     if (config.demoMode) return demo.settings(values);
     const requestToken = uid("settings");
     const response = await postMutation("management_save_settings", { payload: JSON.stringify(values) }, { requestToken, maxWait: 90000 });
@@ -694,7 +662,6 @@ async function getAdminContent() {
 
   async function saveAdminContent(content) {
     if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
-    if (isFastMode()) throw new Error("Salva le comunicazioni in Modalità Standard.");
     if (config.demoMode) {
       const current = demoAdminContent();
       const source = content || {};
@@ -1126,26 +1093,8 @@ async function getAdminContent() {
       : "Il file non è stato confermato dal database entro 180 secondi.");
   }
 
-  async function syncAll(onProgress) {
-    const queue = pendingOperations();
-    const results = [];
-    for (let index = 0; index < queue.length; index += 1) {
-      const op = queue[index];
-      if (onProgress) onProgress({ index, total: queue.length, operation: op });
-      let result;
-      if (op.type === "upsert") result = await remoteUpsert(op.entity, op.record);
-      else if (op.type === "remove") result = config.demoMode ? demo.remove(op.entity, op.id) : await postMutation("management_remove", { entity: op.entity, id: op.id, expected_record_version: op.expectedRecordVersion || 0 }, { requestToken: op.queueId || uid("remove-sync"), maxWait: 90000 });
-      else if (op.type === "settings") result = config.demoMode ? demo.settings(op.values) : (await postMutation("management_save_settings", { payload: JSON.stringify(op.values) }, { requestToken: op.queueId || uid("settings-sync"), maxWait: 90000 })).settings;
-      results.push(result);
-      writeLocal(FAST_QUEUE_KEY, queue.slice(index + 1));
-    }
-    if (onProgress) onProgress({ index: queue.length, total: queue.length, done: true });
-    return results;
-  }
-
   async function adjustInventory(values) {
     if (!isAdmin()) throw new Error("Funzione riservata all'amministratore.");
-    if (isFastMode()) throw new Error("Il magazzino condiviso richiede la Modalità Standard per evitare conflitti tra utenti.");
     const payload = { ...(values || {}), request_token: (values && values.request_token) || uid("stock-req") };
     if (config.demoMode) {
       const previousMovement = demo.list("movements").find((row) => String(row.request_token || "") === String(payload.request_token));
@@ -1357,8 +1306,6 @@ async function getAdminContent() {
       demo: config.demoMode,
       configured: isConfigured(),
       online: online && (typeof navigator === "undefined" || navigator.onLine !== false),
-      fast: isFastMode(),
-      pending: pendingOperations().length,
       serverVersion,
       lastConnectionSuccessAt,
       lastConnectionFailureAt,
@@ -1369,5 +1316,5 @@ async function getAdminContent() {
     };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, bootstrapCacheInfo, saveBootstrapCache, resumeConnectivity, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, listQuotations, loadQuotation, deleteQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, isFastMode, setFastMode, pendingOperations, syncAll, localActivities };
+  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, bootstrapCacheInfo, saveBootstrapCache, resumeConnectivity, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, listQuotations, loadQuotation, deleteQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, localActivities };
 })();
