@@ -5,6 +5,33 @@
   let sourcePromise = null;
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
 
+  async function cachedPlannerSource() {
+    if (!("caches" in window)) return "";
+    const canonicalUrl = new URL(SOURCE, window.location.href).href;
+    const response = await window.caches.match(canonicalUrl, { ignoreSearch: true });
+    return response && response.ok ? response.text() : "";
+  }
+
+  async function loadPlannerSource(version) {
+    const versionedUrl = `${SOURCE}?v=${encodeURIComponent(version || "current")}`;
+    let networkError = null;
+    try {
+      const response = await fetch(versionedUrl, { cache: "default" });
+      if (!response.ok) throw new Error(`File Planner non disponibile (${response.status})`);
+      return await response.text();
+    } catch (error) {
+      networkError = error;
+    }
+    /* Il Service Worker precarica il file senza query string. All'avvio a
+       freddo offline la richiesta versionata non coincideva con quella chiave
+       e il Planner diventava disponibile soltanto dopo una prima apertura.
+       CacheStorage con ignoreSearch consente invece di usare immediatamente la
+       copia installata insieme alla PWA. */
+    const cached = await cachedPlannerSource();
+    if (cached) return cached;
+    throw networkError || new Error("File Planner non disponibile offline.");
+  }
+
   function scopedCss(css) {
     return String(css || "")
       .replace(/:root/g, ":host")
@@ -95,11 +122,16 @@
     container.dataset.plannerMounted = "1";
     container.innerHTML = `<div class="sqp-native-loading"><span></span><strong>Avvio Quotation Planner integrato…</strong><small>Caricamento del motore di calcolo Seemax</small></div>`;
     try {
-      sourcePromise = sourcePromise || fetch(`${SOURCE}?v=${encodeURIComponent(context.version || "current")}`, { cache: "default" }).then((response) => {
-        if (!response.ok) throw new Error(`File Planner non disponibile (${response.status})`);
-        return response.text();
-      });
-      const source = await sourcePromise;
+      sourcePromise = sourcePromise || loadPlannerSource(context.version);
+      let source = "";
+      try { source = await sourcePromise; }
+      catch (error) {
+        /* Una richiesta fallita non deve restare memorizzata per tutta la
+           sessione: il pulsante Riprova deve poter eseguire un nuovo tentativo
+           dopo il ripristino della rete o della cache. */
+        sourcePromise = null;
+        throw error;
+      }
       const parsed = new DOMParser().parseFromString(source, "text/html");
       const styles = Array.from(parsed.querySelectorAll("style")).map((node) => node.textContent).join("\n");
       const applicationScript = Array.from(parsed.querySelectorAll("script:not([src])")).map((node) => node.textContent).join("\n");

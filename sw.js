@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-22-0-offline-planner";
+const CACHE = "seemax-management-v2-22-1-cold-offline-planner";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
@@ -35,6 +35,20 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(event.request).then((response) => {
       const copy = response.clone(); caches.open(CACHE).then((cache) => cache.put("./index.html", copy)); return response;
     }).catch(() => caches.match("./index.html")));
+    return;
+  }
+  const plannerUrl = new URL("./quotation-planner/index.html", self.registration.scope);
+  if (url.pathname === plannerUrl.pathname) {
+    /* Il runtime richiede il Planner con ?v=<versione>, mentre il precache usa
+       il percorso canonico. ignoreSearch rende disponibile la copia offline
+       anche al primo avvio dopo la chiusura completa della PWA. */
+    event.respondWith(caches.match(plannerUrl.href, { ignoreSearch: true }).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
+        if (response && response.ok) caches.open(CACHE).then((cache) => cache.put(plannerUrl.href, response.clone()));
+        return response;
+      });
+    }));
     return;
   }
   const liveCode = /\.(?:js|css)$/.test(url.pathname);

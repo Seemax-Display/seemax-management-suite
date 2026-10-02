@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2220().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2221().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.22.0";
+var SEEMAX_VERSION = "seemax-management-suite-2.22.1";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -132,7 +132,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.22.0 configurato: agenda locale, classifiche, importazioni S.Q.P. guidate e Planner commerciale attivi.";
+  return "DATABASE SEEMAX 2.22.1 configurato: agenda locale, classifiche, importazioni S.Q.P. guidate, Planner commerciale e avvio offline a freddo attivi.";
 }
 
 
@@ -512,6 +512,26 @@ function upgradeSeemaxV2220() {
     styleSheets_();
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.22.0 configurato: agenda locale, classifiche, importazione S.Q.P. controllata e Planner commerciale attivi; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
+  });
+}
+
+function upgradeSeemaxV2221() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    var cleanup = removeTransientPracticeColumnsV2210_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Hotfix v2.22.1 · avvio a freddo del Quotation Planner offline e ripristino reale del comando Riprova.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.22.1 configurato: Quotation Planner disponibile al primo avvio offline e comando Riprova ripristinabile; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
   });
 }
 

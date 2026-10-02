@@ -31,6 +31,7 @@
   let lastResumeSyncAt = 0;
   let connectionRecoveryActive = false;
   let pendingPlannerImport = null;
+  let offlinePlannerNoticeShown = false;
   const LOCAL_SQP_PRACTICES_PREFIX = "SEEMAX_LOCAL_SQP_PRACTICES_V1_";
 
   const NAV = [
@@ -1468,6 +1469,18 @@
     return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   }
 
+  function showOfflinePlannerWelcome() {
+    if (offlinePlannerNoticeShown) return;
+    offlinePlannerNoticeShown = true;
+    const body = `<div class="offline-planner-welcome-content"><span aria-hidden="true">🧮</span><p><strong>Attualmente sei senza connessione.</strong> Riconnettiti a una rete per avere accesso completo al Seemax Management Suite. Utilizza il Planner per creare ed esportare un preventivo.</p></div><div class="form-actions"><button type="button" class="btn primary" data-action="close-modal">CONFERMA</button></div>`;
+    openModal("MODALITÀ PLANNER ATTIVA", body, {
+      kicker: "Seemax Quotation Planner",
+      subtitle: "Funzionamento locale disponibile",
+      panelClass: "offline-planner-welcome",
+      dismissible: false
+    });
+  }
+
   function openOfflinePlanner() {
     state.offlinePlannerOnly = true;
     document.body.classList.add("offline-planner-only");
@@ -1479,6 +1492,7 @@
     renderNav();
     go("planner", false);
     setConnectionState();
+    requestAnimationFrame(showOfflinePlannerWelcome);
   }
 
   function showLogin() {
@@ -2410,7 +2424,8 @@
   function openModal(title, body, options = {}) {
     pendingMessageAcknowledgement = null;
     const panelClasses = ["modal-panel", options.wide ? "wide" : "", options.panelClass || ""].filter(Boolean).join(" ");
-    $("modalRoot").innerHTML = `<div class="modal-layer"><section class="${esc(panelClasses)}" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><header><div><span class="section-kicker">${esc(options.kicker || "Seemax Management")}</span><h2 id="modalTitle">${esc(title)}</h2>${options.subtitle ? `<p>${esc(options.subtitle)}</p>` : ""}</div><button class="icon-btn" data-action="close-modal" aria-label="Chiudi">×</button></header><div class="modal-body">${body}</div></section></div>`;
+    const closeButton = options.dismissible === false ? "" : `<button class="icon-btn" data-action="close-modal" aria-label="Chiudi">×</button>`;
+    $("modalRoot").innerHTML = `<div class="modal-layer"><section class="${esc(panelClasses)}" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><header><div><span class="section-kicker">${esc(options.kicker || "Seemax Management")}</span><h2 id="modalTitle">${esc(title)}</h2>${options.subtitle ? `<p>${esc(options.subtitle)}</p>` : ""}</div>${closeButton}</header><div class="modal-body">${body}</div></section></div>`;
     document.body.classList.add("modal-open");
     setTimeout(() => $("modalRoot").querySelector("input,select,textarea,button")?.focus(), 30);
   }

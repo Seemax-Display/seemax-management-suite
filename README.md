@@ -1,4 +1,4 @@
-# Seemax Management Suite 2.22.0
+# Seemax Management Suite 2.22.1
 
 Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
 
@@ -8,7 +8,7 @@ Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
 2. Salva ed esegui una sola volta:
 
    ```javascript
-   upgradeSeemaxV2220()
+   upgradeSeemaxV2221()
    ```
 
 3. Autorizza lo script se Google lo richiede.
@@ -17,12 +17,15 @@ Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
 6. Attendi la pubblicazione di GitHub Pages, quindi esegui `Ctrl+F5`.
 7. Se usi la PWA installata e appare ancora la vecchia interfaccia, chiudila completamente e riaprila online una volta.
 
-Frontend, backend e Service Worker devono riportare tutti la versione `2.22.0`.
+Frontend, backend e Service Worker devono riportare tutti la versione `2.22.1`.
 
 ## Novità principali
 
 - rimossa la vecchia Modalità Rapida globale;
 - PWA offline avviata direttamente nel Quotation Planner;
+- Planner disponibile anche al primo avvio offline dopo la chiusura completa della PWA;
+- avviso iniziale `MODALITÀ PLANNER ATTIVA` con conferma esplicita;
+- comando `Riprova` nuovamente operativo dopo un errore di caricamento del Planner;
 - paginazione compatta `1 · 2 · 3 · … · ultima`;
 - cliente apribile direttamente dalle pratiche operative;
 - pratiche S.Q.P. con colore di stato standard e simbolo viola dedicato;
@@ -51,6 +54,8 @@ La modalità offline si attiva soltanto quando il gestionale viene avviato come 
 
 Archivio online, salvataggio nel Foglio e invio delle pratiche tornano disponibili alla riconnessione.
 
+Dopo l'installazione di questo aggiornamento, la PWA deve essere aperta online una volta per consentire al browser di acquisire il nuovo Service Worker. Da quel momento il Planner è disponibile anche chiudendo completamente l'applicazione e riaprendola senza connessione.
+
 ## Struttura essenziale
 
 ```text
@@ -67,4 +72,4 @@ Non servono Node.js, npm o compilazioni per pubblicare il gestionale su GitHub P
 
 ## Collaudo
 
-La release è stata verificata con 126 controlli automatici su sintassi, versione, offline, pratiche, documenti, Agenda, Classifiche, Planner, assistenza, sovrascrittura preventivi, concorrenza e integrità delle risorse.
+La release è stata verificata con 133 controlli automatici su sintassi, versione, primo avvio offline, recupero cache, comando Riprova, pratiche, documenti, Agenda, Classifiche, Planner, assistenza, sovrascrittura preventivi, concorrenza e integrità delle risorse.
