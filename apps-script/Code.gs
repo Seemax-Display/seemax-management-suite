@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2221().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2222().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.22.1";
+var SEEMAX_VERSION = "seemax-management-suite-2.22.2";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -80,7 +80,7 @@ var SHEET_SCHEMAS = {
   IMPOSTAZIONI: ["chiave", "valore", "note"],
   PATCH_NOTES: ["chiave", "valore"],
   PATCH_ITEMS: ["emoji", "title", "text", "attivo"],
-  ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "assistenza_integrata", "costo_assistenza_integrato", "valore_minimo_finanziato", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
+  ARCHIVIO_PREVENTIVI: ["id_preventivo", "data_salvataggio", "quote_scope", "agent_username", "agent_display_name", "numero_preventivo", "data_preventivo", "cliente_azienda", "cliente_referente", "prodotto_principale", "misura_principale_cm", "led_count", "totale_led_cliente", "totale_led_agente", "totale_installazione", "totale_provvigione", "totale_trasferta", "finanziaria_selezionata", "assistenza_integrata", "costo_assistenza_integrato", "base_assistenza_prodotti", "percentuale_assistenza", "durata_assistenza_mesi", "valore_minimo_finanziato", "totale_margine_cliente", "totale_margine_agente", "totale_preventivo_riferimento", "agente", "cliente_visibile", "payload_criptato", "salt", "iv", "versione_planner", "versione_config", "note", "saved_by_login", "login_enabled", "password_visibile", "id_preventivo_visibile", "payload_json_completo", "led_json", "sequence_protected", "deleted_at", "delete_note", "save_request_token"],
   MOVIMENTI_MAGAZZINO: ["id", "data", "practiceId", "numero_pratica", "cliente", "product_id", "sku", "prodotto", "quantita", "tipo_movimento", "giacenza_prima", "giacenza_dopo", "username", "note", "request_token"],
   NOTIFICHE: ["id", "data", "recipient_username", "recipient_name", "practiceId", "numero_pratica", "stato_precedente", "nuovo_stato", "titolo", "messaggio", "letta", "letta_il", "actor_username"],
   EMAIL_CODA: ["id", "created_at", "status", "attempts", "next_attempt_at", "to", "subject", "sender_name", "body", "html_body", "notification_id", "actor_username", "last_error", "sent_at"],
@@ -132,7 +132,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.22.1 configurato: agenda locale, classifiche, importazioni S.Q.P. guidate, Planner commerciale e avvio offline a freddo attivi.";
+  return "DATABASE SEEMAX 2.22.2 configurato: sessione Planner persistente e assistenza progressiva sul solo valore prodotti attive.";
 }
 
 
@@ -532,6 +532,26 @@ function upgradeSeemaxV2221() {
     styleSheets_();
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.22.1 configurato: Quotation Planner disponibile al primo avvio offline e comando Riprova ripristinabile; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
+  });
+}
+
+function upgradeSeemaxV2222() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    var cleanup = removeTransientPracticeColumnsV2210_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Hotfix v2.22.2 · sessione Quotation Planner persistente e assistenza progressiva calcolata esclusivamente sul valore prodotti.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.22.2 configurato: sessione Planner protetta dai refresh in background e assistenza progressiva 15%-19% sul solo valore prodotti; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
   });
 }
 

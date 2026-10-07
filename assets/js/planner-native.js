@@ -181,6 +181,7 @@
       };
       const execute = new Function("document", "window", "location", "history", applicationScript);
       execute(scopedDocument, windowProxy(scopedDocument, locationState, listeners, container), locationState, scopedHistory);
+      const plannerRuntime = window.SEEMAX_PLANNER_RUNTIME || null;
       ["btnDatabaseRefresh", "btnAgentLogin", "btnAgentLogout"].forEach((id) => {
         const control = shadow.getElementById(id); if (control) control.remove();
       });
@@ -206,7 +207,11 @@
       syncPlannerLayerState();
       const lifecycle = new MutationObserver(() => {
         if (container.isConnected) return;
+        if (plannerRuntime && typeof plannerRuntime.persistActiveSession === "function") {
+          try { plannerRuntime.persistActiveSession(); } catch (error) { /* la navigazione deve proseguire anche senza memoria locale */ }
+        }
         listeners.forEach(([type, listener, options]) => window.removeEventListener(type, listener, options));
+        if (window.SEEMAX_PLANNER_RUNTIME === plannerRuntime) delete window.SEEMAX_PLANNER_RUNTIME;
         document.body.classList.remove("planner-modal-open");
         plannerLayerObserver.disconnect();
         lifecycle.disconnect();

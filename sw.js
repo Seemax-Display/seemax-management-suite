@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-22-1-cold-offline-planner";
+const CACHE = "seemax-management-v2-22-2-planner-session-assistance";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",

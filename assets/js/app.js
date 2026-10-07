@@ -1533,8 +1533,16 @@
     else applyRoute();
   }
 
-  function renderRoute(animate = false) {
+  function renderRoute(animate = false, options = {}) {
     if (!state.data && state.route !== "settings") return;
+    const mountedPlanner = $("nativePlannerRoot");
+    /* Gli aggiornamenti del bootstrap e le operazioni concluse in background
+       non devono ricostruire lo Shadow DOM del Planner mentre l'utente sta
+       lavorando. Il remount resta disponibile soltanto tramite Riprova. */
+    if (state.route === "planner" && mountedPlanner && mountedPlanner.dataset.plannerMounted === "1" && !options.forcePlannerRemount) return;
+    if (mountedPlanner && window.SEEMAX_PLANNER_RUNTIME && typeof window.SEEMAX_PLANNER_RUNTIME.persistActiveSession === "function") {
+      try { window.SEEMAX_PLANNER_RUNTIME.persistActiveSession(); } catch (error) { /* il salvataggio locale non blocca la navigazione */ }
+    }
     const renders = { dashboard: renderDashboard, practices: renderPractices, clients: renderClients, catalog: renderCatalog, planner: renderPlanner, documents: renderDocuments, activities: renderActivities, rankings: renderRankings, users: renderUsers, settings: renderSettings, profile: renderProfile };
     $("viewContainer").innerHTML = renders[state.route]();
     if (state.route === "planner" && window.SeemaxNativePlanner) {
@@ -4173,7 +4181,7 @@
       },
       "reload": async () => { await refreshSharedData({ interactive: true, announce: true, reason: "richiesta manuale" }); },
       "offline-online-login": () => window.location.reload(),
-      "reload-planner": () => { if (state.route === "planner") renderRoute(); },
+      "reload-planner": () => { if (state.route === "planner") renderRoute(false, { forcePlannerRemount: true }); },
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.health(); setConnectionState(); toast(response.ok ? `Database collegato · ${response.elapsed_ms || 0} ms.` : `Database incompleto: ${(response.missing_sheets || []).join(", ")}.`, response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
       "reset-demo": async () => { if (confirm("Ripristinare tutti i dati dimostrativi?")) { api.resetDemo(); await loadAll(); renderRoute(); toast("Dati demo ripristinati."); } }
