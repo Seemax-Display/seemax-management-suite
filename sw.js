@@ -1,4 +1,4 @@
-const CACHE = "seemax-management-v2-22-2-planner-session-assistance";
+const CACHE = "seemax-management-v2-22-3-grenke-assistance-guard";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",

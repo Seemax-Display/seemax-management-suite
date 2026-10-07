@@ -1,4 +1,4 @@
-# Seemax Management Suite 2.22.2
+# Seemax Management Suite 2.22.3
 
 Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
 
@@ -8,7 +8,7 @@ Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
 2. Salva ed esegui una sola volta:
 
    ```javascript
-   upgradeSeemaxV2222()
+   upgradeSeemaxV2223()
    ```
 
 3. Autorizza lo script se Google lo richiede.
@@ -17,7 +17,7 @@ Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
 6. Attendi la pubblicazione di GitHub Pages, quindi esegui `Ctrl+F5`.
 7. Se usi la PWA installata e appare ancora la vecchia interfaccia, chiudila completamente e riaprila online una volta.
 
-Frontend, backend e Service Worker devono riportare tutti la versione `2.22.2`.
+Frontend, backend e Service Worker devono riportare tutti la versione `2.22.3`.
 
 ## Novità principali
 
@@ -41,6 +41,9 @@ Frontend, backend e Service Worker devono riportare tutti la versione `2.22.2`.
 - Quotation Planner protetto dai refresh e dalle sincronizzazioni concluse in background;
 - ripristino automatico della sessione di lavoro locale, separato per ciascun agente;
 - assistenza Noleggio/Leasing calcolata esclusivamente sul valore prodotti: 15% a 24 mesi, 16% a 30, 17% da 36, 18% da 48 e 19% da 60 mesi, con minimo 500 €;
+- protezione GRENKE basata sulla durata più lunga tra il canone principale e tutti i canoni selezionati per il PDF;
+- durata responsabile del ricarico evidenziata nell'interfaccia con pannello di controllo e percentuale applicata;
+- verifica automatica anti-elusione prima di stampa, salvataggio online e invio della pratica;
 - aggiornamenti in background non distruttivi: i moduli aperti non vengono azzerati;
 - sincronizzazione automatica al ritorno da background su smartphone;
 - lock, versioni record, token idempotenti e controlli magazzino invariati.
@@ -74,4 +77,4 @@ Non servono Node.js, npm o compilazioni per pubblicare il gestionale su GitHub P
 
 ## Collaudo
 
-La release è stata verificata con 159 controlli automatici su sintassi, versione, primo avvio offline, recupero cache, comando Riprova, pratiche, documenti, Agenda, Classifiche, persistenza del Planner, assistenza progressiva, sovrascrittura preventivi, concorrenza e integrità delle risorse.
+La release è stata verificata con 170 controlli automatici su sintassi, versione, primo avvio offline, recupero cache, comando Riprova, pratiche, documenti, Agenda, Classifiche, persistenza del Planner, assistenza progressiva, durata massima GRENKE, protezioni anti-elusione, sovrascrittura preventivi, concorrenza e integrità delle risorse.

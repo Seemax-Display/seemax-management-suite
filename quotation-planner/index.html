@@ -375,6 +375,11 @@
     .durata-item input[type="radio"]:checked::after{content:"";position:absolute;inset:5px;border-radius:999px;background:#111827}
     .print-rate input[type="checkbox"]:checked{border-color:#111827;background:#111827;box-shadow:none}
     .print-rate input[type="checkbox"]:checked::after{content:"✓";position:absolute;left:3px;top:-1px;font-size:13px;line-height:18px;font-weight:700;color:#fff}
+    .durata-item.assistance-driver{background:linear-gradient(90deg,rgba(16,185,129,.22),rgba(16,185,129,.06));box-shadow:inset 4px 0 0 #34d399}
+    .durata-item.assistance-driver>label span:after{content:"ASSISTENZA";display:inline-flex;margin-left:8px;padding:3px 6px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:8px;line-height:1;font-weight:950;letter-spacing:.08em;vertical-align:middle}
+    .grenke-assistance-audit{margin-top:11px;border:1px solid rgba(110,231,183,.72);border-radius:13px;padding:11px 12px;background:rgba(236,253,245,.12);color:#ecfdf5;font-size:11px;line-height:1.45}
+    .grenke-assistance-audit strong,.grenke-assistance-audit span{display:block}.grenke-assistance-audit strong{font-size:11px;letter-spacing:.04em}.grenke-assistance-audit span{margin-top:3px;color:rgba(236,253,245,.78)}
+    .grenke-assistance-audit.is-warning{border-color:#fbbf24;background:rgba(245,158,11,.15);color:#fef3c7}.grenke-assistance-audit.is-warning span{color:rgba(254,243,199,.82)}
     .aside-stack{display:flex;flex-direction:column;gap:12px}
     .kpi-tile{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-soft);overflow:hidden}
     .kpi-head{background:#0b1b2d;color:#fff;padding:14px 16px;font-weight:950;text-transform:uppercase;letter-spacing:.08em;font-size:12px}
@@ -1286,7 +1291,8 @@
                   <div class="durata-item"><label><input type="radio" name="grenkeDuration" value="48" /> <span>48 mesi</span></label><div class="durata-side"><label class="print-rate"><input type="checkbox" name="grenkePrintDuration" value="48" checked /> PDF</label><span class="canone" id="cn48">—</span></div></div>
                   <div class="durata-item"><label><input type="radio" name="grenkeDuration" value="60" /> <span>60 mesi</span></label><div class="durata-side"><label class="print-rate"><input type="checkbox" name="grenkePrintDuration" value="60" checked /> PDF</label><span class="canone" id="cn60">—</span></div></div>
                 </div>
-                <div class="grenke-selection-note">Seleziona fino a 3 canoni Grenke da mostrare nella stampa. Se non selezioni nulla, verrà riportata la durata principale scelta nel calcolatore.</div>
+                <div class="grenke-selection-note">Seleziona fino a 3 canoni Grenke da mostrare nella stampa. L'assistenza viene sempre determinata dalla durata più lunga tra il canone principale e quelli selezionati per il PDF.</div>
+                <div id="grenkeAssistanceAudit" class="grenke-assistance-audit" role="status" aria-live="polite"><strong>CONTROLLO ASSISTENZA</strong><span>La durata di controllo verrà mostrata dopo la selezione.</span></div>
               </div>
             </div>
           </section>
@@ -2828,6 +2834,7 @@
         const fresh = await ensureFreshQuoteNumberBeforeSave();
         if(!fresh){ hideCalcLoading(); return; }
         setCalcLoadingText('Protezione preventivo', 'Preparazione e crittografia dei dati...');
+        if(printFinanceProvider() === 'grenke') ensureGrenkeCommercialCompliance();
         const payload = collectDraftPayload(defaultDraftName(), null);
         payload.appVersion = ONLINE_ARCHIVE.version;
         payload.savedOnlineAt = new Date().toISOString();
@@ -3171,6 +3178,7 @@
         const fresh = await ensureFreshQuoteNumberBeforeSave();
         if(!fresh){ hideCalcLoading(); return; }
         setCalcLoadingText('Protezione preventivo', 'Preparazione e crittografia dei dati...');
+        if(printFinanceProvider() === 'grenke') ensureGrenkeCommercialCompliance();
         const payload = collectDraftPayload(defaultDraftName(), null);
         payload.appVersion = ONLINE_ARCHIVE.version;
         payload.savedOnlineAt = new Date().toISOString();
@@ -3702,6 +3710,7 @@
     function setLiteFinanceProvider(provider){
       if(!isLiteMode()) return;
       state.financeProvider = provider || 'none';
+      if(state.financeProvider === 'grenke') ensureGrenkeCommercialCompliance({notify:true});
       syncLiteFinanceCheckboxes();
       updateSummary();
       updateSideStatus();
@@ -4177,6 +4186,7 @@
 
     function currentAssistanceDuration(provider){
       if(provider === 'ifis' && window.SEEMAX_IFIS && typeof window.SEEMAX_IFIS.currentDuration === 'function') return Number(window.SEEMAX_IFIS.currentDuration()) || 60;
+      if(provider === 'grenke') return grenkeAssistanceDuration();
       return selectedDuration();
     }
 
@@ -4235,6 +4245,7 @@
           detail.textContent = state.assistanceImported ? `Durata ${state.assistanceDuration || '—'} mesi · ${percent}% sul solo valore prodotti ${fmtEuro0(state.assistanceBase)} · assistenza ${fmtEuro0(state.assistanceCost)}${minimumApplied} · valore minimo finanziabile ${fmtEuro0(state.assistanceMinimum)}.` : '';
         }
       });
+      updateGrenkeAssistanceAudit();
     }
 
     function clearAssistanceImportLock(){
@@ -4282,7 +4293,7 @@
 
     function updateQuickCommercialValues(){
       const totals = commercialAmountBreakdown();
-      const rental = assistanceImportValues('grenke', selectedDuration());
+      const rental = assistanceImportValues('grenke', grenkeAssistanceDuration());
       const leasing = assistanceImportValues('ifis', currentAssistanceDuration('ifis'));
       if($('quickPurchaseValue')) $('quickPurchaseValue').textContent = totals.items.length ? fmtEuro0(totals.total) : '—';
       if($('quickRentalValue')) $('quickRentalValue').textContent = totals.items.length ? fmtEuro0(rental.minimum) : '—';
@@ -4980,7 +4991,7 @@
       const selectedItems = selectedLedQuotes();
       if(!selectedItems.length) return;
       state.financeProvider = 'grenke';
-      const assistance = applyAssistanceImport('grenke', {duration:selectedDuration(), preserveManual:false});
+      const assistance = applyAssistanceImport('grenke', {duration:grenkeAssistanceDuration(), preserveManual:false});
       const label = selectedItems.length === 1 ? selectedItems[0].nome : `${selectedItems.length} prodotti selezionati`;
       $('grenkeImportNote').textContent = `${APP_CONFIG.transferLabel}: ${label} · acquisto ${fmtEuro0(assistance.purchase)} + assistenza ${fmtEuro0(assistance.cost)} (${Math.round(assistance.rate * 100)}% sul valore prodotti, minimo 500€).`;
       updateAssistanceBadges();
@@ -5013,9 +5024,10 @@
       $('modeQuarterly').addEventListener('click', () => setGrenkeMode('trimestrale'));
       setupGrenkePrintDurationSelectors();
       document.querySelectorAll('input[name="grenkeDuration"]').forEach(r => r.addEventListener('change', () => {
-        refreshImportedAssistance('grenke', Number(r.value));
+        syncGrenkeAssistanceForSelections();
         markGrenkeNeedsRecalc();
       }));
+      updateGrenkeAssistanceAudit();
       updateGrenkePreview();
     }
 
@@ -5039,6 +5051,66 @@
       return unique.length ? unique : [selectedDuration()];
     }
 
+    function grenkeAssistanceDuration(){
+      return Math.max(selectedDuration(), ...getGrenkePrintDurations());
+    }
+
+    function grenkeSelectedDurationLabel(){
+      return Array.from(new Set([selectedDuration(), ...getGrenkePrintDurations()])).sort((a,b) => a-b).join(', ');
+    }
+
+    function updateGrenkeAssistanceAudit(){
+      const audit = $('grenkeAssistanceAudit');
+      if(!audit) return;
+      const duration = grenkeAssistanceDuration();
+      const percent = Math.round(assistanceRateForDuration(duration) * 100);
+      const active = !!state.assistanceImported && state.financeProvider === 'grenke';
+      const hasProducts = selectedLedQuotes().length > 0;
+      audit.classList.toggle('is-warning', hasProducts && !active);
+      document.querySelectorAll('input[name="grenkeDuration"]').forEach(input => {
+        const row = input.closest('.durata-item');
+        if(row) row.classList.toggle('assistance-driver', Number(input.value) === duration);
+      });
+      const title = audit.querySelector('strong');
+      const detail = audit.querySelector('span');
+      if(title) title.textContent = active
+        ? `ASSISTENZA PROTETTA · ${duration} MESI · ${percent}%`
+        : (hasProducts ? 'SIMULAZIONE LIBERA · CONTROLLO PRIMA DELL’USCITA' : `DURATA DI CONTROLLO · ${duration} MESI · ${percent}%`);
+      if(detail) detail.textContent = active
+        ? `Durate considerate: ${grenkeSelectedDurationLabel()} mesi. Il ricarico usa automaticamente la durata più lunga e il solo valore prodotti.`
+        : (hasProducts
+          ? `Prima di stampa o salvataggio il sistema applicherà automaticamente ${percent}% per ${duration} mesi, con minimo 500 €.`
+          : `Selezioni considerate: ${grenkeSelectedDurationLabel()} mesi. La durata più lunga determinerà il ricarico quando importerai i prodotti.`);
+    }
+
+    function syncGrenkeAssistanceForSelections(){
+      const wasCalculated = !!state.grenkeCalculated;
+      const result = refreshImportedAssistance('grenke', grenkeAssistanceDuration());
+      updateGrenkeAssistanceAudit();
+      if(result && wasCalculated && grenkeAmount()) calcGrenke(true);
+      return result;
+    }
+
+    function ensureGrenkeCommercialCompliance(options={}){
+      if(!selectedLedQuotes().length) return null;
+      const previousProvider = state.financeProvider;
+      const previousMinimum = state.assistanceImported && previousProvider === 'grenke' ? Number(state.assistanceMinimum || 0) : 0;
+      const previousAmount = grenkeAmount();
+      const previousDuration = Number(state.assistanceDuration || 0);
+      const wasProtected = !!state.assistanceImported && previousProvider === 'grenke';
+      state.financeProvider = 'grenke';
+      const result = applyAssistanceImport('grenke', {
+        duration:grenkeAssistanceDuration(),
+        preserveManual:true,
+        previousMinimum
+      });
+      if(grenkeAmount()) calcGrenke(true);
+      const changed = !wasProtected || Math.abs(previousAmount - Number(result.amount || 0)) > 0.001 || previousDuration !== Number(result.duration);
+      if(options.notify && changed) showDraftToast(`Protezione GRENKE applicata: assistenza ${Math.round(result.rate * 100)}% per ${result.duration} mesi sul solo valore prodotti.`);
+      updateGrenkeAssistanceAudit();
+      return {...result, changed};
+    }
+
     function setGrenkePrintDurations(values){
       const allowed = [24,30,36,48,60];
       const normalized = Array.from(new Set((Array.isArray(values) ? values : [])
@@ -5049,6 +5121,7 @@
         cb.checked = normalized.includes(Number(cb.value));
       });
       state.grenkePrintDurations = normalized.length ? normalized : [selectedDuration()];
+      updateGrenkeAssistanceAudit();
     }
 
     function setupGrenkePrintDurationSelectors(){
@@ -5060,6 +5133,7 @@
           sqpAlert('Puoi selezionare al massimo 3 canoni Grenke da mostrare nella stampa.', {title:'Limite canoni Grenke'});
         }
         state.grenkePrintDurations = getGrenkePrintDurations();
+        syncGrenkeAssistanceForSelections();
         if(state.view === 'summary') updateSummary();
       }));
       setGrenkePrintDurations(state.grenkePrintDurations || [36,48,60]);
@@ -5805,6 +5879,7 @@
       closePracticeTypeModal();
       showPersistentCalcLoading('Inserimento pratica', 'Trasferimento di cliente, valori e cabinet al gestionale...');
       try{
+        if(String(type || '').toUpperCase() === 'NOLEGGIO') ensureGrenkeCommercialCompliance({notify:true});
         const practicePayload = practicePayloadFromSummary(type);
         const nativeApi = window.SEEMAX_NATIVE_API;
         const response = nativeApi && typeof nativeApi.createPracticeFromQuote === 'function'
@@ -5832,7 +5907,11 @@
 
     function setupSummary(){
       const btn = $('btnPrint');
-      if(btn) btn.addEventListener('click', () => { updateSummary(); waitForQuoteImagesThenPrint(); });
+      if(btn) btn.addEventListener('click', () => {
+        if(printFinanceProvider() === 'grenke') ensureGrenkeCommercialCompliance({notify:true});
+        updateSummary();
+        waitForQuoteImagesThenPrint();
+      });
       const practiceBtn = $('btnInsertPractice');
       if(practiceBtn) practiceBtn.addEventListener('click', openPracticeTypeModal);
       document.querySelectorAll('[data-close-practice-type]').forEach(node => node.addEventListener('click', closePracticeTypeModal));
@@ -5841,7 +5920,13 @@
         if($(id)) $(id).addEventListener('change', updateSummary);
       });
       document.querySelectorAll('input[name="printFinanceProvider"]').forEach(radio => {
-        radio.addEventListener('change', () => { state.financeProvider = radio.value; syncLiteFinanceCheckboxes(); updateSummary(); updateSideStatus(); });
+        radio.addEventListener('change', () => {
+          state.financeProvider = radio.value;
+          if(state.financeProvider === 'grenke') ensureGrenkeCommercialCompliance({notify:true});
+          syncLiteFinanceCheckboxes();
+          updateSummary();
+          updateSideStatus();
+        });
       });
     }
 
@@ -6272,7 +6357,7 @@
     // =============================
     const DRAFT_STORAGE_KEY = 'seemax_quotation_planner_drafts_v1';
     const ACTIVE_SESSION_STORAGE_PREFIX = 'seemax_quotation_planner_active_v2_';
-    const ACTIVE_SESSION_VERSION = '2.22.2';
+    const ACTIVE_SESSION_VERSION = '2.22.3';
     const DRAFT_LIMIT = 3;
     let activeSessionSaveTimer = 0;
     let activeSessionRestoring = false;
@@ -6421,7 +6506,9 @@
       if(state.assistanceImported && selectedLedQuotes().length){
         const assistanceProvider = assistance.provider === 'ifis' || state.financeProvider === 'ifis' ? 'ifis' : 'grenke';
         applyAssistanceImport(assistanceProvider, {
-          duration:Number(assistance.duration || currentAssistanceDuration(assistanceProvider)),
+          duration:assistanceProvider === 'grenke'
+            ? grenkeAssistanceDuration()
+            : Number(assistance.duration || currentAssistanceDuration(assistanceProvider)),
           preserveManual:true,
           previousMinimum:Number(assistance.minimum || 0)
         });

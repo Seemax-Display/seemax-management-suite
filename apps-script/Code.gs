@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2222().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2223().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.22.2";
+var SEEMAX_VERSION = "seemax-management-suite-2.22.3";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -132,7 +132,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.22.2 configurato: sessione Planner persistente e assistenza progressiva sul solo valore prodotti attive.";
+  return "DATABASE SEEMAX 2.22.3 configurato: sessione Planner persistente e protezione GRENKE sulla durata massima selezionata attive.";
 }
 
 
@@ -552,6 +552,26 @@ function upgradeSeemaxV2222() {
     styleSheets_();
     organizeActiveSheetsForReleaseV2160_();
     return "SEEMAX v2.22.2 configurato: sessione Planner protetta dai refresh in background e assistenza progressiva 15%-19% sul solo valore prodotti; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
+  });
+}
+
+function upgradeSeemaxV2223() {
+  return withMutationLock_(function () {
+    var ss = db_();
+    Object.keys(SHEET_SCHEMAS).forEach(function (name) { ensureSheet_(ss, name, SHEET_SCHEMAS[name]); });
+    seedSettings_();
+    prepareCommunicationsV2144_();
+    ensureEmailQueueTriggerV2151_();
+    initializeInventoryV11_();
+    assignUniquePracticePrefixesV2162_();
+    rebuildPracticeCountersV2140_();
+    rebuildQuoteCountersV2151_();
+    clearArchivedQuoteKeysV2161_();
+    var cleanup = removeTransientPracticeColumnsV2210_();
+    setSetting_("versione_config", SEEMAX_VERSION, "Hotfix v2.22.3 · protezione GRENKE sulla durata massima selezionata, controllo visibile e verifica automatica prima dell'uscita operativa.");
+    styleSheets_();
+    organizeActiveSheetsForReleaseV2160_();
+    return "SEEMAX v2.22.3 configurato: assistenza GRENKE determinata dalla durata massima selezionata e verificata prima di stampa, salvataggio o invio pratica; " + cleanup.columns + " eventuali colonne tecniche rimosse (" + cleanup.cells + " valori locali).";
   });
 }
 
