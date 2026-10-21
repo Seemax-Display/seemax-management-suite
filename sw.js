@@ -1,8 +1,11 @@
-const CACHE = "seemax-management-v2-22-3-grenke-assistance-guard";
+const CACHE = "seemax-management-v2-23-0-pixel-lab";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
   "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/js/planner-native.js", "./assets/js/work-order.js",
+  "./assets/js/pixel-lab.js", "./assets/js/pixel-lab-engine.js", "./assets/js/pixel-lab-app.js",
+  "./assets/css/pixel-lab-launch.css", "./assets/css/pixel-lab.css",
+  "./pixel-lab/index.html", "./assets/pixel-lab/default-marina.png",
   "./assets/icons/icon.svg", "./manifest.webmanifest",
   "./quotation-planner/index.html",
   "./assets/catalog/p19.png", "./assets/catalog/p25.png",
@@ -32,9 +35,17 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   if (event.request.mode === "navigate") {
+    /* Ogni documento HTML ha una chiave propria: una navigazione dell'iframe
+       Pixel Lab non deve mai sovrascrivere la shell offline del gestionale. */
+    const shellUrl = new URL("./index.html", self.registration.scope);
+    const moduleUrl = ["./pixel-lab/index.html", "./quotation-planner/index.html"]
+      .map((path) => new URL(path, self.registration.scope))
+      .find((candidate) => candidate.pathname === url.pathname);
+    const cacheKey = (moduleUrl || shellUrl).href;
     event.respondWith(fetch(event.request).then((response) => {
-      const copy = response.clone(); caches.open(CACHE).then((cache) => cache.put("./index.html", copy)); return response;
-    }).catch(() => caches.match("./index.html")));
+      if (response && response.ok) caches.open(CACHE).then((cache) => cache.put(cacheKey, response.clone()));
+      return response;
+    }).catch(() => caches.match(cacheKey, { ignoreSearch: true })));
     return;
   }
   const plannerUrl = new URL("./quotation-planner/index.html", self.registration.scope);

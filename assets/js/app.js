@@ -1496,6 +1496,7 @@
   }
 
   function showLogin() {
+    if (window.SeemaxPixelLab) window.SeemaxPixelLab.reset();
     $("app").classList.add("is-hidden");
     $("loginScreen").classList.remove("is-hidden");
     $("loginError").textContent = "";
@@ -2215,7 +2216,7 @@
     const allRows = filterRows(state.data.products, ["nome", "categoria", "descrizione", "sku"]);
     const rows = allRows.filter((product) => productCatalogTab(product) === state.catalogTab);
     const activeTab = CATALOG_TABS.find((tab) => tab.id === state.catalogTab) || CATALOG_TABS[0];
-    const inventoryAction = api.isAdmin() ? `<button class="btn inventory-button" data-action="inventory-adjust">📦 Carico / Scarico</button>` : "";
+    const inventoryAction = (state.catalogTab !== "LCD" ? `<button class="btn soft" data-action="open-pixel-lab">▦ PARAGONA · Pixel Lab</button>` : "") + (api.isAdmin() ? `<button class="btn inventory-button" data-action="inventory-adjust">📦 Carico / Scarico</button>` : "");
     const source = state.data.database_meta && state.data.database_meta.inventory_source;
     const tabs = `<nav class="catalog-tabs" aria-label="Categorie catalogo">${CATALOG_TABS.map((tab) => {
       const count = (state.data.products || []).filter((product) => productCatalogTab(product) === tab.id).length;
@@ -2234,7 +2235,12 @@
   }
 
   function renderPlanner() {
-    return `${state.offlinePlannerOnly ? `<div class="planner-fast-notice"><strong>Quotation Planner offline</strong><span>Calcoli, bozze locali ed esportazione PDF restano disponibili. Archivio online, database e pratiche sono disattivati finché non torna la connessione.</span></div>` : ""}<div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
+    return `${state.offlinePlannerOnly ? `<div class="planner-fast-notice"><strong>Quotation Planner offline</strong><span>Calcoli, bozze locali ed esportazione PDF restano disponibili. Archivio online, database e pratiche sono disattivati finché non torna la connessione.</span></div>` : ""}<section class="pixel-lab-entry"><div><strong><span class="pixel-lab-glyph" aria-hidden="true">▦</span>Ogni pixel conta.</strong><p>Paragona i Ledwall: stessa immagine, risoluzioni, schede tecniche e consumi.</p></div><button type="button" class="btn soft" data-action="open-pixel-lab">PARAGONA · Apri Pixel Lab ⇄</button></section><div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
+  }
+
+  function openPixelLab() {
+    if (!window.SeemaxPixelLab) { toast("Pixel Lab non disponibile. Riapri il gestionale online per aggiornare i file dell’app.", "danger"); return; }
+    window.SeemaxPixelLab.open({ products: (state.data || {}).products || [], offlineOnly: state.offlinePlannerOnly, username: String((api.getSession() || {}).username || "offline") });
   }
 
   function documentLibraryKey() {
@@ -2407,7 +2413,7 @@
   function renderSystemSettingsTab() {
     const status = api.status();
     const meta = (state.data && state.data.database_meta) || {};
-    return `<div class="settings-grid"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.demo ? "Demo locale" : status.online ? "Online condivisa" : "Offline"}</dd></div><div><dt>Versione frontend</dt><dd>${esc(config.version)}</dd></div><div><dt>Fonte magazzino</dt><dd>${esc(meta.inventory_source || "PRODOTTI_LED")}</dd></div></dl><p>Le Attività restano locali. Le altre sezioni comunicano con Google Apps Script e con il Foglio condiviso.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Diagnostica</span><h3>Stato tecnico</h3></div></div><div class="config-summary"><dl><div><dt>Prodotti caricati</dt><dd>${Number(meta.products_count || (state.data.products || []).length)}</dd></div><div><dt>Ultimo caricamento</dt><dd>${meta.loaded_at ? esc(new Date(meta.loaded_at).toLocaleString("it-IT")) : "—"}</dd></div><div><dt>Comunicazioni</dt><dd>Revisioni per account</dd></div></dl><p>La modalità “Solo una volta” viene registrata nella riga dell’agente e affiancata da una cache locale: lo stesso account non rivede il messaggio neppure cambiando dispositivo. “Ripubblica” crea una nuova revisione per tutti.</p></div></section></div>`;
+    return `<div class="settings-grid"><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Collegamento</span><h3>Database condiviso</h3></div>${badge(status.demo ? "Demo" : status.online ? "Online" : "Offline")}</div><div class="config-summary"><dl><div><dt>Modalità</dt><dd>${status.demo ? "Demo locale" : status.online ? "Online condivisa" : "Offline"}</dd></div><div><dt>Versione frontend</dt><dd>${esc(config.uiVersion || config.version)}</dd></div><div><dt>Fonte magazzino</dt><dd>${esc(meta.inventory_source || "PRODOTTI_LED")}</dd></div></dl><p>Le Attività restano locali. Le altre sezioni comunicano con Google Apps Script e con il Foglio condiviso.</p><div class="stack-actions"><button class="btn soft" type="button" data-action="test-database">Verifica collegamento</button></div></div></section><section class="panel admin-settings-panel"><div class="panel-head"><div><span class="section-kicker">Diagnostica</span><h3>Stato tecnico</h3></div></div><div class="config-summary"><dl><div><dt>Prodotti caricati</dt><dd>${Number(meta.products_count || (state.data.products || []).length)}</dd></div><div><dt>Ultimo caricamento</dt><dd>${meta.loaded_at ? esc(new Date(meta.loaded_at).toLocaleString("it-IT")) : "—"}</dd></div><div><dt>Comunicazioni</dt><dd>Revisioni per account</dd></div></dl><p>La modalità “Solo una volta” viene registrata nella riga dell’agente e affiancata da una cache locale: lo stesso account non rivede il messaggio neppure cambiando dispositivo. “Ripubblica” crea una nuova revisione per tutti.</p></div></section></div>`;
   }
 
   function renderSettings() {
@@ -4182,6 +4188,7 @@
       "reload": async () => { await refreshSharedData({ interactive: true, announce: true, reason: "richiesta manuale" }); },
       "offline-online-login": () => window.location.reload(),
       "reload-planner": () => { if (state.route === "planner") renderRoute(false, { forcePlannerRemount: true }); },
+      "open-pixel-lab": openPixelLab,
       "test-database": async () => { setLoading(true, "Verifica database…"); try { const response = await api.health(); setConnectionState(); toast(response.ok ? `Database collegato · ${response.elapsed_ms || 0} ms.` : `Database incompleto: ${(response.missing_sheets || []).join(", ")}.`, response.ok ? "success" : "danger"); } catch (e) { toast(e.message, "danger"); } finally { setLoading(false); } },
       "export-demo": () => download(`seemax-demo-${new Date().toISOString().slice(0, 10)}.json`, api.exportDemo()),
       "reset-demo": async () => { if (confirm("Ripristinare tutti i dati dimostrativi?")) { api.resetDemo(); await loadAll(); renderRoute(); toast("Dati demo ripristinati."); } }

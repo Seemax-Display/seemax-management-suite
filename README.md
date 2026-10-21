@@ -1,80 +1,69 @@
-# Seemax Management Suite 2.22.3
+# Seemax Management Suite — interfaccia 2.23.0
 
-Pacchetto operativo essenziale per GitHub Pages e Google Apps Script.
+Aggiornamento Pixel Lab basato sul pacchetto operativo 2.22.3.
 
-## Installazione dell’aggiornamento
+## Come aggiornare
 
-1. Nell’editor Apps Script sostituisci il contenuto del vecchio `Code.gs` con `apps-script/Code.gs`.
-2. Salva ed esegui una sola volta:
+1. Estrai lo ZIP e carica il contenuto della cartella su GitHub, mantenendo nomi e percorsi. Non caricare lo ZIP come singolo file.
+2. Mantieni la configurazione del tuo collegamento in assets/js/config.js se hai cambiato l’URL Apps Script rispetto alla versione precedente.
+3. Dopo la pubblicazione di GitHub Pages, riapri il gestionale online ed esegui Ctrl+F5. Per la PWA installata, chiudi e riapri online una volta: il Service Worker deve acquisire i file nuovi.
+4. Apri Quotation Planner e premi PARAGONA · Apri Pixel Lab. Il pulsante è disponibile anche nel Catalogo Ledwall / Altri LED.
 
-   ```javascript
-   upgradeSeemaxV2223()
-   ```
+Non serve modificare il Foglio né distribuire una nuova versione Apps Script. Il protocollo e il backend rimangono 2.22.3; uiVersion identifica l’interfaccia 2.23.0. Il file apps-script/Code.gs incluso è identico a quello della release di partenza. Se il backend non è ancora 2.22.3, aggiorna prima la release di partenza secondo le sue istruzioni.
 
-3. Autorizza lo script se Google lo richiede.
-4. Crea una nuova versione del deployment Web App, mantenendo lo stesso URL `/exec`.
-5. Carica su GitHub il contenuto completo di questo pacchetto, conservando cartelle e nomi.
-6. Attendi la pubblicazione di GitHub Pages, quindi esegui `Ctrl+F5`.
-7. Se usi la PWA installata e appare ancora la vecchia interfaccia, chiudila completamente e riaprila online una volta.
+## Pixel Lab
 
-Frontend, backend e Service Worker devono riportare tutti la versione `2.22.3`.
+- Animazione iniziale: due schermi convergono al centro e si pixelizzano.
+- Apertura a tutto schermo sopra il lavoro corrente, senza ricreare il Planner.
+- Chiusura tramite Torna al lavoro o Esc.
+- Riapertura con immagini e configurazione mantenute nella stessa sessione.
+- P1.9, P2.5, P3, P3.91, P4, Floor Led e Transparent Led.
+- P3.91 in una sola voce, con passi di 50 cm e composizione automatica 50×100 + 50×50.
+- Confronto della stessa fotografia, grafica di test, testi oppure immagine personale.
+- Matrici native, scala fisica comune, dettagli pixel ingranditi, schede tecniche e consumi stimati.
+- Esportazione PNG del confronto.
+- Catalogo già caricato dal gestionale: nessuna chiamata aggiuntiva a Google Sheets e nessuna scrittura.
+- Funzionamento offline dopo l’acquisizione completa dei nuovi file.
+- Pulizia dell’immagine personale e dell’istanza del laboratorio al logout o al cambio utente.
+- Animazione ridotta quando il dispositivo richiede meno movimento.
 
-## Novità principali
+## Matrici di riferimento
 
-- rimossa la vecchia Modalità Rapida globale;
-- PWA offline avviata direttamente nel Quotation Planner;
-- Planner disponibile anche al primo avvio offline dopo la chiusura completa della PWA;
-- avviso iniziale `MODALITÀ PLANNER ATTIVA` con conferma esplicita;
-- comando `Riprova` nuovamente operativo dopo un errore di caricamento del Planner;
-- paginazione compatta `1 · 2 · 3 · … · ultima`;
-- cliente apribile direttamente dalle pratiche operative;
-- pratiche S.Q.P. con colore di stato standard e simbolo viola dedicato;
-- importazione S.Q.P. guidata con anagrafica precompilata o pratica locale privata;
-- documenti obbligatori soltanto quando la pratica resta `INSERITA`;
-- Agenda personale locale con calendario, promemoria e stati `FATTO`, `SOSPESA`, `ANNULLATA`;
-- nuova scheda Classifiche con profili, fatturato migliore, ultima pratica e trofei;
-- Quotation Planner con scelta unica `OPERAZIONE COMMERCIALE`;
-- modalità Classica e Rapida disponibili dentro la sola sezione Prodotti;
-- memoria delle configurazioni quando si cambia scheda o categoria;
-- caricamento e sovrascrittura controllata dei preventivi già registrati;
-- numero preventivo modificabile manualmente soltanto dagli ADMIN;
-- Quotation Planner protetto dai refresh e dalle sincronizzazioni concluse in background;
-- ripristino automatico della sessione di lavoro locale, separato per ciascun agente;
-- assistenza Noleggio/Leasing calcolata esclusivamente sul valore prodotti: 15% a 24 mesi, 16% a 30, 17% da 36, 18% da 48 e 19% da 60 mesi, con minimo 500 €;
-- protezione GRENKE basata sulla durata più lunga tra il canone principale e tutti i canoni selezionati per il PDF;
-- durata responsabile del ricarico evidenziata nell'interfaccia con pannello di controllo e percentuale applicata;
-- verifica automatica anti-elusione prima di stampa, salvataggio online e invio della pratica;
-- aggiornamenti in background non distruttivi: i moduli aperti non vengono azzerati;
-- sincronizzazione automatica al ritorno da background su smartphone;
-- lock, versioni record, token idempotenti e controlli magazzino invariati.
+| Modello | Passo di composizione | Matrice per passo |
+| --- | --- | --- |
+| P1.9 | 50×100 cm | 264×526 px |
+| P2.5 | 64×64 cm | 256×256 px |
+| P3 | 57×57 cm | 190×190 px |
+| P3.91 unico | 50×50 cm | 128×128 px |
+| P4 | 96×96 cm | 240×240 px |
+| Floor Led | 50×100 cm | 128×256 px |
+| Transparent Led | 100×100 cm | 256×256 px |
 
-## Modalità offline
+Le matrici sono riprese dal Quotation Planner già esistente, senza modificarne il calcolo commerciale. P2.5 e P3.91 corrispondono ai valori forniti da SEEMAX per il primo prototipo. La matrice P1.9 va confermata sulla variante del produttore.
 
-La modalità offline si attiva soltanto quando il gestionale viene avviato come PWA installata senza rete. In tale condizione sono disponibili:
+Esempio P3.91 100×100 cm: 256×256 pixel, con 2 cabinet fisici 50×100. Esempio 150×150 cm: 384×384 pixel, con 3 cabinet 50×100 e 3 cabinet 50×50. La griglia visiva mostra i passi da 50 cm e non tutti i giunti reali.
 
-- configurazione dei prodotti già memorizzati;
-- calcolo commerciale;
-- bozze locali;
-- esportazione del preventivo.
+## Dati tecnici e limiti
 
-Archivio online, salvataggio nel Foglio e invio delle pratiche tornano disponibili alla riconnessione.
+I campi tecnici presenti nel catalogo già caricato prevalgono sui riferimenti inclusi nel laboratorio. Dati mancanti o ambigui sono segnalati: un consumo non noto non viene trasformato in zero. La densità P3 dichiarata nella scheda può differire da quella calcolata da dimensioni e matrice; entrambe restano leggibili. Peso con più valori e scala di grigi “16” richiedono conferma della variante.
 
-Dopo l'installazione di questo aggiornamento, la PWA deve essere aperta online una volta per consentire al browser di acquisire il nuovo Service Worker. Da quel momento il Planner è disponibile anche chiudendo completamente l'applicazione e riaprendola senza connessione.
+Si tratta di una simulazione digitale della risoluzione. Non riproduce luminosità, calibrazione, refresh, distanza visiva, trasparenza o struttura ottica del display reale. Una fotografia di partenza con pochi pixel limita il dettaglio anche su una matrice più ampia.
 
-## Struttura essenziale
+Sono ammessi fino a 8×8 passi per schermo, su una sola faccia. Le immagini personali restano in memoria nella pagina e non vengono inviate a un server; devono essere riselezionate dopo un riavvio o logout.
 
-```text
-index.html                    Interfaccia principale
-assets/                       Codice, immagini e dati necessari
-quotation-planner/index.html  Quotation Planner
-apps-script/Code.gs           Backend Google Apps Script
-apps-script/appsscript.json   Manifest Apps Script
-manifest.webmanifest          Installazione PWA
-sw.js                         Cache offline
-```
+## Verifiche eseguite
 
-Non servono Node.js, npm o compilazioni per pubblicare il gestionale su GitHub Pages.
+- Sintassi dei file JavaScript e del codice inline del Planner.
+- 178 controlli di regressione della suite precedente, con la cache aggiornata.
+- Calcoli delle sette matrici, composizioni P3.91 pari e dispari, potenze, dati mancanti e limiti.
+- Test dei comandi in DOM simulato, rasterizzazione delle immagini ed esportazione PNG.
+- Apertura, chiusura, riapertura, conservazione della bozza sottostante e isolamento delle sessioni.
+- Messaggi limitati alla stessa origine e all’istanza corretta, con soli dati tecnici del catalogo.
+- Test del Service Worker: precache completo, URL versionati offline e separazione tra HTML del laboratorio e shell del gestionale.
+- Integrità dell’archivio e riferimenti locali.
 
-## Collaudo
+Il collaudo visivo in un browser reale non è stato disponibile nell’ambiente di lavoro. Dopo il caricamento su GitHub va quindi verificato su PC, iPhone e Android, insieme alla prima acquisizione online della nuova cache. Non sono stati eseguiti test sul database operativo privato.
 
-La release è stata verificata con 170 controlli automatici su sintassi, versione, primo avvio offline, recupero cache, comando Riprova, pratiche, documenti, Agenda, Classifiche, persistenza del Planner, assistenza progressiva, durata massima GRENKE, protezioni anti-elusione, sovrascrittura preventivi, concorrenza e integrità delle risorse.
+## File essenziali
+
+Il pacchetto contiene solo i file di esecuzione, il backend di riferimento, il README e le licenze già necessarie. Non contiene cartelle di sviluppo, test, duplicati o dipendenze npm. Non sono richieste compilazioni.
