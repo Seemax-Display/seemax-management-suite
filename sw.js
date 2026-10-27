@@ -1,9 +1,10 @@
-const CACHE = "seemax-management-v2-23-0-pixel-lab";
+const CACHE = "seemax-management-v2-24-0-live-inventory";
 const CORE = [
   "./", "./index.html", "./assets/css/app.css", "./assets/js/config.js",
   "./assets/js/seed.js", "./assets/js/store.js", "./assets/js/api.js",
   "./assets/js/app.js", "./assets/js/client-tools.js", "./assets/js/planner-native.js", "./assets/js/work-order.js",
   "./assets/js/pixel-lab.js", "./assets/js/pixel-lab-engine.js", "./assets/js/pixel-lab-app.js",
+  "./assets/js/p391-layout.js",
   "./assets/css/pixel-lab-launch.css", "./assets/css/pixel-lab.css",
   "./pixel-lab/index.html", "./assets/pixel-lab/default-marina.png",
   "./assets/icons/icon.svg", "./manifest.webmanifest",

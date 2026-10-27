@@ -5,12 +5,12 @@
  * INSTALLAZIONE RAPIDA
  * 1. Apri il Foglio Google > Estensioni > Apps Script.
  * 2. Sostituisci Code.gs con questo file.
- * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2223().
+ * 3. Nuovo database: esegui setupSeemaxDatabase(). Database esistente: esegui upgradeSeemaxV2240().
  * 4. Autorizza lo script e distribuisci una nuova versione della Web App come "Me", accesso "Chiunque".
  * 5. Copia l'URL /exec in assets/js/config.js soltanto se il deployment è cambiato.
  */
 
-var SEEMAX_VERSION = "seemax-management-suite-2.22.3";
+var SEEMAX_VERSION = "seemax-management-suite-2.24.0";
 var SEEMAX_PERFORMANCE_OPTIONS_ = {
   diagnostics: true,
   routineUpsertLogs: false,
@@ -36,6 +36,9 @@ var SEEMAX_BRIDGE_ACTIONS_ = {
   management_mark_notifications_read: true,
   management_update_practice_documents: true,
   management_inventory_adjust: true,
+  management_inventory: true,
+  management_upload_document: true,
+  management_upload_and_save_document: true,
   management_set_practice_stock_warning: true
 };
 var RUNTIME_DB_CACHE_ = null;
@@ -46,6 +49,7 @@ var RUNTIME_ROW_LOOKUP_CACHE_ = {};
 var RUNTIME_DEFERRED_EMAILS_ = [];
 var RUNTIME_DEFERRED_LOGS_ = [];
 var RUNTIME_MUTATION_LOCK_HELD_ = false;
+var RUNTIME_INVENTORY_CHANGED_ = {};
 var RUNTIME_PERFORMANCE_ = null;
 var ENTITY_SHEETS = {
   products: "PRODOTTI_LED",
@@ -132,7 +136,7 @@ function setupSeemaxDatabase() {
   normalizeAdminUnknownPlaceholdersV2121_();
   styleSheets_();
   organizeActiveSheetsForReleaseV2160_();
-  return "DATABASE SEEMAX 2.22.3 configurato: sessione Planner persistente e protezione GRENKE sulla durata massima selezionata attive.";
+  return "DATABASE SEEMAX 2.24.0 configurato: magazzino sincronizzato, Planner con nuova sessione e protezione GRENKE sulla durata massima selezionata.";
 }
 
 
@@ -575,6 +579,16 @@ function upgradeSeemaxV2223() {
   });
 }
 
+function upgradeSeemaxV2240() {
+  return withMutationLock_(function () {
+    setSetting_("versione_config", SEEMAX_VERSION, "Magazzino aggiornato automaticamente, composizione P3.91 disponibile, Planner con nuova sessione e numerazione corrente.");
+    rebuildQuoteCountersV2151_();
+    var properties = PropertiesService.getScriptProperties();
+    if (properties.getProperty("SEEMAX_INVENTORY_REVISION") === null) properties.setProperty("SEEMAX_INVENTORY_REVISION", "0");
+    return "SEEMAX 2.24.0 configurato. Dati, giacenze, pratiche, trofei e personalizzazioni conservati.";
+  });
+}
+
 function removeTransientPracticeColumnsV2210_() {
   var sheet = sheet_("PRATICHE");
   var headers = sheetHeaders_(sheet);
@@ -967,11 +981,13 @@ function routeGet_(action, p) {
     case "management_create_from_quote": return managementCreateFromQuote_(p);
     case "management_mark_notifications_read": return managementMarkNotificationsRead_(p);
     case "management_upload_document": return managementUploadDocument_(p);
+    case "management_upload_and_save_document": return managementUploadAndSaveDocument_(p);
     case "management_upload_status": return managementUploadStatus_(p);
     case "management_mutation_status": return managementMutationStatus_(p);
     case "management_update_practice_documents": return managementUpdatePracticeDocuments_(p);
     case "management_verify_vat": return managementVerifyVat_(p);
     case "management_inventory_adjust": return managementInventoryAdjust_(p);
+    case "management_inventory": return managementInventory_(p);
     case "management_set_practice_stock_warning": return managementSetPracticeStockWarning_(p);
     case "config": return plannerConfig_();
     case "version": return { ok: true, version: String(getSettings_().versione_config || SEEMAX_VERSION) };
@@ -1012,7 +1028,12 @@ function managementBootstrap_(p) {
   var user = authenticate_(p.agent_username, p.agent_key);
   /* Lettura diretta ad ogni bootstrap: nessuna cache persistente puo
      sostituire giacenza_attuale del foglio PRODOTTI_LED. */
-  var products = inventoryProductsForRead_();
+  var inventoryLock = LockService.getScriptLock();
+  var inventoryLocked = inventoryLock.tryLock(1200);
+  var inventoryRevisionAtRead = inventoryLocked ? Number(PropertiesService.getScriptProperties().getProperty("SEEMAX_INVENTORY_REVISION") || 0) : -1;
+  var products;
+  try { products = inventoryProductsForRead_(); }
+  finally { if (inventoryLocked) inventoryLock.releaseLock(); }
   var allPractices = rowsToObjects_(sheet_("PRATICHE")).map(stripTransientRecordFields_);
   var allClients = rowsToObjects_(sheet_("CLIENTI"));
   var allUsers = rowsToObjects_(sheet_("AGENTI"));
@@ -1027,9 +1048,9 @@ function managementBootstrap_(p) {
     row.puo_modificare = canEditClient_(row, user) ? "SI" : "NO";
     return row;
   });
-  var practices = isAdmin_(user) ? allPractices : allPractices.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
+  var practices = isAdmin_(user) ? allPractices : allPractices.filter(function (row) { return String(row.agent_username || "") === String(user.username); });
   var allDocuments = rowsToObjects_(sheet_("DOCUMENTI"));
-  var documents = isAdmin_(user) ? allDocuments : allDocuments.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
+  var documents = isAdmin_(user) ? allDocuments : allDocuments.filter(function (row) { return String(row.agent_username || "") === String(user.username); });
   var activities = [];
   var users = isAdmin_(user) ? allUsers.map(publicUser_) : [publicUser_(currentUserRow)];
   var settings = getSettings_(true);
@@ -1051,6 +1072,8 @@ function managementBootstrap_(p) {
     database_meta: {
       loaded_at: new Date().toISOString(),
       inventory_source: "PRODOTTI_LED.giacenza_attuale",
+      inventory_revision: inventoryRevisionAtRead,
+      inventory_pending: !inventoryLocked,
       products_count: products.length
     }
   };
@@ -1177,7 +1200,7 @@ function managementUpsertLocked_(p, preparedUser, preparedEntity, preparedPayloa
       payload.intestatario_telefono = String(assignedUser.telefono || "");
       payload.valore_provvigione = 0;
     }
-    normalizePracticeLedwallConfigurations_(payload);
+    normalizePracticeLedwallConfigurations_(payload, previousPractice);
     completeClientFromPractice_(payload, user);
     validatePracticeRequiredFields_(payload);
     var practiceRow = upsertPracticeWithInventory_(payload, user, assignedUser);
@@ -1388,6 +1411,8 @@ function managementUploadDocument_(p) {
   var requestId = String(p.requestId || "");
   try {
     var user = authenticate_(p.agent_username, p.agent_key);
+    var cachedUpload = requestId ? parseJson_(CacheService.getScriptCache().get(managementUploadCacheKey_(requestId)), null) : null;
+    if (cachedUpload && cachedUpload.ok && cachedUpload.file_id) return cachedUpload;
     var filename = String(p.filename || "documento").replace(/[\\\/:*?"<>|]+/g, "_");
     var mimeType = String(p.mimeType || "application/octet-stream");
     var raw = String(p.fileBase64 || "");
@@ -1408,6 +1433,27 @@ function managementUploadDocument_(p) {
     throw error;
   }
 }
+
+function managementUploadAndSaveDocument_(p) {
+  var user=authenticate_(p.agent_username,p.agent_key),payload=parseJson_(p.payload,{});
+  if(!payload||typeof payload!=="object"||!payload.request_token)throw new Error("Dati documento non validi.");
+  var duplicate=findRowObject_("DOCUMENTI","request_token",payload.request_token);
+  if(duplicate){
+    if(!isAdmin_(user)&&String(duplicate.agent_username||"")!==String(user.username))throw new Error("Documento non autorizzato.");
+    return {ok:true,row:duplicate,duplicate:true};
+  }
+  var current=payload.id?findRowObject_("DOCUMENTI","id",payload.id):null;
+  if(current&&!isAdmin_(user)&&String(current.agent_username||"")!==String(user.username))throw new Error("Documento non autorizzato.");
+  if(payload.practiceId){
+    var practice=findRowObject_("PRATICHE","id",payload.practiceId);
+    if(!practice||(!isAdmin_(user)&&String(practice.agent_username||"")!==String(user.username)))throw new Error("Pratica non autorizzata per il documento.");
+  }
+  var upload=managementUploadDocument_(p);
+  payload.url=upload.url;payload.file_id=upload.file_id;payload.file_size=upload.file_size;payload.file_name=upload.file_name;
+  delete payload.file_base64;
+  return managementUpsert_({agent_username:p.agent_username,agent_key:p.agent_key,entity:"documents",payload:JSON.stringify(payload)});
+}
+
 
 function managementDocumentsFolder_() {
   var properties = PropertiesService.getScriptProperties();
@@ -1603,7 +1649,49 @@ function completeClientFromPractice_(practice, user) {
   upsertObject_("CLIENTI", "id", client.id, client);
 }
 
-function normalizePracticeLedwallConfigurations_(practice) {
+function createP391Planner() {
+  "use strict";
+  function integer(value) { var n=Number(value);return Number.isFinite(n)?Math.max(0,Math.floor(n)):0; }
+  function geometry(raw) {
+    var cols=integer(raw.cols),rows=integer(raw.rows),faces=Number(raw.faces)===2?2:1;
+    if(!cols||!rows||cols>4000||rows>4000)throw new Error("Dimensioni P3.91 non valide.");
+    return {cols:cols,rows:rows,faces:faces,cells:cols*rows*faces,maxRect:Math.floor(cols*rows/2)*faces};
+  }
+  function allocate(configurations,stock) {
+    var grids=(configurations||[]).map(geometry),cells=0,capacity=0;
+    grids.forEach(function(g){cells+=g.cells;capacity+=g.maxRect;});
+    var availableRect=integer(stock&&stock.rect),availableSquare=integer(stock&&stock.square);
+    var chosen=Math.min(capacity,availableRect),feasible=cells-2*chosen<=availableSquare;
+    if(!feasible)chosen=capacity;
+    var left=chosen;
+    var plans=grids.map(function(g){
+      var rect=Math.min(left,g.maxRect);left-=rect;
+      return {cols:g.cols,rows:g.rows,faces:g.faces,cells:g.cells,rect:rect,square:g.cells-2*rect,feasible:feasible};
+    });
+    return {feasible:feasible,rect:chosen,square:cells-2*chosen,plans:plans,availableRect:availableRect,availableSquare:availableSquare};
+  }
+  function plan(cols,rows,faces,rectStock,squareStock) {
+    return allocate([{cols:cols,rows:rows,faces:faces}],{rect:rectStock,square:squareStock}).plans[0];
+  }
+  function tiles(cols,rows,rectCount) {
+    var g=geometry({cols:cols,rows:rows}),needed=integer(rectCount);
+    if(needed>g.maxRect)throw new Error("Composizione P3.91 non valida.");
+    if(g.cells>1600)return null;
+    var pairs=[];
+    for(var y=0;y+1<rows;y+=2)for(var x=0;x<cols;x++)pairs.push({x:x,y:y,w:1,h:2});
+    if(rows%2)for(var x2=0;x2+1<cols;x2+=2)pairs.push({x:x2,y:rows-1,w:2,h:1});
+    var used={},result=[];
+    pairs.slice(0,needed).forEach(function(t){
+      result.push(t);
+      for(var dy=0;dy<t.h;dy++)for(var dx=0;dx<t.w;dx++)used[(t.x+dx)+":"+(t.y+dy)]=true;
+    });
+    for(var cy=0;cy<rows;cy++)for(var cx=0;cx<cols;cx++)if(!used[cx+":"+cy])result.push({x:cx,y:cy,w:1,h:1});
+    return result;
+  }
+  return {allocate:allocate,plan:plan,tiles:tiles};
+}
+
+function normalizePracticeLedwallConfigurations_(practice, previousPractice) {
   var configurations = parseJson_(practice.ledwall_configurazioni_json, []);
   if (!Array.isArray(configurations) || !configurations.length) return;
   var grouped = {};
@@ -1615,7 +1703,8 @@ function normalizePracticeLedwallConfigurations_(practice) {
   var normalized = configurations.map(function (raw, index) {
     var item = raw && typeof raw === "object" ? raw : {};
     var requestedProductId = String(item.product_id || "").trim();
-    var unifiedP391 = requestedProductId.toUpperCase() === "P391_UNIFIED";
+    var requestedCanonicalId = canonicalProductId_(requestedProductId || item.modello_display || item.prodotto, item.cabX, item.cabY);
+    var unifiedP391 = requestedProductId.toUpperCase() === "P391_UNIFIED" || ["p391-50100", "p391-5050"].indexOf(requestedCanonicalId) >= 0;
     var canonicalId = unifiedP391 ? "P391_UNIFIED" : (canonicalProductId_(requestedProductId || item.modello_display || item.prodotto, item.cabX, item.cabY) || requestedProductId);
     var product = unifiedP391 ? null : findInventoryProduct_(canonicalId);
     var calculationMode = unifiedP391 ? "MODULARE" : productCalculationMode_(product || item);
@@ -1695,6 +1784,16 @@ function normalizePracticeLedwallConfigurations_(practice) {
       installazione_localita: String(item.installazione_localita || ""), installazione_indirizzo: String(item.installazione_indirizzo || ""),
       installazione_civico: String(item.installazione_civico || "")
     };
+  });
+  resolveP391Configurations_(normalized, previousPractice);
+  grouped = {}; p391Rectangular = 0; p391Square = 0;
+  normalized.forEach(function (item) {
+    (item.stock_lines || []).forEach(function (line) {
+      if (!grouped[line.product_id]) grouped[line.product_id] = { product_id: line.product_id, quantita: 0, descrizione: line.descrizione };
+      grouped[line.product_id].quantita += Number(line.quantita || 0);
+      if (line.product_id === "p391-50100") p391Rectangular += Number(line.quantita || 0);
+      if (line.product_id === "p391-5050") p391Square += Number(line.quantita || 0);
+    });
   });
   var inventoryRows = Object.keys(grouped).map(function (key) { return grouped[key]; });
   practice.ledwall_configurazioni_json = JSON.stringify(normalized);
@@ -1987,6 +2086,7 @@ function managementCreateFromQuoteLocked_(p, preparedUser, preparedPayload) {
     creatoIl: new Date().toISOString(),
     aggiornatoIl: new Date().toISOString()
   };
+  normalizePracticeLedwallConfigurations_(practice);
   var quoteInventoryAssessment = practiceInventoryAssessment_(practice, false);
   practice.giacenza_insufficiente = quoteInventoryAssessment.insufficient ? "SI" : "NO";
   practice.dettaglio_giacenza = quoteInventoryAssessment.detail;
@@ -2361,6 +2461,31 @@ function upsertPracticeWithInventory_(payload, user, identifierUser) {
   return upsertObject_("PRATICHE", "id", payload.id, payload);
 }
 
+function resolveP391Configurations_(configurations, previousPractice) {
+  var previous=parseJson_(previousPractice&&previousPractice.ledwall_configurazioni_json,[]);
+  var alreadyApplied=String(previousPractice&&previousPractice.magazzino_applicato||"NO").toUpperCase()==="SI";
+  var flexible=[],positions=[];
+  configurations.forEach(function(item,index){
+    if(String(item.product_id).toUpperCase()!=="P391_UNIFIED"||isAdminUnknownValue_(item.cabinet_necessari))return;
+    var old=previous[index];
+    if(alreadyApplied&&old&&(String(old.product_id).toUpperCase()==="P391_UNIFIED"||["p391-50100","p391-5050"].indexOf(canonicalProductId_(old.product_id))>=0)&&Number(old.larghezza)===Number(item.larghezza)&&Number(old.altezza)===Number(item.altezza)&&String(old.bifacciale||"NO")===String(item.bifacciale||"NO")&&Array.isArray(old.stock_lines)&&old.stock_lines.length){
+      item.stock_lines=old.stock_lines;item.cabinet_necessari=old.stock_lines.reduce(function(sum,line){return sum+Number(line.quantita||0);},0);return;
+    }
+    positions.push(index);
+    flexible.push({cols:Math.max(1,Math.ceil((Number(item.larghezza)-1e-8)/0.5)),rows:Math.max(1,Math.ceil((Number(item.altezza)-1e-8)/0.5)),faces:item.bifacciale==="SI"?2:1});
+  });
+  if(!flexible.length)return;
+  var rect=findInventoryProduct_("p391-50100"),square=findInventoryProduct_("p391-5050");
+  var allocation=createP391Planner().allocate(flexible,{rect:Number(rect&&rect.giacenza_attuale||0),square:Number(square&&square.giacenza_attuale||0)});
+  allocation.plans.forEach(function(plan,index){
+    var item=configurations[positions[index]],lines=[];
+    if(plan.rect)lines.push({product_id:"p391-50100",quantita:plan.rect,descrizione:"P3.91 · cabinet 50×100 cm"});
+    if(plan.square)lines.push({product_id:"p391-5050",quantita:plan.square,descrizione:"P3.91 · cabinet 50×50 cm"});
+    item.stock_lines=lines;item.cabinet_necessari=plan.rect+plan.square;
+  });
+}
+
+
 function normalizePracticeStatus_(status) {
   var value = String(status || "").trim().toLowerCase();
   var map = {
@@ -2471,6 +2596,7 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
   var lines = inventoryLinesFromPractice_(practice);
   if (!lines.length) throw new Error("La pratica non contiene righe prodotto valide per il magazzino.");
   var products = {};
+  var movements = [];
   lines.forEach(function (line) {
     var product = findInventoryProduct_(line.product_id);
     if (!product) throw new Error("Prodotto magazzino non trovato: " + line.product_id);
@@ -2488,7 +2614,7 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
     prepareVersionedRecord_("PRODOTTI_LED", "id", product.id, product, user);
     upsertObject_("PRODOTTI_LED", "id", product.id, product);
     var movementId = uid_("mov");
-    upsertObject_("MOVIMENTI_MAGAZZINO", "id", movementId, {
+    movements.push({
       id: movementId, data: new Date().toISOString(), practiceId: practice.id,
       numero_pratica: practice.numero || "", cliente: practice.cliente || "", product_id: product.id,
       sku: product.sku || product.id, prodotto: product.nome + " · " + productFormatLabel_(product),
@@ -2496,6 +2622,7 @@ function applyInventoryForPractice_(practice, user, direction, movementType) {
       username: user.username, note: "Movimento automatico da stato pratica"
     });
   });
+  appendNewObjects_("MOVIMENTI_MAGAZZINO", movements);
 }
 
 function practiceInventoryAssessment_(practice, alreadyApplied) {
@@ -2536,6 +2663,30 @@ function practiceInventoryAssessment_(practice, alreadyApplied) {
     }).join(" | ")
   };
 }
+
+function inventorySnapshotRow_(product) {
+  return {id:product.id,nome:product.nome,sku:product.sku,giacenza_attuale:Number(product.giacenza_attuale||0),stato_giacenza:product.stato_giacenza||"",record_version:Number(product.record_version||0),aggiornatoIl:product.aggiornatoIl||""};
+}
+function managementInventory_(p) {
+  authenticate_(p.agent_username,p.agent_key);
+  var properties=PropertiesService.getScriptProperties(),revision=Number(properties.getProperty("SEEMAX_INVENTORY_REVISION")||0);
+  if(String(p.force||"")!=="SI"&&String(p.since_revision||"")===String(revision))return {ok:true,unchanged:true,inventory:{revision:revision,products:[]}};
+  var lock=LockService.getScriptLock();
+  if(!lock.tryLock(1200))return {ok:true,pending:true};
+  try {
+    resetRequestDataCaches_();
+    revision=Number(properties.getProperty("SEEMAX_INVENTORY_REVISION")||0);
+    return {ok:true,inventory:{revision:revision,complete:true,products:inventoryProductsForRead_().map(inventorySnapshotRow_)}};
+  } finally {lock.releaseLock();}
+}
+function appendNewObjects_(sheetName,records) {
+  if(!records||!records.length)return;
+  var target=sheet_(sheetName),headers=sheetHeaders_(target),first=Math.max(2,target.getLastRow()+1);
+  var values=records.map(function(record){return headers.map(function(header){return record[header]===undefined?"":record[header];});});
+  target.getRange(first,1,values.length,headers.length).setValues(values);
+  invalidateTable_(sheetName);
+}
+
 
 function managementInventoryAdjust_(p) {
   return withMutationLock_(function () { return managementInventoryAdjustLocked_(p); });
@@ -3216,7 +3367,7 @@ function listEntity_(entity, user) {
     });
   }
   if (!isAdmin_(user) && ["practices", "documents"].indexOf(entity) >= 0) {
-    rows = rows.filter(function (row) { return !row.agent_username || String(row.agent_username) === String(user.username); });
+    rows = rows.filter(function (row) { return String(row.agent_username || "") === String(user.username); });
   }
   return rows;
 }
@@ -3250,13 +3401,8 @@ function managementRankings_(userRows, practiceRows, clientRows) {
   return users.map(function (user) {
     var username = String(user.username || "");
     var own = practices.filter(function (practice) { return String(practice.agent_username || "") === username; });
-    var completed = own.filter(function (practice) { return String(practice.stato || "") === "Completata" && practiceCompletionDate_(practice); });
-    var monthly = {};
-    completed.forEach(function (practice) {
-      var key = monthKey_(practiceCompletionDate_(practice));
-      monthly[key] = Number(monthly[key] || 0) + Number(practice.valore || 0);
-    });
-    var bestPeriod = Object.keys(monthly).sort(function (left, right) { return Number(monthly[right] || 0) - Number(monthly[left] || 0) || String(right).localeCompare(String(left)); })[0] || "";
+    var completed = own.filter(function (practice) { return String(practice.stato || "") === "Completata"; });
+    var lifetimeRevenue = completed.reduce(function (sum, practice) { return sum + (Number(practice.valore || 0) || 0); }, 0);
     var latest = own.slice().sort(function (left, right) {
       return String(right.creatoIl || right.aggiornatoIl || "").localeCompare(String(left.creatoIl || left.aggiornatoIl || ""));
     })[0] || {};
@@ -3273,8 +3419,9 @@ function managementRankings_(userRows, practiceRows, clientRows) {
     delete publicProfile.aggiornato_da;
     var achievementData = agentOfMonth_(practices, clients, user, users);
     publicProfile.nome = publicProfile.nome_visualizzato;
-    publicProfile.miglior_fatturato = bestPeriod ? Number(monthly[bestPeriod] || 0) : 0;
-    publicProfile.miglior_periodo = bestPeriod ? monthLabel_(bestPeriod) : "Nessun periodo completato";
+    publicProfile.fatturato_complessivo = lifetimeRevenue;
+    publicProfile.miglior_fatturato = lifetimeRevenue;
+    publicProfile.miglior_periodo = "Totale delle pratiche completate";
     publicProfile.ultima_pratica_data = latest.creatoIl || latest.aggiornatoIl || "";
     publicProfile.ultima_pratica_numero = latest.numero || latest.id || "";
     publicProfile.achievements = (achievementData.achievements || []).map(function (achievement) {
@@ -3479,8 +3626,7 @@ function nextQuote_(p) {
   var properties = PropertiesService.getScriptProperties();
   var key = quoteCounterPropertyKey_(scope);
   var stored = properties.getProperty(key);
-  var current = stored === null || stored === "" ? discoverQuoteCounter_(scope) : Number(stored || 0);
-  if (stored === null || stored === "") properties.setProperty(key, String(current));
+  var current = Math.max(Number(stored || 0), discoverQuoteCounter_(scope));
   var next = Math.max(start - 1, current) + 1;
   var year = String(new Date().getFullYear()).slice(-2);
   return { ok: true, next_num: String(next), next_id: String(next) + "-" + year, quote_scope: scope };
@@ -3786,10 +3932,17 @@ function withMutationLock_(callback) {
   var failure = null;
   try {
     RUNTIME_MUTATION_LOCK_HELD_ = true;
+    RUNTIME_INVENTORY_CHANGED_ = {};
     /* Le letture eseguite prima del lock, per esempio l'autenticazione, non
        possono diventare lo snapshot usato dalla mutazione. */
     resetRequestDataCaches_();
     result = callback();
+    if (Object.keys(RUNTIME_INVENTORY_CHANGED_).length) {
+      var inventoryProperties = PropertiesService.getScriptProperties();
+      var revision = Number(inventoryProperties.getProperty("SEEMAX_INVENTORY_REVISION") || 0) + 1;
+      inventoryProperties.setProperty("SEEMAX_INVENTORY_REVISION", String(revision));
+      if (result && typeof result === "object") result.inventory = { revision: revision, products: Object.keys(RUNTIME_INVENTORY_CHANGED_).map(function (id) { return inventorySnapshotRow_(RUNTIME_INVENTORY_CHANGED_[id]); }) };
+    }
     /* Le email vengono registrate in modo durevole mentre il lock e gia
        posseduto. L'invio effettivo avviene tramite trigger e non ritarda la
        risposta dell'agente. */
@@ -4323,6 +4476,7 @@ function upsertObject_(sheetName, keyField, keyValue, record) {
   sheet.getRange(rowIndex, 1, 1, headers.length).setValues([values]);
   performanceEvent_("write", sheetName + ".row", new Date().getTime() - writeStarted, { rows: 1, columns: headers.length, insert: !existingRecord });
   var result = stripTransientRecordFields_(objectFromValues_(headers, values));
+  if (sheetName === "PRODOTTI_LED" && record.giacenza_attuale !== undefined) RUNTIME_INVENTORY_CHANGED_[String(result.id)] = cloneObject_(result);
   updateTableCacheAfterWrite_(sheetName, rowIndex, headers, values);
   invalidateLookupCache_(sheetName);
   var rowRecord = { rowIndex: rowIndex, values: values.slice(), object: result };

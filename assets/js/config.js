@@ -6,10 +6,8 @@
  */
 window.SEEMAX_APP_CONFIG = {
   appName: "Seemax Management Suite",
-  version: "2.22.3",
-  /* Versione interfaccia distinta dal protocollo backend compatibile 2.22.3.
-     Questo aggiornamento locale non richiede una nuova distribuzione Apps Script. */
-  uiVersion: "2.23.0",
+  version: "2.24.0",
+  uiVersion: "2.24.0",
   demoMode: false,
   performanceDiagnostics: true,
   appsScriptUrl: "https://script.google.com/macros/s/AKfycbxNBdyg27CBYRu9M1FRFCw3Sm701hUZ5UQTyHPI3cE3AuoW8LaBRx_E6TLOoAxzHQCf/exec",

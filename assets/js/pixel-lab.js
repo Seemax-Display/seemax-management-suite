@@ -49,7 +49,7 @@
   if(dialog)return;
   dialog=document.createElement("dialog");dialog.className="pixel-lab-dialog";dialog.id="pixelLabDialog";
   dialog.setAttribute("aria-label","Seemax Pixel Lab — confronto Ledwall");
-  dialog.innerHTML='<header class="pixel-lab-dialog-bar"><div><span>SEEMAX PIXEL LAB</span><small>Confronto Ledwall · il preventivo rimane aperto</small></div><button type="button" class="btn soft" data-lab-close>← Torna al lavoro</button></header><section class="pixel-lab-launch" role="status" aria-live="polite"><div class="pixel-lab-flight" aria-hidden="true"><i class="pixel-lab-monitor pixel-lab-monitor-a"></i><i class="pixel-lab-monitor pixel-lab-monitor-b"></i><b class="pixel-lab-burst"></b></div><strong>Ogni pixel conta.</strong><p>I tuoi Ledwall, pronti per il confronto.</p><button type="button" class="btn primary" data-lab-retry hidden>Riprova</button></section><iframe class="pixel-lab-frame" title="Laboratorio di confronto Ledwall" referrerpolicy="same-origin"></iframe>';
+  dialog.innerHTML='<header class="pixel-lab-dialog-bar"><div><span>SEEMAX PIXEL LAB</span><small>Confronto Ledwall · il tuo lavoro rimane aperto</small></div><button type="button" class="btn soft" data-lab-close>← Torna al lavoro</button></header><section class="pixel-lab-launch" role="status" aria-live="polite"><div class="pixel-lab-flight" aria-hidden="true"><i class="pixel-lab-monitor pixel-lab-monitor-a"></i><i class="pixel-lab-monitor pixel-lab-monitor-b"></i><b class="pixel-lab-burst"></b></div><strong>Ogni pixel conta.</strong><p>I tuoi Ledwall, pronti per il confronto.</p><button type="button" class="btn primary" data-lab-retry hidden>Riprova</button></section><iframe class="pixel-lab-frame" title="Laboratorio di confronto Ledwall" referrerpolicy="same-origin"></iframe>';
   document.body.append(dialog);frame=dialog.querySelector("iframe");
   dialog.querySelector("[data-lab-close]").addEventListener("click",close);
   dialog.querySelector("[data-lab-retry]").addEventListener("click",()=>{openedAt=performance.now();loadFrame();});
@@ -67,6 +67,9 @@
   dialog.querySelector(".pixel-lab-launch").hidden=false;
   dialog.classList.remove("pixel-lab-is-ready");
   frame.setAttribute("aria-hidden","true");frame.tabIndex=-1;
+  /* Ricrea solo il gruppo animato: l'iframe e le immagini restano in memoria. */
+  const flight=dialog.querySelector(".pixel-lab-flight");
+  flight.replaceWith(flight.cloneNode(true));
   dialog.showModal();
   if(!frame.getAttribute("src"))loadFrame();
   else if(ready){sendCatalog();finishOpen();}

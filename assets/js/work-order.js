@@ -28,8 +28,9 @@
     return sanitized || "Pratica";
   }
 
-  function field(label, value, wide) {
-    return `<div class="client-field${wide ? " wide" : ""}"><small>${esc(label)}</small><strong>${esc(text(value))}</strong></div>`;
+  function field(label, value, wide, exact) {
+    const content = exact ? (value === undefined || value === null || value === "" ? "-" : String(value)) : text(value);
+    return `<div class="client-field${wide ? " wide" : ""}"><small>${esc(label)}</small><strong${exact ? ' style="white-space:pre-wrap"' : ""}>${esc(content)}</strong></div>`;
   }
 
   function sectionTitle(number, title, note) {
@@ -78,6 +79,9 @@
     const materialsCount = Math.max(6, Math.min(12, Number.isFinite(requestedMaterialRows) && requestedMaterialRows > 0 ? requestedMaterialRows : adaptiveMaterialRows));
     const brand = text(company.brand, "SEEMAX DISPLAY");
     const legalName = text(company.legalName, "LED LAB COMPANY");
+    const management = text(practice.gestione_ledwall || data.management, "Da specificare");
+    const cloud = /cloud/i.test(management);
+    const managementFields = field("GESTIONE LEDWALL", management) + (cloud ? field("NOME UTENTE CLOUD", practice.cloud_username, false, true) + field("PASSWORD CLOUD", practice.cloud_password, false, true) : "");
 
     const html = `<!doctype html>
 <html lang="it">
@@ -142,10 +146,11 @@
     <section class="card">
       ${sectionTitle("04", "PRODOTTO/I DI RIFERIMENTO")}
       <table class="products"><thead><tr><th>PRODOTTO</th><th>CODICE</th><th>MISURE</th><th>CONFIGURAZIONE</th><th>QUANTITÀ</th></tr></thead><tbody>${productRows(products)}</tbody></table>
+      <div class="client-grid" style="margin-top:3mm;padding-top:3mm;border-top:1px solid #d6e0ec">${managementFields}</div>
     </section>
     <section class="materials-wrap">
       ${sectionTitle("05", "MATERIALI UTILIZZATI", "Compilazione manuale a cura del tecnico")}
-      <table class="materials"><thead><tr><th>PRODOTTO DI RIFERIMENTO</th><th>CODICE PRODOTTO</th><th>QUANTITÀ</th></tr></thead><tbody>${materialRows(materialsCount)}</tbody></table>
+      <table class="materials"><thead><tr><th>PRODOTTO DI RIFERIMENTO</th><th>CODICE PRODOTTO</th><th>QUANTITÀ</th></tr></thead><tbody>${materialRows(Math.max(6, materialsCount - (cloud ? 2 : 1)))}</tbody></table>
     </section>
     <section class="closing">
       <section><h3>NOTE TECNICHE</h3><div class="note-lines"><i></i><i></i><i></i></div></section>

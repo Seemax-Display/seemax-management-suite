@@ -720,8 +720,8 @@
       const cachedAt = status.cacheSavedAt ? ` Ultima copia locale: ${esc(new Date(status.cacheSavedAt).toLocaleString("it-IT"))}.` : "";
       banner.className = state.data ? "connection-banner recovering" : "connection-banner danger";
       banner.innerHTML = state.data
-        ? `<strong>Connessione temporaneamente interrotta.</strong> I dati restano disponibili e verranno riallineati automaticamente.${cachedAt}<button data-action="reload">Riconnetti ora</button>`
-        : `<strong>Connessione al database in ripristino.</strong> Il sistema riproverà automaticamente.<button data-action="reload">Riprova ora</button>`;
+        ? `<strong>Connessione temporaneamente interrotta.</strong> I dati restano disponibili e verranno riallineati automaticamente.${cachedAt}`
+        : `<strong>Connessione al database in ripristino.</strong> Il sistema riproverà automaticamente.`;
     } else if (status.serverVersion && !String(status.serverVersion).includes(String(config.version))) {
       banner.className = "connection-banner danger";
       banner.innerHTML = `<strong>Backend non aggiornato.</strong> Il sito usa la versione ${esc(config.version)}, mentre Apps Script risponde con ${esc(status.serverVersion)}. Pubblica una nuova versione del deployment.`;
@@ -806,7 +806,7 @@
           go(location.hash.replace("#", "") || "dashboard", false);
         }
         if (!state.data) {
-          $("viewContainer").innerHTML = emptyState("Connessione in ripristino", "La rete mobile o Google Apps Script non hanno ancora risposto. Il sistema riproverà automaticamente senza richiedere un refresh della pagina.", "Riprova ora", "reload");
+          $("viewContainer").innerHTML = emptyState("Connessione in ripristino", "La rete mobile o Google Apps Script non hanno ancora risposto. Il sistema riproverà automaticamente senza richiedere un refresh della pagina.", "", "");
         }
         scheduleConnectionRetry();
         if (interactive) toast("Collegamento non ancora disponibile. I dati presenti restano al sicuro e il prossimo tentativo sarà automatico.", "warning");
@@ -820,6 +820,41 @@
     try { return await run; }
     finally { if (resumeSyncPromise === run) resumeSyncPromise = null; }
   }
+
+  let inventoryPollTimer = 0, inventoryLastFullRead = 0, inventoryChannel = null;
+  async function syncInventory(force = false) {
+    if (!state.data || !api.getSession() || config.demoMode || state.offlinePlannerOnly || document.hidden || navigator.onLine === false || !api.inventory) return;
+    try {
+      if (force && Date.now() - inventoryLastFullRead < 2500) return;
+      const full = force || Date.now() - inventoryLastFullRead > 60000;
+      const response = await api.inventory({force:full});
+      if (full && response && !response.pending) inventoryLastFullRead = Date.now();
+    } catch (error) { /* La riconnessione della sessione resta automatica; nessun modulo viene ricostruito. */ }
+  }
+  function scheduleInventoryPoll() {
+    clearTimeout(inventoryPollTimer);
+    if (document.hidden) return;
+    inventoryPollTimer = setTimeout(async () => {
+      if (["catalog","practices","planner"].includes(state.route) && !resumeSyncPromise) await syncInventory();
+      scheduleInventoryPoll();
+    }, 15000);
+  }
+  window.addEventListener("seemax:inventory-updated", event => {
+    const detail=event.detail||{};
+    if (detail.complete) inventoryLastFullRead = Date.now();
+    if (!state.data) return;
+    (detail.products||[]).forEach(row=>replaceLocalEntity("products",row));
+    if (window.SEEMAX_PLANNER_RUNTIME && typeof window.SEEMAX_PLANNER_RUNTIME.updateInventory === "function") window.SEEMAX_PLANNER_RUNTIME.updateInventory(state.data.products);
+    const practiceForm=document.querySelector(".entity-form[data-entity='practices']");
+    if (practiceForm && typeof practiceForm.refreshInventory === "function") practiceForm.refreshInventory();
+    if (state.route==="catalog") requestRouteRender();
+    if (inventoryChannel && detail.source!=="broadcast") inventoryChannel.postMessage({revision:detail.revision,complete:detail.complete,products:detail.products});
+  });
+  if (typeof BroadcastChannel === "function") {
+    inventoryChannel=new BroadcastChannel("seemax-inventory-v2240");
+    inventoryChannel.onmessage=event=>{if(api.applyInventorySnapshot)api.applyInventorySnapshot(event.data||{});};
+  }
+
 
   function setUser() {
     const user = api.getSession();
@@ -1497,6 +1532,7 @@
 
   function showLogin() {
     if (window.SeemaxPixelLab) window.SeemaxPixelLab.reset();
+    if (window.SeemaxNativePlanner) window.SeemaxNativePlanner.resetSession();
     $("app").classList.add("is-hidden");
     $("loginScreen").classList.remove("is-hidden");
     $("loginError").textContent = "";
@@ -1527,6 +1563,7 @@
       $("pageEyebrow").textContent = state.route === "planner" ? "Strumento integrato" : "Seemax Management";
       renderNav();
       renderRoute(true);
+      if (["catalog", "practices", "planner"].includes(state.route)) void syncInventory(true);
       $("sidebar").classList.remove("open");
       $("viewContainer").focus({ preventScroll: true });
     };
@@ -2235,7 +2272,7 @@
   }
 
   function renderPlanner() {
-    return `${state.offlinePlannerOnly ? `<div class="planner-fast-notice"><strong>Quotation Planner offline</strong><span>Calcoli, bozze locali ed esportazione PDF restano disponibili. Archivio online, database e pratiche sono disattivati finché non torna la connessione.</span></div>` : ""}<section class="pixel-lab-entry"><div><strong><span class="pixel-lab-glyph" aria-hidden="true">▦</span>Ogni pixel conta.</strong><p>Paragona i Ledwall: stessa immagine, risoluzioni, schede tecniche e consumi.</p></div><button type="button" class="btn soft" data-action="open-pixel-lab">PARAGONA · Apri Pixel Lab ⇄</button></section><div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
+    return `${state.offlinePlannerOnly ? `<div class="planner-fast-notice"><strong>Quotation Planner offline</strong><span>Calcoli, bozze locali ed esportazione PDF restano disponibili. Archivio online, database e pratiche sono disattivati finché non torna la connessione.</span></div>` : ""}<div id="nativePlannerRoot" class="planner-shell planner-native-root" aria-label="Seemax Quotation Planner integrato"></div>`;
   }
 
   function openPixelLab() {
@@ -2352,7 +2389,7 @@
     const cards = rows.map((row, index) => {
       const appearance = profileAppearance(row);
       const name = row.nome_profilo || row.nome || row.nome_visualizzato || row.username || "Utente";
-      return `<button class="ranking-card profile-theme-${appearance.theme}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}" data-action="open-ranking-profile" data-id="${esc(row.username)}"><span class="ranking-position">${index + 1}</span><span class="profile-avatar ${appearance.icon ? "uses-icon" : ""}">${esc(appearance.icon || initials(name))}</span><div><small>NOME UTENTE</small><h3>${esc(name)}</h3><p>@${esc(row.username || "utente")}</p></div><dl><div><dt>Miglior fatturato</dt><dd>${euros(row.miglior_fatturato || 0)}</dd></div><div><dt>Ultima pratica inserita</dt><dd>${dateIt(row.ultima_pratica_data)}</dd></div></dl><em>Apri profilo →</em></button>`;
+      return `<button class="ranking-card profile-theme-${appearance.theme}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}" data-action="open-ranking-profile" data-id="${esc(row.username)}"><span class="ranking-position">${index + 1}</span><span class="profile-avatar ${appearance.icon ? "uses-icon" : ""}">${esc(appearance.icon || initials(name))}</span><div><small>NOME UTENTE</small><h3>${esc(name)}</h3><p>@${esc(row.username || "utente")}</p></div><dl><div><dt>Fatturato complessivo</dt><dd>${euros(row.miglior_fatturato || 0)}</dd></div><div><dt>Ultima pratica inserita</dt><dd>${dateIt(row.ultima_pratica_data)}</dd></div></dl><em>Apri profilo →</em></button>`;
     }).join("");
     return `<section class="ranking-intro"><span>🏆</span><div><span class="section-kicker">Community Seemax</span><h2>Classifiche e profili</h2><p>Consulta i risultati pubblici, le bacheche e i traguardi degli utenti del Management Suite.</p></div></section><div class="ranking-grid">${cards || emptyState("Classifica in preparazione", "I profili appariranno dopo il prossimo aggiornamento del database.")}</div>`;
   }
@@ -2367,7 +2404,7 @@
     let boardIds = [];
     try { boardIds = JSON.parse(row.bacheca_trofei_json || "[]"); } catch (error) { boardIds = []; }
     const board = boardIds.filter((id) => unlocked.has(id)).map((id) => achievements.find((item) => item.id === id)).filter(Boolean).map((item) => `<article class="profile-trophy"><span>${esc(item.icon || "🏅")}</span><div><small>RICONOSCIMENTO</small><strong>${esc(item.title)}</strong><p>${esc(item.description)}</p></div></article>`).join("");
-    const body = `<div class="public-profile"><section class="profile-hero profile-theme-${appearance.theme}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}"><div class="profile-avatar ${appearance.icon ? "uses-icon" : ""}">${esc(appearance.icon || initials(name))}</div><div class="profile-identity"><span class="section-kicker">Profilo Seemax</span><h2>${esc(name)}</h2><p>${esc(row.descrizione_profilo || "Profilo professionale Seemax.")}</p><div>${badge(row.ruolo || "AGENTE")}</div></div></section><section class="profile-stats-grid"><article><span>💶</span><div><small>Miglior fatturato</small><strong>${euros(row.miglior_fatturato || 0)}</strong><p>${esc(row.miglior_periodo || "Miglior risultato mensile")}</p></div></article><article><span>📋</span><div><small>Ultima pratica inserita</small><strong>${dateIt(row.ultima_pratica_data)}</strong><p>${esc(row.ultima_pratica_numero || "Nessuna pratica")}</p></div></article></section><section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">Bacheca pubblica</span><h3>Trofei</h3></div></div><div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>✨</span><h3>Nessun trofeo in evidenza</h3><p>La bacheca di questo utente è ancora vuota.</p></div>`}</div></section></div>`;
+    const body = `<div class="public-profile"><section class="profile-hero profile-theme-${appearance.theme}" style="--profile-accent:${appearance.color};--profile-accent-rgb:${appearance.rgb}"><div class="profile-avatar ${appearance.icon ? "uses-icon" : ""}">${esc(appearance.icon || initials(name))}</div><div class="profile-identity"><span class="section-kicker">Profilo Seemax</span><h2>${esc(name)}</h2><p>${esc(row.descrizione_profilo || "Profilo professionale Seemax.")}</p><div>${badge(row.ruolo || "AGENTE")}</div></div></section><section class="profile-stats-grid"><article><span>💶</span><div><small>Fatturato complessivo</small><strong>${euros(row.miglior_fatturato || 0)}</strong><p>${esc(row.miglior_periodo || "Totale delle pratiche completate")}</p></div></article><article><span>📋</span><div><small>Ultima pratica inserita</small><strong>${dateIt(row.ultima_pratica_data)}</strong><p>${esc(row.ultima_pratica_numero || "Nessuna pratica")}</p></div></article></section><section class="panel profile-board-panel"><div class="panel-head"><div><span class="section-kicker">Bacheca pubblica</span><h3>Trofei</h3></div></div><div class="profile-trophy-board">${board || `<div class="profile-board-empty"><span>✨</span><h3>Nessun trofeo in evidenza</h3><p>La bacheca di questo utente è ancora vuota.</p></div>`}</div></section></div>`;
     openModal(name, body, { wide: true, kicker: "Profilo utente" });
   }
 
@@ -2644,7 +2681,7 @@
     return {
       generatedAt: new Date(),
       company: config.company || {},
-      practice: { number: record.numero || record.id, stato: record.stato, agente: record.agente },
+      practice: { number: record.numero || record.id, stato: record.stato, agente: record.agente, gestione_ledwall: record.gestione_ledwall || "", cloud_username: record.cloud_username || "", cloud_password: record.cloud_password || "" },
       client: {
         name: record.cliente || record.intestatario_nome || client.ragioneSociale,
         contact: client.referente || record.intestatario_nome,
@@ -2707,7 +2744,7 @@
       <div class="completed-sections">
         <section><div class="completed-section-heading"><span>👤</span><div><small>INTESTAZIONE</small><h4>Cliente e destinatario</h4></div></div><div class="completed-detail-grid">${item("Cliente / intestatario", record.cliente || record.intestatario_nome)}${item("Destinatario ordine", record.destinatario_ordine || "Cliente")}${item("E-mail intestatario", record.intestatario_email || client.email)}${item("Telefono", record.intestatario_telefono || client.telefono)}</div></section>
         <section><div class="completed-section-heading"><span>🖥️</span><div><small>FORNITURA</small><h4>${ledwallConfigurations.length > 1 ? `${ledwallConfigurations.length} prodotti associati` : "Prodotto e configurazione"}</h4></div></div>${ledwallArchive || `<div class="completed-detail-grid">${item("Modello display", record.modelli_display)}${item("Misura preventivata", record.misure_display)}${item("Bifacciale", record.bifacciale || "NO")}${item("Gestione display", record.gestione_ledwall)}</div>`}<ul class="completed-inventory-list">${inventory}</ul></section>
-        <section><div class="completed-section-heading"><span>📍</span><div><small>INSTALLAZIONE</small><h4>Sede e requisiti tecnici</h4></div></div><div class="completed-detail-grid">${item("Tipo indirizzo", record.indirizzo_installazione_tipo)}${item("Indirizzo completo", address, { wide: true })}${item("SIM traffico rete", record.sim_richiesta || "NO")}${item("Predisposizione elettrica", record.predisposizione_elettrica || "NO")}${record.cloud_username ? item("Account Cloud", record.cloud_username) : ""}</div></section>
+        <section><div class="completed-section-heading"><span>📍</span><div><small>INSTALLAZIONE</small><h4>Sede e requisiti tecnici</h4></div></div><div class="completed-detail-grid">${item("Tipo indirizzo", record.indirizzo_installazione_tipo)}${item("Indirizzo completo", address, { wide: true })}${item("SIM traffico rete", record.sim_richiesta || "NO")}${item("Predisposizione elettrica", record.predisposizione_elettrica || "NO")}${item("Gestione Ledwall", record.gestione_ledwall)}${/cloud/i.test(String(record.gestione_ledwall || "")) ? item("Nome utente Cloud", record.cloud_username) + item("Password Cloud", record.cloud_password) : ""}</div></section>
         ${String(record.tipo_pratica || "").toUpperCase() === "ACQUISTO" ? "" : `<section><div class="completed-section-heading"><span>🏦</span><div><small>CONDIZIONI</small><h4>${value(record.finanziaria)} e pagamenti</h4></div></div><div class="completed-detail-grid">${item("Finanziaria", record.finanziaria)}${item("Numero rate", record.numero_rate)}${item("Periodicità", record.periodicita_pagamento)}${item("Preventivo S.Q.P.", record.preventivo_id)}</div></section>`}
         <section class="completed-documents-section"><div class="completed-section-heading"><span>🗂️</span><div><small>DOCUMENTI</small><h4>Allegati archiviati</h4></div></div><ul class="completed-document-list">${documentList}</ul></section>
         ${record.note ? `<section><div class="completed-section-heading"><span>💬</span><div><small>ANNOTAZIONI</small><h4>Note finali</h4></div></div><p class="completed-notes">${esc(record.note)}</p></section>` : ""}
@@ -2887,7 +2924,7 @@
       ${field("Predisposizione elettrica presente", "predisposizione_elettrica", record.predisposizione_elettrica || "NO", { options: ["NO", "SI"] })}
       <div class="cloud-fields form-grid full conditional-section" data-visible-when-management="IN CLOUD">
         ${field("Username Cloud", "cloud_username", record.cloud_username || "", { required: req("cloud_username") })}
-        ${field("Password Cloud", "cloud_password", record.cloud_password || "", { type: "password", required: req("cloud_password") })}
+        ${field("Password Cloud", "cloud_password", record.cloud_password || "", { type: "text", required: req("cloud_password") })}
         <p class="field-help full">Non hai ancora registrato un account? <a href="https://www.led-cloud.com/#/Account/Login" target="_blank" rel="noopener">Fallo adesso.</a></p>
       </div>
     </div></fieldset>`;
@@ -2929,6 +2966,7 @@
     openModal(isNewForm ? "Nuova pratica" : `Pratica ${record.numero}`, formShell("practices", record.id, fields, isNewForm ? "Crea pratica" : "Aggiorna pratica", record.record_version), { wide: true, kicker: isNewForm ? "Nuova opportunità" : "Gestione pratica", subtitle: client ? client.ragioneSociale : "Compila le informazioni principali" });
     bindPracticeConditionalFields(practiceType);
     bindPracticeCalculator(logicalProducts, productOptions, initialLedwalls);
+    void syncInventory(true);
     bindPracticeTabsAndClientCompletion(practiceType);
     const practiceForm = document.querySelector(".entity-form[data-entity='practices']");
     if (window.SeemaxClientTools && practiceForm) window.SeemaxClientTools.bindLocationFields(practiceForm, record, "installazione_").catch((error) => toast(error.message, "danger"));
@@ -3083,6 +3121,10 @@
     const summary = document.getElementById("practiceInventorySummary");
     if (!form || !list || !addButton) return;
     form.noValidate = true;
+    const committedPractice = (state.data.practices || []).find(row => String(row.id) === String(form.dataset.id || ""));
+    const committed = committedPractice && String(committedPractice.magazzino_applicato || "NO").toUpperCase() === "SI";
+    const committedConfigurations = committed ? recordArray(committedPractice.ledwall_configurazioni_json) : [];
+    const committedLines = committed ? recordArray(committedPractice.righe_magazzino_json) : [];
     let configurations = (initialLedwalls || []).map((item, index) => ({ ...item, id: item.id || `product-${index + 1}` }));
     if (!configurations.length) configurations = [{ id: "product-1", product_id: (products[0] || {}).id || "", quantita_unita: 1, bifacciale: "NO", indirizzo_tipo: "INDIRIZZO UNICO" }];
 
@@ -3244,8 +3286,32 @@
     }
 
     function calculateAll() {
+      inventoryProducts = state.data.products || [];
       const cards = Array.from(list.querySelectorAll("[data-ledwall-index]"));
       configurations = cards.map((card, index) => calculateCard(card, index));
+      const flexible = [], positions = [];
+      configurations.forEach((item, index) => {
+        if (item.product_id !== "P391_UNIFIED" || item.unknown) return;
+        const old = committedConfigurations[index];
+        if (old && old.product_id === "P391_UNIFIED" && Number(old.larghezza) === Number(item.larghezza) && Number(old.altezza) === Number(item.altezza) && String(old.bifacciale || "NO") === String(item.bifacciale || "NO")) {
+          item.stock_lines = old.stock_lines || []; item.cabinet_necessari = item.stock_lines.reduce((sum, line) => sum + Number(line.quantita || 0), 0);
+          cards[index].querySelector("[data-ledwall-cabinets]").value = item.cabinet_necessari;
+          cards[index].querySelector("[data-ledwall-validation]").textContent = "Composizione già impegnata nel magazzino: " + item.stock_lines.map(line => line.descrizione + ": " + line.quantita).join(" · "); return;
+        }
+        positions.push(index);
+        flexible.push({cols:Math.max(1, Math.ceil((Number(item.larghezza)-1e-8)/0.5)),rows:Math.max(1, Math.ceil((Number(item.altezza)-1e-8)/0.5)),faces:item.bifacciale === "SI" ? 2 : 1});
+      });
+      if (flexible.length && window.SeemaxP391) {
+        const stock = id => Number((inventoryProducts.find(row => row.id === id) || {}).giacenza_attuale || 0);
+        const allocation = window.SeemaxP391.allocate(flexible, {rect:stock("p391-50100"),square:stock("p391-5050")});
+        allocation.plans.forEach((plan, offset) => {
+          const index = positions[offset], item = configurations[index];
+          item.stock_lines = [{product_id:"p391-50100",quantita:plan.rect,descrizione:"P3.91 · cabinet 50×100 cm"},{product_id:"p391-5050",quantita:plan.square,descrizione:"P3.91 · cabinet 50×50 cm"}].filter(line => line.quantita > 0);
+          item.cabinet_necessari = plan.rect + plan.square;
+          cards[index].querySelector("[data-ledwall-cabinets]").value = item.cabinet_necessari;
+          cards[index].querySelector("[data-ledwall-validation]").textContent = `P3.91: ${plan.rect} cabinet 50×100 e ${plan.square} cabinet 50×50. ${allocation.feasible ? "Composizione disponibile, con rotazione se necessaria." : "Disponibilità da integrare."}`;
+        });
+      }
       const grouped = {};
       configurations.forEach((configuration) => (configuration.stock_lines || []).forEach((line) => {
         const id = String(line.product_id || "");
@@ -3256,7 +3322,7 @@
       const inventoryRows = Object.values(grouped);
       const shortages = inventoryRows.map((line) => {
         const product = inventoryProducts.find((item) => String(item.id).toLowerCase() === String(line.product_id).toLowerCase());
-        const available = Number(product && product.giacenza_attuale || 0);
+        const available = Number(product && product.giacenza_attuale || 0) + committedLines.filter(row => String(row.product_id) === String(line.product_id)).reduce((sum, row) => sum + Number(row.quantita || 0), 0);
         return { ...line, available, missing: Math.max(0, Number(line.quantita || 0) - available) };
       });
       cards.forEach((card, index) => {
@@ -3324,6 +3390,7 @@
       render();
       list.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
+    form.refreshInventory = calculateAll;
     render();
   }
 
@@ -3580,6 +3647,13 @@
       pipeline: STATUSES.map((status) => ({ status, count: practices.filter((p) => p.stato === status).length, value: practices.filter((p) => p.stato === status).reduce((sum, p) => sum + Number(p.valore || 0), 0) })),
       agentOfMonth: state.data.dashboard && state.data.dashboard.agentOfMonth
     };
+    (state.data.rankings || []).forEach(row => {
+      if (!api.isAdmin() && String(row.username || "") !== String(session.username || "")) return;
+      const own = practices.filter(practice => String(practice.agent_username || "") === String(row.username || ""));
+      const total = own.filter(practice => practice.stato === "Completata" && !practice.__sync_new_record).reduce((sum, practice) => sum + (Number(practice.valore || 0) || 0), 0);
+      row.fatturato_complessivo = row.miglior_fatturato = total;
+      row.miglior_periodo = "Totale delle pratiche completate";
+    });
   }
 
   function replaceLocalEntity(entity, row) {
@@ -3605,7 +3679,7 @@
       }
       rows[index] = merged;
     } else rows.unshift(row);
-    updateLocalDashboard();
+    if (["practices", "clients", "activities", "users"].includes(entity)) updateLocalDashboard();
     scheduleBootstrapCache();
   }
 
@@ -4517,13 +4591,16 @@
   window.addEventListener("pagehide", () => {
     pageHiddenAt = Date.now();
     clearConnectionRetry();
+    clearTimeout(inventoryPollTimer);
   });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       pageHiddenAt = Date.now();
       clearConnectionRetry();
+      clearTimeout(inventoryPollTimer);
       return;
     }
+    scheduleInventoryPoll();
     if (!api.getSession()) return;
     const hiddenFor = pageHiddenAt ? Date.now() - pageHiddenAt : 0;
     pageHiddenAt = 0;
@@ -4563,4 +4640,5 @@
   }
 
   boot();
+  scheduleInventoryPoll();
 })();

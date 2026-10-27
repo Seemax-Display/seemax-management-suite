@@ -1506,6 +1506,7 @@
   </div>
 
   <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/p391-layout.js"></script>
   <script>
     // =============================
     // CONFIGURAZIONE GENERALE
@@ -1854,6 +1855,7 @@
       currentDraftId:null,
       currentOnlineQuoteId:null,
       currentOnlineQuoteToken:null,
+      onlineQuoteEpoch:0,
       quoteNumberManual:false,
       productMode:'classic',
       assistanceImported:false,
@@ -2445,7 +2447,60 @@
       return '';
     }
 
+    function applyP391StockPlan(item, reprice=false){
+      const id=stockProductIdForItem(item);
+      if(!window.SeemaxP391 || !['p391-50100','p391-5050','P391_UNIFIED'].includes(id)) return item;
+      const rect=ledwalls.find(model=>stockProductIdForItem(model)==='p391-50100');
+      const square=ledwalls.find(model=>stockProductIdForItem(model)==='p391-5050');
+      if(!rect || !square || !item.displayWidth || !item.displayHeight) return item;
+      const cols=Math.max(1,Math.round(item.displayWidth/50)),rows=Math.max(1,Math.round(item.displayHeight/50)),faces=item.bifacciale?2:1;
+      const plan=window.SeemaxP391.plan(cols,rows,faces,rect.giacenzaAttuale||0,square.giacenzaAttuale||0);
+      item.stockPlan=plan;item.rectCab=plan.rect;item.sqCab=plan.square;
+      item.rectStock=Number(rect.giacenzaAttuale||0);item.sqStock=Number(square.giacenzaAttuale||0);
+      item.totalCab=plan.rect+plan.square;item.layout={type:'p391-stock',cols,rows,bif:!!item.bifacciale,rectPerFace:Math.min(plan.rect,Math.floor(cols*rows/2))};
+      if(reprice){
+        const customer=plan.rect*effectiveClientUnitPrice(rect)+plan.square*effectiveClientUnitPrice(square);
+        const agent=plan.rect*effectiveAgentUnitPrice(rect)+plan.square*effectiveAgentUnitPrice(square);
+        const china=plan.rect*Number(rect.prezzoCina||0)+plan.square*Number(square.prezzoCina||0);
+        const extras=Number(item.margineInstallazione||0)+Number(item.margineKm||0)+Number(item.provvigione||0);
+        if(!item.prezzoClienteManuale)item.prezzoClienteTotale=customer+extras;
+        item.prezzoAgenteTotale=agent+extras;
+        item.prezzoClienteTotaleOriginal=plan.rect*rect.prezzoCliente+plan.square*square.prezzoCliente+extras;
+        item.prezzoAgenteTotaleOriginal=plan.rect*rect.prezzoAgente+plan.square*square.prezzoAgente+extras;
+        item.costoCinaBase=china;item.margineCliente=customer-china+Number(item.provvigione||0);item.margineAgente=agent-china+Number(item.provvigione||0);
+      }
+      return item;
+    }
+    function updatePlannerInventory(products){
+      const byId=new Map((products||[]).map(row=>[String(row.id),row]));
+      [...ledwalls,...extraLedProducts,...lcdProducts].forEach(model=>{
+        const row=byId.get(stockProductIdForItem(model));if(row)model.giacenzaAttuale=Math.max(0,Number(row.giacenza_attuale||0));
+      });
+      const seen=new Set();
+      const refresh=result=>{
+        if(!result||seen.has(result))return;seen.add(result);
+        const row=byId.get(stockProductIdForItem(result));if(row)result.giacenzaAttuale=Math.max(0,Number(row.giacenza_attuale||0));
+        applyP391StockPlan(result,false);
+      };
+      state.ledQuotes.forEach(q=>{(q.allLedResults||[]).forEach(refresh);(q.ledResults||[]).forEach(refresh);});
+      (state.allLedResults||[]).forEach(refresh);(state.ledResults||[]).forEach(refresh);
+      document.querySelectorAll('[data-stock-result-index]').forEach(node=>{
+        const result=state.ledResults[Number(node.dataset.stockResultIndex)];if(result)node.innerHTML=stockWarningHtml(result);
+      });
+      document.querySelectorAll('[data-stock-count]').forEach(node=>{
+        const result=state.ledResults[Number(node.dataset.stockCount)];if(result)node.textContent=Number(result.totalCab||0).toLocaleString('it-IT');
+      });
+      document.querySelectorAll('[data-stock-layout]').forEach(node=>{
+        const result=state.ledResults[Number(node.dataset.stockLayout)];if(result)node.innerHTML=layoutHtml(result);
+      });
+      document.querySelectorAll('[data-stock-mix]').forEach(node=>{
+        const result=state.ledResults[Number(node.dataset.stockMix)];if(result)node.innerHTML=`Cabinet 0.50x1.00: <strong>${result.rectCab}</strong> · Cabinet 0.50x0.50: <strong>${result.sqCab}</strong>`;
+      });
+    }
+
+
     function stockLinesForItem(item){
+      if(item && item.stockPlan) return [{product_id:'p391-50100',quantita:item.stockPlan.rect,descrizione:'P3.91 0.50x1.00'},{product_id:'p391-5050',quantita:item.stockPlan.square,descrizione:'P3.91 0.50x0.50'}].filter(line=>line.quantita>0);
       if(item && item.unified){
         return [
           {product_id:'p391-50100', quantita:archiveNumber(item.rectCab || 0), descrizione:'P3.91 0.50x1.00'},
@@ -2458,7 +2513,7 @@
 
     function stockAvailabilityForResult(item){
       if(!item) return [];
-      if(item.unified){
+      if(item.unified || item.stockPlan){
         return [
           {label:'P3.91 0.50x1.00', richiesti:Number(item.rectCab || 0), disponibili:Number(item.rectStock || 0)},
           {label:'P3.91 0.50x0.50', richiesti:Number(item.sqCab || 0), disponibili:Number(item.sqStock || 0)}
@@ -2504,7 +2559,7 @@
           misura_display: item.displayWidth && item.displayHeight ? archiveNumber(item.displayWidth / 100) + 'x' + archiveNumber(item.displayHeight / 100) : '',
           bifacciale: item.bifacciale ? 'SI' : 'NO',
           cabinet: archiveNumber(item.totalCab),
-          cabinet_layout: item.unified ? ('Rettangolari ' + archiveNumber(item.rectCab || 0) + ' + quadrati ' + archiveNumber(item.sqCab || 0)) : (item.tipoCalcolo === 'UNITA' ? archiveNumber(item.totalCab) + ' pezzi' : (archiveNumber(item.colsNeeded) + 'x' + archiveNumber(item.rowsNeeded))),
+          cabinet_layout: (item.unified || item.stockPlan) ? ('Rettangolari ' + archiveNumber(item.rectCab || 0) + ' + quadrati ' + archiveNumber(item.sqCab || 0)) : (item.tipoCalcolo === 'UNITA' ? archiveNumber(item.totalCab) + ' pezzi' : (archiveNumber(item.colsNeeded) + 'x' + archiveNumber(item.rowsNeeded))),
           quantita_unita: item.tipoCalcolo === 'UNITA' ? archiveNumber(item.totalCab || 0) : '',
           pixel: item.pixelBase && item.pixelHeight ? archiveNumber(item.pixelBase) + 'x' + archiveNumber(item.pixelHeight) : '',
           prezzo_unitario_agente: archiveNumber(item.prezzoAgenteUnitEff || item.prezzoAgente || ''),
@@ -2518,7 +2573,7 @@
           cabinet_rettangolari: archiveNumber(item.rectCab || 0),
           cabinet_quadrati: archiveNumber(item.sqCab || 0),
           stock_lines: stockLinesForItem(item),
-          cabinet_da_sottrarre: item.unified ? ('P3.91 0.50x1.00: ' + archiveNumber(item.rectCab || 0) + ' | P3.91 0.50x0.50: ' + archiveNumber(item.sqCab || 0)) : archiveNumber(item.totalCab || 0),
+          cabinet_da_sottrarre: (item.unified || item.stockPlan) ? ('P3.91 0.50x1.00: ' + archiveNumber(item.rectCab || 0) + ' | P3.91 0.50x0.50: ' + archiveNumber(item.sqCab || 0)) : archiveNumber(item.totalCab || 0),
           costo_cina: archiveNumber(item.costoCinaBase || 0),
           provvigione: archiveNumber(item.provvigione || 0),
           installazione: archiveNumber(item.margineInstallazione || 0),
@@ -2746,13 +2801,28 @@
     async function saveQuotationWithConfirmation(fields, id, expectedToken, agentMode){
       const nativeApi = nativeQuotationApi();
       if(nativeApi && typeof nativeApi.saveQuotation === 'function'){
-        const response = await nativeApi.saveQuotation(fields);
-        if(!response || response.ok === false){
-          const error = new Error((response && response.error) || 'Salvataggio preventivo non confermato.');
-          error.payload = response || null;
-          throw error;
+        for(let attempt=0;attempt<3;attempt++){
+          try{
+            const response = await nativeApi.saveQuotation(fields);
+            if(!response || response.ok === false){
+              const error = new Error((response && response.error) || 'Salvataggio preventivo non confermato.');
+              error.payload = response || null;throw error;
+            }
+            return response;
+          }catch(error){
+            const conflict=error && error.payload;
+            if(!agentMode || attempt===2 || !conflict || conflict.error_code!=='QUOTE_NUMBER_CHANGED' || fields.overwrite_existing==='SI' || (admin && state.quoteNumberManual))throw error;
+            const oldId=String(fields.id_preventivo),nextId=String(conflict.next_id||''),nextNumber=String(conflict.next_num||'');
+            if(!nextId || !nextNumber)throw error;
+            const snapshot=JSON.parse(fields.payload_json_completo||'null');
+            if(!snapshot || !snapshot.data || !snapshot.data.anagrafica)throw error;
+            snapshot.data.anagrafica.quoteNumber=nextNumber;snapshot.onlineId=nextId;
+            const encrypted=await encryptArchivePayload(JSON.stringify(snapshot),agentSession.key);
+            Object.assign(fields,encrypted,{id_preventivo:nextId,id_preventivo_visibile:nextId,numero_preventivo:nextId,payload_json_completo:JSON.stringify(snapshot)});
+            if(archiveDefaultId()===oldId && $('quoteNumber'))$('quoteNumber').value=nextNumber;
+            showDraftToast('Numero assegnato automaticamente: ' + nextId + '.');
+          }
         }
-        return response;
       }
       await postDatabaseForm('savequote', fields, 1500);
       return agentMode
@@ -2825,6 +2895,7 @@
     async function saveQuoteOnline(){
       const valid = validateArchiveFields(true);
       if(!valid) return;
+      const previewId = archiveDefaultId();
       let progressId = '';
       let progressRecord = {id_preventivo:valid.id, cliente:archiveClientLabel()};
       showPersistentCalcLoading('Comando ricevuto', 'Preparazione del salvataggio nel DATABASE SEEMAX...');
@@ -2833,6 +2904,10 @@
         setCalcLoadingText('Verifica numero preventivo', 'Controllo della sequenza prima della registrazione...');
         const fresh = await ensureFreshQuoteNumberBeforeSave();
         if(!fresh){ hideCalcLoading(); return; }
+        if(valid.id === previewId){
+          valid.id = archiveDefaultId();
+          if($('onlineArchiveId')) $('onlineArchiveId').value = valid.id;
+        }
         setCalcLoadingText('Protezione preventivo', 'Preparazione e crittografia dei dati...');
         if(printFinanceProvider() === 'grenke') ensureGrenkeCommercialCompliance();
         const payload = collectDraftPayload(defaultDraftName(), null);
@@ -2917,6 +2992,8 @@
 
     function loadAgentSession(){
       try{
+        const nativeSession = window.SEEMAX_NATIVE_CONTEXT && window.SEEMAX_NATIVE_CONTEXT.session;
+        if(nativeSession && nativeSession.username && nativeSession.key) return {...nativeSession};
         const managementRaw = localStorage.getItem('SEEMAX_MANAGEMENT_SESSION_V1');
         if(managementRaw){
           const managementSession = JSON.parse(managementRaw);
@@ -3026,7 +3103,7 @@
         if(res && res.ok && res.next_num){
           const current = input ? String(input.value || '').trim() : '';
           const nextNum = String(res.next_num || '').trim();
-          if(input && (!current || opts.force || opts.updateIfDifferent)) input.value = nextNum;
+          if(input && !state.currentOnlineQuoteId && !state.quoteNumberManual && (!current || opts.force || opts.updateIfDifferent)) input.value = nextNum;
           updateSideStatus();
           if(state.view === 'summary') updateSummary();
           return res;
@@ -3043,16 +3120,16 @@
       const currentId = archiveDefaultId();
       if(state.currentOnlineQuoteId && String(state.currentOnlineQuoteId) === String(currentId)) return true;
       if(admin && state.quoteNumberManual) return true;
-      const res = await loadNextQuoteNumber({silent:true, updateIfDifferent:false});
+      const res = await loadNextQuoteNumber({silent:true, updateIfDifferent:true});
+      if(!res || !res.next_num) throw new Error('Numerazione non disponibile: attendi la riconnessione prima di salvare online.');
       if(res && res.next_num){
         const nextNum = String(res.next_num || '').trim();
         if(before && nextNum && before !== nextNum){
           if(input) input.value = nextNum;
-          hideCalcLoading();
-          await sqpAlert('Sembra che il numero del preventivo sia variato. Il campo verrà aggiornato automaticamente.', {title:'Numero preventivo aggiornato'});
+          showDraftToast('Numero preventivo aggiornato automaticamente a ' + nextNum + '.');
           updateSideStatus();
           if(state.view === 'summary') updateSummary();
-          return false;
+          return true;
         }
       }
       return true;
@@ -3160,7 +3237,7 @@
     async function saveQuoteOnlineAgent(){
       if(!agentLoggedIn()){ openAgentLoginModal(); return; }
       if(!onlineArchiveAvailable()){ await sqpAlert('Questo browser non supporta la crittografia necessaria per l archivio online.', {title:'Browser non compatibile'}); return; }
-      const id = archiveDefaultId();
+      let id = archiveDefaultId();
       const roleLabel = admin ? 'ADMIN' : 'AGENTE';
       const overwriting = !!(state.currentOnlineQuoteId && String(state.currentOnlineQuoteId) === String(id) && state.currentOnlineQuoteToken);
       const ok = await sqpConfirm((overwriting ? 'Sovrascrivere il preventivo caricato' : 'Salvare questo preventivo nell’archivio online') + '? Codice preventivo: ' + id, {
@@ -3177,6 +3254,7 @@
         setCalcLoadingText('Verifica numero preventivo', 'Controllo della sequenza ' + roleLabel + '...');
         const fresh = await ensureFreshQuoteNumberBeforeSave();
         if(!fresh){ hideCalcLoading(); return; }
+        id = archiveDefaultId();
         setCalcLoadingText('Protezione preventivo', 'Preparazione e crittografia dei dati...');
         if(printFinanceProvider() === 'grenke') ensureGrenkeCommercialCompliance();
         const payload = collectDraftPayload(defaultDraftName(), null);
@@ -3211,6 +3289,7 @@
           quote_scope:currentQuoteScope(),
           ...buildArchiveDatabaseFields(payload, 'ACCESSO_' + roleLabel, id)
         };
+        const savingEpoch = state.onlineQuoteEpoch;
         progressRecord = {id_preventivo:id, cliente:fields.cliente_visibile};
         progressId = startQuotationBackgroundProgress(progressRecord);
         if(progressId){
@@ -3218,10 +3297,14 @@
           hideCalcLoading();
         }else setCalcLoadingText('Registrazione preventivo', 'Invio dei dati al DATABASE SEEMAX...');
         const saveResponse = await saveQuotationWithConfirmation(fields, id, saveRequestToken, true);
-        state.currentOnlineQuoteId = id;
-        state.currentOnlineQuoteToken = String((saveResponse && saveResponse.save_request_token) || saveRequestToken);
-        state.quoteNumberManual = false;
-        scheduleActivePlannerSessionSave(0);
+        id = String((saveResponse && saveResponse.id_preventivo) || id);
+        progressRecord = {...progressRecord,id_preventivo:id};
+        if(state.onlineQuoteEpoch === savingEpoch && archiveDefaultId() === String(fields.id_preventivo)){
+          state.currentOnlineQuoteId = id;
+          state.currentOnlineQuoteToken = String((saveResponse && saveResponse.save_request_token) || saveRequestToken);
+          state.quoteNumberManual = false;
+          scheduleActivePlannerSessionSave(0);
+        }
         completeQuotationBackgroundProgress(progressId, progressRecord);
         hideCalcLoading();
         if(!overwriting) loadNextQuoteNumber({silent:true, force:false}).catch(() => {});
@@ -4755,7 +4838,7 @@
       const pixelBase = cols * pxBaseCab;
       const pixelHeight = rows * pxHeightCab;
       const diff = chosen.diff;
-      return {
+      return applyP391StockPlan({
         ...model, colsNeeded:cols, rowsNeeded:rows, totalCab, displayWidth, displayHeight, areaMq,
         prezzoClienteTotale:prezzoClienteBase + extraInstall + extraKm + provvigione,
         prezzoAgenteTotale:prezzoAgenteBase + extraInstall + extraKm + provvigione,
@@ -4770,7 +4853,7 @@
         margineKm:extraKm, provvigione, costoCinaBase,
         perfectMatch:perfect, rotatedMatch:exactRotated, diff, bifacciale:bif, pixelBase, pixelHeight,
         layout:{type:'standard', cols, rows, cabX:model.cabX, cabY:model.cabY, rotated, bif}
-      };
+      }, true);
     }
 
     function buildUnifiedPlan(results, base, altezza, bif, tipoInst, extraKm, perfectMatches, provvigione, installMultiplier, manualInstall){
@@ -4797,7 +4880,7 @@
       const areaMq = (base/100) * (altezza/100);
       const baseInstall = installationBaseCost(areaMq, tipoInst, manualInstall);
       const extraInstall = Math.round(baseInstall * installMultiplier);
-      return {
+      return applyP391StockPlan({
         nome:'P3.91 Unificato', productId:'P391_UNIFIED', productFamily:'LEDWALL', tipoCalcolo:'UNIFICATO', unitaMagazzino:'CABINET', formatoLabel:'Composizione 50×100 + 50×50 cm', icon:'🧩', cabX:50, cabY:100, info:PRODUCT_DESCRIPTIONS['P3.91 Unificato'], unified:true,
         rectStock:Number(rectModel.giacenzaAttuale || 0), sqStock:Number(sqModel.giacenzaAttuale || 0),
         colsNeeded:colsU, rowsNeeded:rectRowsU + sqRowsU, totalCab:rectCab + sqCab,
@@ -4817,7 +4900,7 @@
         pixelBase:colsU * 128,
         pixelHeight:(rectRowsU * 256) + 128,
         layout:{type:'unified', cols:colsU, rectRows:rectRowsU, squareRows:sqRowsU, bif}
-      };
+      }, true);
     }
 
     function updateAdminClientPrice(index, rawValue, rerender){
@@ -4923,8 +5006,8 @@
         <div class="pm"><span>Margine agente</span><strong>${fmtEuro0(r.margineAgente)}</strong></div>
         <div class="pm"><span>Margine cliente</span><strong>${fmtEuro0(r.margineCliente)}</strong></div>
         <div class="pm"><span>Costo Cina</span><strong>${fmtEuro0(r.costoCinaBase)}</strong></div>` : '';
-      const unifiedText = r.unified ? `<div class="notice success" style="margin:8px 0 11px">Cabinet 0.50x1.00: <strong>${r.rectCab}</strong> · Cabinet 0.50x0.50: <strong>${r.sqCab}</strong></div>` : '';
-      const stockText = stockWarningHtml(r);
+      const unifiedText = (r.unified || r.stockPlan) ? `<div class="notice success" data-stock-mix="${i}" style="margin:8px 0 11px">Cabinet 0.50x1.00: <strong>${r.rectCab}</strong> · Cabinet 0.50x0.50: <strong>${r.sqCab}</strong></div>` : '';
+      const stockText = `<div data-stock-result-index="${i}">${stockWarningHtml(r)}</div>`;
       const autonomaText = r.installAutonoma ? `<div class="autonoma-warning"><strong>Installazione autonoma:</strong> valore inserito manualmente. Base manuale ${fmtEuro0(r.installManualValue)} · valore applicato ${fmtEuro0(r.margineInstallazione)}.</div>` : '';
       const specText = r.unified ? 'Cabinet misti P3.91' : isUnit ? `Formato ${r.formatoLabel || 'predefinito'}` : `Cabinet ${r.cabX} × ${r.cabY} cm`;
       const quantityLabel = isUnit ? 'Numero pezzi' : 'Numero cabinet';
@@ -4933,7 +5016,7 @@
         : `<div class="pm"><span>Formato</span><strong>${safe(r.formatoLabel || 'Predefinito')}</strong></div>`;
       const pixelMetric = r.pixelBase && r.pixelHeight ? `<div class="pm"><span>Resa in pixel</span><strong>${r.pixelBase.toLocaleString('it-IT')} × ${r.pixelHeight.toLocaleString('it-IT')}</strong></div>` : '';
       const installationMetric = `<div class="pm"><span>Installazione</span><strong>${fmtEuro0(r.margineInstallazione)}</strong><small>${r.installationFixed ? safe(r.installLabel) + ' · costo fisso' : (r.installAutonoma ? 'Valore autonomo inserito manualmente · nessun impatto applicato' : `Base ${fmtEuro0(r.installazioneBase)} · impatto ${r.installImpactLabel}`)}</small></div>`;
-      const layoutDetails = r.layout ? `<details class="schema"><summary>Visualizza schema moduli</summary><div class="layout-box">${layoutHtml(r)}</div></details>` : '';
+      const layoutDetails = r.layout ? `<details class="schema"><summary>Visualizza schema moduli</summary><div class="layout-box" data-stock-layout="${i}">${layoutHtml(r)}</div></details>` : '';
       return `
         <article class="product-card ${selected ? 'selected' : ''} ${r.unified ? 'unified' : ''} ${promoVisible ? 'has-promo' : ''}">
           <img class="product-thumb" src="${productImageFor(r.nome)}" alt="${safe(r.nome)}" />
@@ -4947,7 +5030,7 @@
           ${stockText}
           ${autonomaText}
           <div class="product-metrics">
-            <div class="pm"><span>${quantityLabel}</span><strong>${r.totalCab.toLocaleString('it-IT')}</strong></div>
+            <div class="pm"><span>${quantityLabel}</span><strong data-stock-count="${i}">${r.totalCab.toLocaleString('it-IT')}</strong></div>
             ${adminPriceMetrics}
             ${measureMetric}
             ${pixelMetric}
@@ -4966,6 +5049,12 @@
 
     function layoutHtml(r){
       if(!r.layout) return '';
+      if(r.layout.type==='p391-stock' && window.SeemaxP391){
+        const tiles=window.SeemaxP391.tiles(r.layout.cols,r.layout.rows,r.layout.rectPerFace);
+        if(!tiles)return `<div class="notice">Schema esteso: ${r.rectCab} cabinet 50×100 e ${r.sqCab} cabinet 50×50.</div>`;
+        const size=Math.max(5,Math.min(22,480/r.layout.cols,300/r.layout.rows));
+        return `<div class="module-grid" style="position:relative;width:${r.layout.cols*size}px;height:${r.layout.rows*size}px;display:block" aria-label="Composizione P3.91 di una faccia">${tiles.map(tile=>`<span class="mod ${tile.w*tile.h===2?'rect':'square'}" style="position:absolute;left:${tile.x*size}px;top:${tile.y*size}px;width:${tile.w*size-1}px;height:${tile.h*size-1}px"></span>`).join('')}</div>`;
+      }
       const bifClass = r.bifacciale ? ' bif' : '';
       const cellSize = (r.colsNeeded > 12 || r.rowsNeeded > 8) ? 16 : 22;
       const rectW = r.layout.rotated ? Math.round(cellSize * 1.55) : cellSize;
@@ -6357,7 +6446,7 @@
     // =============================
     const DRAFT_STORAGE_KEY = 'seemax_quotation_planner_drafts_v1';
     const ACTIVE_SESSION_STORAGE_PREFIX = 'seemax_quotation_planner_active_v2_';
-    const ACTIVE_SESSION_VERSION = '2.22.3';
+    const ACTIVE_SESSION_VERSION = '2.24.0';
     const DRAFT_LIMIT = 3;
     let activeSessionSaveTimer = 0;
     let activeSessionRestoring = false;
@@ -6450,6 +6539,7 @@
 
     function applyDraftPayload(draft, options={}){
       if(!draft || !draft.data) return;
+      state.onlineQuoteEpoch++;
       const data = draft.data;
       const a = data.anagrafica || {};
       Object.keys(a).forEach(id => { if($(id)) $(id).value = a[id] || ''; });
@@ -6610,26 +6700,23 @@
       return ACTIVE_SESSION_STORAGE_PREFIX + activeSessionOwnerKey();
     }
 
+    let pagePlannerDraft = null;
     function readActivePlannerSession(){
-      if(!canUseLocalStorage()) return null;
-      try{
-        const raw = localStorage.getItem(activeSessionStorageKey());
-        const parsed = raw ? JSON.parse(raw) : null;
-        return parsed && parsed.data ? parsed : null;
-      }catch(error){ return null; }
+      return (window.SEEMAX_NATIVE_CONTEXT && window.SEEMAX_NATIVE_CONTEXT.sessionDraft) || pagePlannerDraft;
     }
 
     function persistActivePlannerSession(){
       clearTimeout(activeSessionSaveTimer);
       activeSessionSaveTimer = 0;
-      if(activeSessionRestoring || !canUseLocalStorage()) return false;
+      if(activeSessionRestoring) return false;
       try{
         const payload = collectDraftPayload('Sessione di lavoro automatica', null);
         payload.id = null;
         payload.autoSession = true;
         payload.autoSessionVersion = ACTIVE_SESSION_VERSION;
         payload.savedAt = new Date().toISOString();
-        localStorage.setItem(activeSessionStorageKey(), JSON.stringify(payload));
+        pagePlannerDraft = payload;
+        if(window.SEEMAX_NATIVE_CONTEXT && typeof window.SEEMAX_NATIVE_CONTEXT.savePageDraft === 'function') window.SEEMAX_NATIVE_CONTEXT.savePageDraft(payload);
         return true;
       }catch(error){ return false; }
     }
@@ -6659,6 +6746,9 @@
     }
 
     function setupActivePlannerSession(){
+      /* Le vecchie sessioni automatiche non devono riapparire dopo una nuova
+         apertura. Le bozze salvate esplicitamente mantengono la propria chiave. */
+      try { localStorage.removeItem(activeSessionStorageKey()); } catch(error) {}
       const schedule = () => scheduleActivePlannerSessionSave();
       document.addEventListener('input', schedule);
       document.addEventListener('change', schedule);
@@ -6670,6 +6760,7 @@
     }
 
     window.SEEMAX_PLANNER_RUNTIME = {
+      updateInventory:updatePlannerInventory,
       persistActiveSession:persistActivePlannerSession,
       scheduleActiveSessionSave:scheduleActivePlannerSessionSave
     };
@@ -7085,7 +7176,6 @@
       setupDatabaseTest();
       setupDataInputs();
       applyAgentProfileToData();
-      setTimeout(() => loadNextQuoteNumber({silent:true, force:!val('quoteNumber')}), 180);
       setupLedwall();
       setupProductModes();
       setupCommercialOperation();
@@ -7093,6 +7183,7 @@
       if(window.SEEMAX_IFIS && window.SEEMAX_IFIS.setup) window.SEEMAX_IFIS.setup();
       setupSummary();
       const restoredSession = restoreActivePlannerSession();
+      if(!restoredSession) setTimeout(() => loadNextQuoteNumber({silent:true, force:true}), 180);
       if(!restoredSession){
         const initialView = viewFromHash() || state.view;
         setView(initialView, {skipHash:true, noScroll:true, instant:true});
@@ -7100,7 +7191,7 @@
       setupActivePlannerSession();
       window.addEventListener('hashchange', () => { const hashed = viewFromHash(); if(hashed) setView(hashed, {skipHash:true}); });
       updateSideStatus();
-      if(restoredSession) setTimeout(() => showDraftToast('Sessione di lavoro ripristinata automaticamente.'), 180);
+      if(restoredSession) setTimeout(() => showDraftToast('Preventivo mantenuto nella sessione corrente.'), 180);
     }
 
     document.addEventListener('DOMContentLoaded', boot);

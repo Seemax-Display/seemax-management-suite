@@ -395,6 +395,9 @@
         return row;
       });
     });
+    if (session && !isAdmin()) ["practices", "documents"].forEach(entity => {
+      if (Array.isArray(copy[entity])) copy[entity] = copy[entity].filter(row => String(row.agent_username || "") === String(session.username || ""));
+    });
     return copy;
   }
   function newestCompatibleBootstrapCache() {
@@ -481,6 +484,63 @@
     return response;
   }
 
+  let inventoryRevision = -1, inventoryEpoch = 0, inventoryPromise = null;
+  const inventoryKnown = new Map();
+  function consumeInventory(response, source = "server") {
+    const update = response && response.inventory;
+    if (!update || !Array.isArray(update.products)) return response;
+    const revision = Number(update.revision || 0);
+    const changed = [];
+    update.products.forEach(row => {
+      if (!row || !row.id) return;
+      const current = inventoryKnown.get(String(row.id));
+      if (current && Number(row.record_version || 0) < Number(current.record_version || 0)) return;
+      const value = { id:row.id, giacenza_attuale:Number(row.giacenza_attuale || 0), stato_giacenza:row.stato_giacenza || "", record_version:Number(row.record_version || 0), aggiornatoIl:row.aggiornatoIl || "" };
+      if (current && Object.keys(value).every(key => current[key] === value[key])) return;
+      inventoryKnown.set(String(row.id), value);changed.push(value);
+    });
+    /* Una mutazione contiene solo i prodotti coinvolti. Solo uno snapshot
+       completo può avanzare il cursore di sincronizzazione: due risposte
+       su prodotti diversi possono arrivare in ordine inverso. */
+    if (update.complete === true) inventoryRevision = Math.max(inventoryRevision, revision);
+    if (changed.length) {
+      inventoryEpoch += 1;
+      window.dispatchEvent(new CustomEvent("seemax:inventory-updated", {detail:{products:changed,revision,complete:update.complete===true,source}}));
+    }
+    return response;
+  }
+  function reconcileInventory(data, epochAtStart) {
+    data.products = (data.products || []).map(row => {
+      const known = inventoryKnown.get(String(row.id));
+      const older = known && (Number(row.record_version || 0) < Number(known.record_version || 0) ||
+        (inventoryEpoch > epochAtStart && Number(row.record_version || 0) === Number(known.record_version || 0)));
+      return older ? { ...row, ...known } : row;
+    });
+    const meta = data.database_meta || {};
+    const revision = Number(meta.inventory_revision || 0);
+    consumeInventory({inventory:{revision,complete:!meta.inventory_pending,products:data.products}});
+    return data;
+  }
+  async function inventory(options = {}) {
+    if (config.demoMode) return consumeInventory({ok:true,inventory:{revision:Date.now(),complete:true,products:demo.list("products")}});
+    if (inventoryPromise) return inventoryPromise;
+    const request = (async () => {
+      const values={since_revision:String(inventoryRevision),force:options.force?"SI":"NO"};
+      let response;
+      try {
+        response=await callManagementBridge("management_inventory",values,uid("inventory"),12000);
+        delete response.__seemax_transport;
+      } catch(error) {
+        if(error && error.code==="BRIDGE_SERVER_ERROR")throw error;
+        response=await jsonp("management_inventory",{...authParams(),...values},14000);
+      }
+      return consumeInventory(response);
+    })();
+    inventoryPromise=request;
+    try{return await request;}finally{if(inventoryPromise===request)inventoryPromise=null;}
+  }
+
+
   async function bootstrap(options = {}) {
     if (typeof options.onProgress === "function") options.onProgress(10, "Preparazione della richiesta…");
     if (config.demoMode) {
@@ -499,6 +559,7 @@
        inutilmente Apps Script e possono completarsi in ordine inverso. */
     if (bootstrapPromise) return bootstrapPromise;
     const request = (async () => {
+      const inventoryEpochAtStart = inventoryEpoch;
       if (typeof options.onProgress === "function") options.onProgress(24, "Connessione a Google Apps Script…");
       /* Durante la ripresa mobile usiamo un tentativo breve. Se la radio di
          rete non è ancora pronta, l'interfaccia conserva la cache e programma
@@ -520,6 +581,7 @@
         demo.setSession(session);
       }
       data.database_meta = response.database_meta || {};
+      reconcileInventory(data, inventoryEpochAtStart);
       const local = localActivities();
       data.activities = local.length ? local : [];
       saveBootstrapCache(data);
@@ -549,18 +611,13 @@
     if (config.demoMode) return demo.upsert(entity, record);
     let value = { ...record };
     if (entity === "documents" && value.file_base64) {
-      if (typeof options.onProgress === "function") options.onProgress("Trasferimento del file a Google Drive…");
-      const upload = await postForm("management_upload_document", {
-        filename: value.file_name || value.nome || "documento",
-        mimeType: value.file_type || "application/octet-stream",
-        fileBase64: value.file_base64
-      });
-      if (typeof options.onProgress === "function") options.onProgress(upload.pending ? "Verifica del file su Google Drive…" : "File ricevuto da Google Drive…");
-      const confirmedUpload = upload.pending ? await waitForUpload(upload.requestId) : upload;
-      value.url = confirmedUpload.url;
-      value.file_id = confirmedUpload.file_id;
-      delete value.file_base64;
-      if (typeof options.onProgress === "function") options.onProgress("Registrazione del documento nel database…");
+      if (typeof options.onProgress === "function") options.onProgress("Trasferimento e registrazione del documento…");
+      const fileBase64=value.file_base64;delete value.file_base64;
+      const response=await postMutation("management_upload_and_save_document",{
+        payload:JSON.stringify(value),filename:value.file_name||value.nome||"documento",
+        mimeType:value.file_type||"application/octet-stream",fileBase64
+      },{entity:"documents",requestToken:value.request_token,maxWait:180000});
+      return response.row || {};
     }
     const response = await postMutation("management_upsert", { entity, payload: JSON.stringify(value) }, {
       entity,
@@ -1032,7 +1089,7 @@ async function getAdminContent() {
         delete bridgeResponse.__seemax_transport;
         markConnectionSuccess();
         captureMutationPerformance(action, bridgeResponse, clientStarted, null, transport);
-        return bridgeResponse;
+        return consumeInventory(bridgeResponse);
       } catch (bridgeError) {
         if (bridgeError && bridgeError.code === "BRIDGE_SERVER_ERROR") throw bridgeError;
         transport = {
@@ -1050,7 +1107,7 @@ async function getAdminContent() {
             transport = { ...transport, ...recovered.transport, mode: "native_bridge_status_recovery", bridge_fallback: true };
             markConnectionSuccess();
             captureMutationPerformance(action, recovered.result, clientStarted, null, transport);
-            return recovered.result;
+            return consumeInventory(recovered.result);
           } catch (recoveryError) {
             transport = { ...transport, ...((recoveryError && recoveryError.transport) || {}) };
           }
@@ -1065,7 +1122,7 @@ async function getAdminContent() {
       };
       markConnectionSuccess();
       captureMutationPerformance(action, legacy.result, clientStarted, null, transport);
-      return legacy.result;
+      return consumeInventory(legacy.result);
     } catch (error) {
       transport = { ...transport, ...((error && error.transport) || {}) };
       captureMutationPerformance(action, null, clientStarted, error, transport);
@@ -1316,5 +1373,5 @@ async function getAdminContent() {
     };
   }
 
-  window.SeemaxApi = { login, logout, ping, health, bootstrap, cachedBootstrap, bootstrapCacheInfo, saveBootstrapCache, resumeConnectivity, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, listQuotations, loadQuotation, deleteQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, localActivities };
+  window.SeemaxApi = { inventory, applyInventorySnapshot: (update) => consumeInventory({inventory:update}, "broadcast"), login, logout, ping, health, bootstrap, cachedBootstrap, bootstrapCacheInfo, saveBootstrapCache, resumeConnectivity, list, upsert, remove, getSettings, saveSettings, getAdminContent, saveAdminContent, markMessageSeen, saveProfile, verifyVat, updatePracticeDocuments, adjustInventory, nextQuoteNumber, saveQuotation, listQuotations, loadQuotation, deleteQuotation, setPracticeStockWarning, createPracticeFromQuote, markNotificationsRead, nextPracticeNumber, resetDemo, exportDemo, getSession, isFirstAccess, consumeFirstAccess, isAdmin, status, getLastPerformance, localActivities };
 })();

@@ -3,6 +3,8 @@
 
   const SOURCE = "quotation-planner/index.html";
   let sourcePromise = null;
+  let pageDraft = null;
+  let pageDraftOwner = "";
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
 
   async function cachedPlannerSource() {
@@ -119,6 +121,10 @@
 
   async function mount(container, context) {
     if (!container || container.dataset.plannerMounted === "1") return;
+    const owner = String((context.session || {}).username || "offline");
+    if (pageDraftOwner !== owner) { pageDraft = null; pageDraftOwner = owner; }
+    context.sessionDraft = pageDraft;
+    context.savePageDraft = (draft) => { pageDraft = draft; context.sessionDraft = draft; };
     container.dataset.plannerMounted = "1";
     container.innerHTML = `<div class="sqp-native-loading"><span></span><strong>Avvio Quotation Planner integrato…</strong><small>Caricamento del motore di calcolo Seemax</small></div>`;
     try {
@@ -227,5 +233,5 @@
     }
   }
 
-  window.SeemaxNativePlanner = { mount };
+  window.SeemaxNativePlanner = { mount, resetSession() { pageDraft = null; pageDraftOwner = ""; } };
 })();
