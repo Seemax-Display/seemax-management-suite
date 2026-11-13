@@ -1,6 +1,7 @@
 (function () {
  "use strict";
- let dialog=null,frame=null,ready=false,openedAt=0,context={},opener=null,owner="",revealTimer=0,timeoutTimer=0,oldOverflow="";
+ let dialog=null,frame=null,ready=false,openedAt=0,context={},opener=null,owner="",revealTimer=0,timeoutTimer=0,oldOverflow="",comparisonRevision=0;
+ const siteRoot=new URL("../../",document.currentScript.src);
  function snapshot(products) {
   return (Array.isArray(products)?products:[]).map(product=>{
    const result={id:String(product.id||""),nome:String(product.nome||"")};
@@ -10,7 +11,7 @@
  }
  function sendCatalog() {
   if(!frame||!ready)return;
-  frame.contentWindow.postMessage({type:"SEEMAX_PIXEL_LAB_CATALOG",products:snapshot(context.products),catalogLabel:context.offlineOnly?"Catalogo disponibile offline":"Catalogo già caricato nel gestionale"},window.location.origin);
+  frame.contentWindow.postMessage({type:"SEEMAX_PIXEL_LAB_CATALOG",products:snapshot(context.products),catalogLabel:context.offlineOnly?"Catalogo disponibile offline":"Catalogo già caricato nel gestionale",comparison:Array.isArray(context.comparison)?context.comparison:null,comparisonRevision},window.location.origin);
  }
  function finishOpen() {
   if(!dialog||!dialog.open||!ready)return;
@@ -42,7 +43,7 @@
   panel.querySelector("p").textContent="I tuoi Ledwall, pronti per il confronto.";
   panel.querySelector("[data-lab-retry]").hidden=true;
   frame.setAttribute("aria-hidden","true");frame.tabIndex=-1;
-  frame.src=new URL("pixel-lab/index.html",window.location.href).href;
+  frame.src=new URL("pixel-lab/index.html",siteRoot).href;
   timeoutTimer=setTimeout(showError,15000);
  }
  function ensureDialog() {
@@ -59,7 +60,7 @@
  function open(options={}) {
   const user=String(options.username||"offline");
   if(owner&&owner!==user)reset();
-  owner=user;context=options;
+  owner=user;context=options;comparisonRevision++;
   ensureDialog();
   if(dialog.open)return;
   opener=document.activeElement;openedAt=performance.now();oldOverflow=document.body.style.overflow;
