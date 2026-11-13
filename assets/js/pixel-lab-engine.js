@@ -45,16 +45,8 @@ function hydrateCatalog(products=[]) {
  }
 }
 const clampInt=(v,min,max,fallback=1)=>{const n=Number(v);return Number.isFinite(n)?Math.min(max,Math.max(min,Math.round(n))):fallback;};
-function metrics(id,cols,rows,configuration) {
- let p=MODELS[id];if(!p)throw new Error("Modello non disponibile");
- if(configuration){
-  const c=configuration,w=Number(c.width),h=Number(c.height),rx=Number(c.pixelWidth),ry=Number(c.pixelHeight),count=Number(c.cabinets);
-  if(![w,h,rx,ry,count].every(n=>Number.isFinite(n)&&n>0)||rx>16384||ry>16384||rx*ry>32000000)throw new Error("Configurazione Planner troppo grande per il laboratorio");
-  cols=clampInt(cols,1,1000);rows=clampInt(rows,1,1000);
-  p={...p,name:String(c.name||p.name).slice(0,120)};
-  const area=w*h/10000,mix=Number.isFinite(c.rect)&&Number.isFinite(c.square)?{rect:c.rect,square:c.square}:null;
-  return {p,cols,rows,count,cells:cols*rows,mix,w,h,area,rx,ry,pixels:rx*ry,density:rx*ry/area,pitchExact:w*10/rx,pitchY:h*10/ry,avgW:p.avg===null?null:area*p.avg,maxW:p.max===null?null:area*p.max,fromPlanner:true,faces:c.faces===2?2:1};
- }
+function metrics(id,cols,rows) {
+ const p=MODELS[id];if(!p)throw new Error("Modello non disponibile");
  cols=clampInt(cols,1,8);rows=clampInt(rows,1,8);
  const w=p.cabW*cols,h=p.cabH*rows,area=w*h/10000,rx=p.pxW*cols,ry=p.pxH*rows;
  const mix=p.unified?{rect:cols*Math.floor(rows/2),square:cols*(rows%2)}:null;

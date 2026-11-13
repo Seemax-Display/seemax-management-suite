@@ -92,23 +92,13 @@
   function installClientImporter(shadow, clients) {
     const company = shadow.getElementById("clientCompany");
     const grid = company && company.closest(".form-grid");
-    if (!grid) return;
-    const options = `<option value="">Inserimento manuale</option>${clients.map((client) => `<option value="${escapeHtml(client.id)}">${escapeHtml(client.ragioneSociale || client.nome || "Cliente senza nome")}</option>`).join("")}`;
-    const existing = shadow.getElementById("suiteClientSource");
-    if (existing) {
-      const selected = existing.value;
-      existing.innerHTML = options;
-      existing.__seemaxClients = clients;
-      existing.value = selected;
-      return;
-    }
+    if (!grid || shadow.getElementById("suiteClientSource")) return;
     const field = document.createElement("div");
     field.className = "field full suite-client-import";
-    field.innerHTML = `<label class="label" for="suiteClientSource">Origine dati cliente</label><div class="suite-client-choice"><select id="suiteClientSource">${options}</select><span>Seleziona un cliente del Management Suite oppure compila liberamente i campi sottostanti.</span></div>`;
+    field.innerHTML = `<label class="label" for="suiteClientSource">Origine dati cliente</label><div class="suite-client-choice"><select id="suiteClientSource"><option value="">Inserimento manuale</option>${clients.map((client) => `<option value="${escapeHtml(client.id)}">${escapeHtml(client.ragioneSociale || client.nome || "Cliente senza nome")}</option>`).join("")}</select><span>Seleziona un cliente del Management Suite oppure compila liberamente i campi sottostanti.</span></div>`;
     grid.insertBefore(field, company.closest(".field"));
-    field.querySelector("select").__seemaxClients = clients;
     field.querySelector("select").addEventListener("change", (event) => {
-      const client = (event.target.__seemaxClients || []).find((item) => String(item.id) === event.target.value);
+      const client = clients.find((item) => String(item.id) === event.target.value);
       if (!client) return;
       const values = {
         clientCompany: first(client, "ragioneSociale", "nome"),
@@ -138,7 +128,7 @@
     container.dataset.plannerMounted = "1";
     container.innerHTML = `<div class="sqp-native-loading"><span></span><strong>Avvio Quotation Planner integrato…</strong><small>Caricamento del motore di calcolo Seemax</small></div>`;
     try {
-      sourcePromise = sourcePromise || loadPlannerSource((window.SEEMAX_APP_CONFIG || {}).uiVersion || context.version);
+      sourcePromise = sourcePromise || loadPlannerSource(context.version);
       let source = "";
       try { source = await sourcePromise; }
       catch (error) {
@@ -184,20 +174,6 @@
          per pratiche e preventivi: niente payload estesi in una URL JSONP e
          nessun ciclo di rilettura dopo il salvataggio. */
       window.SEEMAX_NATIVE_API = {
-        isActive: () => container.isConnected,
-        refreshPlannerData: async () => {
-          if (context.offlineOnly) throw new Error("Aggiornamento database non disponibile offline.");
-          const snapshot = await window.SeemaxApi.bootstrap({force:true,recovery:true});
-          return {ok:true,prodotti:snapshot.products || [],impostazioni:snapshot.settings || {},patchNotes:snapshot.patchNotes || {},version:context.version,suiteClients:snapshot.clients || []};
-        },
-        applyPlannerData: (data) => {
-          if (!container.isConnected) return;
-          context.products = data.prodotti;
-          context.settings = data.impostazioni;
-          context.patchNotes = data.patchNotes;
-          context.clients = data.suiteClients || context.clients || [];
-          installClientImporter(shadow, context.clients);
-        },
         createPracticeFromQuote: (payload) => window.SeemaxSuite && window.SeemaxSuite.requestPracticeImport ? window.SeemaxSuite.requestPracticeImport(payload) : window.SeemaxApi.createPracticeFromQuote(payload),
         nextQuoteNumber: (scope) => context.offlineOnly ? Promise.resolve({ ok: true, next_num: "OFFLINE", next_id: `OFFLINE-${new Date().toISOString().slice(0, 10)}` }) : window.SeemaxApi.nextQuoteNumber(scope),
         saveQuotation: (fields) => context.offlineOnly ? Promise.reject(new Error("Archivio online non disponibile senza connessione.")) : window.SeemaxApi.saveQuotation(fields),
